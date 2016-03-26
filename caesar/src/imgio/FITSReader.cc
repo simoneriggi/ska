@@ -1,0 +1,362 @@
+// ***********************************************************************
+// * License and Disclaimer                                              *
+// *                                                                     *
+// * Copyright 2016 Simone Riggi																			   *
+// *																																	   *
+// * This file is part of Caesar. 																		   *
+// * Caesar is free software: you can redistribute it and/or modify it   *
+// * under the terms of the GNU General Public License as published by   *
+// * the Free Software Foundation, either * version 3 of the License,    *
+// * or (at your option) any later version.                              *
+// * Caesar is distributed in the hope that it will be useful, but 			 *
+// * WITHOUT ANY WARRANTY; without even the implied warranty of          * 
+// * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                *
+// * See the GNU General Public License for more details. You should     * 
+// * have received a copy of the GNU General Public License along with   * 
+// * Caesar. If not, see http://www.gnu.org/licenses/.                   *
+// ***********************************************************************
+/**
+* @file FITSReader.cc
+* @class FITSReader
+* @brief FITSReader
+*
+* FITS Image Reader class
+* @author S. Riggi
+* @date 20/01/2015
+*/
+
+#include <FITSReader.h>
+#include <SysUtils.h>
+#include <Img.h>
+
+#include <TObject.h>
+#include <TFITS.h>
+#include <TMath.h>
+#include <TVectorD.h>
+
+
+#include <iomanip>
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+#include <string>
+#include <stdexcept>
+#include <algorithm>
+#include <math.h>
+using namespace std;
+
+ClassImp(Caesar::FITSHeader)
+ClassImp(Caesar::FITSFileInfo)
+ClassImp(Caesar::FITSReader)
+
+namespace Caesar {
+
+
+FITSReader::FITSReader() {
+
+}//close costructor
+
+
+FITSReader::~FITSReader() {
+
+}//close destructor
+
+
+bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
+
+	if(!hdu) return false;
+
+	//##### GET STANDARD & MANDATORY KEYWORDS (if not existing set an invalid header...)
+	// Get image size field
+	int Nchannels= 0;
+	if(hdu->GetKeywordValue("NAXIS")=="") {
+		cerr<<"FITSReader::ReadHeader(): ERROR: Invalid header detected (no NAXIS keyword)!"<<endl;
+		return false;
+	}			
+
+	Nchannels= hdu->GetKeywordValue("NAXIS").Atoi();//nchannels
+	if(Nchannels!=2){
+		cerr<<"FITSReader::ReadHeader(): ERROR: Not supported number of channels ("<<Nchannels<<"), only 2 channel images are supported!"<<endl;
+		return false;	
+	}	
+
+	int Nx= 0;
+	int Ny= 0;
+	if(hdu->GetKeywordValue("NAXIS1")=="" || hdu->GetKeywordValue("NAXIS2")=="") {
+		cerr<<"FITSReader::ReadHeader(): ERROR: Invalid header detected (no NAXIS keywords found!"<<endl;
+		return false;
+	}
+	Nx= hdu->GetKeywordValue("NAXIS1").Atoi();//image size X
+	Ny= hdu->GetKeywordValue("NAXIS2").Atoi();//image size Y
+
+	// Get pixel content unit
+	std::string BUnit= "";
+	if(hdu->GetKeywordValue("BUNIT")=="") {
+		cerr<<"FITSReader::ReadHeader(): WARNING: BUNIT keyword not found in header!"<<endl;
+	}
+	else{
+		BUnit= std::string(hdu->GetKeywordValue("BUNIT").Data());	
+		if(BUnit[0]=='\'') BUnit.erase(0,1);
+		if(BUnit[BUnit.length()-1]=='\'') BUnit.erase(BUnit.length()-1,1);		
+	}
+
+	//Get Coordinate type and projection
+	std::string CoordTypeX= "";
+	std::string CoordTypeY= "";
+	if(hdu->GetKeywordValue("CTYPE1")=="" || hdu->GetKeywordValue("CTYPE2")=="") {
+		cerr<<"FITSReader::ReadHeader(): WARNING: CTYPE keyword not found in header!"<<endl;
+	}
+	else{
+		CoordTypeX= std::string(hdu->GetKeywordValue("CTYPE1").Data());
+		CoordTypeY= std::string(hdu->GetKeywordValue("CTYPE2").Data());
+
+		if(CoordTypeX[0]=='\'') CoordTypeX.erase(0,1);
+		if(CoordTypeX[CoordTypeX.length()-1]=='\'') CoordTypeX.erase(CoordTypeX.length()-1,1);
+		if(CoordTypeY[0]=='\'') CoordTypeY.erase(0,1);
+		if(CoordTypeY[CoordTypeY.length()-1]=='\'') CoordTypeY.erase(CoordTypeY.length()-1,1);
+	}
+
+	//Get reference pixel id
+	double CenterPixIdX= 0;
+	double CenterPixIdY= 0;
+	if(hdu->GetKeywordValue("CRPIX1")=="" || hdu->GetKeywordValue("CRPIX2")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: CRPIX keyword not found in header!"<<endl;
+	}
+	else{
+		CenterPixIdX= hdu->GetKeywordValue("CRPIX1").Atof();
+		CenterPixIdY= hdu->GetKeywordValue("CRPIX2").Atof();
+	}
+	
+	//Get reference pixel coordinates (RA/DEC)
+	double CenterPixX= 0;
+	double CenterPixY= 0;
+	if(hdu->GetKeywordValue("CRVAL1")=="" || hdu->GetKeywordValue("CRVAL2")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: CRVAL keyword not found in header!"<<endl;
+	}
+	else{
+		CenterPixX= hdu->GetKeywordValue("CRVAL1").Atof();
+		CenterPixY= hdu->GetKeywordValue("CRVAL2").Atof();
+	}
+	
+	double PixStepX= 0;
+	double PixStepY= 0;
+	if(hdu->GetKeywordValue("CDELT1")=="" || hdu->GetKeywordValue("CDELT2")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: CDELT keyword not found in header!"<<endl;
+	}
+	else{
+		PixStepX= hdu->GetKeywordValue("CDELT1").Atof();
+		PixStepY= hdu->GetKeywordValue("CDELT2").Atof();
+	}
+
+	//Beam information
+	double Bmaj= 0;
+	double Bmin= 0;
+	double Bpa= 0;
+	if(hdu->GetKeywordValue("BMAJ")=="" || hdu->GetKeywordValue("BMIN")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: BMAJ/BMIN keywords not found in header!"<<endl;
+	}
+	else{
+		Bmaj= hdu->GetKeywordValue("BMAJ").Atof();
+		Bmin= hdu->GetKeywordValue("BMIN").Atof();
+	}
+
+	if(hdu->GetKeywordValue("BPA")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: BPA keyword not found in header, setting to zero!"<<endl;
+		Bpa= 0;
+	}
+	else{
+		Bpa= hdu->GetKeywordValue("BPA").Atof();
+	}
+	
+	
+	//########  GET NON STANDARD/NON-MANDATORY KEYWORDS
+	int nRec=	hdu->GetRecordNumber();
+
+	// Get rotation matrix
+	double RotX= 0;
+	double RotY= 0;
+	if(hdu->GetKeywordValue("CROTA1")=="" || hdu->GetKeywordValue("CROTA2")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: CROTA keyword not found in header, setting rotation to 0!"<<endl;
+	}
+	else{
+		RotX= hdu->GetKeywordValue("CROTA1").Atof();
+		RotY= hdu->GetKeywordValue("CROTA2").Atof();
+	}
+
+	// Get Observation Location
+	double ObsRA= -999;
+	double ObsDEC= -999;
+	if(hdu->GetKeywordValue("OBSRA")=="" || hdu->GetKeywordValue("OBSDEC")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: OBSRA/OBSDEC keywords not found in header, setting them to fake values!"<<endl;
+	}
+	else{
+		ObsRA= hdu->GetKeywordValue("OBSRA").Atof();
+		ObsDEC= hdu->GetKeywordValue("OBSDEC").Atof();
+	}
+
+	// Get epoch information
+	double Epoch= 2000;
+	if(hdu->GetKeywordValue("EPOCH")==""){
+		cerr<<"FITSReader::ReadHeader(): WARNING: EPOCH keyword not found in header, setting it to 2000!"<<endl;
+	}
+	else{
+		Epoch= hdu->GetKeywordValue("EPOCH").Atof();
+	}
+
+	
+	//## Fill header info in FITS INFO struct
+	(fits_info.header).Nx= Nx;
+	(fits_info.header).Ny= Ny;
+	(fits_info.header).nRec= nRec;
+	(fits_info.header).ObsRA= ObsRA;
+	(fits_info.header).ObsDEC= ObsDEC;
+	(fits_info.header).BUnit= BUnit;
+	(fits_info.header).CoordTypeX= CoordTypeX;
+	(fits_info.header).CoordTypeY= CoordTypeY;
+	(fits_info.header).Cx= CenterPixIdX;
+	(fits_info.header).Cy= CenterPixIdY;
+	(fits_info.header).Xc= CenterPixX;
+	(fits_info.header).Yc= CenterPixY;
+	(fits_info.header).dX= PixStepX;
+	(fits_info.header).dY= PixStepY;
+	(fits_info.header).Bmaj= Bmaj;
+	(fits_info.header).Bmin= Bmin;
+	(fits_info.header).Bpa= Bpa;
+	(fits_info.header).RotX= RotX;
+	(fits_info.header).RotY= RotY;
+	(fits_info.header).Epoch= Epoch;
+	
+	return true;
+
+}//close FITSReader::ReadHeader()
+
+
+TFITSHDU* FITSReader::ReadFile(std::string filename,Caesar::FITSFileInfo& fits_info){
+	
+	//## Check file
+	if(!SysUtils::CheckFile(filename,fits_info.info,true,".fits")){
+		cerr<<"FITSReader::Read(): ERROR: Failed to read file "<<filename<<"!"<<endl;
+		return 0;
+	}
+
+	//## Open primary HDU from file if not already present
+	TFITSHDU* hdu = new TFITSHDU(filename.c_str());
+  if (hdu == 0) {
+		cerr<<"FITSReader::ReadFile(): ERROR: Cannot access the FITS HDU!"<<endl;
+		return 0;
+	}
+	
+	//## Read file header	
+	if(!ReadHeader(hdu,fits_info)){
+		cerr<<"FITSReader::ReadFile(): ERROR: Failed to read header from FITS file!"<<endl;
+		return 0;
+	}
+
+	return hdu;
+	
+}//close ReadFile()
+
+
+int FITSReader::Read(std::string filename,Caesar::Img& image,Caesar::FITSFileInfo& fits_info){
+
+	//## Read file
+	TFITSHDU* hdu= ReadFile(filename,fits_info);
+	if(!hdu){
+		cerr<<"FITSReader::Read(): ERROR: Failed to read file "<<filename<<"!"<<endl;
+		return -1;
+	}
+	int Nx= (fits_info.header).Nx;
+	int Ny= (fits_info.header).Ny;
+
+	//Compute image meta-data	
+	Caesar::ImgMetaData* metadata= new Caesar::ImgMetaData;
+	metadata->SetFITSCards(fits_info);
+
+	//## Set image properties
+	image.Reset();
+	image.SetBins(Nx,-0.5,Nx-0.5,Ny,-0.5,Ny-0.5);
+	image.SetMetaData(metadata);
+
+	//## Fill image
+	for(int j=0;j<Ny;j++){
+		TVectorD* thisPixelRow= hdu->GetArrayRow(j);
+		for(int i=0;i<Nx;i++){
+			double pixValue= ((*thisPixelRow))(i);
+			if(TMath::IsNaN(pixValue) || fabs(pixValue)==TMath::Infinity()) continue;
+			image.FillPixel(i,j,pixValue);
+		}//end loop columns
+		if(thisPixelRow) thisPixelRow->Delete();
+	}//end loop row
+	
+	return 0;
+	
+}//close FITSReader::Read()
+
+
+int FITSReader::ReadTile(std::string filename,Caesar::Img& image,Caesar::FITSFileInfo& fits_info,int ix_min,int ix_max,int iy_min,int iy_max){
+
+	//## Read file
+	TFITSHDU* hdu= ReadFile(filename,fits_info);
+	if(!hdu){
+		cerr<<"FITSReader::Read(): ERROR: Failed to read file "<<filename<<"!"<<endl;
+		return -1;
+	}
+	int Nx= (fits_info.header).Nx;
+	int Ny= (fits_info.header).Ny;
+	
+
+	//## Check tile sizes
+	if(ix_min<0 || ix_min>=Nx || ix_min>=ix_max){
+		cerr<<"FITSReader::ReadTile(): ERROR: Invalid min tile X given ("<<ix_min<<")"<<endl;	
+		return -1;
+	}
+	if(ix_max<0 || ix_max>=Nx || ix_max<=ix_min){
+		cerr<<"FITSReader::ReadTile(): ERROR: Invalid max tile Y given ("<<ix_max<<")"<<endl;
+		return -1;
+	}
+	if(iy_min<0 || iy_min>=Ny || iy_min>=iy_max){
+		cerr<<"FITSReader::ReadTile(): ERROR: Invalid min tile X given ("<<iy_min<<")"<<endl;
+		return -1;
+	}
+	if(iy_max<0 || iy_max>=Ny || iy_max<=iy_min){
+		cerr<<"FITSReader::ReadTile(): ERROR: Invalid max tile Y given ("<<iy_max<<")"<<endl;
+		return -1;
+	}
+
+	int TileSizeX= ix_max-ix_min+1;
+	int TileSizeY= iy_max-iy_min+1;
+		
+	//Compute image meta-data	
+	Caesar::ImgMetaData* metadata= new Caesar::ImgMetaData;
+	metadata->SetFITSCards(fits_info);
+
+	
+	//## Set image properties
+	cout<<"ImgReader::ReadTile(): INFO: Set image properties..."<<endl;
+	image.Reset();
+	image.SetBins(TileSizeX,ix_min-0.5,ix_max+0.5,TileSizeY,iy_min-0.5,iy_max+0.5);	
+	image.SetMetaData(metadata);
+	//image.SetWCS();
+
+	//## Read tile
+	cout<<"ImgReader::ReadTile(): INFO: Starting reading tile..."<<endl;
+	int nFilledPixels= 0;
+	
+	for(int j=iy_min;j<=iy_max;j++){
+		TVectorD* thisPixelRow= hdu->GetArrayRow(j);
+		for(int i=ix_min;i<=ix_max;i++){		
+			double pixValue= ((*thisPixelRow))(i);
+			if(TMath::IsNaN(pixValue) || fabs(pixValue)==TMath::Infinity()) continue;
+			image.FillPixel(i,j,pixValue);
+			nFilledPixels++;
+		}//end loop columns
+		if(thisPixelRow) thisPixelRow->Delete();
+	}//end loop row
+
+	return 0;
+	
+}//close FITSReader::ReadTile()
+
+
+}//close namespace
+
