@@ -1,0 +1,537 @@
+// ***********************************************************************
+// * License and Disclaimer                                              *
+// *                                                                     *
+// * Copyright 2016 Simone Riggi																			   *
+// *																																	   *
+// * This file is part of Caesar. 																		   *
+// * Caesar is free software: you can redistribute it and/or modify it   *
+// * under the terms of the GNU General Public License as published by   *
+// * the Free Software Foundation, either * version 3 of the License,    *
+// * or (at your option) any later version.                              *
+// * Caesar is distributed in the hope that it will be useful, but 			 *
+// * WITHOUT ANY WARRANTY; without even the implied warranty of          * 
+// * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                *
+// * See the GNU General Public License for more details. You should     * 
+// * have received a copy of the GNU General Public License along with   * 
+// * Caesar. If not, see http://www.gnu.org/licenses/.                   *
+// ***********************************************************************
+/**
+* @file Blob.cc
+* @class Blob
+* @brief Blob class
+*
+* Class representing an image blob
+* @author S. Riggi
+* @date 20/01/2015
+*/
+
+
+#include <Blob.h>
+#include <Img.h>
+#include <Pixel.h>
+#include <Contour.h>
+#include <StatsUtils.h>
+
+#include <TObject.h>
+#include <TMatrixD.h>
+
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
+#include <iomanip>
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+#include <string>
+#include <stdexcept>
+#include <algorithm>
+#include <math.h>
+#include <numeric>
+#include <time.h>
+#include <ctime>
+#include <queue>
+
+using namespace std;
+
+ClassImp(Caesar::Blob)
+
+namespace Caesar {
+
+Blob::Blob() {
+
+	Init();
+	
+}//close costructor
+
+Blob::~Blob(){
+
+	ClearPixels();
+	ClearContours();	
+
+}//close destructor
+
+void Blob::Init(){
+
+	Id= -999;
+	Name= "";
+	HasPixelsAtEdge= false;
+	ResetStats();
+	ResetMoments();
+	ClearPixels();
+	ClearContours();	
+
+}//close Init()
+
+void Blob::ResetStats(){
+
+	NPix= 0;
+	Mean= 0;
+	RMS= 0;
+	Skewness= 0;
+	Median= 0;
+	MedianRMS= 0;
+
+	X0= 0;
+	Y0= 0;
+
+	Mean_curv= 0;
+	RMS_curv= 0;
+	Median_curv= 0;
+	MedianRMS_curv= 0;
+	
+	m_HasParameters= false;
+	m_HasStats= false;
+	
+}//close ResetStats()
+
+void Blob::ClearPixels(){
+
+	for(unsigned int i=0;i<m_Pixels.size();i++){
+		if(m_Pixels[i]){
+			delete m_Pixels[i];
+			m_Pixels[i]= 0;
+		}
+	}
+	m_Pixels.clear();
+	
+}//close ClearPixels()
+
+
+void Blob::ClearContours(){
+
+	for(unsigned int i=0;i<m_Contours.size();i++){
+		if(m_Contours[i]){
+			delete m_Contours[i];
+			m_Contours[i]= 0;
+		}
+	}
+	m_Contours.clear();
+	
+}//close ClearContours()
+
+void Blob::ResetMoments(){
+	
+	//Reset moments
+	m_M1= 0;
+  m_M2= 0;
+	m_M3= 0;
+	m_M4= 0;
+	m_M1_curv= 0;
+  m_M2_curv= 0;
+
+	//Reset stat accumulator pars
+	NPix= 0;	  
+	X0= 0; 
+	Y0= 0;
+	m_S= 0; m_S_curv= 0.; m_S_edge= 0.;
+	m_Smax= -1.e+99;
+	m_Smin= 1.e+99;
+	m_Sxx= 0; m_Syy= 0; m_Sxy= 0;
+	m_Sx= 0; m_Sy= 0;
+	m_PixIdmax= -1; m_PixIdmin= -1;
+	
+	//Reset image ranges
+	m_Xmin= std::numeric_limits<double>::infinity();
+	m_Xmax= -std::numeric_limits<double>::infinity();
+	m_Ymin= std::numeric_limits<double>::infinity();
+	m_Ymax= -std::numeric_limits<double>::infinity();
+
+	m_Ix_min= std::numeric_limits<double>::infinity();
+	m_Ix_max= -std::numeric_limits<double>::infinity();
+	m_Iy_min= std::numeric_limits<double>::infinity();
+	m_Iy_max= -std::numeric_limits<double>::infinity();
+	
+	m_HasStats= false;
+
+}//close ResetMoments()
+
+
+void Blob::UpdateMoments(Pixel* pixel){
+
+	if(!pixel) return;
+
+	//Get pixel data
+	double w= pixel->S;
+	double x= pixel->x;	
+	double y= pixel->y;
+	int ix= pixel->ix;
+	int iy= pixel->iy;
+	int id= pixel->id;
+	double w_edge= pixel->S_edge;
+	double w_curv= pixel->S_curv;
+	
+	//Update accumulator
+	if(w<m_Smin) {
+		m_Smin= w;
+		m_PixIdmin= id;
+	}
+	if(w>m_Smax) {
+		m_Smax= w;
+		m_PixIdmax= id;
+	}
+	m_S+= w;
+	m_Sx+= w*x;
+	m_Sy+= w*y;
+	m_Sxx+= w*x*x;
+	m_Syy+= w*y*y;
+	m_Sxy+= w*x*y;
+	m_S_curv+= w_curv;
+	m_S_edge+= w_edge;	
+	X0+= x;
+	Y0+= y;
+
+	if(x<m_Xmin) m_Xmin= x;
+	if(x>m_Xmax) m_Xmax= x;
+	if(y<m_Ymin) m_Ymin= y;
+	if(y>m_Ymax) m_Ymax= y;
+
+	if(ix<m_Ix_min) m_Ix_min= ix;
+	if(ix>m_Ix_max) m_Ix_max= ix;
+	if(iy<m_Iy_min) m_Iy_min= iy;
+	if(iy>m_Iy_max) m_Iy_max= iy;
+
+	
+	//Update moments
+	NPix++;
+  double delta = w - m_M1;
+  double delta_n = delta/NPix;
+  double delta_n2 = delta_n * delta_n;
+  double f = delta * delta_n * (NPix-1);
+  m_M1+= delta_n;
+  m_M4+= f * delta_n2 * (NPix*NPix - 3*NPix + 3) + 6 * delta_n2 * m_M2 - 4 * delta_n * m_M3;
+  m_M3+= f * delta_n * (NPix - 2) - 3 * delta_n * m_M2;
+  m_M2+= f;	
+
+	double delta_curv = w_curv - m_M1_curv;
+  double delta_curv_n = delta_curv/NPix;
+  double f_curv = delta_curv * delta_curv_n * (NPix-1);
+  m_M1_curv+= delta_curv_n;
+  m_M2_curv+= f_curv;	
+
+}//close UpdateMoments()
+
+void Blob::AddPixel(Pixel* aPixel){
+
+	//Append pixel to list
+	m_Pixels.push_back(aPixel);
+
+	//Update moment counts
+	UpdateMoments(aPixel);
+
+}//close AddPixel()
+
+
+
+
+int Blob::ComputeStats(bool computeRobustStats,bool forceRecomputing){
+
+	//## Compute region stats & shape parameters
+	if(NPix<=0) return -1;
+
+	//## Recomputing moments?
+	if(forceRecomputing){
+		ResetMoments();//reset moments
+		for(unsigned int k=0;k<m_Pixels.size();k++) UpdateMoments(m_Pixels[k]);//update moments
+	}
+		
+	//## Compute standard stats
+	X0/= (double)(NPix);
+	Y0/= (double)(NPix);
+	m_Sx/= m_S;
+	m_Sy/= m_S;
+	m_Sxx/= m_S;
+	m_Syy/= m_S;
+	m_Sxy/= m_S;
+	
+	Mean= m_M1;
+	Mean_curv= m_M1_curv;
+	RMS= 0;
+	RMS_curv= 0;	
+	if(NPix>1) {
+		RMS= sqrt(m_M2/(NPix-1));
+		RMS_curv= sqrt(m_M2_curv/(NPix-1));
+	}
+
+	Skewness= 0;
+	if(m_M2!=0) {
+  	Skewness= sqrt(NPix)*m_M3/pow(m_M2,1.5);//need to adjust for finite population?
+	}
+	
+	//## Compute robust stats (median, MAD, Entropy, ...)
+	if(computeRobustStats){	
+		std::vector<double> SList;
+		std::vector<double> SCurvList;
+		
+		for(int i=0;i<NPix;i++){
+			double S= m_Pixels[i]->S;		
+			double S_curv= m_Pixels[i]->S_curv;
+			SList.push_back(S);
+			SCurvList.push_back(S_curv);
+		}
+		Median= StatsUtils::GetMedianFast<double>(SList);
+		MedianRMS= 1.4826*StatsUtils::GetMADFast(SList,Median);
+		Median_curv= StatsUtils::GetMedianFast<double>(SCurvList);
+		MedianRMS_curv= 1.4826*StatsUtils::GetMADFast(SCurvList,Median);
+	}//close if computeRobustStats
+
+	m_HasStats= true;
+
+	return 0;
+
+}//close ComputeStats()
+
+int Blob::ComputeMorphologyParams(){
+
+	cout<<"Source::ComputeMorphologyParams(): INFO: Computing morphology parameters..."<<endl;
+	if(NPix<=0 || m_Pixels.size()<=0) return -1;
+		
+	//######################################
+	//## Find the source bounding box
+	//######################################
+	double xRange[2]= {m_Xmin,m_Xmax};
+	double yRange[2]= {m_Ymin,m_Ymax};	
+	int ixRange[2]= {m_Ix_min,m_Ix_max};
+	int iyRange[2]= {m_Iy_min,m_Iy_max};
+	
+	//Bounding box in (x,y) coordinates
+	int boundingBoxX[2];
+	int boundingBoxY[2];
+	int deltaPix= 50;
+	boundingBoxX[0]= xRange[0]-deltaPix;
+	boundingBoxX[1]= xRange[1]+deltaPix;
+	boundingBoxY[0]= yRange[0]-deltaPix;
+	boundingBoxY[1]= yRange[1]+deltaPix;
+	
+	//Bounding box in (ix,iy) coordinates
+	int boundingBoxIX[2];
+	int boundingBoxIY[2];	
+	boundingBoxIX[0]= ixRange[0]-deltaPix;
+	boundingBoxIX[1]= ixRange[1]+deltaPix;
+	boundingBoxIY[0]= iyRange[0]-deltaPix;
+	boundingBoxIY[1]= iyRange[1]+deltaPix;
+	int nBoxIX= boundingBoxIX[1]-boundingBoxIX[0]+1;
+	int nBoxIY= boundingBoxIY[1]-boundingBoxIY[0]+1;
+
+	cout<<"Source::ComputeMorphologyParams(): INFO: xRange("<<xRange[0]<<","<<xRange[1]<<"), yRange("<<yRange[0]<<","<<yRange[1]<<")"<<endl;
+	cout<<"Source::ComputeMorphologyParams(): INFO: ixRange("<<ixRange[0]<<","<<ixRange[1]<<"), iyRange("<<yRange[0]<<","<<iyRange[1]<<")"<<endl;
+	cout<<"Source::ComputeMorphologyParams(): INFO: boundingBoxX("<<boundingBoxX[0]<<","<<boundingBoxX[1]<<"), boundingBoxY("<<boundingBoxY[0]<<","<<boundingBoxY[1]<<")"<<endl;
+	cout<<"Source::ComputeMorphologyParams(): INFO: boundingBoxIX("<<boundingBoxIX[0]<<","<<boundingBoxIX[1]<<"), boundingBoxIY("<<boundingBoxIY[0]<<","<<boundingBoxIY[1]<<")"<<"  nBoxIX="<<nBoxIX<<", nBoxIY="<<nBoxIY<<endl;
+
+	//## Fill image and binarized image
+	cv::Mat binarizedImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_8UC1);
+	cv::Mat rasterImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_64FC1);
+
+	for(unsigned int k=0;k<m_Pixels.size();k++){
+		Pixel* thisPixel= m_Pixels[k];
+		double thisS= thisPixel->S;	
+		int ix= thisPixel->ix;
+		int iy= thisPixel->iy;	
+		ix-= boundingBoxIX[0];
+		iy-= boundingBoxIY[0];
+		int rowId= nBoxIY-1-iy;
+		int colId= nBoxIX-1-ix;
+		binarizedImg.at<uchar>(rowId, colId, 0) = 1;
+		rasterImg.at<double>(rowId, colId, 0) = thisS;		
+	}//end loop pixels
+
+
+	//## Compute contour
+	cv::Mat binarizedImg_clone= binarizedImg.clone();//image will be modified by findContours! 
+	std::vector<std::vector<cv::Point>> contours; // Vector for storing contour
+  std::vector<cv::Vec4i> hierarchy;
+	cv::findContours( binarizedImg_clone, contours, hierarchy,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE, cv::Point(0,0) ); // Find only the external contours in the image
+  //cv::findContours( binarizedImg_clone, contours, hierarchy,CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE ); // Find the contours in the image organizing in a 2-level hierarchy
+	//cv::findContours( binarizedImg_clone, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_NONE, Point(0,0) );
+	
+	Contour* aContour= 0;
+
+	for(unsigned int i=0; i<contours.size(); i++){ // iterate through each contour
+		int nContourPts= (int)contours[i].size();
+		if(nContourPts<=0) continue;
+
+		//Create and fill contour
+		aContour= new Contour;
+
+		cout<<"Source::ComputeMorphologyParams(): INFO: Contour no. "<<i+1<<": (";
+		
+		for(int j=0;j<nContourPts;j++){
+			int contx= contours[i][j].x;
+			int conty= contours[i][j].y;
+			int rowId= nBoxIY-1-conty;
+			int colId= nBoxIX-1-contx;
+			int contx_transf= colId + boundingBoxX[0];
+			int conty_transf= rowId + boundingBoxY[0];
+			//aContour->AddPoint(cv::Point2f(contx_transf,conty_transf));
+			aContour->AddPoint(TVector2(contx_transf,conty_transf));
+			//cout<<"("<<contx<<","<<conty<<"), ";
+			cout<<"("<<contx_transf<<","<<conty_transf<<"), ";
+		}//end loop points in contour
+		cout<<")"<<endl;
+		
+
+		//Compute contour parameters
+		if(aContour->ComputeParameters()<0){
+			cerr<<"Source::ComputeMorphologyParams(): WARN: Failed to compute parameters for contour no. "<<i<<"!"<<endl;
+			//delete fContour;
+			//continue;
+		}
+		
+		//Add contour to the list
+		m_Contours.push_back(aContour);	
+
+	}//end loop contours
+
+
+	//## Compute HuMoments
+	cv::Moments moments= cv::moments(rasterImg, false);
+	Moments.push_back(moments.m00);
+	Moments.push_back(moments.m10);
+	Moments.push_back(moments.m01);
+	Moments.push_back(moments.m20);
+	Moments.push_back(moments.m11);
+	Moments.push_back(moments.m02);
+	Moments.push_back(moments.m30);
+	Moments.push_back(moments.m21);
+	Moments.push_back(moments.m12);
+	Moments.push_back(moments.m03);
+	
+	Moments.push_back(moments.mu20);
+	Moments.push_back(moments.mu11);
+	Moments.push_back(moments.mu02);
+	Moments.push_back(moments.mu30);
+	Moments.push_back(moments.mu21);
+	Moments.push_back(moments.mu12);
+	Moments.push_back(moments.mu03);
+	
+	Moments.push_back(moments.nu20);
+	Moments.push_back(moments.nu11);
+	Moments.push_back(moments.nu02);
+	Moments.push_back(moments.nu30);
+	Moments.push_back(moments.nu21);
+	Moments.push_back(moments.nu12);
+	Moments.push_back(moments.nu03);
+		
+
+	double hu_moments[7];
+	cv::HuMoments(moments, hu_moments);
+	for(int i=0;i<7;i++) HuMoments.push_back(hu_moments[i]);
+
+	//## Compute zernike moments
+	//int order= 6;
+	//ComputeZernikeMoments(order);
+		
+	m_HasParameters= true;
+
+	return 0;
+
+}//close ComputeMorphologyParams()
+
+Img* Blob::GetImage(Img::ImgType mode){
+
+	//Bounding box in (x,y) coordinates
+	double xRange[2]= {m_Xmin,m_Xmax};
+	double yRange[2]= {m_Ymin,m_Ymax};	
+	int boundingBoxX[2];
+	int boundingBoxY[2];
+	int deltaPix= 50;
+	boundingBoxX[0]= xRange[0]-deltaPix;
+	boundingBoxX[1]= xRange[1]+deltaPix;
+	boundingBoxY[0]= yRange[0]-deltaPix;
+	boundingBoxY[1]= yRange[1]+deltaPix;
+	int nBoxX= boundingBoxX[1]-boundingBoxX[0]+1;
+	int nBoxY= boundingBoxY[1]-boundingBoxY[0]+1;
+
+	//## Fill image and binarized image
+	TString imgName= Form("SourceImg_%s_mode%d",Name.c_str(),mode);
+	Img* blobImg= new Img(imgName,imgName,nBoxX,boundingBoxX[0]-0.5,boundingBoxX[1]+0.5,nBoxY,boundingBoxY[0]-0.5,boundingBoxY[1]+0.5);
+	
+	if(mode==Img::eBinaryMap){
+		for(unsigned int k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			blobImg->FillPixel(thisX,thisY,1);
+		}//end loop pixels
+	}//close if
+	else if(mode==Img::eFluxMap){
+		for(unsigned int k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			double thisS= thisPixel->S;	
+			blobImg->FillPixel(thisX,thisY,thisS);
+		}//end loop pixels
+	}//close else
+	else if(mode==Img::eSignificanceMap){
+		for(unsigned int k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			double thisS= thisPixel->S;		
+			double thisBkg= thisPixel->bkgLevel;
+			double thisNoise= thisPixel->noiseLevel;
+			double thisZ= 0;
+			if(thisNoise!=0) thisZ= (thisS-thisBkg)/thisNoise;	
+			blobImg->FillPixel(thisX,thisY,thisZ);
+		}//end loop pixels
+	}//close else
+	else if(mode==Img::ePullMap){
+		for(unsigned int k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			double thisS= thisPixel->S;	
+			double thisPull= (thisS-Median)/MedianRMS;
+			blobImg->FillPixel(thisX,thisY,thisPull);
+		}//end loop pixels
+	}//close else if
+	else if(mode==Img::eCurvatureMap){
+		for(unsigned int k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			double thisCurv= thisPixel->S_curv;	
+			blobImg->FillPixel(thisX,thisY,thisCurv);
+		}//end loop pixels
+	}//close else if
+	
+	else if(mode==Img::eMeanFluxMap){
+		for(unsigned int k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			blobImg->FillPixel(thisX,thisY,Mean);
+		}//end loop pixels
+	}
+
+	return blobImg;
+
+}//close Blob::GetImage()
+
+
+}//close namespace
+
+
