@@ -1,0 +1,279 @@
+#----------------------------------------------------------------
+# - Enforce an out-of-source builds before anything else
+# ---------------------------------------------------------------
+if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+    message(STATUS "Caesar requires an out-of-source build.")
+    message(STATUS "Please remove these files from ${CMAKE_BINARY_DIR} first:")
+    message(STATUS "CMakeCache.txt")
+    message(STATUS "CMakeFiles")
+    message(STATUS "Once these files are removed, create a separate directory")
+    message(STATUS "and run CMake from there")
+    message(FATAL_ERROR "in-source build detected")
+endif()
+
+# -------------------------------------------
+# CMAKE VERSIONS
+# -------------------------------------------
+cmake_minimum_required(VERSION 2.8.8 FATAL_ERROR)
+##cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+cmake_policy(SET CMP0005 NEW)
+
+#---------------------------------------------
+# - Project definition
+# --------------------------------------------
+project(Caesar)
+
+#---Set pathes where to put the libraries, executables and headers------------------------------
+#set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+#set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
+set(CMAKE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
+set(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
+
+set(BINARY_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/bin)
+
+
+
+message (STATUS "CMAKE_LIBRARY_OUTPUT_DIRECTORY: ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+message (STATUS "PROJECT_BINARY_DIR: ${PROJECT_BINARY_DIR}")
+
+set(SFINDER ${CMAKE_BINARY_DIR})
+set(HEADER_OUTPUT_PATH ${CMAKE_BINARY_DIR}/include)
+set(SFINDER_INCLUDE_DIR ${HEADER_OUTPUT_PATH})
+
+
+# ----------------------------------------------------------------------------------------------
+#---Where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked-------------
+# ----------------------------------------------------------------------------------------------
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
+
+# - Versioning. We do this here for now
+set(${PROJECT_NAME}_VERSION "1.1.0")
+set(${PROJECT_NAME}_VERSION_MAJOR "1")
+set(${PROJECT_NAME}_VERSION_MINOR "1")
+set(${PROJECT_NAME}_VERSION_PATCH "0")
+
+# ----------------------------------------------------------------------------------------------
+#---Load some basic macros which are needed later for the configuration and build----------------
+#-----------------------------------------------------------------------------------------------
+#include(SFinderBuildOptions)
+#include(CheckCompiler) # Set compiler flag
+#include(MacroEnsureVersion)
+
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX11)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64")
+elseif(COMPILER_SUPPORTS_CXX0X)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64")
+else()
+    message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+endif()
+
+#-----------------------------------------------------------------------------------------------
+#---Here we look for installed software and switch on and of the different build options--------
+include(SearchInstalledSoftware)
+#SFINDER_SHOW_OPTIONS()
+#-----------------------------------------------------------------------------------------------
+
+
+#-----------------------------------------------------------------------------------------------
+#---  SET INCLUDES & LIBS
+#-----------------------------------------------------------------------------------------------
+set(INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
+set(LINKED_LIBS "")
+
+# Append subdirs (headers & sources files are appended in subdirs)
+add_subdirectory(src)
+add_subdirectory(task)
+
+# -- debug --
+#message (STATUS "SRCS: ${SRCS}")
+message (STATUS "HEADERS: ${HEADERS}")
+#message (STATUS "DICT_HEADERS: ${DICT_HEADERS}")
+#------------
+
+#-- WCSTools
+set(WCSTOOL_DIR ${CMAKE_SOURCE_DIR}/external/wcstools/v3.9.2/libwcs)
+set(WCSTOOL_DOWNLOAD_DIR ${CMAKE_SOURCE_DIR}/external/wcstools/v3.9.2)
+set(WCSTOOL_DOWNLOAD_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/wcstools)
+set(WCSTOOL_BUILD_DIR ${WCSTOOL_DOWNLOAD_DEST_DIR}/v3.9.2)
+set(WCSTOOL_LIB libwcs.a)
+set(WCSTOOL_INC wcs.h)
+set(WCSTOOL_HEADERS ${WCSTOOL_BUILD_DIR}/libwcs/wcs.h)
+list(APPEND WCSTOOL_HEADERS ${WCSTOOL_BUILD_DIR}/libwcs/wcslib.h)
+list(APPEND WCSTOOL_HEADERS ${WCSTOOL_BUILD_DIR}/libwcs/fitshead.h)
+set(WCSTOOL_INCLUDE_DIRS ${CMAKE_INSTALL_INCLUDEDIR})
+set(WCSTOOL_LIBRARIES ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${WCSTOOL_LIB})
+
+#-- linterp
+set(LINTERP_DOWNLOAD_DIR ${CMAKE_SOURCE_DIR}/external/linterp)
+set(LINTERP_DOWNLOAD_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set(LINTERP_BUILD_DIR ${LINTERP_DOWNLOAD_DEST_DIR}/linterp)
+set(LINTERP_HEADERS ${LINTERP_BUILD_DIR}/linterp.h)
+set(LINTERP_INCLUDE_DIRS ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Append external includes found 
+list (APPEND INCLUDE_DIRS ${ROOT_INCLUDE_DIRS})
+list (APPEND INCLUDE_DIRS ${OpenCV_INCLUDE_DIRS})
+list (APPEND INCLUDE_DIRS ${OpenCV2_INCLUDE_DIRS})
+list (APPEND INCLUDE_DIRS ${R_INCLUDE_DIR})
+list (APPEND INCLUDE_DIRS ${Boost_INCLUDE_DIRS})
+list (APPEND INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
+list (APPEND INCLUDE_DIRS ${WCSTOOL_INCLUDE_DIRS})
+list (APPEND INCLUDE_DIRS ${LINTERP_INCLUDE_DIRS})
+include_directories(${INCLUDE_DIRS})
+
+# -- debug --
+message (STATUS "INCLUDE_DIRS: ${INCLUDE_DIRS}")
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+  message(STATUS "dir='${dir}'")
+endforeach()
+# -----------
+
+# Append external libs found 
+list (APPEND LINKED_LIBS ${ROOT_LIBRARIES})
+list (APPEND LINKED_LIBS ${OpenCV2_LIBRARIES})
+list (APPEND LINKED_LIBS ${R_LIBRARIES})
+list (APPEND LINKED_LIBS ${Boost_LIBRARIES})
+list (APPEND LINKED_LIBS ${PYTHON_LIBRARIES})
+list (APPEND LINKED_LIBS ${WCSTOOL_LIBRARIES})
+message (STATUS "LINKED_LIBS: ${LINKED_LIBS}")
+
+
+#-----------------------------------------------------------------------------------------------
+#---  BUILD EXTERNALS
+#-----------------------------------------------------------------------------------------------
+message (STATUS "CMAKE_CURRENT_BINARY_DIR: ${CMAKE_CURRENT_BINARY_DIR}")
+
+include(ExternalProject)
+ExternalProject_Add(WCSTools
+	DOWNLOAD_COMMAND cp -rp ${WCSTOOL_DOWNLOAD_DIR} ${WCSTOOL_DOWNLOAD_DEST_DIR}
+	BINARY_DIR ${WCSTOOL_BUILD_DIR}
+	BUILD_IN_SOURCE 0
+	CONFIGURE_COMMAND ""
+	BUILD_COMMAND make
+	INSTALL_COMMAND cp ${WCSTOOL_BUILD_DIR}/libwcs/${WCSTOOL_LIB} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} COMMAND cp ${WCSTOOL_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+ExternalProject_Add(LINTERP
+	DOWNLOAD_COMMAND cp -rp ${LINTERP_DOWNLOAD_DIR} ${LINTERP_DOWNLOAD_DEST_DIR}
+	BINARY_DIR ${LINTERP_BUILD_DIR}
+  BUILD_IN_SOURCE 0
+  CONFIGURE_COMMAND ""
+	BUILD_COMMAND ""
+	INSTALL_COMMAND cp ${LINTERP_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
+)
+message (STATUS "LINTERP_DOWNLOAD_DIR: ${LINTERP_DOWNLOAD_DIR}")
+message (STATUS "LINTERP_DOWNLOAD_DEST_DIR: ${LINTERP_DOWNLOAD_DEST_DIR}")
+message (STATUS "LINTERP_BUILD_DIR: ${LINTERP_BUILD_DIR}")
+message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
+
+#-----------------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------------------------
+#---  CLEAN STUFF
+#-----------------------------------------------------------------------------------------------
+#--- Set external WCTOOLS lib to be removed by clean command
+#--- Set copied headers to be removed by clean command
+set(ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${WCSTOOL_LIB})
+
+set(CLEANED_HEADERS "")
+foreach (_headerFile ${HEADERS_WPATH})
+	set(_cleanedHeader ${CMAKE_INSTALL_INCLUDEDIR}/${_headerFile})
+	list(APPEND CLEANED_HEADERS ${_cleanedHeader})
+endforeach()
+list(REMOVE_DUPLICATES CLEANED_HEADERS)
+list(APPEND ADDITIONAL_CLEAN_TARGETS ${CLEANED_HEADERS})
+list(APPEND ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/CaesarDict_rdict.pcm)
+
+message(STATUS "ADDITIONAL_CLEAN_TARGETS: ${ADDITIONAL_CLEAN_TARGETS}")
+set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_CLEAN_TARGETS}") ## do not forget to put "" in final vars otherwise you'll get a parsing error
+
+
+#-----------------------------------------------------------------------------------------------
+#---  BUILD PROJECT SHARED LIB
+#-----------------------------------------------------------------------------------------------
+#--- Generate classes dictionary
+message (STATUS "DICT_HEADERS: ${DICT_HEADERS}, $DICT_SRCS: ${DICT_SRCS}")
+##ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} MODULE Caesar LINKDEF LinkDef.h)
+ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} LINKDEF LinkDef.h)
+
+
+#---Create a shared library with geneated dictionary
+add_library(Caesar SHARED ${SRCS} CaesarDict.cxx)
+add_dependencies(Caesar LINTERP WCSTools)
+target_link_libraries(Caesar PUBLIC ${LINKED_LIBS})
+#-----------------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------------------------
+#---  BUILD PROJECT TASKS EXEs
+#-----------------------------------------------------------------------------------------------
+add_executable(FindSource ${Task_FindSource_SRCS})
+target_link_libraries(FindSource Caesar ${LINKED_LIBS})
+
+add_executable(FindSourceResidual ${Task_FindSourceResidual_SRCS})
+target_link_libraries(FindSourceResidual Caesar ${LINKED_LIBS})
+
+add_executable(FindSaliency ${Task_FindSaliency_SRCS})
+target_link_libraries(FindSaliency Caesar ${LINKED_LIBS})
+
+add_executable(FindBkg ${Task_FindBkg_SRCS})
+target_link_libraries(FindBkg Caesar ${LINKED_LIBS})
+
+add_executable(FITS2ROOT ${Task_FITS2ROOT_SRCS})
+target_link_libraries(FITS2ROOT Caesar ${LINKED_LIBS})
+
+add_executable(ROOT2FITS ${Task_ROOT2FITS_SRCS})
+target_link_libraries(ROOT2FITS Caesar ${LINKED_LIBS})
+#-----------------------------------------------------------------------------------------------
+
+
+
+#-----------------------------------------------------------------------------------------------
+#---  INSTALL STUFF
+#-----------------------------------------------------------------------------------------------
+#-- INstall targets
+#install(TARGETS FindSource FindBkg DESTINATION ${BINARY_INSTALL_DIR} COMPONENT binaries)
+
+# -- Install library dict map
+install(FILES ${PROJECT_BINARY_DIR}/CaesarDict_rdict.pcm DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+
+#-- Install project headers
+#file(COPY ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+#-----------------------------------------------------------------------------------------------
+
+
+
+###############################################################################
+## packaging ##################################################################
+###############################################################################
+
+# all install commands get the same destination. this allows us to use paths
+# relative to the executable.
+#install(TARGETS example DESTINATION example_destination)
+# this is basically a repeat of the file copy instruction that copies the
+# resources in the build directory, but here we tell cmake that we want it
+# in the package
+#install(DIRECTORY resources DESTINATION example_destination)
+
+# now comse everything we need, to create a package
+# there are a lot more variables you can set, and some
+# you need to set for some package types, but we want to
+# be minimal here
+set(CPACK_PACKAGE_NAME "CAESAR")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+
+# we don't want to split our program up into several things
+set(CPACK_MONOLITHIC_INSTALL 1)
+
+# This must be last
+include(CPack)
