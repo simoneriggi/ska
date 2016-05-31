@@ -27,6 +27,8 @@
 
 
 #include <MathUtils.h>
+#include <CodeUtils.h>
+#include <Logger.h>
 
 #include <TMath.h>
 
@@ -64,12 +66,14 @@ int MathUtils::BiLinearInterpolation(std::vector<double>const& sampled_gridX, st
 	long int nSamplesY= (long int)sampled_gridY.size();
 	long int nSamplesZ= (long int)sampledZ.size();
 	if(nSamplesX<=0 || nSamplesY<=0){
-		cerr<<"MathUtils::BiLinearInterpolation(): ERROR: Invalid sample grid size given!"<<endl;
+		//cerr<<"MathUtils::BiLinearInterpolation(): ERROR: Invalid sample grid size given!"<<endl;
+		ERROR_LOG("Invalid sample grid size given!");
 		return -1;
 	}
 	long int num_elements = nSamplesX*nSamplesY;
 	if(nSamplesZ!=num_elements){
-		cerr<<"MathUtils::BiLinearInterpolation(): ERROR: Invalid sample Z given (it must be equal to Nx x Ny and indexed as ix*Ny+iy)!"<<endl;
+		//cerr<<"MathUtils::BiLinearInterpolation(): ERROR: Invalid sample Z given (it must be equal to Nx x Ny and indexed as ix*Ny+iy)!"<<endl;
+		ERROR_LOG("Invalid sample Z given (it must be equal to Nx x Ny and indexed as ix*Ny+iy)!");
 		return -1;
 	}
 
@@ -77,7 +81,8 @@ int MathUtils::BiLinearInterpolation(std::vector<double>const& sampled_gridX, st
 	long int nInterpY= (long int)interp_gridY.size();
   long int num_interp_elements = nInterpX*nInterpY;
 	if(nInterpX<=0 || nInterpY<=0){
-		cerr<<"MathUtils::BiLinearInterpolation(): ERROR: Invalid interpolation grid given (size must be >0 in both directions)!"<<endl;
+		//cerr<<"MathUtils::BiLinearInterpolation(): ERROR: Invalid interpolation grid given (size must be >0 in both directions)!"<<endl;
+		ERROR_LOG("Invalid interpolation grid given (size must be >0 in both directions)!");
 		return -1;
 	}
 	interpZ.clear();
@@ -86,7 +91,9 @@ int MathUtils::BiLinearInterpolation(std::vector<double>const& sampled_gridX, st
 	try {		
 	
 		// Construct the grid in each dimension (note that we will pass in a sequence of iterators pointing to the beginning of each grid)
-		cout<<"MathUtils::BiLinearInterpolation(): INFO: Build 2D grid for interpolation (nSamplesX="<<nSamplesX<<", nSamplesY="<<nSamplesY<<")..."<<endl;
+		//cout<<"MathUtils::BiLinearInterpolation(): INFO: Build 2D grid for interpolation (nSamplesX="<<nSamplesX<<", nSamplesY="<<nSamplesY<<")..."<<endl;
+		DEBUG_LOG("Build 2D grid for interpolation (nSamplesX="<<nSamplesX<<", nSamplesY="<<nSamplesY<<")...");
+
   	std::vector< std::vector<double>::const_iterator > grid_iter_list;
   	grid_iter_list.push_back(sampled_gridX.begin());
   	grid_iter_list.push_back(sampled_gridY.begin());
@@ -97,13 +104,15 @@ int MathUtils::BiLinearInterpolation(std::vector<double>const& sampled_gridX, st
   	grid_sizes[1] = nSamplesY;
   
   	// construct the interpolator. the last two arguments are pointers to the underlying data
-		cout<<"MathUtils::BiLinearInterpolation(): INFO: Build the bkg interpolator..."<<endl;
+		//cout<<"MathUtils::BiLinearInterpolation(): INFO: Build the bkg interpolator..."<<endl;
+		DEBUG_LOG("Build the bkg interpolator...");
   	InterpMultilinear<2, double> interpolator_ML(grid_iter_list.begin(), grid_sizes.begin(), sampledZ.data(), sampledZ.data() + num_elements);
 		
 		
 		//Construct interpolated grid
 		// interpolate multiple values: create sequences for each coordinate
-		cout<<"MathUtils::BiLinearInterpolation(): INFO: Build the interpolated grid ("<<nInterpX<<","<<nInterpY<<") x("<<interp_gridX[0]<<","<<interp_gridX[nInterpX-1]<<") y("<<interp_gridY[0]<<","<<interp_gridY[nInterpY-1]<<")..."<<endl;
+		//cout<<"MathUtils::BiLinearInterpolation(): INFO: Build the interpolated grid ("<<nInterpX<<","<<nInterpY<<") x("<<interp_gridX[0]<<","<<interp_gridX[nInterpX-1]<<") y("<<interp_gridY[0]<<","<<interp_gridY[nInterpY-1]<<")..."<<endl;
+		DEBUG_LOG("Build the interpolated grid ("<<nInterpX<<","<<nInterpY<<") x("<<interp_gridX[0]<<","<<interp_gridX[nInterpX-1]<<") y("<<interp_gridY[0]<<","<<interp_gridY[nInterpY-1]<<")...");
   	
   	//std::vector<double> interp_gridX = CodeUtils::linspace(xlim[0],xlim[1], Nx);
 		//std::vector<double> interp_gridY = CodeUtils::linspace(ylim[0],ylim[1], Ny);
@@ -126,17 +135,19 @@ int MathUtils::BiLinearInterpolation(std::vector<double>const& sampled_gridX, st
   	interp_list.push_back(interp_y.begin());
   
 		//Interpolate sequence
-		cout<<"MathUtils::BiLinearInterpolation(): INFO: Run the interpolation on grid..."<<endl;
+		//cout<<"MathUtils::BiLinearInterpolation(): INFO: Run the interpolation on grid..."<<endl;
+		DEBUG_LOG("Run the interpolation on grid...");
 		interpolator_ML.interp_vec(num_interp_elements, interp_list.begin(), interp_list.end(), interpZ.begin());
-  	cout<<"MathUtils::BiLinearInterpolation(): INFO: done!"<<endl;
-		
+  	
 	}//close try block
 	catch( std::exception &ex ) {
-		cerr << "MathUtils::BiLinearInterpolation(): ERROR: Exception detected in interpolation: " << ex.what() << endl;
+		//cerr << "MathUtils::BiLinearInterpolation(): ERROR: Exception detected in interpolation: " << ex.what() << endl;
+		ERROR_LOG("Exception detected in interpolation (err=" << ex.what()<<")");
 		return -1;
   } 
 	catch(...) { 
-		cerr << "MathUtils::BiLinearInterpolation(): ERROR: C++ exception (unknown reason) in interpolation!" << endl;
+		//cerr << "MathUtils::BiLinearInterpolation(): ERROR: C++ exception (unknown reason) in interpolation!" << endl;
+		ERROR_LOG("Unknown exception caught in interpolation!");
 		return -1;
   }		
 	

@@ -27,6 +27,9 @@
 
 
 #include <SysUtils.h>
+#include <CodeUtils.h>
+#include <Logger.h>
+
 
 #include <boost/filesystem.hpp>
 
@@ -62,11 +65,13 @@ bool SysUtils::CheckFile(std::string path,Caesar::FileInfo& info,bool match_exte
 
 	//Check input file path
 	if(path==""){	
-		cerr<<"SysUtils::CheckFile(): WARNING: Empty filename given!"<<endl;	
+		//cerr<<"SysUtils::CheckFile(): WARNING: Empty filename given!"<<endl;	
+		WARN_LOG("Empty filename given!");
 		return false;
 	}
 	if(!(&info)){
-		cerr<<"SysUtils::CheckFile(): WARNING: Null ptr to file info struct given!"<<endl;	
+		//cerr<<"SysUtils::CheckFile(): WARNING: Null ptr to file info struct given!"<<endl;	
+		ERROR_LOG("Null ptr to file info struct given!");
 		return false;
 	}
 
@@ -75,21 +80,25 @@ bool SysUtils::CheckFile(std::string path,Caesar::FileInfo& info,bool match_exte
 		//Check if file exists on filesystem
 		boost::filesystem::path file_path(path.c_str());
 		if (!boost::filesystem::exists(file_path)){
-			cerr<<"SysUtils::CheckFile(): ERROR: File "<<path<<" not found in local filesystem!"<<endl;
+			//cerr<<"SysUtils::CheckFile(): ERROR: File "<<path<<" not found in local filesystem!"<<endl;
+			ERROR_LOG("File "<<path<<" not found in local filesystem!");
 			return false;
 		}
 		if (!boost::filesystem::is_regular_file(file_path)){
-			cerr<<"SysUtils::CheckFile(): ERROR: File "<<path<<" is not a regular file!"<<endl;
+			//cerr<<"SysUtils::CheckFile(): ERROR: File "<<path<<" is not a regular file!"<<endl;	
+			ERROR_LOG("File "<<path<<" is not a regular file!");
 			return false;
 		}
 		if (boost::filesystem::is_directory(file_path)){
-    	cerr << "SysUtils::CheckFile(): ERROR: File ("<<file_path<<") is a directory!"<<endl;
+    	//cerr << "SysUtils::CheckFile(): ERROR: File ("<<file_path<<") is a directory!"<<endl;
+			ERROR_LOG("File ("<<file_path<<") is a directory!");
 			return false;
     }
 	
 		//Get filename and extension
 		if(!file_path.has_filename()){
-			cerr << "SysUtils::CheckFile(): ERROR: File ("<<file_path<<") does not have a filename!"<<endl;
+			//cerr << "SysUtils::CheckFile(): ERROR: File ("<<file_path<<") does not have a filename!"<<endl;
+			ERROR_LOG("File ("<<file_path<<") does not have a filename!");
 			return false;
 		}
 
@@ -100,7 +109,8 @@ bool SysUtils::CheckFile(std::string path,Caesar::FileInfo& info,bool match_exte
         	
 		//Check extension
 		if(!file_path.has_extension()){
-			cerr << "SysUtils::CheckFile(): ERROR: Given file without extension!"<<endl;
+			//cerr << "SysUtils::CheckFile(): ERROR: Given file without extension!"<<endl;
+			ERROR_LOG("Given file without extension!");
 			return false;
 		}
 
@@ -108,17 +118,21 @@ bool SysUtils::CheckFile(std::string path,Caesar::FileInfo& info,bool match_exte
 		info.extension= file_extension;
 						
 		if(match_extension && file_extension!=extension){
-			cerr<<"SysUtils::CheckFile(): ERROR: Invalid file extension detected ("<<file_extension<<"!="<<extension<<")..."<<endl;
+			//cerr<<"SysUtils::CheckFile(): ERROR: Invalid file extension detected ("<<file_extension<<"!="<<extension<<")..."<<endl;
+			ERROR_LOG("Invalid file extension detected ("<<file_extension<<"!="<<extension<<")...");
 			return false;
 		}
 	
 		//Dump file info
-		info.Print();
+		//info.Print();
+		std::string info_printable= info.GetPrintable();
+		INFO_LOG(info_printable);
 
   }//close try block
 
   catch (const boost::filesystem::filesystem_error& ex) {
-    cerr<<"SysUtils::CheckFile(): ERROR: Exception detected ("<<ex.what()<<")!"<<endl;
+    //cerr<<"SysUtils::CheckFile(): ERROR: Exception detected ("<<ex.what()<<")!"<<endl;
+		ERROR_LOG("Exception detected while checking file (err: "<<ex.what()<<")!");
 		return false;
   }
 

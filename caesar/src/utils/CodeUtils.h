@@ -31,6 +31,9 @@
 
 #include <TObject.h>
 
+#include <boost/regex.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -195,10 +198,67 @@ class CodeUtils : public TObject {
   			return result;
 			}
 
+
+		template< class InputIterator, class Function, class Predicate >
+    static Function for_each_if(InputIterator first, 
+    					 InputIterator last, 
+    					 Predicate pred, 
+    					 Function f)
+    {
+    	for( ; first != last; ++first)
+    	{
+    		if( pred(*first) )
+    			f(*first);
+    	}
+    	return f;
+    };
+
 	private:
 	
 		ClassDef(CodeUtils,1)
 };
+
+
+inline std::string getClassName(std::string fullFuncName,std::string funcName){
+
+	//Init pattern to be searched
+	std::string result= "";
+	//std::string pattern("::(.*)::");//FIX ME!!!
+	std::string pattern("([-A-Za-z0-9_]+)::");
+	pattern+= funcName;
+
+	//Create regex
+	boost::regex expression;
+	try {
+  	expression = pattern;
+  }
+  catch (boost::regex_error& e) {
+  	return result;
+  }
+
+	//Find match
+	boost::smatch matches;
+	if (boost::regex_search(fullFuncName, matches, expression) && matches.size()>1) {
+		result= std::string(matches[1].first, matches[1].second);
+		//result= std::string(matches[matches.size()-1].first, matches[matches.size()-1].second);
+		//for(int i=0;i<matches.size();i++) cout<<"match no. "<<i<<"="<<matches[i]<<endl;
+  }//close if
+	
+	return result;
+
+}//close function
+
+inline std::string getClassNamePrefix(std::string fullFuncName,std::string funcName){
+	std::string className= getClassName(fullFuncName,funcName);
+	std::string sprefix= "::";
+	if(className=="") return className;
+	return className+sprefix;
+}
+
+#define __CLASS__ getClassName(__PRETTY_FUNCTION__,__FUNCTION__)
+#define __CLASS_PREFIX__ getClassNamePrefix(__PRETTY_FUNCTION__,__FUNCTION__)
+#define __DEVICE_CLASS(deviceInstance) deviceInstance->get_device_class()->get_name()
+
 
 #ifdef __MAKECINT__
 #pragma link C++ class CodeUtils+;

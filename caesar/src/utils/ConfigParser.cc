@@ -166,6 +166,20 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(tileMaxX,double,0,-1.e+6,1.e+6);
 		REGISTER_OPTION(tileMinY,double,0,-1.e+6,1.e+6);
 		REGISTER_OPTION(tileMaxY,double,0,-1.e+6,1.e+6);
+
+		//======================
+		//==  Logger options  ==
+		//======================
+		REGISTER_OPTION(loggerTarget,int,1,1,3);//1=CONSOLE, 2=FILE, 3=SYSLOG
+		REGISTER_OPTION(loggerTag,std::string,"logger","","");
+		REGISTER_OPTION(logLevel,std::string,"INFO","","");//INFO, WARN, DEBUG, WARN, ERROR, FATAL
+		REGISTER_OPTION(logFile,std::string,"out.log","","");//only for FILE TARGET
+		REGISTER_OPTION(appendToLogFile,bool,false,false,true);//only for FILE TARGET
+		REGISTER_OPTION(maxLogFileSize,std::string,"10MB","","");//only for FILE TARGET
+		REGISTER_OPTION(maxBackupLogFiles,int,1,1,1000000);//only for FILE TARGET
+		REGISTER_OPTION(consoleTarget,std::string,"System.out","","");//only for CONSOLE TARGET (System.out, System.err)
+		REGISTER_OPTION(syslogFacility,std::string,"local6","","");//only for SYSLOG TARGET (local0-7, user, syslog, ...)
+		
 		
 		//===================
 		//==  Bkg options  ==
@@ -195,9 +209,9 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//==============================
 		//==  Source finding options  ==
 		//==============================
+		REGISTER_OPTION(searchCompactSources,bool,true,false,true);
 		REGISTER_OPTION(searchBrightSources,bool,false,false,true);
 		REGISTER_OPTION(searchFaintSources,bool,false,false,true);
-		REGISTER_OPTION(searchExtendedSources,bool,false,false,true);
 		REGISTER_OPTION(searchNestedSources,bool,true,false,true);
 		REGISTER_OPTION(minNPix,int,10,0,10000);
 		REGISTER_OPTION(seedBrightThr,double,10,0,10000);	
@@ -207,10 +221,15 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(searchNegativeExcess,bool,false,false,true);
 		REGISTER_OPTION(nestedBlobThrFactor,double,1,0,100);
 		REGISTER_OPTION(wtScaleFaint,int,1,1,10);
-		REGISTER_OPTION(wtScaleExtended,int,6,1,10);
-		REGISTER_OPTION(extendedSearchMethod,int,2,1,3);
+		
+		//=======================================
+		//==  Extended Source finding options  ==
+		//=======================================
+		REGISTER_OPTION(searchExtendedSources,bool,false,false,true);
+		REGISTER_OPTION(extendedSearchMethod,int,2,1,3);		
 		REGISTER_OPTION(useResidualInExtendedSearch,bool,true,false,true);
-
+		REGISTER_OPTION(wtScaleExtended,int,6,1,10);
+		
 		//================================
 		//==  Source selection options  ==
 		//================================

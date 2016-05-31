@@ -65,6 +65,16 @@ class FileInfo : public TObject {
 		virtual ~FileInfo(){};
 
 	public:
+		std::string GetPrintable() {
+			std::stringstream ss;
+			ss<<"FileInfo: ";
+			ss<<"path: "<<path<<", ";
+			ss<<"name: "<<filename<<", ";
+			ss<<"namewext: "<<filename_wext<<", ";
+			ss<<"ext: "<<extension<<", ";
+			ss<<"size (kB): "<<size/1024.;
+			return ss.str();
+		}
 		void Print(){
 			cout <<"*** FILE INFO ***"<<endl;
 			cout << "File Path: "<<path<<endl;
