@@ -68,9 +68,9 @@ include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 if(COMPILER_SUPPORTS_CXX11)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64 -DBOOST_LOG_DYN_LINK")
 elseif(COMPILER_SUPPORTS_CXX0X)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64 -DBOOST_LOG_DYN_LINK")
 else()
     message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
@@ -79,6 +79,7 @@ endif()
 #---Here we look for installed software and switch on and of the different build options--------
 include(SearchInstalledSoftware)
 #SFINDER_SHOW_OPTIONS()
+add_definitions(-DBOOST_LOG_USE_NATIVE_SYSLOG -DBOOST_LOG_DYN_LINK)
 #-----------------------------------------------------------------------------------------------
 
 
@@ -127,6 +128,12 @@ list (APPEND INCLUDE_DIRS ${Boost_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${WCSTOOL_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${LINTERP_INCLUDE_DIRS})
+list (APPEND INCLUDE_DIRS ${LOG4CXX_INCLUDE_DIRS})
+if(ENABLE_TANGO)
+	list (APPEND INCLUDE_DIRS ${OMNIORB_INCLUDE_DIR})
+	list (APPEND INCLUDE_DIRS ${ZMQ_INCLUDE_DIR})
+	list (APPEND INCLUDE_DIRS ${TANGO_INCLUDE_DIR})
+endif()
 include_directories(${INCLUDE_DIRS})
 
 # -- debug --
@@ -144,6 +151,12 @@ list (APPEND LINKED_LIBS ${R_LIBRARIES})
 list (APPEND LINKED_LIBS ${Boost_LIBRARIES})
 list (APPEND LINKED_LIBS ${PYTHON_LIBRARIES})
 list (APPEND LINKED_LIBS ${WCSTOOL_LIBRARIES})
+list (APPEND LINKED_LIBS ${LOG4CXX_LIBRARIES})
+if(ENABLE_TANGO)
+	list (APPEND LINKED_LIBS ${OMNIORB_LIBRARIES})
+	list (APPEND LINKED_LIBS ${ZMQ_LIBRARIES})
+	list (APPEND LINKED_LIBS ${TANGO_LIBRARIES})
+endif()
 message (STATUS "LINKED_LIBS: ${LINKED_LIBS}")
 
 
@@ -203,10 +216,10 @@ set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_CL
 #--- Generate classes dictionary
 message (STATUS "DICT_HEADERS: ${DICT_HEADERS}, $DICT_SRCS: ${DICT_SRCS}")
 ##ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} MODULE Caesar LINKDEF LinkDef.h)
-ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} LINKDEF LinkDef.h)
+ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} LINKDEF LinkDef.h OPTIONS -DBOOST_LOG_USE_NATIVE_SYSLOG -DBOOST_LOG_DYN_LINK )
 
 
-#---Create a shared library with geneated dictionary
+#---Create a shared library with generated dictionary
 add_library(Caesar SHARED ${SRCS} CaesarDict.cxx)
 add_dependencies(Caesar LINTERP WCSTools)
 target_link_libraries(Caesar PUBLIC ${LINKED_LIBS})

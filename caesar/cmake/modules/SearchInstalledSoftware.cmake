@@ -30,7 +30,8 @@ message (STATUS "ROOT HEADERS: ${ROOT_INCLUDE_DIRS}, LIBS: ${ROOT_LIBRARIES}")
 #-------------------------
 # -- Check for BOOST -----
 #-------------------------
-find_package(Boost REQUIRED COMPONENTS filesystem system)
+find_package(Boost REQUIRED COMPONENTS filesystem system regex thread log log_setup)
+add_definitions(-DBOOST_LOG_USE_NATIVE_SYSLOG -DBOOST_LOG_DYN_LINK)
 message (STATUS "BOOST HEADERS: ${Boost_INCLUDE_DIRS}, LIBS: ${Boost_LIBRARIES}")
 #-------------------------
 
@@ -61,4 +62,105 @@ find_package (PythonLibs REQUIRED)
 message (STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}, PYTHON_INCLUDE_DIRS: ${PYTHON_INCLUDE_DIRS}")
 
 
+#==================================
+#==   Check for Log4Cxx         ===
+#==================================
+MESSAGE(STATUS "Looking for Log4Cxx")
+FIND_PACKAGE(Log4Cxx REQUIRED)
+MESSAGE(STATUS "LOG4CXX_INCLUDE_DIR: ${LOG4CXX_INCLUDE_DIRS}")
+MESSAGE(STATUS "LOG4CXX_LIBRARIES: ${LOG4CXX_LIBRARIES}")
+
+
+
+
+
+#===========================================
+#==   Check for Tango Framework          ===
+#===========================================
+option(ENABLE_TANGO "Enable Tango in building" OFF)
+if(ENABLE_TANGO)
+	MESSAGE(STATUS "Looking for Tango Framework")
+
+	## Define Tango preprocessor flag
+  add_definitions(-DUSE_TANGO)
+
+	#================================
+	#==   Check for OMNIORB       ===
+	#================================
+	MESSAGE(STATUS "Looking for omniORB")
+	if(NOT DEFINED ENV{OMNI_ROOT})
+		MESSAGE(SEND_ERROR "OMNI_ROOT variable not defined!")
+	endif()
+
+	SET (OMNI_ROOT $ENV{OMNI_ROOT})
+	MESSAGE(STATUS "OMNI_ROOT: ${OMNI_ROOT}")
+
+	FIND_PATH (OMNIORB_INCLUDE_DIR
+		NAMES omniconfig.h
+  	HINTS
+  	${OMNI_ROOT}/include
+	)
+
+	FIND_LIBRARY (OMNIORB_LIB1 NAMES omniORB4 HINTS ${OMNI_ROOT}/lib)
+	FIND_LIBRARY (OMNIORB_LIB2 NAMES COS4 HINTS ${OMNI_ROOT}/lib)
+	FIND_LIBRARY (OMNIORB_LIB3 NAMES omniDynamic4 HINTS ${OMNI_ROOT}/lib)
+	FIND_LIBRARY (OMNIORB_LIB4 NAMES omnithread HINTS ${OMNI_ROOT}/lib)
+	list(APPEND OMNIORB_LIBRARIES ${OMNIORB_LIB1} ${OMNIORB_LIB2} ${OMNIORB_LIB3} ${OMNIORB_LIB4})
+
+	MARK_AS_ADVANCED (OMNIORB_INCLUDE_DIR OMNIORB_LIBRARIES)
+	MESSAGE(STATUS "OMNIORB_INCLUDE_DIR: ${OMNIORB_INCLUDE_DIR}")
+	MESSAGE(STATUS "OMNIORB_LIBRARIES: ${OMNIORB_LIBRARIES}")
+
+	#================================
+	#==   Check for ZMQ           ===
+	#================================
+	MESSAGE(STATUS "Looking for ZMQ")
+	if(NOT DEFINED ENV{ZMQ_ROOT})
+		MESSAGE(SEND_ERROR "ZMQ_ROOT variable not defined!")
+	endif()
+
+	SET (ZMQ_ROOT $ENV{ZMQ_ROOT})
+	MESSAGE(STATUS "ZMQ_ROOT: ${ZMQ_ROOT}")
+
+	FIND_PATH (ZMQ_INCLUDE_DIR
+		NAMES zmq.h
+  	HINTS
+  	${ZMQ_ROOT}/include
+	)
+
+	FIND_LIBRARY (ZMQ_LIBRARIES NAMES zmq HINTS ${ZMQ_ROOT}/lib)
+
+	MARK_AS_ADVANCED (ZMQ_INCLUDE_DIR ZMQ_LIBRARIES)
+	MESSAGE(STATUS "ZMQ_INCLUDE_DIR: ${ZMQ_INCLUDE_DIR}")
+	MESSAGE(STATUS "ZMQ_LIBRARIES: ${ZMQ_LIBRARIES}")
+
+
+	#==================================	
+	#==   Check for TANGO           ===
+	#==================================
+	MESSAGE(STATUS "Looking for TANGO")
+	if(NOT DEFINED ENV{TANGO_ROOT})
+		MESSAGE(SEND_ERROR "TANGO_ROOT variable not defined!")
+	endif()
+
+	SET (TANGO_ROOT $ENV{TANGO_ROOT})
+	MESSAGE(STATUS "TANGO_ROOT: ${TANGO_ROOT}")
+
+	FIND_PATH (TANGO_INCLUDE_DIR
+		NAMES tango.h
+  	HINTS
+  	${TANGO_ROOT}/include/tango
+	)
+
+	add_definitions(-DAPPENDERS_HAVE_LEVEL_THRESHOLD=1)
+
+	FIND_LIBRARY (TANGO_LIB1 NAMES tango HINTS ${TANGO_ROOT}/lib)
+	FIND_LIBRARY (TANGO_LIB2 NAMES log4tango HINTS ${TANGO_ROOT}/lib)
+	list(APPEND TANGO_LIBRARIES ${TANGO_LIB1} ${TANGO_LIB2})
+
+	MARK_AS_ADVANCED (TANGO_INCLUDE_DIR TANGO_LIBRARIES)
+	MESSAGE(STATUS "TANGO_INCLUDE_DIR: ${TANGO_INCLUDE_DIR}")
+	MESSAGE(STATUS "TANGO_LIBRARIES: ${TANGO_LIBRARIES}")
+
+endif() ### close if enable Tango
 
