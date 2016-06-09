@@ -71,18 +71,51 @@ MESSAGE(STATUS "LOG4CXX_INCLUDE_DIR: ${LOG4CXX_INCLUDE_DIRS}")
 MESSAGE(STATUS "LOG4CXX_LIBRARIES: ${LOG4CXX_LIBRARIES}")
 
 
+#==================================
+#==   Check for JSONCPP         ===
+#==================================
+MESSAGE(STATUS "Looking for JSONCPP")
 
+if(NOT DEFINED ENV{JSONCPP_ROOT})
+	MESSAGE(SEND_ERROR "JSONCPP_ROOT variable not defined!")
+endif()
+
+SET (JSONCPP_ROOT $ENV{JSONCPP_ROOT})
+MESSAGE(STATUS "JSONCPP_ROOT: ${JSONCPP_ROOT}")
+
+FIND_PATH (JSONCPP_INCLUDE_DIR
+	NAMES json/json.h
+  HINTS
+ ${JSONCPP_ROOT}/include
+)
+
+FIND_LIBRARY (JSONCPP_LIBRARIES NAMES jsoncpp HINTS ${JSONCPP_ROOT}/lib)
+
+MARK_AS_ADVANCED (JSONCPP_INCLUDE_DIR JSONCPP_LIBRARIES)
+MESSAGE(STATUS "JSONCPP_INCLUDE_DIR: ${JSONCPP_INCLUDE_DIR}")
+MESSAGE(STATUS "JSONCPP_LIBRARIES: ${JSONCPP_LIBRARIES}")
 
 
 #===========================================
 #==   Check for Tango Framework          ===
 #===========================================
-option(ENABLE_TANGO "Enable Tango in building" OFF)
-if(ENABLE_TANGO)
-	MESSAGE(STATUS "Looking for Tango Framework")
+option(ENABLE_SERVER "Enable Caesar server in building" OFF)
+if(ENABLE_SERVER)
+	## Define a preprocessor option
+	add_definitions(-DBUILD_CAESAR_SERVER)
+	
 
-	## Define Tango preprocessor flag
-  add_definitions(-DUSE_TANGO)
+	#================================
+	#==   Check for MSGPACK       ===
+	#================================
+	MESSAGE(STATUS "Looking for MessagePack lib")
+	FIND_PACKAGE(MsgPack REQUIRED)
+	IF (NOT MSGPACK_FOUND)
+		MESSAGE(SEND_ERROR "MessagePack not found!")
+	endif()
+	MESSAGE(STATUS "MSGPACK_INCLUDE_DIR: ${MSGPACK_INCLUDE_DIRS}")
+	MESSAGE(STATUS "MSGPACK_LIBRARIES: ${MSGPACK_LIBRARIES}")
+	
 
 	#================================
 	#==   Check for OMNIORB       ===
@@ -138,7 +171,12 @@ if(ENABLE_TANGO)
 	#==================================	
 	#==   Check for TANGO           ===
 	#==================================
-	MESSAGE(STATUS "Looking for TANGO")
+	MESSAGE(STATUS "Looking for TANGO Framework")
+	
+	## Define Tango preprocessor flag
+  add_definitions(-DUSE_TANGO)
+	add_definitions(-DAPPENDERS_HAVE_LEVEL_THRESHOLD=1)
+
 	if(NOT DEFINED ENV{TANGO_ROOT})
 		MESSAGE(SEND_ERROR "TANGO_ROOT variable not defined!")
 	endif()
@@ -151,8 +189,6 @@ if(ENABLE_TANGO)
   	HINTS
   	${TANGO_ROOT}/include/tango
 	)
-
-	add_definitions(-DAPPENDERS_HAVE_LEVEL_THRESHOLD=1)
 
 	FIND_LIBRARY (TANGO_LIB1 NAMES tango HINTS ${TANGO_ROOT}/lib)
 	FIND_LIBRARY (TANGO_LIB2 NAMES log4tango HINTS ${TANGO_ROOT}/lib)
