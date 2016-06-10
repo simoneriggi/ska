@@ -52,31 +52,7 @@
 #include <log4cxx/helpers/exception.h>
 
 
-/*
-//Boost headers
-#define BOOST_LOG_DYN_LINK 1 // necessary when linking the boost_log library dynamically
-#include <boost/log/core/core.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
-#include <boost/log/common.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/attributes.hpp>
-#include <boost/log/sinks/sink.hpp>
-#include <boost/log/sinks/sync_frontend.hpp>
-#include <boost/log/sinks/syslog_backend.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/regex.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-namespace logging = boost::log;
-namespace src = boost::log::sources;
-namespace sinks = boost::log::sinks;
-namespace keywords = boost::log::keywords;
-*/
-
-
-#include <syslog.h>
-
+//#include <syslog.h>
 
 
 #include <cstdlib>
@@ -99,17 +75,6 @@ using namespace std;
 
 namespace Caesar {
 
-/*
-enum boost_severity_level {	
-	boost_off= 0,
-	boost_fatal= 1,
-	boost_error= 2,
-  boost_warn= 3,
-	boost_info= 4,
-  boost_debug= 5
-};
-BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity",boost_severity_level)
-*/
 
 class Logger : public TObject {
 
@@ -121,9 +86,9 @@ class Logger : public TObject {
 		};
 		virtual ~Logger(){};
 
-	protected:
+	public:
 		#ifdef USE_TANGO
-			virtual log4cxx::LevelPtr GetMappedLogLevel(int level) const {	
+			static log4cxx::LevelPtr GetMappedLogLevel(int level) {	
 				if(level==log4tango::Level::DEBUG) return log4cxx::Level::getDebug();
 				else if(level==log4tango::Level::INFO) return log4cxx::Level::getInfo();
 				else if(level==log4tango::Level::WARN) return log4cxx::Level::getWarn();
@@ -133,18 +98,7 @@ class Logger : public TObject {
 				return log4cxx::Level::getOff();
 			}//close GetMappedLogLevel()
 			
-			/*
-			virtual boost_severity_level GetMappedLogLevel(int level) const {	
-				if(level==log4tango::Level::DEBUG) return boost_debug;
-				else if(level==log4tango::Level::INFO) return boost_info;
-				else if(level==log4tango::Level::WARN) return boost_warn;
-				else if(level==log4tango::Level::ERROR) return boost_error;
-				else if(level==log4tango::Level::FATAL) return boost_fatal;
-				else return boost_off;
-				return boost_off;
-			}//close GetMappedLogLevel()
-			*/
-			virtual log4tango::Level::Value GetTangoLogLevelFromString(std::string sLevel) const {
+			static log4tango::Level::Value GetTangoLogLevelFromString(std::string sLevel) {
   			if (sLevel == "DEBUG") return log4tango::Level::DEBUG;
 				else if (sLevel == "INFO") return log4tango::Level::INFO; 
 				else if (sLevel == "WARN") return log4tango::Level::WARN;
@@ -154,21 +108,7 @@ class Logger : public TObject {
 				else return log4tango::Level::OFF;
 				return log4tango::Level::OFF;
 			}	
-			
 		#endif
-
-		/*
-		boost_severity_level GetMappedLogLevelFromString(const std::string sLevel) const {
-	 		if (sLevel == "DEBUG") return boost_debug;
-			else if (sLevel == "INFO") return boost_info;
-			else if (sLevel == "WARN") return boost_warn;
-			else if (sLevel == "ERROR") return boost_error;
-			else if (sLevel == "FATAL") return boost_fatal;
-			else if (sLevel == "OFF") return boost_off;
-			else return boost_off;
- 			return boost_off;
-		}//close GetMappedLogLevelFromString()
-		*/
 
 	public:
 		virtual int Init() = 0;
@@ -283,7 +223,11 @@ class SysLogger : public Logger {
 
 		
 		virtual int GetFacilityCode(const std::string syslog_facility) const {
-			int syslog_facility_code= LOG_LOCAL6;
+			std::string default_syslog_facility= "LOCAL6";
+			int syslog_facility_code= log4cxx::net::SyslogAppender::getFacility(syslog_facility);
+			if(syslog_facility_code==-1) syslog_facility_code= log4cxx::net::SyslogAppender::getFacility(default_syslog_facility);
+			
+			/*
 			if(syslog_facility=="local0") syslog_facility_code= LOG_LOCAL0;
 			else if(syslog_facility=="local1") syslog_facility_code= LOG_LOCAL1;
 			else if(syslog_facility=="local2") syslog_facility_code= LOG_LOCAL2;
@@ -295,7 +239,7 @@ class SysLogger : public Logger {
 			else if(syslog_facility=="syslog") syslog_facility_code= LOG_SYSLOG;
 			else if(syslog_facility=="user") syslog_facility_code= LOG_USER;
 			else syslog_facility_code= LOG_LOCAL6;
-
+			*/
 			return syslog_facility_code;
 		}//close GetFacilityCode()
 		
@@ -504,10 +448,12 @@ class LoggerManager : public TObject {
 			
 		};
 		virtual ~LoggerManager(){
+			/*
 			if(m_logger){
 				delete m_logger;
 				m_logger= 0;
-			}		
+			}	
+			*/	
 		};
 
 	private:
@@ -525,8 +471,8 @@ class LoggerManager : public TObject {
 class ScopedLogger {
 	public:
 		//--> Constructor
-		ScopedLogger(std::string level,std::string prefix="")
-  		: m_level(level), m_msgprefix(prefix) 
+		ScopedLogger(std::string level,std::string prefix="",std::string device_name="")
+  		: m_level(level), m_msgprefix(prefix), m_deviceName(device_name) 
 		{}
 			
 		//--> Destructor
@@ -534,6 +480,21 @@ class ScopedLogger {
 			//logging command
 			Logger* logger= LoggerManager::Instance().GetLogger();
 			if(logger) logger->Log(m_level, m_sstream.str(), m_msgprefix);			
+
+			//Tango logging
+			#ifdef USE_TANGO	
+				try {
+					Tango::DeviceImpl* ds_impl= Tango::Util::instance(false)->get_device_by_name(m_deviceName);
+					log4tango::Level::Value tango_level= Logger::GetTangoLogLevelFromString(m_level);
+					if(ds_impl && ds_impl->get_logger()->is_level_enabled(tango_level) ) {
+						ds_impl->get_logger()->log(tango_level, m_msgprefix+m_sstream.str());
+					}
+				}
+				catch(Tango::DevFailed& e){
+					//cerr<<"ScopedLogger::~ScopedLogger(): ERROR: Failed to log with Tango logger!"<<endl;
+					//Tango::Except::print_exception(e);
+				}
+			#endif
 		}//close destructor
 
 	public:
@@ -546,15 +507,43 @@ class ScopedLogger {
 		std::stringstream m_sstream;
   	std::string m_level;
 		std::string m_msgprefix;
+		std::string m_deviceName;
 
 };//close ScopedLogger
 
+
+#ifdef USE_TANGO	
+inline std::string GetDeviceName(){	
+	std::string dev_name= "";
+	try {
+		//dev_name= Tango::Util::instance(false)->get_ds_name();
+		std::vector<Tango::DeviceImpl*> dev_list= Tango::Util::instance(false)->get_device_list("*");	
+		if(dev_list.empty()) dev_name= "";
+		else dev_name= dev_list[0]->get_name();
+	}
+	catch(Tango::DevFailed& e){
+		dev_name= "";
+	}
+	return dev_name;
+}
+#endif
 
 //== LOG MACROS ===
 #define LOG_PREFIX \
 	__CLASS_PREFIX__ + __FUNCTION__ + std::string("() - ")
 
-#define LOG(Level, What) ScopedLogger(Level,LOG_PREFIX).stream() << What
+#ifdef USE_TANGO
+	#define DEVICE_NAME GetDeviceName()
+#else 
+	#define	DEVICE_NAME std::string("")
+#endif
+
+#define DEV_LOG(DeviceName, Level, What) \
+	ScopedLogger(Level,LOG_PREFIX,DeviceName).stream() << What
+
+#define LOG(Level, What) DEV_LOG(DEVICE_NAME,Level,What)
+//ScopedLogger(Level,LOG_PREFIX).stream() << What
+
 #define INFO_LOG(What) LOG("INFO",What)
 #define WARN_LOG(What) LOG("WARN",What)
 #define DEBUG_LOG(What) LOG("DEBUG",What)

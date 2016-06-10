@@ -25,6 +25,7 @@
 */
 
 #include <ConfigParser.h>
+#include <Option.h>
 #include <SysUtils.h>
 
 #include <cstdlib>
@@ -38,14 +39,6 @@
 
 using namespace std;
 
-ClassImp(Caesar::OptionBase)
-ClassImp(Caesar::Option<int>)
-ClassImp(Caesar::Option<long int>)
-ClassImp(Caesar::Option<double>)
-ClassImp(Caesar::Option<float>)
-ClassImp(Caesar::Option<std::string>)
-ClassImp(Caesar::Option<bool>)
-ClassImp(Caesar::OptionFactory)
 ClassImp(Caesar::ConfigParser)
 
 namespace Caesar {
@@ -54,7 +47,6 @@ bool ConfigParser::m_HasRegisteredOptions;
 
 ConfigParser::ConfigParser() {
 
-	cout<<"call constructor..."<<endl;
 	m_ConfigFile= "";
 	m_HasRegisteredOptions= false;	
 
@@ -110,6 +102,7 @@ int ConfigParser::Parse(std::string filename){
 		//Get and set option value
 		std::string optionValue= "";
 		line >> optionValue;
+		//cout<<"optionKey="<<optionKey<<" optionValue="<<optionValue<<endl;
 		if(SetOptionFromString(optionKey,optionValue)<0){
 			cerr<<"ConfigParser::Parse(): WARN: Failed to set option "<<optionKey<<" (unregistered?)...skip it!"<<endl;
 			continue;
@@ -287,7 +280,6 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(spMinArea,int,10,1,10000);
 		REGISTER_OPTION(spUseLogContrast,bool,false,false,true);
 				
-		
 		//Set has_registered flag (otherwise options are re-built)
 		m_HasRegisteredOptions= true;
 
