@@ -27,15 +27,16 @@
 #ifndef Serializer_H
 #define Serializer_H
 
-#include <Source.h>
-
-#ifdef BUILD_CAESAR_SERVER
-	#include <tango.h>
+//#ifdef BUILD_CAESAR_SERVER
+	#include <Source.pb.h>
 	#include <msgpack.hpp>
-#endif
+	#include <tango.h>
+//#endif
 
-//# JSON CPP
-//#include <json/json.h>
+#include <Source.h>
+#include <Contour.h>
+
+#include <TVector2.h> 
 
 #include <string>
 #include <ctime>
@@ -49,6 +50,17 @@
 #include <map>
 
 namespace Caesar {
+
+class SBuffer : public TObject {
+	public:
+		SBuffer(){};
+		virtual ~SBuffer(){};
+	public: 
+		std::string data;
+		long int size;
+
+	ClassDef(SBuffer,1)
+};
 
 class Serializer : public TObject {
 
@@ -64,11 +76,22 @@ class Serializer : public TObject {
 
 	public: 
 		
-		#ifdef BUILD_CAESAR_SERVER
+		//#ifdef BUILD_CAESAR_SERVER
+			static int EncodePointToProtobuf(SourcePB::Point& point_pb,TVector2& point);
+			static int EncodeContourToProtobuf(SourcePB::Contour& contour_pb,Contour* contour);
+			static int EncodePixelToProtobuf(SourcePB::Pixel& pixel_pb,Pixel* pixel);
+			static int EncodeBlobToProtobuf(SourcePB::Blob& blob_pb,Source* source);
+			static int EncodeSourceToProtobuf(SourcePB::Source& source_pb,Source* source);
+			static int SourceToBuffer(SBuffer& buffer,Source* source);
+			
+			static int SourceToBuffer(Source* source,msgpack::sbuffer& buffer);
 			static int SourceToString(Source* source,std::string& msg);
 			static int SourceToDevString(Source* source,Tango::DevString& msg);
-			static int SourceToBuffer(Source* source,msgpack::sbuffer& buffer);
-		#endif
+			
+			static int SourceCollectionToBuffer(std::vector<Source*>& sources,msgpack::sbuffer& buffer);
+			static int SourceCollectionToString(std::vector<Source*>& sources,std::string& msg);
+			static int SourceCollectionToDevString(std::vector<Source*>& sources,Tango::DevString& msg);
+		//#endif
 
 		
 	public:
