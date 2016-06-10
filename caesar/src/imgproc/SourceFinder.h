@@ -58,6 +58,12 @@ class Img;
 class Source;
 class BkgData;
 
+enum SegmAlgo {
+	eWT= 1,
+	eHClust= 2,
+	eChanVese= 3,
+};
+
 class SourceFinder : public TObject {
 
 	public:
@@ -119,7 +125,20 @@ class SourceFinder : public TObject {
 		void InitOptions();
 		int Init();
 		int Save();	
-		
+		int FindSources(std::vector<Source*>& sources,Img* inputImg,double seedThr,double mergeThr);
+		int FindCompactSources();
+		int FindResidualMap();
+		int FindExtendedSources();
+		int FindExtendedSources_HClust(Img*);
+		int FindExtendedSources_ChanVese(Img*);
+		int FindExtendedSources_WT(Img*);
+	
+
+		int SelectSources(std::vector<Source*>& sources);
+		bool IsGoodSource(Source* aSource);
+		bool IsPointLikeSource(Source* aSource);
+		int DrawSources(Img* image,std::vector<Source*>& sources);
+
 	public:
 		
 		//Input data
@@ -142,9 +161,12 @@ class SourceFinder : public TObject {
 		int m_DS9RegionFormat;		
 		TTree* m_SourceTree;
 		bool m_SaveSources;
+		bool m_SaveResidualMap;
 
 		//Source
 		Source* m_Source;
+		std::vector<Source*> m_CompactSources;
+		std::vector<Source*> m_ExtendedSources;
 		std::vector<Source*> m_SourceCollection;
 
 		//Read options
@@ -156,6 +178,7 @@ class SourceFinder : public TObject {
 
 		//Bkg computation
 		BkgData* m_BkgData;
+		Img* m_SignificanceMap;
 		bool m_UseLocalBkg;	
 		bool m_Use2ndPassInLocalBkg;
 		bool m_SkipOutliersInLocalBkg;
@@ -167,13 +190,86 @@ class SourceFinder : public TObject {
 		double m_GridSizeX;
 		double m_GridSizeY;
 
+		//Residual map
+		Img* m_ResidualImg;
+		BkgData* m_ResidualBkgData;
+		bool m_DilateNestedSources;
+		int m_DilateKernelSize;
+		int m_DilatedSourceType;
+		int m_DilateSourceModel;
+		bool m_DilateRandomize;
+		bool m_UseResidualInExtendedSearch;
+
+		//Smoothing
+		bool m_UsePreSmoothing;	
+		int m_SmoothFilter;			
+		int m_GausFilterKernSize;
+		double m_GausFilterSigma;
+		double m_GuidedFilterRadius;
+		double m_GuidedFilterColorEps;
+
+
 		//Compact source search
+		bool m_SearchCompactSources;
 		int m_NMinPix;
 		double m_SeedBrightThr;
 		double m_SeedThr;
 		double m_MergeThr;
+		bool m_MergeBelowSeed;
+		bool m_SearchNegativeExcess;
 
-		ClassDef(SourceFinder,1)
+		//Nested source search
+		bool m_SearchNestedSources;
+		double m_NestedBlobThrFactor;
+		
+		//Source selection
+		bool m_ApplySourceSelection;
+		double m_SourceMinBoundingBox;
+		double m_psCircRatioThr;
+		double m_psElongThr;
+		double m_psEllipseAreaRatioMinThr;
+		double m_psEllipseAreaRatioMaxThr;
+		double m_psMaxNPix;
+
+		//Saliency computation
+		Img* m_SaliencyImg;
+		double m_SaliencyThrFactor;
+		double m_SaliencyBkgThrFactor;
+		double m_SaliencyImgThrFactor;
+		int m_SaliencyResoMin;
+		int m_SaliencyResoMax;
+		int m_SaliencyResoStep;
+		bool m_SaliencyUseRobustPars;
+		bool m_SaliencyUseBkgMap;
+		bool m_SaliencyUseNoiseMap;
+		bool m_SaliencyUseCurvInDiss;
+		double m_SaliencyNNFactor;
+		double m_SaliencySpatialRegFactor;
+		double m_SaliencyMultiResoCombThrFactor;
+
+		//Extended sources
+		bool m_SearchExtendedSources;
+		int m_ExtendedSearchMethod;
+		int m_wtScaleExtended;
+
+		//Superpixel options
+		int m_spSize;
+		double m_spBeta;
+		int m_spMinArea;
+		bool m_spUseLogContrast;
+
+		//CHan-Vese options
+		double m_cvTimeStepPar;
+		double m_cvWindowSizePar;
+		double m_cvLambda1Par;
+		double m_cvLambda2Par;
+		double m_cvMuPar;
+		double m_cvNuPar;
+		double m_cvPPar;
+		
+
+
+	ClassDef(SourceFinder,1)
 
 };//close SourceFinder
 

@@ -31,6 +31,10 @@
 #include <Pixel.h>
 #include <Img.h>
 
+#ifdef BUILD_CAESAR_SERVER
+	#include <msgpack.hpp>
+#endif
+
 #include <TObject.h>
 #include <TMatrixD.h>
 #include <TColor.h>
@@ -57,6 +61,17 @@ using namespace std;
 namespace Caesar {
 
 class Contour;
+
+
+struct MatchPixelType {
+	MatchPixelType(const int& type) : m_type(type) {}
+ 	bool operator()(const Pixel* obj) const {
+  	return obj->type == m_type;
+ 	}
+ 	private:
+  	const int& m_type;
+};
+
 
 class Blob : public TObject {
 
@@ -86,6 +101,19 @@ class Blob : public TObject {
 			if(!HasPixels() || index<0 || index>=GetNPixels() ) return 0;
 			return m_Pixels[index];
 		}
+
+		std::vector<int> GetSeedPixelIndexes(){
+			std::vector<int> seedPixelIndexes;
+			if(m_Pixels.empty()) return seedPixelIndexes;
+			std::vector<Pixel*>::iterator it = m_Pixels.begin();
+			while ((it = std::find_if(it, m_Pixels.end(), MatchPixelType(Pixel::eSeed))) != m_Pixels.end()) {
+    		//int id= (*it)->id;
+				int index = std::distance(m_Pixels.begin(), it);
+				seedPixelIndexes.push_back(index);
+    		it++;
+			}//end loop
+			return seedPixelIndexes;
+		}//close GetSeedPixelIndexes()
 		
 		//Parameters
 		int ComputeStats(bool computeRobustStats=true,bool forceRecomputing=false);
@@ -93,6 +121,28 @@ class Blob : public TObject {
 		int ComputeMorphologyParams();
 		bool HasParameters(){return m_HasParameters;}
 
+		double GetM1(){return m_M1;}
+		double GetM2(){return m_M2;}
+		double GetM3(){return m_M3;}
+		double GetM4(){return m_M4;}
+		double GetM1Curv(){return m_M1_curv;}
+		double GetM2Curv(){return m_M2_curv;}
+
+		double GetS(){return m_S;}
+		double GetSmax(){return m_Smax;}
+		double GetSmin(){return m_Smin;}
+		double GetSxx(){return m_Sxx;}
+		double GetSyy(){return m_Syy;}
+		double GetSxy(){return m_Sxy;}
+		double GetSx(){return m_Sx;}
+		double GetSy(){return m_Sy;}
+		long int GetSmaxPixId() {return m_PixIdmax;}
+		long int GetSminPixId() {return m_PixIdmin;}
+		double GetScurv(){return m_S_curv;}
+		double GetSedge(){return m_S_edge;}
+		
+		
+		
 		//Image setters/getters
 		void SetImageRange(double xmin,double xmax,double ymin,double ymax){
 			m_ImageMinX= xmin;
@@ -121,6 +171,19 @@ class Blob : public TObject {
 
 		void SetImageSize(long int Nx,long int Ny){m_ImageSizeX=Nx; m_ImageSizeY=Ny;}
 		void GetImageSize(long int& sizeX,long int& sizeY){sizeX=m_ImageSizeX;sizeY=m_ImageSizeY;}
+
+		void GetSourceRange(double& xmin,double& xmax,double& ymin,double& ymax){
+			xmin= m_Xmin; 
+			xmax= m_Xmax;
+			ymin= m_Ymin;
+			ymax= m_Ymax;
+		}
+		void GetSourcePixelRange(long int& ixmin,long int& ixmax,long int& iymin,long int& iymax){
+			ixmin= m_Ix_min; 
+			ixmax= m_Ix_max;
+			iymin= m_Iy_min;
+			iymax= m_Iy_max;
+		}
 
 		/**
 		* \brief Dump region info
@@ -202,8 +265,8 @@ class Blob : public TObject {
 		double m_Sxy;
 		double m_Sx;//Signal-weighted X position average
 		double m_Sy;//Signal-weighted Y position average
-		int m_PixIdmax;//id of pixel with max signal
-		int m_PixIdmin;//id of pixel with min signal
+		long int m_PixIdmax;//id of pixel with max signal
+		long int m_PixIdmin;//id of pixel with min signal
 		
 		double m_S_curv;//sum of pixel curvature
 		double m_S_edge;//sum of edge estimator
@@ -227,18 +290,38 @@ class Blob : public TObject {
 		double m_Xmax;
 		double m_Ymin;
 		double m_Ymax;
-		int m_Ix_min;
-		int m_Ix_max;
-		int m_Iy_min;
-		int m_Iy_max;
+		long int m_Ix_min;
+		long int m_Ix_max;
+		long int m_Iy_min;
+		long int m_Iy_max;
 
 		//Pixel collection
 		PixelCollection m_Pixels;
 			
 		//Contour collection
 		std::vector<Contour*> m_Contours;
-
+	
 	ClassDef(Blob,1)
+
+	public:
+		#ifdef BUILD_CAESAR_SERVER
+			MSGPACK_DEFINE(
+				HasPixelsAtEdge,Id,Name,
+				NPix,Mean,RMS,Skewness,Median,MedianRMS,X0,Y0,
+				Mean_curv,RMS_curv,Median_curv,MedianRMS_curv,
+				Moments,HuMoments,ZMMoments,
+				m_HasStats,m_HasParameters,
+				m_M1,m_M2,m_M3,m_M4,
+				m_M1_curv,m_M2_curv,
+				m_S,m_Smax,m_Smin,m_Sxx,m_Syy,m_Sxy,m_Sx,m_Sy,m_PixIdmax,m_PixIdmin,
+				m_S_curv,m_S_edge,
+				m_ImageSizeX,m_ImageSizeY,m_ImageMinX,m_ImageMaxX,m_ImageMinY,m_ImageMaxY,m_ImageMinS,m_ImageMaxS,
+				m_ImageMinScurv,m_ImageMaxScurv,m_ImageMinSedge,m_ImageMaxSedge,m_ImageRMS,
+				m_Xmin,m_Xmax,m_Ymin,m_Ymax,m_Ix_min,m_Ix_max,m_Iy_min,m_Iy_max,
+				m_Pixels
+			);
+		#endif
+
 
 };//close Blob()
 

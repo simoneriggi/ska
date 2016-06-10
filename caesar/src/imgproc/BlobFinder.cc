@@ -31,6 +31,7 @@
 #include <BkgData.h>
 #include <Blob.h>
 #include <Source.h>
+#include <Logger.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -72,18 +73,18 @@ int BlobFinder::FloodFill(Img* img,std::vector<int>& clusterPixelIds,int seedPix
 
 	//Check image and given seed id
 	if(!img){
-		cerr<<"BlobFinder::FloodFill(): ERROR: Null ptr given!"<<endl;
+		ERROR_LOG("Null ptr to image given!");
 		return -1;
 	}
 	if(!img->HasBin(seedPixelId)){//check if given seed actually exists
-		cerr<<"BlobFinder::FloodFill(): ERROR: Given seed id is outside image range!"<<endl;
+		ERROR_LOG("Given seed id is outside image range!");
 		return -1;
 	}
 
 	//Check given flood range
 	double seedSignal= img->GetBinContent(seedPixelId);
 	if(seedSignal<floodMinThr || seedSignal>floodMaxThr){
-		cerr<<"BlobFinder::FloodFill(): WARN: Given flood threshold range does not contain seed, no blobs detected!"<<endl;
+		WARN_LOG("Given flood threshold range does not contain seed, no blobs detected!");
 		return -1;
 	}
 	
@@ -162,7 +163,7 @@ int BlobFinder::FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg,Bkg
 
 	//## Check input img
 	if(!inputImg){
-		cout<<"BlobFinder::FindBlobs(): ERROR: Null ptr to given input image!"<<endl;
+		ERROR_LOG("Null ptr to given input image!");
 		return -1;
 	}
 
@@ -191,8 +192,9 @@ int BlobFinder::FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg,Bkg
 		floodMaxThr= seedThr;
 		floodMinThr_inv= seedThr;
 	}
-	cout<<"BlobFinder::FindBlobs(): INFO: Flood thr("<<floodMinThr<<","<<floodMaxThr<<") Flood inv thr("<<floodMinThr_inv<<","<<floodMaxThr_inv<<")"<<endl;
 
+	DEBUG_LOG("Flood thr("<<floodMinThr<<","<<floodMaxThr<<") Flood inv thr("<<floodMinThr_inv<<","<<floodMaxThr_inv<<")");
+	
 	//## Find seed pixels (above seed threshold)	
 	std::vector<int> pixelSeeds;	
 	std::vector<bool> isNegativeExcessSeed;
@@ -213,7 +215,7 @@ int BlobFinder::FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg,Bkg
 		}//end loop y
 	}//end loop x
 	
-	cout<<"BlobFinder::FindBlobs(): INFO: #"<<pixelSeeds.size()<<" seeds found ..."<<endl;
+	DEBUG_LOG("#"<<pixelSeeds.size()<<" seeds found ...");
 
 	//## Perform cluster finding starting from detected seeds
 	int nBlobs= 0;
@@ -242,21 +244,21 @@ int BlobFinder::FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg,Bkg
 			status= FloodFill(floodImg,clusterPixelIds,seedPixelId,floodMinThr,floodMaxThr);
 		}
 		if(status<0) {
-			cerr<<"BlobFinder::FindBlobs(): WARN: Flood fill failed, skip seed!"<<endl;
+			WARN_LOG("Flood fill failed, skip seed!");
 			continue;
 		}
 
 		//Append cluster pixels to a blob object
 		int nClusterPixels= (int)clusterPixelIds.size();
 		if(nClusterPixels==0 || nClusterPixels<minPixels) {//skip small blobs
-			cout<<"BlobFinder::FindBlobs(): INFO: Blob pixels found @ (x,y)=("<<binX<<","<<binY<<") (N="<<nClusterPixels<<") below npix threshold (thr="<<minPixels<<"), skip blob!"<<endl; 
+			DEBUG_LOG("Blob pixels found @ (x,y)=("<<binX<<","<<binY<<") (N="<<nClusterPixels<<") below npix threshold (thr="<<minPixels<<"), skip blob!");
 			continue;
 		}
-		cout<<"BlobFinder::FindBlobs(): INFO: Blob found @ (x,y)=("<<binX<<","<<binY<<") (N="<<nClusterPixels<<")"<<endl;
-
+		DEBUG_LOG("Blob found @ (x,y)=("<<binX<<","<<binY<<") (N="<<nClusterPixels<<")");
+		
 		nBlobs++;	
 		
-		cout<<"BlobFinder::FindBlobs(): INFO: Adding new blob (# "<<nBlobs<<") to list "<<endl;
+		DEBUG_LOG("Adding new blob (# "<<nBlobs<<") to list...");
 		TString blobName= Form("%s_blobId%d",std::string(inputImg->GetName()).c_str(),nBlobs);
 		aBlob= new T;
 		aBlob->SetId(nBlobs);	
@@ -309,11 +311,11 @@ int BlobFinder::FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg,Bkg
 		}
 
 		//## Compute stats
-		cout<<"BlobFinder::FindBlobs(): INFO: Computing blob stats..."<<endl;		
+		DEBUG_LOG("Computing blob stats...");
 		aBlob->ComputeStats();
 		
 		//## Compute morphology parameters
-		cout<<"Img::FindCompactSource(): INFO: Computing morphology params..."<<endl;
+		DEBUG_LOG("Computing blob morphology params...");
 		aBlob->ComputeMorphologyParams();
 
 		//## Add blob to list
@@ -321,7 +323,7 @@ int BlobFinder::FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg,Bkg
 		
 	}//end loop seeds
 
-	cout<<"BlobFinder::FindBlobs(): INFO: #"<<blobs.size()<<" blobs found!"<<endl;
+	INFO_LOG("#"<<blobs.size()<<" blobs found!");
 
 	return 0;
 
@@ -334,7 +336,7 @@ Img* BlobFinder::GetMultiScaleBlobMask(Img* img,int kernelFactor,double sigmaMin
 
 	//## Check imge
 	if(!img){
-		cerr<<"BlobFinder::GetMultiScaleBlobMask(): ERROR: Null ptr to given image!"<<endl;
+		ERROR_LOG("Null ptr to given image!");
 		return 0;
 	}
 
@@ -353,7 +355,7 @@ Img* BlobFinder::GetMultiScaleBlobMask(Img* img,int kernelFactor,double sigmaMin
 		double sigma= sigmaMin + i*sigmaStep;
 		int kernelSize= kernelFactor*sigma;	
 		if(kernelSize%2==0) kernelSize++;
-		cout<<"BlobFinder::GetMultiScaleBlobMask(): INFO: Computing LoG map @ scale "<<sigma<<" (step="<<sigmaStep<<", kernsize="<<kernelSize<<")"<<endl;
+		INFO_LOG("Computing LoG map @ scale "<<sigma<<" (step="<<sigmaStep<<", kernsize="<<kernelSize<<")");
 
 		//Compute LoG filter
 		Img* filterMap= img->GetNormLoGImage(kernelSize,sigma,true);

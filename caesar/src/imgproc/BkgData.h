@@ -29,6 +29,8 @@
 #define BkgData_h 1
 
 #include <Img.h>
+#include <CodeUtils.h>
+#include <Logger.h>
 
 #include <TObject.h>
 #include <cstdlib>
@@ -69,11 +71,21 @@ class BkgSampleData : public TObject{
 			bkgLevel= aBkgSample.bkgLevel;
 			bkgRMS= aBkgSample.bkgRMS;
 		}
+		void Log(std::string level="INFO"){
+			LOG(level,GetPrintable());
+		}
 		void Print(){
 			cout<<"== BKG SAMPLE DATA NO. "<<id<<" =="<<endl;
 			cout<<"N="<<npix<<" xrange("<<ix_min<<","<<ix_max<<") yrange("<<iy_min<<","<<iy_max<<")"<<endl;
 			cout<<"bkgLevel="<<bkgLevel<<" bkgRMS="<<bkgRMS<<endl;
 			cout<<"=================================="<<endl;
+		}
+		std::string GetPrintable(){
+			std::stringstream ss;
+			ss<<"BkgSample no. "<<id<<": ";
+			ss<<"N="<<npix<<", xrange("<<ix_min<<","<<ix_max<<"), yrange("<<iy_min<<","<<iy_max<<"), ";
+			ss<<"bkgLevel="<<bkgLevel<<", bkgRMS="<<bkgRMS;
+			return ss.str();
 		}
 
 	public:	

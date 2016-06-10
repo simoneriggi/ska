@@ -74,9 +74,11 @@ class Source : public Blob {
 		void SetType(SourceType choice){Type=choice;}
 		void SetFlag(SourceFlag choice){Flag=choice;}
 		void SetBeamFluxIntegral(double val){m_BeamFluxIntegral= val;}
+		double GetBeamFluxIntegral(){return m_BeamFluxIntegral;}
 		bool IsGoodSource(){return m_IsGoodSource;}
 		void SetGoodSourceFlag(bool flag){m_IsGoodSource=flag;}
 		void SetDepthLevel(int level){m_DepthLevel=level;}		
+		int GetDepthLevel(){return m_DepthLevel;}
 
 		/**
 		* \brief Is source inside given source
@@ -111,6 +113,17 @@ class Source : public Blob {
 		*/
 		std::vector<Source*>& GetNestedSources(){return m_NestedSources;}
 		/**
+		* \brief Get nested source number
+		*/
+		int GetNestedSourceNumber(){return m_NestedSources.size();}
+		/**
+		* \brief Get nested source
+		*/
+		Source* GetNestedSource(int index){
+			if(index<0 || index>=m_NestedSources.size() || m_NestedSources.size()==0) return 0;
+			return m_NestedSources[index];
+		}
+		/**
 		* \brief Draw contours
 		*/
 		void Draw(bool drawBoundingBox=false,bool drawFittedEllipse=false,bool drawNested=false,int lineColor=kBlack);
@@ -141,6 +154,16 @@ class Source : public Blob {
 
 		ClassDef(Source,1)
 
+	public:
+		#ifdef BUILD_CAESAR_SERVER
+			MSGPACK_DEFINE(
+				MSGPACK_BASE(Blob),
+				Type,Flag,m_BeamFluxIntegral,m_IsGoodSource,
+				m_DepthLevel,m_HasNestedSources
+			)
+		#endif
+//				m_NestedSource,m_NestedSources
+
 };//close Source()
 
 typedef std::vector<Source*> SourceCollection;
@@ -152,5 +175,57 @@ typedef std::vector<Source*> SourceCollection;
 #endif
 
 }//close namespace
+
+
+#ifdef BUILD_CAESAR_SERVER
+	#include <msgpack.hpp>
+
+	//Serialization for TVector2
+	namespace msgpack {
+	MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
+		namespace adaptor {
+
+			/*
+			template<>
+			struct convert<Source> {
+    		msgpack::object const& operator()(msgpack::object const& o, Source& v) const {
+        	if (o.type != msgpack::type::ARRAY) throw msgpack::type_error();
+        	if (o.via.array.size != 2) throw msgpack::type_error();
+        	v = TVector2(
+            o.via.array.ptr[0].as<double>(),
+            o.via.array.ptr[1].as<double>());
+        	return o;
+    		}
+			};//close struct
+			*/
+	
+			template <>
+			struct pack<Caesar::Source*> {
+    		template <typename Stream>
+    			packer<Stream>& operator()(msgpack::packer<Stream>& o, Caesar::Source* v) const {
+        		return o << static_cast<Caesar::Source*>(v);
+    			}
+			};
+
+			template <>
+			struct object_with_zone<Caesar::Source*> {
+    		void operator()(msgpack::object::with_zone& o, Caesar::Source* v) const {
+        	o << static_cast<Caesar::Source*>(v);
+    		}
+			};
+
+			template <>
+			struct object<Caesar::Source*> {
+    		void operator()(msgpack::object& o, Caesar::Source* v) const {
+        	o << static_cast<Caesar::Source*>(v);
+    		}
+			};
+
+
+		} // namespace adaptor
+	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
+} // namespace msgpack
+#endif
+
 
 #endif

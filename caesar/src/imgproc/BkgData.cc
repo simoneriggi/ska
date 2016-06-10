@@ -41,7 +41,7 @@
 #include <math.h>
 using namespace std;
 
-//ClassImp(Caesar::BkgEstimator)
+
 ClassImp(Caesar::BkgSampleData)
 ClassImp(Caesar::BkgData)
 
@@ -71,22 +71,15 @@ void BkgData::CopyBkgMap(Caesar::Img* aMap){
 }//close CopyBkgMap()
 		
 void BkgData::CopyNoiseMap(Caesar::Img* aMap){
-	cout<<"BkgData::CopyNoiseMap(): INFO: Start..."<<endl;
 	if(!aMap) return;
 	TString mapName= "noiseMap";
-	cout<<"BkgData::CopyNoiseMap(): INFO: Before if..."<<endl;	
 	if(NoiseMap) {
-		cout<<"BkgData::CopyNoiseMap(): INFO: Get NoiseMap name..."<<endl;
 		mapName= NoiseMap->GetName();	
-		cout<<"BkgData::CopyNoiseMap(): INFO: Get NoiseMap name after..."<<endl;
 		delete NoiseMap;
-		cout<<"BkgData::CopyNoiseMap(): INFO: Deleted NoiseMap..."<<endl;
 		NoiseMap= 0;
-		cout<<"BkgData::CopyNoiseMap(): INFO: NoiseMap null..."<<endl;	
 	}
-	cout<<"BkgData::CopyNoiseMap(): INFO: get cloned to map name "<<mapName<<" ..."<<endl;
 	NoiseMap= aMap->GetCloned(std::string(mapName),true,true);
-	cout<<"BkgData::CopyNoiseMap(): INFO: get cloned end"<<endl;
+
 }//close CopyNoiseMap()
 		
 }//close namespace

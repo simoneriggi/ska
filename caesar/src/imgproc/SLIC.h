@@ -71,14 +71,12 @@ class SLIC : public TObject {
 		/**
 		* \brief Generate Superpixel partition
 		*/
-		//static SLICData* SPGenerator(Img* img,int regionSize=10,double regParam=1,int minRegionSize=10,bool useLogScaleMapping=false,SLICEdgeModel edgeModel=eKirschEdge);	
 		static SLICData* SPGenerator(Img* img,int regionSize=10,double regParam=1,int minRegionSize=10,bool useLogScaleMapping=false,Img* edgeImg=0);	
 
 	private:
 		/**
 		* \brief Initialize and fill SLIC image data
 		*/
-		//static int Init(SLICData* slicData,Img* img,bool useLogScaleMapping,SLICEdgeModel edgeModel);
 		static int Init(SLICData* slicData,Img* img,bool useLogScaleMapping,Img* edgeImg);
 	
 	private:

@@ -31,6 +31,7 @@
 #include <Pixel.h>
 #include <Contour.h>
 #include <StatsUtils.h>
+#include <Logger.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -305,7 +306,7 @@ int Blob::ComputeStats(bool computeRobustStats,bool forceRecomputing){
 
 int Blob::ComputeMorphologyParams(){
 
-	cout<<"Source::ComputeMorphologyParams(): INFO: Computing morphology parameters..."<<endl;
+	DEBUG_LOG("Computing blob morphology parameters...");
 	if(NPix<=0 || m_Pixels.size()<=0) return -1;
 		
 	//######################################
@@ -313,12 +314,12 @@ int Blob::ComputeMorphologyParams(){
 	//######################################
 	double xRange[2]= {m_Xmin,m_Xmax};
 	double yRange[2]= {m_Ymin,m_Ymax};	
-	int ixRange[2]= {m_Ix_min,m_Ix_max};
-	int iyRange[2]= {m_Iy_min,m_Iy_max};
+	long int ixRange[2]= {m_Ix_min,m_Ix_max};
+	long int iyRange[2]= {m_Iy_min,m_Iy_max};
 	
 	//Bounding box in (x,y) coordinates
-	int boundingBoxX[2];
-	int boundingBoxY[2];
+	long int boundingBoxX[2];
+	long int boundingBoxY[2];
 	int deltaPix= 50;
 	boundingBoxX[0]= xRange[0]-deltaPix;
 	boundingBoxX[1]= xRange[1]+deltaPix;
@@ -326,19 +327,19 @@ int Blob::ComputeMorphologyParams(){
 	boundingBoxY[1]= yRange[1]+deltaPix;
 	
 	//Bounding box in (ix,iy) coordinates
-	int boundingBoxIX[2];
-	int boundingBoxIY[2];	
+	long int boundingBoxIX[2];
+	long int boundingBoxIY[2];	
 	boundingBoxIX[0]= ixRange[0]-deltaPix;
 	boundingBoxIX[1]= ixRange[1]+deltaPix;
 	boundingBoxIY[0]= iyRange[0]-deltaPix;
 	boundingBoxIY[1]= iyRange[1]+deltaPix;
-	int nBoxIX= boundingBoxIX[1]-boundingBoxIX[0]+1;
-	int nBoxIY= boundingBoxIY[1]-boundingBoxIY[0]+1;
+	long int nBoxIX= boundingBoxIX[1]-boundingBoxIX[0]+1;
+	long int nBoxIY= boundingBoxIY[1]-boundingBoxIY[0]+1;
 
-	cout<<"Source::ComputeMorphologyParams(): INFO: xRange("<<xRange[0]<<","<<xRange[1]<<"), yRange("<<yRange[0]<<","<<yRange[1]<<")"<<endl;
-	cout<<"Source::ComputeMorphologyParams(): INFO: ixRange("<<ixRange[0]<<","<<ixRange[1]<<"), iyRange("<<yRange[0]<<","<<iyRange[1]<<")"<<endl;
-	cout<<"Source::ComputeMorphologyParams(): INFO: boundingBoxX("<<boundingBoxX[0]<<","<<boundingBoxX[1]<<"), boundingBoxY("<<boundingBoxY[0]<<","<<boundingBoxY[1]<<")"<<endl;
-	cout<<"Source::ComputeMorphologyParams(): INFO: boundingBoxIX("<<boundingBoxIX[0]<<","<<boundingBoxIX[1]<<"), boundingBoxIY("<<boundingBoxIY[0]<<","<<boundingBoxIY[1]<<")"<<"  nBoxIX="<<nBoxIX<<", nBoxIY="<<nBoxIY<<endl;
+	DEBUG_LOG("xRange("<<xRange[0]<<","<<xRange[1]<<"), yRange("<<yRange[0]<<","<<yRange[1]<<")");
+	DEBUG_LOG("ixRange("<<ixRange[0]<<","<<ixRange[1]<<"), iyRange("<<yRange[0]<<","<<iyRange[1]<<")");
+	DEBUG_LOG("boundingBoxX("<<boundingBoxX[0]<<","<<boundingBoxX[1]<<"), boundingBoxY("<<boundingBoxY[0]<<","<<boundingBoxY[1]<<")");
+	DEBUG_LOG("boundingBoxIX("<<boundingBoxIX[0]<<","<<boundingBoxIX[1]<<"), boundingBoxIY("<<boundingBoxIY[0]<<","<<boundingBoxIY[1]<<")"<<"  nBoxIX="<<nBoxIX<<", nBoxIY="<<nBoxIY);
 
 	//## Fill image and binarized image
 	cv::Mat binarizedImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_8UC1);
@@ -347,12 +348,12 @@ int Blob::ComputeMorphologyParams(){
 	for(unsigned int k=0;k<m_Pixels.size();k++){
 		Pixel* thisPixel= m_Pixels[k];
 		double thisS= thisPixel->S;	
-		int ix= thisPixel->ix;
-		int iy= thisPixel->iy;	
+		long int ix= thisPixel->ix;
+		long int iy= thisPixel->iy;	
 		ix-= boundingBoxIX[0];
 		iy-= boundingBoxIY[0];
-		int rowId= nBoxIY-1-iy;
-		int colId= nBoxIX-1-ix;
+		long int rowId= nBoxIY-1-iy;
+		long int colId= nBoxIX-1-ix;
 		binarizedImg.at<uchar>(rowId, colId, 0) = 1;
 		rasterImg.at<double>(rowId, colId, 0) = thisS;		
 	}//end loop pixels
@@ -375,8 +376,9 @@ int Blob::ComputeMorphologyParams(){
 		//Create and fill contour
 		aContour= new Contour;
 
-		cout<<"Source::ComputeMorphologyParams(): INFO: Contour no. "<<i+1<<": (";
 		
+		std::stringstream sstream;
+		sstream<<"Contour no. "<<i+1<<": (";
 		for(int j=0;j<nContourPts;j++){
 			int contx= contours[i][j].x;
 			int conty= contours[i][j].y;
@@ -387,14 +389,15 @@ int Blob::ComputeMorphologyParams(){
 			//aContour->AddPoint(cv::Point2f(contx_transf,conty_transf));
 			aContour->AddPoint(TVector2(contx_transf,conty_transf));
 			//cout<<"("<<contx<<","<<conty<<"), ";
-			cout<<"("<<contx_transf<<","<<conty_transf<<"), ";
+			sstream<<"("<<contx_transf<<","<<conty_transf<<"), ";
 		}//end loop points in contour
-		cout<<")"<<endl;
+		sstream<<")";
+		DEBUG_LOG(sstream.str());
 		
 
 		//Compute contour parameters
 		if(aContour->ComputeParameters()<0){
-			cerr<<"Source::ComputeMorphologyParams(): WARN: Failed to compute parameters for contour no. "<<i<<"!"<<endl;
+			WARN_LOG("Failed to compute parameters for contour no. "<<i<<"!");
 			//delete fContour;
 			//continue;
 		}

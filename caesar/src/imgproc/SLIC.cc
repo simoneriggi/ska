@@ -61,7 +61,7 @@ SLIC::~SLIC(){
 
 }//close destructor
 
-//int SLIC::Init(SLICData* slicData,Img* img,bool useLogScaleMapping,SLICEdgeModel edgeModel){
+
 int SLIC::Init(SLICData* slicData,Img* img,bool useLogScaleMapping,Img* edgeImg){
 
 	//## Check SLICData and clear existing data
@@ -178,7 +178,7 @@ int SLIC::Init(SLICData* slicData,Img* img,bool useLogScaleMapping,Img* edgeImg)
 
 }//close Init()
 
-//SLICData* SLIC::SPGenerator(Img* img,int regionSize,double regParam, int minRegionSize, bool useLogScaleMapping, SLICEdgeModel edgeModel){
+
 SLICData* SLIC::SPGenerator(Img* img,int regionSize,double regParam, int minRegionSize, bool useLogScaleMapping, Img* edgeImg){
 
 	//## Check inputs

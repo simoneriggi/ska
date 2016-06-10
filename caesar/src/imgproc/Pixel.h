@@ -28,6 +28,9 @@
 #ifndef Pixel_h
 #define Pixel_h 1
 
+#ifdef BUILD_CAESAR_SERVER
+	#include <msgpack.hpp>
+#endif
 
 #include <TObject.h>
 
@@ -52,6 +55,9 @@
 
 using namespace std;
 
+#ifdef BUILD_CAESAR_SERVER
+//	MSGPACK_ADD_ENUM(PixelType);
+#endif
 
 namespace Caesar {
 
@@ -67,13 +73,14 @@ class Pixel : public TObject {
 
 	public: 
 		void SetPhysCoords(double xx,double yy){x=xx;y=yy;}
-		void SetCoords(int i,int j){ix=i;iy=j;}
+		void SetCoords(long int i,long int j){ix=i;iy=j;}
 		void SetBkg(double bkg,double noise){bkgLevel=bkg;noiseLevel=noise;}
 		void SetCurv(double val){S_curv=val;}
 		void SetEdge(double val){S_edge=val;}
 		std::pair<double,double> GetBkg(){return std::make_pair(bkgLevel,noiseLevel);}
 		double GetCurv(){return S_curv;}
 		double GetEdge(){return S_edge;}
+		
 
 	private:
 		void Init();
@@ -83,13 +90,13 @@ class Pixel : public TObject {
 		void ResetPixels();
 
 	public:
-		int id;//global bin id of reference image	
+		long int id;//global bin id of reference image	
 		PixelType type;//pixel flag
 		double S;//pixel intensity
 		double x;//pixel x coordinate
 		double y;//pixel y coordinate
-		int ix;//pixel id x
-		int iy;//pixel id y
+		long int ix;//pixel id x
+		long int iy;//pixel id y
 		bool isOnEdge;//flag marking if pixel is found on region contour
 		double distanceToEdge;//distance to the edge (=0 for edge pixels)		
 
@@ -104,6 +111,15 @@ class Pixel : public TObject {
 	friend class Blob;
 
 	ClassDef(Pixel,1)
+
+	public:
+		#ifdef BUILD_CAESAR_SERVER
+			MSGPACK_DEFINE(
+				id,type,S,x,y,ix,iy,isOnEdge,distanceToEdge,
+				S_curv,S_edge,
+				bkgLevel,noiseLevel
+			)
+		#endif
 };
 typedef std::vector<Pixel*> PixelCollection;
 typedef std::map<int,Pixel*> PixelMap;
@@ -116,6 +132,44 @@ typedef std::map<int,Pixel*> PixelMap;
 #endif
 
 }//close namespace
+
+
+#ifdef BUILD_CAESAR_SERVER
+	MSGPACK_ADD_ENUM(Caesar::Pixel::PixelType);
+	
+	//Serialization for Pixel*
+	namespace msgpack {
+	MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
+		namespace adaptor {
+
+			template <>
+			struct pack<Caesar::Pixel*> {
+    		template <typename Stream>
+    			packer<Stream>& operator()(msgpack::packer<Stream>& o, Caesar::Pixel* v) const {
+        		return o << static_cast<Caesar::Pixel*>(v);
+    			}
+			};
+
+			template <>
+			struct object_with_zone<Caesar::Pixel*> {
+    		void operator()(msgpack::object::with_zone& o, Caesar::Pixel* v) const {
+        	o << static_cast<Caesar::Pixel*>(v);
+    		}
+			};
+
+			template <>
+			struct object<Caesar::Pixel*> {
+    		void operator()(msgpack::object& o, Caesar::Pixel* v) const {
+        	o << static_cast<Caesar::Pixel*>(v);
+    		}
+			};
+
+
+		} // namespace adaptor
+	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
+} // namespace msgpack
+#endif
+
 
 #endif
 

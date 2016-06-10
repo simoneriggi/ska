@@ -29,6 +29,9 @@
 #define Contour_h 1
 
 
+
+#include <Logger.h>
+
 #include <TGraph.h>
 #include <TPolyLine.h>
 #include <TPaveText.h>
@@ -54,6 +57,55 @@
 
 
 using namespace std;
+
+#ifdef BUILD_CAESAR_SERVER
+	#include <msgpack.hpp>
+
+	//Serialization for TVector2
+	namespace msgpack {
+	MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
+		namespace adaptor {
+
+			template<>
+			struct convert<TVector2> {
+    		msgpack::object const& operator()(msgpack::object const& o, TVector2& v) const {
+        	if (o.type != msgpack::type::ARRAY) throw msgpack::type_error();
+        	if (o.via.array.size != 2) throw msgpack::type_error();
+        	v = TVector2(
+            o.via.array.ptr[0].as<double>(),
+            o.via.array.ptr[1].as<double>());
+        	return o;
+    		}
+			};//close struct
+
+			template<>
+			struct pack<TVector2> {
+    		template <typename Stream>
+    			packer<Stream>& operator()(msgpack::packer<Stream>& o, TVector2 const& v) const {
+      	  	// packing member variables as an array.
+      	  	o.pack_array(2);
+      	  	o.pack(v.X());
+      	  	o.pack(v.Y());
+      	  	return o;
+    			}
+			};//close struct
+
+			template <>
+			struct object_with_zone<TVector2> {
+    		void operator()(msgpack::object::with_zone& o, TVector2 const& v) const {
+      		o.type = type::ARRAY;
+        	o.via.array.size = 2;
+        	o.via.array.ptr = static_cast<msgpack::object*>(
+        	o.zone.allocate_align(sizeof(msgpack::object) * o.via.array.size));
+        	o.via.array.ptr[0] = msgpack::object(v.X(), o.zone);
+      		o.via.array.ptr[1] = msgpack::object(v.Y(), o.zone);
+    		}
+			};//close struct
+		} // namespace adaptor
+	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
+} // namespace msgpack
+#endif
+
 
 namespace Caesar {
 
@@ -95,7 +147,6 @@ class Contour : public TObject {
 		/**
 		* \brief Get contour point with given index
 		*/
-		//cv::Point2f* GetPoint(int i){
 		TVector2* GetPoint(int i){
 			if(GetN()<=0 || i<0 || i>=GetN()) return 0;
 			return (&m_Points[i]);
@@ -103,7 +154,6 @@ class Contour : public TObject {
 		/**
 		* \brief Add contour points
 		*/
-		//void AddPoint(cv::Point2f p){
 		void AddPoint(TVector2 p){
 			m_Points.push_back(p);
 		}
@@ -139,7 +189,9 @@ class Contour : public TObject {
 		* \brief Compute shape parameters
 		*/
 		void ComputeShapeParams();
-
+		/**
+		* \brief Dump
+		*/
 		void Dump(){
 			cout<<"== ContourINFO =="<<endl;
 			cout<<"C("<<Centroid.X()<<","<<Centroid.Y()<<") Area: "<<Area<<", Perimeter: "<<Perymeter<<" BoundingBox: ("<<BoundingBoxMin<<","<<BoundingBoxMaj<<","<<BoundingBoxAngle<<")"<<endl;
@@ -150,6 +202,28 @@ class Contour : public TObject {
 			cout<<")"<<endl;
 			cout<<"================="<<endl;
 		}//close Dump()
+
+		/**
+		* \brief Log 
+		*/
+		void Log(std::string level="INFO"){
+			LOG(level,GetPrintable());
+		}
+
+		/**
+		* \brief GetPrintable
+		*/
+		std::string GetPrintable(){
+			std::stringstream ss;
+			ss<<"ContourInfo: ";
+			ss<<"C("<<Centroid.X()<<","<<Centroid.Y()<<") Area: "<<Area<<", Perimeter: "<<Perymeter<<" BoundingBox: ("<<BoundingBoxMin<<","<<BoundingBoxMaj<<","<<BoundingBoxAngle<<"), ";
+			ss<<"Elong: "<<Elongation<<" Rectangularity: "<<Rectangularity<<" Roundness="<<Roundness<<" Eccentricity="<<Eccentricity<<", ";
+			ss<<"CircularityRatio: "<<CircularityRatio<<" EllipseAreaRatio="<<EllipseAreaRatio<<" Ellipse("<<EllipseCenter.X()<<","<<EllipseCenter.Y()<<","<<EllipseMinAxis<<","<<EllipseMajAxis<<","<<EllipseRotAngle<<"), ";
+			ss<<"HuMoments=(";
+			for(int k=0;k<7;k++) ss<<HuMoments[k]<<",";
+			ss<<")";
+			return ss.str();
+		}
 
 	private:
 		void ComputeArea();
@@ -219,7 +293,6 @@ class Contour : public TObject {
   		return v;
 		}//close EllipseFitChi2()
 
-		
 
 	public:	
 		bool HasParameters;
@@ -272,11 +345,15 @@ class Contour : public TObject {
 		double nu12;
 		double nu03;
 
-		double HuMoments[7];
-		TVector2 BoundingBoxVertex[4];	
+		//double HuMoments[7];
+		std::vector<double> HuMoments;
+		//TVector2 BoundingBoxVertex[4];	
+		std::vector<TVector2> BoundingBoxVertex;
 		TVector2 Centroid;
 		
-		std::vector< std::complex<double> > FDs;
+		//std::vector< std::complex<double> > FDs;
+		std::vector<double> RealFDs;
+		std::vector<double> ImagFDs;
 		std::vector<double> ModFDs;//module of complex Fourier descriptors
 		std::vector<double> BendingEnergies;
 		std::vector<double> CentroidDistanceModFDs;//module of complex Fourier descriptors
@@ -285,6 +362,22 @@ class Contour : public TObject {
 		Points m_Points;	
 		
 	ClassDef(Contour,1)
+
+	public:	
+		#ifdef BUILD_CAESAR_SERVER
+			MSGPACK_DEFINE(
+				HasParameters,Area,Perymeter,IsConvexContour,CircularityRatio,
+				BoundingBoxMaj,BoundingBoxMin,BoundingBoxAngle,
+				Elongation,Rectangularity,Roundness,Eccentricity,TiltAngle,
+				HasEllipseFit,EllipseMajAxis,EllipseMinAxis,EllipseRotAngle,EllipseFitRedChi2,EllipseAreaRatio,
+				BoundingBoxCenter,EllipseCenter,
+				m00,m10,m01,m20,m11,m02,m30,m21,m12,m03,mu20,mu11,mu02,mu30,mu21,mu12,mu03,
+		 		nu20,nu11,nu02,nu30,nu21,nu12,nu03,
+				HuMoments,BoundingBoxVertex,Centroid,
+				RealFDs,ImagFDs,ModFDs,BendingEnergies,CentroidDistanceModFDs,
+				m_Points
+			)
+		#endif
 
 };//close class
 

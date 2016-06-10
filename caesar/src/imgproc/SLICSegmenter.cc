@@ -168,7 +168,7 @@ int SLICSegmenter::FindSegmentation(SLICData const& slicData,SLICData& segmSlicD
 			return -1;
 		}	
 		int nRegions_afterMerging= segmSlicData.GetNRegions();
-		cout<<"SLICSegmenter::MultiStepSPMerger(): INFO: Merged signal regions (NR="<<nRegions_afterMerging-nRegions_beforeMerging<<")"<<endl;
+		cout<<"SLICSegmenter::FindSegmentation(): INFO: Merged signal regions (NR="<<nRegions_afterMerging-nRegions_beforeMerging<<")"<<endl;
 	}//close if
 	
 
@@ -233,7 +233,7 @@ int SLICSegmenter::FindSegmentation(SLICData const& slicData,SLICData& segmSlicD
 			nSignalRegions++;
 		}
 		else{
-			cerr<<"SLICSegmenter::MultiStepSPMerger(): WARN: Untagged region present (CHECK!!!!)"<<endl;
+			cerr<<"SLICSegmenter::FindSegmentation(): WARN: Untagged region present (CHECK!!!!)"<<endl;
 		}
 	}//end loop regions
 

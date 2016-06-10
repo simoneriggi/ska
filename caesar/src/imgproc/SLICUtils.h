@@ -77,7 +77,6 @@ class SLICUtils : public TObject {
 	public:
 		
 		static SLICContourData* ComputeBoundaryContours(SLICData* slicData);
-		//static SLICSimilarityData* ComputeRegionSimilarity(SLICData* slicData,SLICContourData* contourData,double beta=0.5,bool includeSpatialDist=false,int mergedTag=-1);
 		static SLICSimilarityData* ComputeRegionSimilarity(SLICData* slicData,std::vector<SLICNeighborCollection>& neighbors,double beta=0.5);
 
 		static int FindNeighbors(std::vector<SLICNeighborCollection>& neighbors,SLICData* slicData,SLICContourData* contourData,bool get2ndNeighbors=true,int selectedTag=-1,bool includeSpatialDist=false);
