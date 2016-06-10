@@ -104,6 +104,16 @@ if(ENABLE_SERVER)
 	## Define a preprocessor option
 	add_definitions(-DBUILD_CAESAR_SERVER)
 	
+	#=================================
+	#==   Check for PROTOBUF       ===
+	#=================================
+	MESSAGE(STATUS "Looking for Protobuf lib")
+	FIND_PACKAGE(Protobuf REQUIRED COMPONENTS protobuf protoc)
+	IF (NOT PROTOBUF_FOUND)
+		MESSAGE(SEND_ERROR "Protobuf not found!")
+	endif()
+	MESSAGE(STATUS "PROTOBUF_INCLUDE_DIR: ${PROTOBUF_INCLUDE_DIRS}")
+	MESSAGE(STATUS "PROTOBUF_LIBRARIES: ${PROTOBUF_LIBRARIES}")
 
 	#================================
 	#==   Check for MSGPACK       ===

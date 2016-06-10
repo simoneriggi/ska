@@ -71,18 +71,33 @@
 #pragma link C++ function Caesar::StatsUtils::GetBiWeightEstimators<long int>;
 //==============
 
+//== LOGGER ==
+#pragma link C++ class Caesar::Logger+;
+#pragma link C++ class Caesar::SysLogger+;
+#pragma link C++ class Caesar::FileLogger+;
+#pragma link C++ class Caesar::ConsoleLogger+;
+#pragma link C++ class Caesar::LoggerManager+;
+
 //== CNFIG PARSER ==
 #pragma link C++ class Caesar::OptionBase+;
-//#pragma link C++ class Caesar::OptionBasePtr+;
 #pragma link C++ class Caesar::OptionBase*+;
 #pragma link C++ class std::map<std::string,Caesar::OptionBase*>+;
-//#pragma link C++ typedef Caesar::OptionMap+;
+
 #pragma link C++ class Caesar::Option<int>+;
 #pragma link C++ class Caesar::Option<long int>+;
 #pragma link C++ class Caesar::Option<float>+;
 #pragma link C++ class Caesar::Option<double>+;
 #pragma link C++ class Caesar::Option<std::string>+;
 #pragma link C++ class Caesar::Option<bool>+;
+#pragma link C++ class Caesar::Option<char*>+;
+
+#pragma link C++ class Caesar::Option<std::vector<int>>+;
+#pragma link C++ class Caesar::Option<std::vector<long int>>+;
+#pragma link C++ class Caesar::Option<std::vector<float>>+;
+#pragma link C++ class Caesar::Option<std::vector<double>>+;
+#pragma link C++ class Caesar::Option<std::vector<std::string>>+;
+#pragma link C++ class Caesar::Option<std::vector<bool>>+;
+#pragma link C++ class Caesar::Option<std::vector<char*>>+;
 
 #pragma link C++ class Caesar::Option<int>*+;
 #pragma link C++ class Caesar::Option<long int>*+;
@@ -90,6 +105,48 @@
 #pragma link C++ class Caesar::Option<double>*+;
 #pragma link C++ class Caesar::Option<std::string>*+;
 #pragma link C++ class Caesar::Option<bool>*+;
+#pragma link C++ class Caesar::Option<char*>*+;
+
+#pragma link C++ class Caesar::Option<std::vector<int>>*+;
+#pragma link C++ class Caesar::Option<std::vector<long int>>*+;
+#pragma link C++ class Caesar::Option<std::vector<float>>*+;
+#pragma link C++ class Caesar::Option<std::vector<double>>*+;
+#pragma link C++ class Caesar::Option<std::vector<std::string>>*+;
+#pragma link C++ class Caesar::Option<std::vector<bool>>*+;
+#pragma link C++ class Caesar::Option<std::vector<char*>>*+;
+
+
+#pragma link C++ class Caesar::OptionHelper<int>+;
+#pragma link C++ class Caesar::OptionHelper<long int>+;
+#pragma link C++ class Caesar::OptionHelper<float>+;
+#pragma link C++ class Caesar::OptionHelper<double>+;
+#pragma link C++ class Caesar::OptionHelper<std::string>+;
+#pragma link C++ class Caesar::OptionHelper<bool>+;
+#pragma link C++ class Caesar::OptionHelper<char*>+;
+
+#pragma link C++ class Caesar::OptionHelper<std::vector<int>>+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<long int>>+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<float>>+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<double>>+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<std::string>>+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<bool>>+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<char*>>+;
+
+#pragma link C++ class Caesar::OptionHelper<int>*+;
+#pragma link C++ class Caesar::OptionHelper<long int>*+;
+#pragma link C++ class Caesar::OptionHelper<float>*+;
+#pragma link C++ class Caesar::OptionHelper<double>*+;
+#pragma link C++ class Caesar::OptionHelper<std::string>*+;
+#pragma link C++ class Caesar::OptionHelper<bool>*+;
+#pragma link C++ class Caesar::OptionHelper<char*>*+;
+
+#pragma link C++ class Caesar::OptionHelper<std::vector<int>>*+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<long int>>*+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<float>>*+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<double>>*+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<std::string>>*+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<bool>>*+;
+#pragma link C++ class Caesar::OptionHelper<std::vector<char*>*>+;
 
 #pragma link C++ class Caesar::OptionFactory+;
 #pragma link C++ class Caesar::ConfigParser+;
@@ -164,5 +221,11 @@
 //ChanVese segmenter
 #pragma link C++ class Caesar::SourceFinder+;
 //======================
+
+//== SERVER ==
+#pragma link C++ class Caesar::SBuffer+;
+#pragma link C++ class Caesar::Serializer+;
+//======================
+
 
 #endif

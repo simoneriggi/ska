@@ -134,6 +134,7 @@ list (APPEND INCLUDE_DIRS ${LINTERP_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${LOG4CXX_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
 if(ENABLE_SERVER)
+	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
 	list (APPEND INCLUDE_DIRS ${MSGPACK_INCLUDE_DIRS})
 	list (APPEND INCLUDE_DIRS ${OMNIORB_INCLUDE_DIR})
 	list (APPEND INCLUDE_DIRS ${ZMQ_INCLUDE_DIR})
@@ -159,6 +160,7 @@ list (APPEND LINKED_LIBS ${WCSTOOL_LIBRARIES})
 list (APPEND LINKED_LIBS ${LOG4CXX_LIBRARIES})
 list (APPEND LINKED_LIBS ${JSONCPP_LIBRARIES})
 if(ENABLE_SERVER)
+	list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
 	list (APPEND LINKED_LIBS ${MSGPACK_LIBRARIES})
 	list (APPEND LINKED_LIBS ${OMNIORB_LIBRARIES})
 	list (APPEND LINKED_LIBS ${ZMQ_LIBRARIES})
@@ -195,6 +197,74 @@ message (STATUS "LINTERP_DOWNLOAD_DEST_DIR: ${LINTERP_DOWNLOAD_DEST_DIR}")
 message (STATUS "LINTERP_BUILD_DIR: ${LINTERP_BUILD_DIR}")
 message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
 
+
+#-----------------------------------------------------------------------------------------------
+#---  GENERATE PROTOBUF SOURCES
+#-----------------------------------------------------------------------------------------------
+if(ENABLE_SERVER)
+	MESSAGE(STATUS PROTO_FILES: ${PROTO_FILES})
+	MESSAGE(STATUS PROTO_SRCS: ${PROTO_SRCS})
+	MESSAGE(STATUS PROTO_HEADERS: ${PROTO_HEADERS})
+		
+	set(GEN_PROTO_SRCS "")
+	set(GEN_PROTO_HEADERS "")
+	foreach (_protoFile ${PROTO_SRCS})
+		list (APPEND GEN_PROTO_SRCS ${CMAKE_BINARY_DIR}/${_protoFile})
+	endforeach()
+	foreach (_protoFile ${PROTO_HEADERS})
+		list (APPEND GEN_PROTO_HEADERS ${CMAKE_BINARY_DIR}/${_protoFile})
+	endforeach()
+	list(REMOVE_DUPLICATES GEN_PROTO_SRCS)
+	list(REMOVE_DUPLICATES GEN_PROTO_HEADERS)
+	MESSAGE(STATUS GEN_PROTO_SRCS: ${GEN_PROTO_SRCS})
+	MESSAGE(STATUS GEN_PROTO_HEADERS: ${GEN_PROTO_HEADERS})
+
+	
+	SET(proto_args 
+  	PROTOFILES ${PROTO_FILES}
+		OUTPATH ${CMAKE_BINARY_DIR}
+	)
+	PROTOBUF_GENERATE_CPP(PROTO_GEN_SRCS PROTO_GEN_HEADERS ${proto_args})	
+	MESSAGE(STATUS PROTO_GEN_SRCS: ${PROTO_GEN_SRCS})
+	MESSAGE(STATUS PROTO_GEN_HEADERS: ${PROTO_GEN_HEADERS})
+	
+	SET_SOURCE_FILES_PROPERTIES(${GEN_PROTO_SRCS} ${GEN_PROTO_HEADERS} PROPERTIES GENERATED TRUE)
+	
+	# Dummy output which is never actually produced. Anything that depends on this will always be rebuilt.
+	add_custom_command(
+  	OUTPUT always_rebuild
+    COMMAND cmake -E echo
+  )
+
+	# custom_output will always be rebuilt because it depends on always_rebuild
+	add_custom_command(
+  	OUTPUT proto_generation
+    COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
+    DEPENDS always_rebuild
+  )
+
+	add_custom_target(ProtobufSchema ALL 
+		DEPENDS proto_generation
+  )
+
+	
+	#ExternalProject_Add(ProtobufSchema
+	#	DOWNLOAD_COMMAND ""
+	#	BINARY_DIR ${CMAKE_BINARY_DIR}
+  #	BUILD_IN_SOURCE 0
+  #	CONFIGURE_COMMAND ""
+	#	BUILD_COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
+	#	INSTALL_COMMAND cp ${GEN_PROTO_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
+	#)
+
+	#ExternalProject_Add_Step(ProtobufSchema Generation # Names of project and custom step
+  #	COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
+  #	COMMENT "Regenerating proto srcs & heads..."]     # Text printed when step executes
+  #	ALWAYS 1              # No stamp file, step always runs
+ 	#)
+
+endif()
+
 #-----------------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------------
@@ -228,7 +298,9 @@ ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} LINKDEF LinkDef.h OPTIONS -D
 
 #---Create a shared library with generated dictionary
 add_library(Caesar SHARED ${SRCS} CaesarDict.cxx)
-add_dependencies(Caesar LINTERP WCSTools)
+add_dependencies(Caesar LINTERP WCSTools ProtobufSchema)
+#add_library(Caesar SHARED ${PROTO_GEN_SRCS} ${SRCS} CaesarDict.cxx)
+#add_dependencies(Caesar LINTERP WCSTools)
 target_link_libraries(Caesar PUBLIC ${LINKED_LIBS})
 #-----------------------------------------------------------------------------------------------
 
