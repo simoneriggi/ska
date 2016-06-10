@@ -512,6 +512,174 @@ void SFinderClass::set_default_property()
 	}
 	else
 		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "selectCompactSources_default";
+	prop_desc = "Default flag to enable/disable selection of compact source \non the basis of defined cuts";
+	prop_def  = "true";
+	vect_data.clear();
+	vect_data.push_back("true");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "useCircRatioCut_default";
+	prop_desc = "Use cut on circularity ratio in source selection";
+	prop_def  = "true";
+	vect_data.clear();
+	vect_data.push_back("true");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "psCircRatioThr_default";
+	prop_desc = "Point-source circularity ratio default cut. \nSource is not selected as point-like if circratio<cut (circ ratio\nis =1 for a circle).";
+	prop_def  = "0.4";
+	vect_data.clear();
+	vect_data.push_back("0.4");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "useElongCut_default";
+	prop_desc = "Default flag to enable/disable elongation point-like source cut.\nSource is not selected as point-source if elong>cut (Elong=0 \nfor circle/square).";
+	prop_def  = "true";
+	vect_data.clear();
+	vect_data.push_back("true");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "psElongThr_default";
+	prop_desc = "Default elongation point-like source cut";
+	prop_def  = "0.7";
+	vect_data.clear();
+	vect_data.push_back("0.7");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "useEllipseAreaRatioCut_default";
+	prop_desc = "Default flag to enable/disable ellipse area ratio cut";
+	prop_def  = "true";
+	vect_data.clear();
+	vect_data.push_back("true");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "psEllipseAreaRatioMinThr_default";
+	prop_desc = "Default min Ellipse Area Ratio cut";
+	prop_def  = "0.6";
+	vect_data.clear();
+	vect_data.push_back("0.6");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "psEllipseAreaRatioMaxThr_default";
+	prop_desc = "Default max Ellipse Area Ratio cut";
+	prop_def  = "1.4";
+	vect_data.clear();
+	vect_data.push_back("1.4");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "useMaxNPixCut_default";
+	prop_desc = "Default flag to enable/disable max npixel point-like source cut";
+	prop_def  = "true";
+	vect_data.clear();
+	vect_data.push_back("true");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "psMaxNPix_default";
+	prop_desc = "Default maximum number of pixels to select point-like sources";
+	prop_def  = "1000";
+	vect_data.clear();
+	vect_data.push_back("1000");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "useBoundingBoxCut_default";
+	prop_desc = "Default flag to enable/disable bounding box cut";
+	prop_def  = "true";
+	vect_data.clear();
+	vect_data.push_back("true");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "minBoundingBoxThr_default";
+	prop_desc = "Minimum default bounding box cut (source tagged as bad if below this threshold)";
+	prop_def  = "2";
+	vect_data.clear();
+	vect_data.push_back("2");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
 }
 
 //--------------------------------------------------------
@@ -1165,6 +1333,306 @@ void SFinderClass::attribute_factory(vector<Tango::Attr *> &att_list)
 	searchcompactsources->set_memorized();
 	searchcompactsources->set_memorized_init(true);
 	att_list.push_back(searchcompactsources);
+
+	//	Attribute : selectCompactSources
+	selectCompactSourcesAttrib	*selectcompactsources = new selectCompactSourcesAttrib();
+	Tango::UserDefaultAttrProp	selectcompactsources_prop;
+	selectcompactsources_prop.set_description("Flag to enable/disable selection of compact sources according to defined cuts");
+	//	label	not set for selectCompactSources
+	//	unit	not set for selectCompactSources
+	//	standard_unit	not set for selectCompactSources
+	//	display_unit	not set for selectCompactSources
+	//	format	not set for selectCompactSources
+	//	max_value	not set for selectCompactSources
+	//	min_value	not set for selectCompactSources
+	//	max_alarm	not set for selectCompactSources
+	//	min_alarm	not set for selectCompactSources
+	//	max_warning	not set for selectCompactSources
+	//	min_warning	not set for selectCompactSources
+	//	delta_t	not set for selectCompactSources
+	//	delta_val	not set for selectCompactSources
+	
+	selectcompactsources->set_default_properties(selectcompactsources_prop);
+	//	Not Polled
+	selectcompactsources->set_disp_level(Tango::OPERATOR);
+	selectcompactsources->set_memorized();
+	selectcompactsources->set_memorized_init(true);
+	att_list.push_back(selectcompactsources);
+
+	//	Attribute : useCircRatioCut
+	useCircRatioCutAttrib	*usecircratiocut = new useCircRatioCutAttrib();
+	Tango::UserDefaultAttrProp	usecircratiocut_prop;
+	usecircratiocut_prop.set_description("Use cut on circularity ratio in source selection");
+	//	label	not set for useCircRatioCut
+	//	unit	not set for useCircRatioCut
+	//	standard_unit	not set for useCircRatioCut
+	//	display_unit	not set for useCircRatioCut
+	//	format	not set for useCircRatioCut
+	//	max_value	not set for useCircRatioCut
+	//	min_value	not set for useCircRatioCut
+	//	max_alarm	not set for useCircRatioCut
+	//	min_alarm	not set for useCircRatioCut
+	//	max_warning	not set for useCircRatioCut
+	//	min_warning	not set for useCircRatioCut
+	//	delta_t	not set for useCircRatioCut
+	//	delta_val	not set for useCircRatioCut
+	
+	usecircratiocut->set_default_properties(usecircratiocut_prop);
+	//	Not Polled
+	usecircratiocut->set_disp_level(Tango::OPERATOR);
+	usecircratiocut->set_memorized();
+	usecircratiocut->set_memorized_init(true);
+	att_list.push_back(usecircratiocut);
+
+	//	Attribute : psCircRatioThr
+	psCircRatioThrAttrib	*pscircratiothr = new psCircRatioThrAttrib();
+	Tango::UserDefaultAttrProp	pscircratiothr_prop;
+	pscircratiothr_prop.set_description("Point-source circularity ratio cut. \nSource is not selected as point-like if circratio<cut (circ ratio\nis =1 for a circle).");
+	//	label	not set for psCircRatioThr
+	//	unit	not set for psCircRatioThr
+	//	standard_unit	not set for psCircRatioThr
+	//	display_unit	not set for psCircRatioThr
+	//	format	not set for psCircRatioThr
+	//	max_value	not set for psCircRatioThr
+	//	min_value	not set for psCircRatioThr
+	//	max_alarm	not set for psCircRatioThr
+	//	min_alarm	not set for psCircRatioThr
+	//	max_warning	not set for psCircRatioThr
+	//	min_warning	not set for psCircRatioThr
+	//	delta_t	not set for psCircRatioThr
+	//	delta_val	not set for psCircRatioThr
+	
+	pscircratiothr->set_default_properties(pscircratiothr_prop);
+	//	Not Polled
+	pscircratiothr->set_disp_level(Tango::OPERATOR);
+	pscircratiothr->set_memorized();
+	pscircratiothr->set_memorized_init(true);
+	att_list.push_back(pscircratiothr);
+
+	//	Attribute : useElongCut
+	useElongCutAttrib	*useelongcut = new useElongCutAttrib();
+	Tango::UserDefaultAttrProp	useelongcut_prop;
+	useelongcut_prop.set_description("Flag to enable/disable elongation point-like source cut.\nSource is not selected as point-source if elong>cut (Elong=0 \nfor circle/square).");
+	//	label	not set for useElongCut
+	//	unit	not set for useElongCut
+	//	standard_unit	not set for useElongCut
+	//	display_unit	not set for useElongCut
+	//	format	not set for useElongCut
+	//	max_value	not set for useElongCut
+	//	min_value	not set for useElongCut
+	//	max_alarm	not set for useElongCut
+	//	min_alarm	not set for useElongCut
+	//	max_warning	not set for useElongCut
+	//	min_warning	not set for useElongCut
+	//	delta_t	not set for useElongCut
+	//	delta_val	not set for useElongCut
+	
+	useelongcut->set_default_properties(useelongcut_prop);
+	//	Not Polled
+	useelongcut->set_disp_level(Tango::OPERATOR);
+	useelongcut->set_memorized();
+	useelongcut->set_memorized_init(true);
+	att_list.push_back(useelongcut);
+
+	//	Attribute : psElongThr
+	psElongThrAttrib	*pselongthr = new psElongThrAttrib();
+	Tango::UserDefaultAttrProp	pselongthr_prop;
+	pselongthr_prop.set_description("Elongation point-like source cut");
+	//	label	not set for psElongThr
+	//	unit	not set for psElongThr
+	//	standard_unit	not set for psElongThr
+	//	display_unit	not set for psElongThr
+	//	format	not set for psElongThr
+	//	max_value	not set for psElongThr
+	//	min_value	not set for psElongThr
+	//	max_alarm	not set for psElongThr
+	//	min_alarm	not set for psElongThr
+	//	max_warning	not set for psElongThr
+	//	min_warning	not set for psElongThr
+	//	delta_t	not set for psElongThr
+	//	delta_val	not set for psElongThr
+	
+	pselongthr->set_default_properties(pselongthr_prop);
+	//	Not Polled
+	pselongthr->set_disp_level(Tango::OPERATOR);
+	pselongthr->set_memorized();
+	pselongthr->set_memorized_init(true);
+	att_list.push_back(pselongthr);
+
+	//	Attribute : useEllipseAreaRatioCut
+	useEllipseAreaRatioCutAttrib	*useellipsearearatiocut = new useEllipseAreaRatioCutAttrib();
+	Tango::UserDefaultAttrProp	useellipsearearatiocut_prop;
+	useellipsearearatiocut_prop.set_description(" Flag to enable/disable ellipse area ratio cut");
+	//	label	not set for useEllipseAreaRatioCut
+	//	unit	not set for useEllipseAreaRatioCut
+	//	standard_unit	not set for useEllipseAreaRatioCut
+	//	display_unit	not set for useEllipseAreaRatioCut
+	//	format	not set for useEllipseAreaRatioCut
+	//	max_value	not set for useEllipseAreaRatioCut
+	//	min_value	not set for useEllipseAreaRatioCut
+	//	max_alarm	not set for useEllipseAreaRatioCut
+	//	min_alarm	not set for useEllipseAreaRatioCut
+	//	max_warning	not set for useEllipseAreaRatioCut
+	//	min_warning	not set for useEllipseAreaRatioCut
+	//	delta_t	not set for useEllipseAreaRatioCut
+	//	delta_val	not set for useEllipseAreaRatioCut
+	
+	useellipsearearatiocut->set_default_properties(useellipsearearatiocut_prop);
+	//	Not Polled
+	useellipsearearatiocut->set_disp_level(Tango::OPERATOR);
+	useellipsearearatiocut->set_memorized();
+	useellipsearearatiocut->set_memorized_init(true);
+	att_list.push_back(useellipsearearatiocut);
+
+	//	Attribute : psEllipseAreaRatioMinThr
+	psEllipseAreaRatioMinThrAttrib	*psellipsearearatiominthr = new psEllipseAreaRatioMinThrAttrib();
+	Tango::UserDefaultAttrProp	psellipsearearatiominthr_prop;
+	psellipsearearatiominthr_prop.set_description("Min Ellipse Area Ratio cut");
+	//	label	not set for psEllipseAreaRatioMinThr
+	//	unit	not set for psEllipseAreaRatioMinThr
+	//	standard_unit	not set for psEllipseAreaRatioMinThr
+	//	display_unit	not set for psEllipseAreaRatioMinThr
+	//	format	not set for psEllipseAreaRatioMinThr
+	//	max_value	not set for psEllipseAreaRatioMinThr
+	//	min_value	not set for psEllipseAreaRatioMinThr
+	//	max_alarm	not set for psEllipseAreaRatioMinThr
+	//	min_alarm	not set for psEllipseAreaRatioMinThr
+	//	max_warning	not set for psEllipseAreaRatioMinThr
+	//	min_warning	not set for psEllipseAreaRatioMinThr
+	//	delta_t	not set for psEllipseAreaRatioMinThr
+	//	delta_val	not set for psEllipseAreaRatioMinThr
+	
+	psellipsearearatiominthr->set_default_properties(psellipsearearatiominthr_prop);
+	//	Not Polled
+	psellipsearearatiominthr->set_disp_level(Tango::OPERATOR);
+	psellipsearearatiominthr->set_memorized();
+	psellipsearearatiominthr->set_memorized_init(true);
+	att_list.push_back(psellipsearearatiominthr);
+
+	//	Attribute : psEllipseAreaRatioMaxThr
+	psEllipseAreaRatioMaxThrAttrib	*psellipsearearatiomaxthr = new psEllipseAreaRatioMaxThrAttrib();
+	Tango::UserDefaultAttrProp	psellipsearearatiomaxthr_prop;
+	psellipsearearatiomaxthr_prop.set_description("Max Ellipse Area Ratio cut");
+	//	label	not set for psEllipseAreaRatioMaxThr
+	//	unit	not set for psEllipseAreaRatioMaxThr
+	//	standard_unit	not set for psEllipseAreaRatioMaxThr
+	//	display_unit	not set for psEllipseAreaRatioMaxThr
+	//	format	not set for psEllipseAreaRatioMaxThr
+	//	max_value	not set for psEllipseAreaRatioMaxThr
+	//	min_value	not set for psEllipseAreaRatioMaxThr
+	//	max_alarm	not set for psEllipseAreaRatioMaxThr
+	//	min_alarm	not set for psEllipseAreaRatioMaxThr
+	//	max_warning	not set for psEllipseAreaRatioMaxThr
+	//	min_warning	not set for psEllipseAreaRatioMaxThr
+	//	delta_t	not set for psEllipseAreaRatioMaxThr
+	//	delta_val	not set for psEllipseAreaRatioMaxThr
+	
+	psellipsearearatiomaxthr->set_default_properties(psellipsearearatiomaxthr_prop);
+	//	Not Polled
+	psellipsearearatiomaxthr->set_disp_level(Tango::OPERATOR);
+	psellipsearearatiomaxthr->set_memorized();
+	psellipsearearatiomaxthr->set_memorized_init(true);
+	att_list.push_back(psellipsearearatiomaxthr);
+
+	//	Attribute : useMaxNPixCut
+	useMaxNPixCutAttrib	*usemaxnpixcut = new useMaxNPixCutAttrib();
+	Tango::UserDefaultAttrProp	usemaxnpixcut_prop;
+	//	description	not set for useMaxNPixCut
+	//	label	not set for useMaxNPixCut
+	//	unit	not set for useMaxNPixCut
+	//	standard_unit	not set for useMaxNPixCut
+	//	display_unit	not set for useMaxNPixCut
+	//	format	not set for useMaxNPixCut
+	//	max_value	not set for useMaxNPixCut
+	//	min_value	not set for useMaxNPixCut
+	//	max_alarm	not set for useMaxNPixCut
+	//	min_alarm	not set for useMaxNPixCut
+	//	max_warning	not set for useMaxNPixCut
+	//	min_warning	not set for useMaxNPixCut
+	//	delta_t	not set for useMaxNPixCut
+	//	delta_val	not set for useMaxNPixCut
+	
+	usemaxnpixcut->set_default_properties(usemaxnpixcut_prop);
+	//	Not Polled
+	usemaxnpixcut->set_disp_level(Tango::OPERATOR);
+	usemaxnpixcut->set_memorized();
+	usemaxnpixcut->set_memorized_init(true);
+	att_list.push_back(usemaxnpixcut);
+
+	//	Attribute : psMaxNPix
+	psMaxNPixAttrib	*psmaxnpix = new psMaxNPixAttrib();
+	Tango::UserDefaultAttrProp	psmaxnpix_prop;
+	psmaxnpix_prop.set_description("Maximum number of pixels to select point-like sources");
+	//	label	not set for psMaxNPix
+	//	unit	not set for psMaxNPix
+	//	standard_unit	not set for psMaxNPix
+	//	display_unit	not set for psMaxNPix
+	//	format	not set for psMaxNPix
+	//	max_value	not set for psMaxNPix
+	//	min_value	not set for psMaxNPix
+	//	max_alarm	not set for psMaxNPix
+	//	min_alarm	not set for psMaxNPix
+	//	max_warning	not set for psMaxNPix
+	//	min_warning	not set for psMaxNPix
+	//	delta_t	not set for psMaxNPix
+	//	delta_val	not set for psMaxNPix
+	
+	psmaxnpix->set_default_properties(psmaxnpix_prop);
+	//	Not Polled
+	psmaxnpix->set_disp_level(Tango::OPERATOR);
+	psmaxnpix->set_memorized();
+	psmaxnpix->set_memorized_init(true);
+	att_list.push_back(psmaxnpix);
+
+	//	Attribute : useBoundingBoxCut
+	useBoundingBoxCutAttrib	*useboundingboxcut = new useBoundingBoxCutAttrib();
+	Tango::UserDefaultAttrProp	useboundingboxcut_prop;
+	useboundingboxcut_prop.set_description("Flag to enable/disable bounding box cut");
+	//	label	not set for useBoundingBoxCut
+	//	unit	not set for useBoundingBoxCut
+	//	standard_unit	not set for useBoundingBoxCut
+	//	display_unit	not set for useBoundingBoxCut
+	//	format	not set for useBoundingBoxCut
+	//	max_value	not set for useBoundingBoxCut
+	//	min_value	not set for useBoundingBoxCut
+	//	max_alarm	not set for useBoundingBoxCut
+	//	min_alarm	not set for useBoundingBoxCut
+	//	max_warning	not set for useBoundingBoxCut
+	//	min_warning	not set for useBoundingBoxCut
+	//	delta_t	not set for useBoundingBoxCut
+	//	delta_val	not set for useBoundingBoxCut
+	
+	useboundingboxcut->set_default_properties(useboundingboxcut_prop);
+	//	Not Polled
+	useboundingboxcut->set_disp_level(Tango::OPERATOR);
+	useboundingboxcut->set_memorized();
+	useboundingboxcut->set_memorized_init(true);
+	att_list.push_back(useboundingboxcut);
+
+	//	Attribute : minBoundingBoxThr
+	minBoundingBoxThrAttrib	*minboundingboxthr = new minBoundingBoxThrAttrib();
+	Tango::UserDefaultAttrProp	minboundingboxthr_prop;
+	minboundingboxthr_prop.set_description("Minimum default bounding box cut (source tagged as bad if below this threshold)");
+	//	label	not set for minBoundingBoxThr
+	//	unit	not set for minBoundingBoxThr
+	//	standard_unit	not set for minBoundingBoxThr
+	//	display_unit	not set for minBoundingBoxThr
+	//	format	not set for minBoundingBoxThr
+	//	max_value	not set for minBoundingBoxThr
+	//	min_value	not set for minBoundingBoxThr
+	//	max_alarm	not set for minBoundingBoxThr
+	//	min_alarm	not set for minBoundingBoxThr
+	//	max_warning	not set for minBoundingBoxThr
+	//	min_warning	not set for minBoundingBoxThr
+	//	delta_t	not set for minBoundingBoxThr
+	//	delta_val	not set for minBoundingBoxThr
+	
+	minboundingboxthr->set_default_properties(minboundingboxthr_prop);
+	//	Not Polled
+	minboundingboxthr->set_disp_level(Tango::OPERATOR);
+	minboundingboxthr->set_memorized();
+	minboundingboxthr->set_memorized_init(true);
+	att_list.push_back(minboundingboxthr);
 
 
 	//	Create a list of static attributes

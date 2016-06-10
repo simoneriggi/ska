@@ -414,6 +414,246 @@ bool SFinder::is_searchCompactSources_allowed(TANGO_UNUSED(Tango::AttReqType typ
 	return true;
 }
 
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_selectCompactSources_allowed()
+ *	Description : Execution allowed for selectCompactSources attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_selectCompactSources_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for selectCompactSources attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::selectCompactSourcesStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::selectCompactSourcesStateAllowed_WRITE
+
+	//	Not any excluded states for selectCompactSources attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::selectCompactSourcesStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::selectCompactSourcesStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_useCircRatioCut_allowed()
+ *	Description : Execution allowed for useCircRatioCut attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_useCircRatioCut_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for useCircRatioCut attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::useCircRatioCutStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useCircRatioCutStateAllowed_WRITE
+
+	//	Not any excluded states for useCircRatioCut attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::useCircRatioCutStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useCircRatioCutStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_psCircRatioThr_allowed()
+ *	Description : Execution allowed for psCircRatioThr attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_psCircRatioThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for psCircRatioThr attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::psCircRatioThrStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psCircRatioThrStateAllowed_WRITE
+
+	//	Not any excluded states for psCircRatioThr attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::psCircRatioThrStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psCircRatioThrStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_useElongCut_allowed()
+ *	Description : Execution allowed for useElongCut attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_useElongCut_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for useElongCut attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::useElongCutStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useElongCutStateAllowed_WRITE
+
+	//	Not any excluded states for useElongCut attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::useElongCutStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useElongCutStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_psElongThr_allowed()
+ *	Description : Execution allowed for psElongThr attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_psElongThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for psElongThr attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::psElongThrStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psElongThrStateAllowed_WRITE
+
+	//	Not any excluded states for psElongThr attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::psElongThrStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psElongThrStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_useEllipseAreaRatioCut_allowed()
+ *	Description : Execution allowed for useEllipseAreaRatioCut attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_useEllipseAreaRatioCut_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for useEllipseAreaRatioCut attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::useEllipseAreaRatioCutStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useEllipseAreaRatioCutStateAllowed_WRITE
+
+	//	Not any excluded states for useEllipseAreaRatioCut attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::useEllipseAreaRatioCutStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useEllipseAreaRatioCutStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_psEllipseAreaRatioMinThr_allowed()
+ *	Description : Execution allowed for psEllipseAreaRatioMinThr attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_psEllipseAreaRatioMinThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for psEllipseAreaRatioMinThr attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::psEllipseAreaRatioMinThrStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psEllipseAreaRatioMinThrStateAllowed_WRITE
+
+	//	Not any excluded states for psEllipseAreaRatioMinThr attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::psEllipseAreaRatioMinThrStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psEllipseAreaRatioMinThrStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_psEllipseAreaRatioMaxThr_allowed()
+ *	Description : Execution allowed for psEllipseAreaRatioMaxThr attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_psEllipseAreaRatioMaxThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for psEllipseAreaRatioMaxThr attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::psEllipseAreaRatioMaxThrStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psEllipseAreaRatioMaxThrStateAllowed_WRITE
+
+	//	Not any excluded states for psEllipseAreaRatioMaxThr attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::psEllipseAreaRatioMaxThrStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psEllipseAreaRatioMaxThrStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_useMaxNPixCut_allowed()
+ *	Description : Execution allowed for useMaxNPixCut attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_useMaxNPixCut_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for useMaxNPixCut attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::useMaxNPixCutStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useMaxNPixCutStateAllowed_WRITE
+
+	//	Not any excluded states for useMaxNPixCut attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::useMaxNPixCutStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useMaxNPixCutStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_psMaxNPix_allowed()
+ *	Description : Execution allowed for psMaxNPix attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_psMaxNPix_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for psMaxNPix attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::psMaxNPixStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psMaxNPixStateAllowed_WRITE
+
+	//	Not any excluded states for psMaxNPix attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::psMaxNPixStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::psMaxNPixStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_useBoundingBoxCut_allowed()
+ *	Description : Execution allowed for useBoundingBoxCut attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_useBoundingBoxCut_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for useBoundingBoxCut attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::useBoundingBoxCutStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useBoundingBoxCutStateAllowed_WRITE
+
+	//	Not any excluded states for useBoundingBoxCut attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::useBoundingBoxCutStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::useBoundingBoxCutStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_minBoundingBoxThr_allowed()
+ *	Description : Execution allowed for minBoundingBoxThr attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_minBoundingBoxThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+	//	Not any excluded states for minBoundingBoxThr attribute in Write access.
+	/*----- PROTECTED REGION ID(SFinder::minBoundingBoxThrStateAllowed_WRITE) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::minBoundingBoxThrStateAllowed_WRITE
+
+	//	Not any excluded states for minBoundingBoxThr attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::minBoundingBoxThrStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::minBoundingBoxThrStateAllowed_READ
+	return true;
+}
+
 
 //=================================================
 //		Commands Allowed Methods

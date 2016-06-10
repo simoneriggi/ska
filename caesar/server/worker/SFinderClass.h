@@ -329,6 +329,186 @@ public:
 		{return (static_cast<SFinder *>(dev))->is_searchCompactSources_allowed(ty);}
 };
 
+//	Attribute selectCompactSources class definition
+class selectCompactSourcesAttrib: public Tango::Attr
+{
+public:
+	selectCompactSourcesAttrib():Attr("selectCompactSources",
+			Tango::DEV_BOOLEAN, Tango::READ_WRITE) {};
+	~selectCompactSourcesAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_selectCompactSources(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_selectCompactSources(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_selectCompactSources_allowed(ty);}
+};
+
+//	Attribute useCircRatioCut class definition
+class useCircRatioCutAttrib: public Tango::Attr
+{
+public:
+	useCircRatioCutAttrib():Attr("useCircRatioCut",
+			Tango::DEV_BOOLEAN, Tango::READ_WRITE) {};
+	~useCircRatioCutAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_useCircRatioCut(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_useCircRatioCut(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_useCircRatioCut_allowed(ty);}
+};
+
+//	Attribute psCircRatioThr class definition
+class psCircRatioThrAttrib: public Tango::Attr
+{
+public:
+	psCircRatioThrAttrib():Attr("psCircRatioThr",
+			Tango::DEV_FLOAT, Tango::READ_WRITE) {};
+	~psCircRatioThrAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_psCircRatioThr(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_psCircRatioThr(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_psCircRatioThr_allowed(ty);}
+};
+
+//	Attribute useElongCut class definition
+class useElongCutAttrib: public Tango::Attr
+{
+public:
+	useElongCutAttrib():Attr("useElongCut",
+			Tango::DEV_BOOLEAN, Tango::READ_WRITE) {};
+	~useElongCutAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_useElongCut(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_useElongCut(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_useElongCut_allowed(ty);}
+};
+
+//	Attribute psElongThr class definition
+class psElongThrAttrib: public Tango::Attr
+{
+public:
+	psElongThrAttrib():Attr("psElongThr",
+			Tango::DEV_FLOAT, Tango::READ_WRITE) {};
+	~psElongThrAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_psElongThr(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_psElongThr(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_psElongThr_allowed(ty);}
+};
+
+//	Attribute useEllipseAreaRatioCut class definition
+class useEllipseAreaRatioCutAttrib: public Tango::Attr
+{
+public:
+	useEllipseAreaRatioCutAttrib():Attr("useEllipseAreaRatioCut",
+			Tango::DEV_BOOLEAN, Tango::READ_WRITE) {};
+	~useEllipseAreaRatioCutAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_useEllipseAreaRatioCut(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_useEllipseAreaRatioCut(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_useEllipseAreaRatioCut_allowed(ty);}
+};
+
+//	Attribute psEllipseAreaRatioMinThr class definition
+class psEllipseAreaRatioMinThrAttrib: public Tango::Attr
+{
+public:
+	psEllipseAreaRatioMinThrAttrib():Attr("psEllipseAreaRatioMinThr",
+			Tango::DEV_FLOAT, Tango::READ_WRITE) {};
+	~psEllipseAreaRatioMinThrAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_psEllipseAreaRatioMinThr(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_psEllipseAreaRatioMinThr(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_psEllipseAreaRatioMinThr_allowed(ty);}
+};
+
+//	Attribute psEllipseAreaRatioMaxThr class definition
+class psEllipseAreaRatioMaxThrAttrib: public Tango::Attr
+{
+public:
+	psEllipseAreaRatioMaxThrAttrib():Attr("psEllipseAreaRatioMaxThr",
+			Tango::DEV_FLOAT, Tango::READ_WRITE) {};
+	~psEllipseAreaRatioMaxThrAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_psEllipseAreaRatioMaxThr(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_psEllipseAreaRatioMaxThr(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_psEllipseAreaRatioMaxThr_allowed(ty);}
+};
+
+//	Attribute useMaxNPixCut class definition
+class useMaxNPixCutAttrib: public Tango::Attr
+{
+public:
+	useMaxNPixCutAttrib():Attr("useMaxNPixCut",
+			Tango::DEV_BOOLEAN, Tango::READ_WRITE) {};
+	~useMaxNPixCutAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_useMaxNPixCut(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_useMaxNPixCut(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_useMaxNPixCut_allowed(ty);}
+};
+
+//	Attribute psMaxNPix class definition
+class psMaxNPixAttrib: public Tango::Attr
+{
+public:
+	psMaxNPixAttrib():Attr("psMaxNPix",
+			Tango::DEV_LONG, Tango::READ_WRITE) {};
+	~psMaxNPixAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_psMaxNPix(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_psMaxNPix(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_psMaxNPix_allowed(ty);}
+};
+
+//	Attribute useBoundingBoxCut class definition
+class useBoundingBoxCutAttrib: public Tango::Attr
+{
+public:
+	useBoundingBoxCutAttrib():Attr("useBoundingBoxCut",
+			Tango::DEV_BOOLEAN, Tango::READ_WRITE) {};
+	~useBoundingBoxCutAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_useBoundingBoxCut(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_useBoundingBoxCut(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_useBoundingBoxCut_allowed(ty);}
+};
+
+//	Attribute minBoundingBoxThr class definition
+class minBoundingBoxThrAttrib: public Tango::Attr
+{
+public:
+	minBoundingBoxThrAttrib():Attr("minBoundingBoxThr",
+			Tango::DEV_FLOAT, Tango::READ_WRITE) {};
+	~minBoundingBoxThrAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_minBoundingBoxThr(att);}
+	virtual void write(Tango::DeviceImpl *dev,Tango::WAttribute &att)
+		{(static_cast<SFinder *>(dev))->write_minBoundingBoxThr(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_minBoundingBoxThr_allowed(ty);}
+};
+
 
 //=========================================
 //	Define classes for commands

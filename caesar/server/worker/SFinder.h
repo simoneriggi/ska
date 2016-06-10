@@ -96,6 +96,20 @@ class SFinder : public TANGO_BASE_CLASS
 		Tango::DevBoolean	attr_searchNestedSources_write;
 		Tango::DevFloat	attr_nestedBlobThrFactor_write;
 
+		//Source selection
+		Tango::DevBoolean	attr_selectCompactSources_write;
+		Tango::DevBoolean	attr_useCircRatioCut_write;
+		Tango::DevFloat	attr_psCircRatioThr_write;
+		Tango::DevBoolean	attr_useElongCut_write;
+		Tango::DevFloat	attr_psElongThr_write;
+		Tango::DevBoolean	attr_useEllipseAreaRatioCut_write;
+		Tango::DevFloat	attr_psEllipseAreaRatioMinThr_write;
+		Tango::DevFloat	attr_psEllipseAreaRatioMaxThr_write;
+		Tango::DevBoolean	attr_useMaxNPixCut_write;
+		Tango::DevLong attr_psMaxNPix_write;
+		Tango::DevBoolean	attr_useBoundingBoxCut_write;
+		Tango::DevFloat	attr_minBoundingBoxThr_write;
+
 /*----- PROTECTED REGION END -----*/	//	SFinder::Data Members
 
 //	Device property data members
@@ -158,6 +172,35 @@ public:
 	Tango::DevFloat	nestedBlobThrFactor_default;
 	//	searchCompactSources_default:	Default flag to enable/disable search of compact sources
 	Tango::DevBoolean	searchCompactSources_default;
+	//	selectCompactSources_default:	Default flag to enable/disable selection of compact source 
+	//  on the basis of defined cuts
+	Tango::DevBoolean	selectCompactSources_default;
+	//	useCircRatioCut_default:	Use cut on circularity ratio in source selection
+	Tango::DevBoolean	useCircRatioCut_default;
+	//	psCircRatioThr_default:	Point-source circularity ratio default cut. 
+	//  Source is not selected as point-like if circratio<cut (circ ratio
+	//  is =1 for a circle).
+	Tango::DevFloat	psCircRatioThr_default;
+	//	useElongCut_default:	Default flag to enable/disable elongation point-like source cut.
+	//  Source is not selected as point-source if elong>cut (Elong=0 
+	//  for circle/square).
+	Tango::DevBoolean	useElongCut_default;
+	//	psElongThr_default:	Default elongation point-like source cut
+	Tango::DevFloat	psElongThr_default;
+	//	useEllipseAreaRatioCut_default:	Default flag to enable/disable ellipse area ratio cut
+	Tango::DevBoolean	useEllipseAreaRatioCut_default;
+	//	psEllipseAreaRatioMinThr_default:	Default min Ellipse Area Ratio cut
+	Tango::DevFloat	psEllipseAreaRatioMinThr_default;
+	//	psEllipseAreaRatioMaxThr_default:	Default max Ellipse Area Ratio cut
+	Tango::DevFloat	psEllipseAreaRatioMaxThr_default;
+	//	useMaxNPixCut_default:	Default flag to enable/disable max npixel point-like source cut
+	Tango::DevBoolean	useMaxNPixCut_default;
+	//	psMaxNPix_default:	Default maximum number of pixels to select point-like sources
+	Tango::DevLong	psMaxNPix_default;
+	//	useBoundingBoxCut_default:	Default flag to enable/disable bounding box cut
+	Tango::DevBoolean	useBoundingBoxCut_default;
+	//	minBoundingBoxThr_default:	Minimum default bounding box cut (source tagged as bad if below this threshold)
+	Tango::DevFloat	minBoundingBoxThr_default;
 
 //	Attribute data members
 public:
@@ -179,6 +222,18 @@ public:
 	Tango::DevBoolean	*attr_searchNegativeExcess_read;
 	Tango::DevFloat	*attr_nestedBlobThrFactor_read;
 	Tango::DevBoolean	*attr_searchCompactSources_read;
+	Tango::DevBoolean	*attr_selectCompactSources_read;
+	Tango::DevBoolean	*attr_useCircRatioCut_read;
+	Tango::DevFloat	*attr_psCircRatioThr_read;
+	Tango::DevBoolean	*attr_useElongCut_read;
+	Tango::DevFloat	*attr_psElongThr_read;
+	Tango::DevBoolean	*attr_useEllipseAreaRatioCut_read;
+	Tango::DevFloat	*attr_psEllipseAreaRatioMinThr_read;
+	Tango::DevFloat	*attr_psEllipseAreaRatioMaxThr_read;
+	Tango::DevBoolean	*attr_useMaxNPixCut_read;
+	Tango::DevLong	*attr_psMaxNPix_read;
+	Tango::DevBoolean	*attr_useBoundingBoxCut_read;
+	Tango::DevFloat	*attr_minBoundingBoxThr_read;
 
 //	Constructors and destructors
 public:
@@ -436,6 +491,130 @@ public:
 	virtual void read_searchCompactSources(Tango::Attribute &attr);
 	virtual void write_searchCompactSources(Tango::WAttribute &attr);
 	virtual bool is_searchCompactSources_allowed(Tango::AttReqType type);
+/**
+ *	Attribute selectCompactSources related methods
+ *	Description: Flag to enable/disable selection of compact sources according to defined cuts
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+	virtual void read_selectCompactSources(Tango::Attribute &attr);
+	virtual void write_selectCompactSources(Tango::WAttribute &attr);
+	virtual bool is_selectCompactSources_allowed(Tango::AttReqType type);
+/**
+ *	Attribute useCircRatioCut related methods
+ *	Description: Use cut on circularity ratio in source selection
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+	virtual void read_useCircRatioCut(Tango::Attribute &attr);
+	virtual void write_useCircRatioCut(Tango::WAttribute &attr);
+	virtual bool is_useCircRatioCut_allowed(Tango::AttReqType type);
+/**
+ *	Attribute psCircRatioThr related methods
+ *	Description: Point-source circularity ratio cut. 
+ *               Source is not selected as point-like if circratio<cut (circ ratio
+ *               is =1 for a circle).
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+	virtual void read_psCircRatioThr(Tango::Attribute &attr);
+	virtual void write_psCircRatioThr(Tango::WAttribute &attr);
+	virtual bool is_psCircRatioThr_allowed(Tango::AttReqType type);
+/**
+ *	Attribute useElongCut related methods
+ *	Description: Flag to enable/disable elongation point-like source cut.
+ *               Source is not selected as point-source if elong>cut (Elong=0 
+ *               for circle/square).
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+	virtual void read_useElongCut(Tango::Attribute &attr);
+	virtual void write_useElongCut(Tango::WAttribute &attr);
+	virtual bool is_useElongCut_allowed(Tango::AttReqType type);
+/**
+ *	Attribute psElongThr related methods
+ *	Description: Elongation point-like source cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+	virtual void read_psElongThr(Tango::Attribute &attr);
+	virtual void write_psElongThr(Tango::WAttribute &attr);
+	virtual bool is_psElongThr_allowed(Tango::AttReqType type);
+/**
+ *	Attribute useEllipseAreaRatioCut related methods
+ *	Description:  Flag to enable/disable ellipse area ratio cut
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+	virtual void read_useEllipseAreaRatioCut(Tango::Attribute &attr);
+	virtual void write_useEllipseAreaRatioCut(Tango::WAttribute &attr);
+	virtual bool is_useEllipseAreaRatioCut_allowed(Tango::AttReqType type);
+/**
+ *	Attribute psEllipseAreaRatioMinThr related methods
+ *	Description: Min Ellipse Area Ratio cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+	virtual void read_psEllipseAreaRatioMinThr(Tango::Attribute &attr);
+	virtual void write_psEllipseAreaRatioMinThr(Tango::WAttribute &attr);
+	virtual bool is_psEllipseAreaRatioMinThr_allowed(Tango::AttReqType type);
+/**
+ *	Attribute psEllipseAreaRatioMaxThr related methods
+ *	Description: Max Ellipse Area Ratio cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+	virtual void read_psEllipseAreaRatioMaxThr(Tango::Attribute &attr);
+	virtual void write_psEllipseAreaRatioMaxThr(Tango::WAttribute &attr);
+	virtual bool is_psEllipseAreaRatioMaxThr_allowed(Tango::AttReqType type);
+/**
+ *	Attribute useMaxNPixCut related methods
+ *	Description: 
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+	virtual void read_useMaxNPixCut(Tango::Attribute &attr);
+	virtual void write_useMaxNPixCut(Tango::WAttribute &attr);
+	virtual bool is_useMaxNPixCut_allowed(Tango::AttReqType type);
+/**
+ *	Attribute psMaxNPix related methods
+ *	Description: Maximum number of pixels to select point-like sources
+ *
+ *	Data type:	Tango::DevLong
+ *	Attr type:	Scalar
+ */
+	virtual void read_psMaxNPix(Tango::Attribute &attr);
+	virtual void write_psMaxNPix(Tango::WAttribute &attr);
+	virtual bool is_psMaxNPix_allowed(Tango::AttReqType type);
+/**
+ *	Attribute useBoundingBoxCut related methods
+ *	Description: Flag to enable/disable bounding box cut
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+	virtual void read_useBoundingBoxCut(Tango::Attribute &attr);
+	virtual void write_useBoundingBoxCut(Tango::WAttribute &attr);
+	virtual bool is_useBoundingBoxCut_allowed(Tango::AttReqType type);
+/**
+ *	Attribute minBoundingBoxThr related methods
+ *	Description: Minimum default bounding box cut (source tagged as bad if below this threshold)
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+	virtual void read_minBoundingBoxThr(Tango::Attribute &attr);
+	virtual void write_minBoundingBoxThr(Tango::WAttribute &attr);
+	virtual bool is_minBoundingBoxThr_allowed(Tango::AttReqType type);
 
 
 	//--------------------------------------------------------
@@ -491,8 +670,11 @@ public:
 		int RunSourceTask(std::vector<Caesar::Source*>& sources,const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
 		Caesar::Img* ReadImage(const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
 		Caesar::BkgData* ComputeStatsAndBkg(Caesar::Img* img);
-		int FindSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,double seedThr,double mergeThr,long int minNPix);
-		//int FindCompactSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg);
+		int FindSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
+		int FindCompactSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
+		int SelectSources(std::vector<Caesar::Source*>& sources);
+		bool IsGoodSource(Caesar::Source* aSource);
+		bool IsPointLikeSource(Caesar::Source* aSource);
 
 /*----- PROTECTED REGION END -----*/	//	SFinder::Additional Method prototypes
 };

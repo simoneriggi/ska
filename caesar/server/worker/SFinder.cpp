@@ -43,11 +43,15 @@ static const char *RcsId = "$Id:  $";
 #include <SFinder.h>
 #include <SFinderClass.h>
 
+//ROOT headers
 #include <TFile.h>
 
+//Caesar headers
 #include <Img.h>
 #include <BkgData.h>
+#include <Contour.h>
 #include <Logger.h>
+#include <Serializer.h>
 using namespace Caesar;
 
 /*----- PROTECTED REGION END -----*/	//	SFinder.cpp
@@ -71,24 +75,36 @@ using namespace Caesar;
 //================================================================
 //  Attributes managed are:
 //================================================================
-//  useLocalBkg             |  Tango::DevBoolean	Scalar
-//  use2ndPassInLocalBkg    |  Tango::DevBoolean	Scalar
-//  skipNegativePixels      |  Tango::DevBoolean	Scalar
-//  skipOutliersInLocalBkg  |  Tango::DevBoolean	Scalar
-//  localBkgMethod          |  Tango::DevShort	Scalar
-//  bkgEstimator            |  Tango::DevShort	Scalar
-//  useBeamInfoInBkg        |  Tango::DevBoolean	Scalar
-//  localBkgBoxSizeX        |  Tango::DevFloat	Scalar
-//  localBkgBoxSizeY        |  Tango::DevFloat	Scalar
-//  localBkgGridStepSizeX   |  Tango::DevFloat	Scalar
-//  localBkgGridStepSizeY   |  Tango::DevFloat	Scalar
-//  seedThr                 |  Tango::DevFloat	Scalar
-//  mergeThr                |  Tango::DevFloat	Scalar
-//  minNPix                 |  Tango::DevLong	Scalar
-//  mergeBelowSeed          |  Tango::DevBoolean	Scalar
-//  searchNegativeExcess    |  Tango::DevBoolean	Scalar
-//  nestedBlobThrFactor     |  Tango::DevFloat	Scalar
-//  searchCompactSources    |  Tango::DevBoolean	Scalar
+//  useLocalBkg               |  Tango::DevBoolean	Scalar
+//  use2ndPassInLocalBkg      |  Tango::DevBoolean	Scalar
+//  skipNegativePixels        |  Tango::DevBoolean	Scalar
+//  skipOutliersInLocalBkg    |  Tango::DevBoolean	Scalar
+//  localBkgMethod            |  Tango::DevShort	Scalar
+//  bkgEstimator              |  Tango::DevShort	Scalar
+//  useBeamInfoInBkg          |  Tango::DevBoolean	Scalar
+//  localBkgBoxSizeX          |  Tango::DevFloat	Scalar
+//  localBkgBoxSizeY          |  Tango::DevFloat	Scalar
+//  localBkgGridStepSizeX     |  Tango::DevFloat	Scalar
+//  localBkgGridStepSizeY     |  Tango::DevFloat	Scalar
+//  seedThr                   |  Tango::DevFloat	Scalar
+//  mergeThr                  |  Tango::DevFloat	Scalar
+//  minNPix                   |  Tango::DevLong	Scalar
+//  mergeBelowSeed            |  Tango::DevBoolean	Scalar
+//  searchNegativeExcess      |  Tango::DevBoolean	Scalar
+//  nestedBlobThrFactor       |  Tango::DevFloat	Scalar
+//  searchCompactSources      |  Tango::DevBoolean	Scalar
+//  selectCompactSources      |  Tango::DevBoolean	Scalar
+//  useCircRatioCut           |  Tango::DevBoolean	Scalar
+//  psCircRatioThr            |  Tango::DevFloat	Scalar
+//  useElongCut               |  Tango::DevBoolean	Scalar
+//  psElongThr                |  Tango::DevFloat	Scalar
+//  useEllipseAreaRatioCut    |  Tango::DevBoolean	Scalar
+//  psEllipseAreaRatioMinThr  |  Tango::DevFloat	Scalar
+//  psEllipseAreaRatioMaxThr  |  Tango::DevFloat	Scalar
+//  useMaxNPixCut             |  Tango::DevBoolean	Scalar
+//  psMaxNPix                 |  Tango::DevLong	Scalar
+//  useBoundingBoxCut         |  Tango::DevBoolean	Scalar
+//  minBoundingBoxThr         |  Tango::DevFloat	Scalar
 //================================================================
 
 namespace SFinder_ns
@@ -218,6 +234,18 @@ void SFinder::get_device_property()
 	dev_prop.push_back(Tango::DbDatum("searchNestedSources_default"));
 	dev_prop.push_back(Tango::DbDatum("nestedBlobThrFactor_default"));
 	dev_prop.push_back(Tango::DbDatum("searchCompactSources_default"));
+	dev_prop.push_back(Tango::DbDatum("selectCompactSources_default"));
+	dev_prop.push_back(Tango::DbDatum("useCircRatioCut_default"));
+	dev_prop.push_back(Tango::DbDatum("psCircRatioThr_default"));
+	dev_prop.push_back(Tango::DbDatum("useElongCut_default"));
+	dev_prop.push_back(Tango::DbDatum("psElongThr_default"));
+	dev_prop.push_back(Tango::DbDatum("useEllipseAreaRatioCut_default"));
+	dev_prop.push_back(Tango::DbDatum("psEllipseAreaRatioMinThr_default"));
+	dev_prop.push_back(Tango::DbDatum("psEllipseAreaRatioMaxThr_default"));
+	dev_prop.push_back(Tango::DbDatum("useMaxNPixCut_default"));
+	dev_prop.push_back(Tango::DbDatum("psMaxNPix_default"));
+	dev_prop.push_back(Tango::DbDatum("useBoundingBoxCut_default"));
+	dev_prop.push_back(Tango::DbDatum("minBoundingBoxThr_default"));
 
 	//	is there at least one property to be read ?
 	if (dev_prop.size()>0)
@@ -440,6 +468,138 @@ void SFinder::get_device_property()
 		}
 		//	And try to extract searchCompactSources_default value from database
 		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  searchCompactSources_default;
+
+		//	Try to initialize selectCompactSources_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  selectCompactSources_default;
+		else {
+			//	Try to initialize selectCompactSources_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  selectCompactSources_default;
+		}
+		//	And try to extract selectCompactSources_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  selectCompactSources_default;
+
+		//	Try to initialize useCircRatioCut_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  useCircRatioCut_default;
+		else {
+			//	Try to initialize useCircRatioCut_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  useCircRatioCut_default;
+		}
+		//	And try to extract useCircRatioCut_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  useCircRatioCut_default;
+
+		//	Try to initialize psCircRatioThr_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  psCircRatioThr_default;
+		else {
+			//	Try to initialize psCircRatioThr_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  psCircRatioThr_default;
+		}
+		//	And try to extract psCircRatioThr_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  psCircRatioThr_default;
+
+		//	Try to initialize useElongCut_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  useElongCut_default;
+		else {
+			//	Try to initialize useElongCut_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  useElongCut_default;
+		}
+		//	And try to extract useElongCut_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  useElongCut_default;
+
+		//	Try to initialize psElongThr_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  psElongThr_default;
+		else {
+			//	Try to initialize psElongThr_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  psElongThr_default;
+		}
+		//	And try to extract psElongThr_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  psElongThr_default;
+
+		//	Try to initialize useEllipseAreaRatioCut_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  useEllipseAreaRatioCut_default;
+		else {
+			//	Try to initialize useEllipseAreaRatioCut_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  useEllipseAreaRatioCut_default;
+		}
+		//	And try to extract useEllipseAreaRatioCut_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  useEllipseAreaRatioCut_default;
+
+		//	Try to initialize psEllipseAreaRatioMinThr_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  psEllipseAreaRatioMinThr_default;
+		else {
+			//	Try to initialize psEllipseAreaRatioMinThr_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  psEllipseAreaRatioMinThr_default;
+		}
+		//	And try to extract psEllipseAreaRatioMinThr_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  psEllipseAreaRatioMinThr_default;
+
+		//	Try to initialize psEllipseAreaRatioMaxThr_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  psEllipseAreaRatioMaxThr_default;
+		else {
+			//	Try to initialize psEllipseAreaRatioMaxThr_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  psEllipseAreaRatioMaxThr_default;
+		}
+		//	And try to extract psEllipseAreaRatioMaxThr_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  psEllipseAreaRatioMaxThr_default;
+
+		//	Try to initialize useMaxNPixCut_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  useMaxNPixCut_default;
+		else {
+			//	Try to initialize useMaxNPixCut_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  useMaxNPixCut_default;
+		}
+		//	And try to extract useMaxNPixCut_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  useMaxNPixCut_default;
+
+		//	Try to initialize psMaxNPix_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  psMaxNPix_default;
+		else {
+			//	Try to initialize psMaxNPix_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  psMaxNPix_default;
+		}
+		//	And try to extract psMaxNPix_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  psMaxNPix_default;
+
+		//	Try to initialize useBoundingBoxCut_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  useBoundingBoxCut_default;
+		else {
+			//	Try to initialize useBoundingBoxCut_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  useBoundingBoxCut_default;
+		}
+		//	And try to extract useBoundingBoxCut_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  useBoundingBoxCut_default;
+
+		//	Try to initialize minBoundingBoxThr_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  minBoundingBoxThr_default;
+		else {
+			//	Try to initialize minBoundingBoxThr_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  minBoundingBoxThr_default;
+		}
+		//	And try to extract minBoundingBoxThr_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  minBoundingBoxThr_default;
 
 	}
 
@@ -1225,6 +1385,482 @@ void SFinder::write_searchCompactSources(Tango::WAttribute &attr)
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::write_searchCompactSources
 }
+//--------------------------------------------------------
+/**
+ *	Read attribute selectCompactSources related method
+ *	Description: Flag to enable/disable selection of compact sources according to defined cuts
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_selectCompactSources(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_selectCompactSources(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_selectCompactSources) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_selectCompactSources_read);
+	attr.set_value(&attr_selectCompactSources_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_selectCompactSources
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute selectCompactSources related method
+ *	Description: Flag to enable/disable selection of compact sources according to defined cuts
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_selectCompactSources(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_selectCompactSources(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevBoolean	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_selectCompactSources) ENABLED START -----*/
+	attr.get_write_value(attr_selectCompactSources_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_selectCompactSources
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute useCircRatioCut related method
+ *	Description: Use cut on circularity ratio in source selection
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_useCircRatioCut(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_useCircRatioCut(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_useCircRatioCut) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_useCircRatioCut_read);
+	attr.set_value(&attr_useCircRatioCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_useCircRatioCut
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute useCircRatioCut related method
+ *	Description: Use cut on circularity ratio in source selection
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_useCircRatioCut(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_useCircRatioCut(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevBoolean	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_useCircRatioCut) ENABLED START -----*/
+	attr.get_write_value(attr_useCircRatioCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_useCircRatioCut
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute psCircRatioThr related method
+ *	Description: Point-source circularity ratio cut. 
+ *               Source is not selected as point-like if circratio<cut (circ ratio
+ *               is =1 for a circle).
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_psCircRatioThr(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_psCircRatioThr(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_psCircRatioThr) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_psCircRatioThr_read);
+	attr.set_value(&attr_psCircRatioThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_psCircRatioThr
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute psCircRatioThr related method
+ *	Description: Point-source circularity ratio cut. 
+ *               Source is not selected as point-like if circratio<cut (circ ratio
+ *               is =1 for a circle).
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_psCircRatioThr(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_psCircRatioThr(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevFloat	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_psCircRatioThr) ENABLED START -----*/
+	attr.get_write_value(attr_psCircRatioThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_psCircRatioThr
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute useElongCut related method
+ *	Description: Flag to enable/disable elongation point-like source cut.
+ *               Source is not selected as point-source if elong>cut (Elong=0 
+ *               for circle/square).
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_useElongCut(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_useElongCut(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_useElongCut) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_useElongCut_read);
+	attr.set_value(&attr_useElongCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_useElongCut
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute useElongCut related method
+ *	Description: Flag to enable/disable elongation point-like source cut.
+ *               Source is not selected as point-source if elong>cut (Elong=0 
+ *               for circle/square).
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_useElongCut(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_useElongCut(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevBoolean	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_useElongCut) ENABLED START -----*/
+	attr.get_write_value(attr_useElongCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_useElongCut
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute psElongThr related method
+ *	Description: Elongation point-like source cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_psElongThr(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_psElongThr(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_psElongThr) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_psElongThr_read);
+	attr.set_value(&attr_psElongThr_write);
+
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_psElongThr
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute psElongThr related method
+ *	Description: Elongation point-like source cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_psElongThr(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_psElongThr(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevFloat	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_psElongThr) ENABLED START -----*/
+	attr.get_write_value(attr_psElongThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_psElongThr
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute useEllipseAreaRatioCut related method
+ *	Description:  Flag to enable/disable ellipse area ratio cut
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_useEllipseAreaRatioCut(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_useEllipseAreaRatioCut(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_useEllipseAreaRatioCut) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_useEllipseAreaRatioCut_read);
+	attr.set_value(&attr_useEllipseAreaRatioCut_write);	
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_useEllipseAreaRatioCut
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute useEllipseAreaRatioCut related method
+ *	Description:  Flag to enable/disable ellipse area ratio cut
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_useEllipseAreaRatioCut(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_useEllipseAreaRatioCut(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevBoolean	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_useEllipseAreaRatioCut) ENABLED START -----*/
+	attr.get_write_value(attr_useEllipseAreaRatioCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_useEllipseAreaRatioCut
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute psEllipseAreaRatioMinThr related method
+ *	Description: Min Ellipse Area Ratio cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_psEllipseAreaRatioMinThr(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_psEllipseAreaRatioMinThr(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_psEllipseAreaRatioMinThr) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_psEllipseAreaRatioMinThr_read);
+	attr.set_value(&attr_psEllipseAreaRatioMinThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_psEllipseAreaRatioMinThr
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute psEllipseAreaRatioMinThr related method
+ *	Description: Min Ellipse Area Ratio cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_psEllipseAreaRatioMinThr(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_psEllipseAreaRatioMinThr(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevFloat	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_psEllipseAreaRatioMinThr) ENABLED START -----*/
+	attr.get_write_value(attr_psEllipseAreaRatioMinThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_psEllipseAreaRatioMinThr
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute psEllipseAreaRatioMaxThr related method
+ *	Description: Max Ellipse Area Ratio cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_psEllipseAreaRatioMaxThr(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_psEllipseAreaRatioMaxThr(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_psEllipseAreaRatioMaxThr) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_psEllipseAreaRatioMaxThr_read);
+	attr.set_value(&attr_psEllipseAreaRatioMaxThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_psEllipseAreaRatioMaxThr
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute psEllipseAreaRatioMaxThr related method
+ *	Description: Max Ellipse Area Ratio cut
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_psEllipseAreaRatioMaxThr(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_psEllipseAreaRatioMaxThr(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevFloat	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_psEllipseAreaRatioMaxThr) ENABLED START -----*/
+	attr.get_write_value(attr_psEllipseAreaRatioMaxThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_psEllipseAreaRatioMaxThr
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute useMaxNPixCut related method
+ *	Description: 
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_useMaxNPixCut(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_useMaxNPixCut(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_useMaxNPixCut) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_useMaxNPixCut_read);
+	attr.set_value(&attr_useMaxNPixCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_useMaxNPixCut
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute useMaxNPixCut related method
+ *	Description: 
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_useMaxNPixCut(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_useMaxNPixCut(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevBoolean	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_useMaxNPixCut) ENABLED START -----*/
+	attr.get_write_value(attr_useMaxNPixCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_useMaxNPixCut
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute psMaxNPix related method
+ *	Description: Maximum number of pixels to select point-like sources
+ *
+ *	Data type:	Tango::DevLong
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_psMaxNPix(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_psMaxNPix(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_psMaxNPix) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_psMaxNPix_read);
+	attr.set_value(&attr_psMaxNPix_write);
+
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_psMaxNPix
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute psMaxNPix related method
+ *	Description: Maximum number of pixels to select point-like sources
+ *
+ *	Data type:	Tango::DevLong
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_psMaxNPix(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_psMaxNPix(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevLong	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_psMaxNPix) ENABLED START -----*/
+	attr.get_write_value(attr_psMaxNPix_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_psMaxNPix
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute useBoundingBoxCut related method
+ *	Description: Flag to enable/disable bounding box cut
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_useBoundingBoxCut(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_useBoundingBoxCut(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_useBoundingBoxCut) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_useBoundingBoxCut_read);
+	attr.set_value(&attr_useBoundingBoxCut_write);
+
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_useBoundingBoxCut
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute useBoundingBoxCut related method
+ *	Description: Flag to enable/disable bounding box cut
+ *
+ *	Data type:	Tango::DevBoolean
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_useBoundingBoxCut(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_useBoundingBoxCut(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevBoolean	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_useBoundingBoxCut) ENABLED START -----*/
+	attr.get_write_value(attr_useBoundingBoxCut_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_useBoundingBoxCut
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute minBoundingBoxThr related method
+ *	Description: Minimum default bounding box cut (source tagged as bad if below this threshold)
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_minBoundingBoxThr(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_minBoundingBoxThr(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_minBoundingBoxThr) ENABLED START -----*/
+	//	Set the attribute value
+	//attr.set_value(attr_minBoundingBoxThr_read);
+	attr.set_value(&attr_minBoundingBoxThr_write);
+
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_minBoundingBoxThr
+}
+//--------------------------------------------------------
+/**
+ *	Write attribute minBoundingBoxThr related method
+ *	Description: Minimum default bounding box cut (source tagged as bad if below this threshold)
+ *
+ *	Data type:	Tango::DevFloat
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::write_minBoundingBoxThr(Tango::WAttribute &attr)
+{
+	DEBUG_STREAM << "SFinder::write_minBoundingBoxThr(Tango::WAttribute &attr) entering... " << endl;
+	//	Retrieve write value
+	Tango::DevFloat	w_val;
+	attr.get_write_value(w_val);
+	/*----- PROTECTED REGION ID(SFinder::write_minBoundingBoxThr) ENABLED START -----*/
+	attr.get_write_value(attr_minBoundingBoxThr_write);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::write_minBoundingBoxThr
+}
 
 //--------------------------------------------------------
 /**
@@ -1275,7 +1911,7 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 	long int ack= 0;
 	argout= new Tango::DevVarLongStringArray;
 	argout->lvalue.length(1);
-	argout->svalue.length(1);
+	argout->svalue.length(2);
 
 	//Validate args	
 	long int nArgs_s= argin->svalue.length();
@@ -1335,6 +1971,16 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		INFO_LOG("Starting source finding task no. "<<i+1<<"...");
 		int status= RunSourceTask(sources,inputFileName,tileMinX_list[i],tileMaxX_list[i],tileMinY_list[i],tileMaxY_list[i]);
 		if(status<0){
+			//Clear sources
+			for(unsigned int k=0;k<sources.size();k++){
+				if(sources[k]){
+					delete sources[k];
+					sources[k]= 0;
+				}
+			}
+			sources.clear();
+
+			//Set error reply
 			ERROR_LOG("Source finding task failed for reco task no. "<<i+1<<"!");
 			ack= -1;
 			reply= "Source finding task failed!";
@@ -1344,16 +1990,58 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 			set_status("Source finding task failed!");
 			return argout;
 		}
-	}//end loop reco		
+
+		INFO_LOG("#"<<sources.size()<<" sources found in task no. "<<i+1<<"...");
+
+	}//end loop reco
+
+	
+	//## Encode source list 
+	std::string serialized_sources= "";
+	if(sources.size()>0){
+		INFO_LOG("Serializing source collection (nsources="<<sources.size()<<")");
+		int status= Serializer::SourceCollectionToString(sources,serialized_sources);
+		if(status<0){
+			//Clear sources
+			for(unsigned int k=0;k<sources.size();k++){
+				if(sources[k]){
+					delete sources[k];
+					sources[k]= 0;
+				}
+			}
+			sources.clear();
+
+			//Set error reply
+			ERROR_LOG("Source serialization failed!");
+			ack= -1;
+			reply= "Source serialization failed!";
+			argout->lvalue[0]= ack;
+			argout->svalue[0] = CORBA::string_dup(reply.c_str());
+			set_state(Tango::ON);
+			set_status("Source serialization failed!");
+			return argout;
+		}
+	}
 	
 	//Return reply
 	argout->lvalue[0]= ack;
 	argout->svalue[0] = CORBA::string_dup(reply.c_str());
+	argout->svalue[1] = CORBA::string_dup(serialized_sources.c_str());
+	
 
 	//Set free state	
 	set_state(Tango::ON);
 	set_status("Source finding ended");
 	INFO_LOG("Source finding ended");
+
+	//Clear sources
+	for(unsigned int k=0;k<sources.size();k++){
+		if(sources[k]){
+			delete sources[k];
+			sources[k]= 0;
+		}
+	}
+	sources.clear();
 
 	/*----- PROTECTED REGION END -----*/	//	SFinder::extract_sources
 	return argout;
@@ -1387,45 +2075,104 @@ int SFinder::RunSourceTask(std::vector<Source*>& sources,const std::string& file
 		return -1;
 	}
 
+	//## Compute input image stats & bkg
+	INFO_LOG("Computing input image stats & bkg...");	
+	BkgData* bkgData= ComputeStatsAndBkg(inputImg);	
+	if(!bkgData){
+		ERROR_LOG("ERROR: Failed to compute stats/bkg info!");
+		inputImg->Delete();
+		return -1;
+	}
+
 	//## Find compact sources
 	INFO_LOG("Searching compact sources...");
 	std::vector<Source*> compact_sources;
-	/*
-	if(attr_searchCompactSources_write && FindCompactSources(compact_sources)<0){
+	if(attr_searchCompactSources_write && FindCompactSources(compact_sources,inputImg,false,bkgData)<0){
 		ERROR_LOG("Compact source search failed!");
 		return -1;
 	}
-	*/
+	sources.insert(sources.end(),compact_sources.begin(),compact_sources.end());
+	
 
 	//...
 	//...
 
 	//## Clear data
 	inputImg->Delete();
+	delete bkgData;
+	bkgData= 0;
 
 	return 0;
 
 }//close RunSourceTask()
 
 
-int SFinder::FindSources(std::vector<Source*>& sources,Img* inputImg,double seedThr,double mergeThr,long int minNPix){
+int SFinder::FindCompactSources(std::vector<Source*>& sources,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
 
-	if(!inputImg) return -1;
-
-	//## Compute stats and bkg
-	INFO_LOG("Computing image stats/bkg...");
-	BkgData* bkgData= ComputeStatsAndBkg(inputImg);	
-	if(!bkgData){
-		ERROR_LOG("Failed to compute stats/bkg info!");
+	//## Check input image
+	if(!inputImg) {
+		ERROR_LOG("Null ptr to input image given!");
 		return -1;
+	}
+
+	//## Find sources
+	INFO_LOG("Finding compact sources ...");		
+	int status= FindSources(sources,inputImg,computeStatsAndBkg,inputBkgData);
+	if(status<0) {
+		ERROR_LOG("Compact source finding failed!");
+		return -1;
+	}
+
+	//## Retrieve found sources 
+	int nSources= (int)sources.size();
+	INFO_LOG("#"<<nSources<<" compact sources detected in input image...");
+	if(nSources<=0) return 0;
+
+	//## Apply source selection?
+	int nSelSources= nSources;
+	if(attr_selectCompactSources_write){
+		if(SelectSources(sources)<0){
+			ERROR_LOG("Failed to select sources!");
+			return -1;
+		}
+		nSelSources= sources.size();
+	}//close if source selection
+
+	//## Add detected sources to the list	
+	INFO_LOG("#"<<nSelSources<<" compact sources selected after cuts...");
+
+	return 0;
+
+}//close FindCompactSources()
+
+
+int SFinder::FindSources(std::vector<Source*>& sources,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
+
+	//## Check input image
+	if(!inputImg) {
+		ERROR_LOG("Null ptr to input image given!");
+		return -1;
+	}
+
+	//## Compute stats and bkg?
+	BkgData* bkgData= inputBkgData;
+	if(computeStatsAndBkg || !bkgData){
+		INFO_LOG("Computing image stats/bkg...");
+		bkgData= ComputeStatsAndBkg(inputImg);	
+		if(!bkgData){
+			ERROR_LOG("Failed to compute stats/bkg info!");
+			return -1;
+		}
 	}
 
 	//## Compute significance map
 	Img* significanceMap= inputImg->GetSignificanceMap(bkgData,attr_useLocalBkg_write);
 	if(!significanceMap){
 		ERROR_LOG("Failed to compute significance map!");
-		delete bkgData;
-		bkgData= 0;
+		if(!inputBkgData){//delete only if inputBkgData is null (e.g. bkg is computed here)
+			delete bkgData;
+			bkgData= 0;
+		}
 		return -1;
 	}
 
@@ -1433,14 +2180,16 @@ int SFinder::FindSources(std::vector<Source*>& sources,Img* inputImg,double seed
 	INFO_LOG("Finding sources...");	
 	int status= inputImg->FindCompactSource(
 		sources,significanceMap,bkgData,
-		seedThr,mergeThr,minNPix,attr_searchNegativeExcess_write,attr_mergeBelowSeed_write,
+		attr_seedThr_write,attr_mergeThr_write,attr_minNPix_write,attr_searchNegativeExcess_write,attr_mergeBelowSeed_write,
 		attr_searchNestedSources_write,attr_nestedBlobThrFactor_write
 	);
 
 	if(status<0) {
 		ERROR_LOG("Source finding failed!");
-		delete bkgData;
-		bkgData= 0;
+		if(!inputBkgData){
+			delete bkgData;
+			bkgData= 0;
+		}
 		significanceMap->Delete();
 		return -1;
 	}
@@ -1448,14 +2197,159 @@ int SFinder::FindSources(std::vector<Source*>& sources,Img* inputImg,double seed
 	INFO_LOG(nSources<<" sources detected in input image...");	
 	
 	//## Clear allocated data
-	delete bkgData;
-	bkgData= 0;
+	if(!inputBkgData){
+		delete bkgData;
+		bkgData= 0;
+	}
 	significanceMap->Delete();
 		
 	return 0;
 
 }//close FindSources()
 
+
+int SFinder::SelectSources(std::vector<Source*>& sources){
+
+	//## Apply source selection?
+	int nSources= (int)sources.size();
+	if(nSources<=0) return 0;
+	
+	int nSelSources= 0;
+	std::vector<Source*> sources_sel;
+
+	for(int i=0;i<nSources;i++){	
+		std::string sourceName= sources[i]->Name;
+		int sourceId= sources[i]->Id;
+		long int NPix= sources[i]->NPix;
+		double X0= sources[i]->X0;
+		double Y0= sources[i]->Y0;
+
+		//Is bad source (i.e. line-like blob, etc...)?
+		if(!IsGoodSource(sources[i])) {
+			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!");
+			sources[i]->SetGoodSourceFlag(false);
+			continue;
+		}
+			
+		//Is point-like source?
+		if( IsPointLikeSource(sources[i]) ){
+			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as a point-like source ...");
+			sources[i]->SetType(Source::ePointLike);
+		}
+
+		//Tag nested sources
+		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();
+		for(unsigned int j=0;j<nestedSources.size();j++){
+			std::string nestedSourceName= nestedSources[j]->Name;
+			int nestedSourceId= nestedSources[j]->Id;
+			long int nestedNPix= nestedSources[j]->NPix;
+			double nestedX0= nestedSources[j]->X0;
+			double nestedY0= nestedSources[j]->Y0;
+
+			if(!IsGoodSource(nestedSources[j])) {
+				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as bad source, skipped!");
+				nestedSources[j]->SetGoodSourceFlag(false);
+			}
+			if( IsPointLikeSource(nestedSources[j]) ){
+				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as a point-like source ...");
+				nestedSources[j]->SetType(Source::ePointLike);
+			}
+		}//end loop nested sources
+			
+		//Add source to the list	
+		sources_sel.push_back(sources[i]);
+		nSelSources++;
+	}//end loop sources
+
+	INFO_LOG("Added "<<nSelSources<<" compact sources to the selected list...");
+
+	//Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
+	sources.clear();
+	sources.insert(sources.end(),sources_sel.begin(),sources_sel.end());
+	sources_sel.clear();
+
+	return 0;
+
+}//close SelectSources()
+
+bool SFinder::IsGoodSource(Source* aSource){
+	
+	if(!aSource) return false;
+
+	//## Check for pixels 	
+	if(aSource->NPix<=0 || (aSource->GetPixels()).size()<=0) return false;
+
+	//## Check for line-like source
+	if( (aSource->GetContours()).size()<=0) {
+		WARN_LOG("No contour stored for this source, cannot perform check!");
+		return true;
+	}
+
+	double BoundingBoxMin= ((aSource->GetContours())[0])->BoundingBoxMin;
+	if(attr_useBoundingBoxCut_write && BoundingBoxMin<attr_minBoundingBoxThr_write) {
+		DEBUG_LOG("BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<attr_minBoundingBoxThr_write<<")");
+		return false;
+	}
+
+	//## Add other check here ...
+	//...
+
+	return true;
+
+}//close IsGoodSource()
+
+bool SFinder::IsPointLikeSource(Source* aSource){
+
+	if(!aSource) return false;
+	if(!aSource->HasParameters()) {
+		WARN_LOG("No parameters are available for this source (did you compute them?)...point-like check cannot be performed!");
+		return true;
+	}
+
+	std::string sourceName= aSource->Name;
+	int sourceId= aSource->Id;
+
+	//Loop over contours and check if all of them have circular features
+	bool isPointLike= true;
+	std::vector<Contour*> contours= aSource->GetContours();
+
+	for(unsigned int i=0;i<contours.size();i++){
+		Contour* thisContour= contours[i];
+
+		//Test circularity ratio: 1= circle
+		if(attr_useCircRatioCut_write && thisContour->CircularityRatio<attr_psCircRatioThr_write) {
+			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass CircularityRatio cut (CR="<<thisContour->CircularityRatio<<"<"<<attr_psCircRatioThr_write<<")");
+			isPointLike= false;
+			break;
+		}
+
+		//Test elongation (how symmetrical is the shape): 0=circle,square
+		if(attr_useElongCut_write && thisContour->Elongation>attr_psElongThr_write) {
+			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass Elongation cut (ELONG="<<thisContour->CircularityRatio<<">"<<attr_psElongThr_write<<")");
+			isPointLike= false;
+			break;	
+		}
+
+		//Test ellipse fit
+		if(attr_useEllipseAreaRatioCut_write && (thisContour->EllipseAreaRatio<attr_psEllipseAreaRatioMinThr_write || thisContour->EllipseAreaRatio>attr_psEllipseAreaRatioMaxThr_write)) {
+			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass EllipseAreaRatio cut (EAR="<<thisContour->EllipseAreaRatio<<" outside range ["<<attr_psEllipseAreaRatioMinThr_write<<","<<attr_psEllipseAreaRatioMaxThr_write<<"])");
+			isPointLike= false;
+			break;	
+		}
+
+	}//end contour loop
+	
+	//Check number of pixels
+	if(attr_useMaxNPixCut_write && aSource->NPix>attr_psMaxNPix_write){
+		DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nMaxPix cut (NPix="<<aSource->NPix<<">"<<attr_psMaxNPix_write<<")");
+		isPointLike= false;
+	}
+
+	if(!isPointLike) return false;
+
+	return true;
+
+}//close IsPointLikeSource()
 
 Img* SFinder::ReadImage(const std::string& filename,long int tileMinX,long int tileMaxX,long int tileMinY,long int tileMaxY){
 
@@ -1550,7 +2444,8 @@ BkgData* SFinder::ComputeStatsAndBkg(Img* img){
 
 	double gridSizeX= attr_localBkgGridStepSizeX_write*boxSizeX;
 	double gridSizeY= attr_localBkgGridStepSizeY_write*boxSizeY;
-
+	INFO_LOG("Bkg box ("<<boxSizeX<<","<<boxSizeY<<") pixels, Grid step ("<<gridSizeX<<","<<gridSizeY<<") pixels ...");
+		
 	//## Compute Bkg
 	BkgData* bkgData= img->ComputeBkg(
 		attr_bkgEstimator_write,attr_useLocalBkg_write,
@@ -1587,6 +2482,7 @@ int SFinder::LoadDefaultConfig(){
 	attr_localBkgGridStepSizeY_write= localBkgGridStepSizeY_default;
 
 	//--> Source finding options
+	attr_searchCompactSources_write= searchCompactSources_default;
 	attr_seedThr_write= seedThr_default;
 	attr_mergeThr_write= mergeThr_default;
 	attr_minNPix_write= minNPix_default;
@@ -1596,6 +2492,20 @@ int SFinder::LoadDefaultConfig(){
 	//--> Nested source search
 	attr_searchNestedSources_write= searchNestedSources_default;
 	attr_nestedBlobThrFactor_write= nestedBlobThrFactor_default;
+
+	//--> Source selection
+	attr_selectCompactSources_write= selectCompactSources_default;
+	attr_useCircRatioCut_write= useCircRatioCut_default;
+	attr_psCircRatioThr_write= psCircRatioThr_default;
+	attr_useElongCut_write= useElongCut_default;
+	attr_psElongThr_write= psElongThr_default;
+	attr_useEllipseAreaRatioCut_write= useEllipseAreaRatioCut_default;
+	attr_psEllipseAreaRatioMinThr_write= psEllipseAreaRatioMinThr_default;
+	attr_psEllipseAreaRatioMaxThr_write= psEllipseAreaRatioMaxThr_default;
+	attr_useMaxNPixCut_write= useMaxNPixCut_default;
+	attr_psMaxNPix_write= psMaxNPix_default;
+	attr_useBoundingBoxCut_write= useBoundingBoxCut_default;
+	attr_minBoundingBoxThr_write= minBoundingBoxThr_default;
 
 	return 0;
 
