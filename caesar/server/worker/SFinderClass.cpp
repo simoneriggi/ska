@@ -177,6 +177,25 @@ CORBA::Any *ExtractSourcesClass::execute(Tango::DeviceImpl *device, const CORBA:
 	return insert((static_cast<SFinder *>(device))->extract_sources(argin));
 }
 
+//--------------------------------------------------------
+/**
+ * method : 		ConfigureClass::execute()
+ * description : 	method to trigger the execution of the command.
+ *
+ * @param	device	The device on which the command must be executed
+ * @param	in_any	The command input data
+ *
+ *	returns The command output data (packed in the Any object)
+ */
+//--------------------------------------------------------
+CORBA::Any *ConfigureClass::execute(Tango::DeviceImpl *device, const CORBA::Any &in_any)
+{
+	cout2 << "ConfigureClass::execute(): arrived" << endl;
+	Tango::DevString argin;
+	extract(in_any, argin);
+	return insert((static_cast<SFinder *>(device))->configure(argin));
+}
+
 
 //===================================================================
 //	Properties management
@@ -671,6 +690,20 @@ void SFinderClass::set_default_property()
 	prop_def  = "2";
 	vect_data.clear();
 	vect_data.push_back("2");
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "brokerList";
+	prop_desc = "List of broker devices";
+	prop_def  = "caesar/broker/id1";
+	vect_data.clear();
+	vect_data.push_back("caesar/broker/id1");
 	if (prop_def.length()>0)
 	{
 		Tango::DbDatum	data(prop_name);
@@ -1634,6 +1667,82 @@ void SFinderClass::attribute_factory(vector<Tango::Attr *> &att_list)
 	minboundingboxthr->set_memorized_init(true);
 	att_list.push_back(minboundingboxthr);
 
+	//	Attribute : runProgress
+	runProgressAttrib	*runprogress = new runProgressAttrib();
+	Tango::UserDefaultAttrProp	runprogress_prop;
+	runprogress_prop.set_description("Run progress info\n[0]: run id\n[1]: status (RUNNING, COMPLETED, ABORTED, FAILED)\n[2]: progress fraction (0-100%)\n[3]: log info (INIT, READ_IMAGE, BKG, COMPACT_SOURCE, EXT_SOURCE)\n[4]: timestamp");
+	//	label	not set for runProgress
+	//	unit	not set for runProgress
+	//	standard_unit	not set for runProgress
+	//	display_unit	not set for runProgress
+	//	format	not set for runProgress
+	//	max_value	not set for runProgress
+	//	min_value	not set for runProgress
+	//	max_alarm	not set for runProgress
+	//	min_alarm	not set for runProgress
+	//	max_warning	not set for runProgress
+	//	min_warning	not set for runProgress
+	//	delta_t	not set for runProgress
+	//	delta_val	not set for runProgress
+	
+	runprogress->set_default_properties(runprogress_prop);
+	//	Not Polled
+	runprogress->set_disp_level(Tango::OPERATOR);
+	//	Not Memorized
+	att_list.push_back(runprogress);
+
+	//	Attribute : compactSources
+	compactSourcesAttrib	*compactsources = new compactSourcesAttrib();
+	Tango::UserDefaultAttrProp	compactsources_prop;
+	compactsources_prop.set_description("Source list\n[0]: run id\n[1]: source no. 1\n[2]: source no. 2\n...\n[n] source no. n");
+	//	label	not set for compactSources
+	//	unit	not set for compactSources
+	//	standard_unit	not set for compactSources
+	//	display_unit	not set for compactSources
+	//	format	not set for compactSources
+	//	max_value	not set for compactSources
+	//	min_value	not set for compactSources
+	//	max_alarm	not set for compactSources
+	//	min_alarm	not set for compactSources
+	//	max_warning	not set for compactSources
+	//	min_warning	not set for compactSources
+	//	delta_t	not set for compactSources
+	//	delta_val	not set for compactSources
+	
+	compactsources->set_default_properties(compactsources_prop);
+	//	Not Polled
+	compactsources->set_disp_level(Tango::OPERATOR);
+	//	Not Memorized
+	compactsources->set_data_ready_event(true);
+	compactsources->set_change_event(true, false);
+	att_list.push_back(compactsources);
+
+	//	Attribute : extendedSources
+	extendedSourcesAttrib	*extendedsources = new extendedSourcesAttrib();
+	Tango::UserDefaultAttrProp	extendedsources_prop;
+	extendedsources_prop.set_description("Extended source list\n[0]: run id\n[1]: source no. 1\n...\n[N]: source no. N");
+	//	label	not set for extendedSources
+	//	unit	not set for extendedSources
+	//	standard_unit	not set for extendedSources
+	//	display_unit	not set for extendedSources
+	//	format	not set for extendedSources
+	//	max_value	not set for extendedSources
+	//	min_value	not set for extendedSources
+	//	max_alarm	not set for extendedSources
+	//	min_alarm	not set for extendedSources
+	//	max_warning	not set for extendedSources
+	//	min_warning	not set for extendedSources
+	//	delta_t	not set for extendedSources
+	//	delta_val	not set for extendedSources
+	
+	extendedsources->set_default_properties(extendedsources_prop);
+	//	Not Polled
+	extendedsources->set_disp_level(Tango::OPERATOR);
+	//	Not Memorized
+	extendedsources->set_data_ready_event(true);
+	extendedsources->set_change_event(true, false);
+	att_list.push_back(extendedsources);
+
 
 	//	Create a list of static attributes
 	create_static_attribute_list(get_class_attr()->get_attr_list());
@@ -1683,10 +1792,19 @@ void SFinderClass::command_factory()
 	ExtractSourcesClass	*pExtractSourcesCmd =
 		new ExtractSourcesClass("ExtractSources",
 			Tango::DEVVAR_LONGSTRINGARRAY, Tango::DEVVAR_LONGSTRINGARRAY,
-			"String arg\n[0]: filename \n\nLong arg\n[nmaps+0]: tile min x\n[nmaps+1]: tile max x\n[nmaps+2]: tile min y\n[nmaps+3]: tile max y",
-			"Long arg\n[0]: ack code\n\nString arg\n[0]: Encoded sources found\n[1]: err description",
+			"String arg\n[0]: filename\n[1]: run guid (set by the broker)\n[2]: configuration string  \n\nLong arg\n[nmaps+0]: tile min x\n[nmaps+1]: tile max x\n[nmaps+2]: tile min y\n[nmaps+3]: tile max y",
+			"Long arg\n[0]: ack code\n\nString arg\n[0]: err description",
 			Tango::OPERATOR);
 	command_list.push_back(pExtractSourcesCmd);
+
+	//	Command Configure
+	ConfigureClass	*pConfigureCmd =
+		new ConfigureClass("Configure",
+			Tango::DEV_STRING, Tango::DEVVAR_LONGSTRINGARRAY,
+			"Configuration string",
+			"",
+			Tango::OPERATOR);
+	command_list.push_back(pConfigureCmd);
 
 	/*----- PROTECTED REGION ID(SFinderClass::command_factory_after) ENABLED START -----*/
 	

@@ -509,6 +509,45 @@ public:
 		{return (static_cast<SFinder *>(dev))->is_minBoundingBoxThr_allowed(ty);}
 };
 
+//	Attribute runProgress class definition
+class runProgressAttrib: public Tango::SpectrumAttr
+{
+public:
+	runProgressAttrib():SpectrumAttr("runProgress",
+			Tango::DEV_STRING, Tango::READ, 10) {};
+	~runProgressAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_runProgress(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_runProgress_allowed(ty);}
+};
+
+//	Attribute compactSources class definition
+class compactSourcesAttrib: public Tango::SpectrumAttr
+{
+public:
+	compactSourcesAttrib():SpectrumAttr("compactSources",
+			Tango::DEV_STRING, Tango::READ, 1000000) {};
+	~compactSourcesAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_compactSources(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_compactSources_allowed(ty);}
+};
+
+//	Attribute extendedSources class definition
+class extendedSourcesAttrib: public Tango::SpectrumAttr
+{
+public:
+	extendedSourcesAttrib():SpectrumAttr("extendedSources",
+			Tango::DEV_STRING, Tango::READ, 1000000) {};
+	~extendedSourcesAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_extendedSources(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_extendedSources_allowed(ty);}
+};
+
 
 //=========================================
 //	Define classes for commands
@@ -534,6 +573,29 @@ public:
 	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
 	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
 	{return (static_cast<SFinder *>(dev))->is_ExtractSources_allowed(any);}
+};
+
+//	Command Configure class definition
+class ConfigureClass : public Tango::Command
+{
+public:
+	ConfigureClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out,
+				   const char        *in_desc,
+				   const char        *out_desc,
+				   Tango::DispLevel  level)
+	:Command(name,in,out,in_desc,out_desc, level)	{};
+
+	ConfigureClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out)
+	:Command(name,in,out)	{};
+	~ConfigureClass() {};
+	
+	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
+	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
+	{return (static_cast<SFinder *>(dev))->is_Configure_allowed(any);}
 };
 
 

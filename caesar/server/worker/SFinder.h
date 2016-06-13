@@ -38,10 +38,17 @@
 #ifndef SFinder_H
 #define SFinder_H
 
+#include <SFinderThread.h>
+
 #include <tango.h>
 
+//Jsoncpp headers
+#include <json/json.h>
+#include <json/reader.h>
+
+//Caesar headers
 #include <Img.h>
-//#include <BkgData.h>
+#include <BkgData.h>
 #include <Source.h>
 namespace Caesar {
 	class Img;
@@ -61,6 +68,7 @@ namespace SFinder_ns
 /*----- PROTECTED REGION ID(SFinder::Additional Class Declarations) ENABLED START -----*/
 
 //	Additional Class Declarations
+	class SFinderThread;
 
 /*----- PROTECTED REGION END -----*/	//	SFinder::Additional Class Declarations
 
@@ -71,6 +79,11 @@ class SFinder : public TANGO_BASE_CLASS
 
 //	Add your own data members
 	protected:
+		//Thread 
+		bool m_StopThreadFlag;	
+		omni_mutex* m_mutex;
+		SFinderThread* m_WorkerThread;
+		
 		//Bkg attributes
 		Tango::DevBoolean	attr_useLocalBkg_write;	
 		Tango::DevBoolean	attr_use2ndPassInLocalBkg_write;
@@ -201,6 +214,8 @@ public:
 	Tango::DevBoolean	useBoundingBoxCut_default;
 	//	minBoundingBoxThr_default:	Minimum default bounding box cut (source tagged as bad if below this threshold)
 	Tango::DevFloat	minBoundingBoxThr_default;
+	//	brokerList:	List of broker devices
+	vector<string>	brokerList;
 
 //	Attribute data members
 public:
@@ -234,6 +249,9 @@ public:
 	Tango::DevLong	*attr_psMaxNPix_read;
 	Tango::DevBoolean	*attr_useBoundingBoxCut_read;
 	Tango::DevFloat	*attr_minBoundingBoxThr_read;
+	Tango::DevString	*attr_runProgress_read;
+	Tango::DevString	*attr_compactSources_read;
+	Tango::DevString	*attr_extendedSources_read;
 
 //	Constructors and destructors
 public:
@@ -615,6 +633,47 @@ public:
 	virtual void read_minBoundingBoxThr(Tango::Attribute &attr);
 	virtual void write_minBoundingBoxThr(Tango::WAttribute &attr);
 	virtual bool is_minBoundingBoxThr_allowed(Tango::AttReqType type);
+/**
+ *	Attribute runProgress related methods
+ *	Description: Run progress info
+ *               [0]: run id
+ *               [1]: status (RUNNING, COMPLETED, ABORTED, FAILED)
+ *               [2]: progress fraction (0-100%)
+ *               [3]: log info (INIT, READ_IMAGE, BKG, COMPACT_SOURCE, EXT_SOURCE)
+ *               [4]: timestamp
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Spectrum max = 10
+ */
+	virtual void read_runProgress(Tango::Attribute &attr);
+	virtual bool is_runProgress_allowed(Tango::AttReqType type);
+/**
+ *	Attribute compactSources related methods
+ *	Description: Source list
+ *               [0]: run id
+ *               [1]: source no. 1
+ *               [2]: source no. 2
+ *               ...
+ *               [n] source no. n
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Spectrum max = 1000000
+ */
+	virtual void read_compactSources(Tango::Attribute &attr);
+	virtual bool is_compactSources_allowed(Tango::AttReqType type);
+/**
+ *	Attribute extendedSources related methods
+ *	Description: Extended source list
+ *               [0]: run id
+ *               [1]: source no. 1
+ *               ...
+ *               [N]: source no. N
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Spectrum max = 1000000
+ */
+	virtual void read_extendedSources(Tango::Attribute &attr);
+	virtual bool is_extendedSources_allowed(Tango::AttReqType type);
 
 
 	//--------------------------------------------------------
@@ -636,7 +695,9 @@ public:
 	 *               as argument.
 	 *
 	 *	@param argin String arg
-	 *               [0]: filename 
+	 *               [0]: filename
+	 *               [1]: run guid (set by the broker)
+	 *               [2]: configuration string  
 	 *               
 	 *               Long arg
 	 *               [nmaps+0]: tile min x
@@ -647,11 +708,19 @@ public:
 	 *           [0]: ack code
 	 *           
 	 *           String arg
-	 *           [0]: Encoded sources found
-	 *           [1]: err description
+	 *           [0]: err description
 	 */
 	virtual Tango::DevVarLongStringArray *extract_sources(const Tango::DevVarLongStringArray *argin);
 	virtual bool is_ExtractSources_allowed(const CORBA::Any &any);
+	/**
+	 *	Command Configure related method
+	 *	Description: 
+	 *
+	 *	@param argin Configuration string
+	 *	@returns 
+	 */
+	virtual Tango::DevVarLongStringArray *configure(Tango::DevString argin);
+	virtual bool is_Configure_allowed(const CORBA::Any &any);
 
 
 	//--------------------------------------------------------
@@ -667,6 +736,12 @@ public:
 //	Additional Method prototypes
 	protected:
 		int LoadDefaultConfig();
+		int ApplyConfig(std::string& config);
+		int SetAttrFromConfig(Json::Value& optionObj);
+		int SetScalarAttrValue(Tango::WAttribute& attr,Json::Value& optionObj);
+		int SetSpectrumAttrValue(Tango::WAttribute& attr,Json::Value& optionObj);
+
+		/*
 		int RunSourceTask(std::vector<Caesar::Source*>& sources,const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
 		Caesar::Img* ReadImage(const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
 		Caesar::BkgData* ComputeStatsAndBkg(Caesar::Img* img);
@@ -675,6 +750,8 @@ public:
 		int SelectSources(std::vector<Caesar::Source*>& sources);
 		bool IsGoodSource(Caesar::Source* aSource);
 		bool IsPointLikeSource(Caesar::Source* aSource);
+		*/
+	friend class SFinderThread;
 
 /*----- PROTECTED REGION END -----*/	//	SFinder::Additional Method prototypes
 };

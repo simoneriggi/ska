@@ -46,6 +46,9 @@ static const char *RcsId = "$Id:  $";
 //ROOT headers
 #include <TFile.h>
 
+#include <json/json.h>
+#include <json/reader.h>
+
 //Caesar headers
 #include <Img.h>
 #include <BkgData.h>
@@ -53,6 +56,33 @@ static const char *RcsId = "$Id:  $";
 #include <Logger.h>
 #include <Serializer.h>
 using namespace Caesar;
+
+//## Standard headers
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <fstream>
+#include <iomanip>
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <ctime>
+#include <stdexcept>
+#include <unistd.h>
+#include <getopt.h>
+#include <math.h>
+#include <time.h>
+
+#include <map>
+#include <vector>
+#include <thread>
+#include <memory>
+#include <functional>
+#include <chrono>
+#include <regex>
+#include <exception>
+
+using namespace std;
 
 /*----- PROTECTED REGION END -----*/	//	SFinder.cpp
 
@@ -70,6 +100,7 @@ using namespace Caesar;
 //  State           |  Inherited (no method)
 //  Status          |  Inherited (no method)
 //  ExtractSources  |  extract_sources
+//  Configure       |  configure
 //================================================================
 
 //================================================================
@@ -105,6 +136,9 @@ using namespace Caesar;
 //  psMaxNPix                 |  Tango::DevLong	Scalar
 //  useBoundingBoxCut         |  Tango::DevBoolean	Scalar
 //  minBoundingBoxThr         |  Tango::DevFloat	Scalar
+//  runProgress               |  Tango::DevString	Spectrum  ( max = 10)
+//  compactSources            |  Tango::DevString	Spectrum  ( max = 1000000)
+//  extendedSources           |  Tango::DevString	Spectrum  ( max = 1000000)
 //================================================================
 
 namespace SFinder_ns
@@ -161,8 +195,17 @@ void SFinder::delete_device()
 	/*----- PROTECTED REGION ID(SFinder::delete_device) ENABLED START -----*/
 	
 	//	Delete device allocated objects
+	if (m_WorkerThread) {
+		DEBUG_LOG("Shutting down worker thread...");
+		m_WorkerThread->Stop();
+		delete m_WorkerThread;
+		m_WorkerThread = 0;
+	}
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::delete_device
+	delete[] attr_runProgress_read;
+	delete[] attr_compactSources_read;
+	delete[] attr_extendedSources_read;
 }
 
 //--------------------------------------------------------
@@ -184,17 +227,25 @@ void SFinder::init_device()
 	//	Get the device properties from database
 	get_device_property();
 	
+	attr_runProgress_read = new Tango::DevString[10];
+	attr_compactSources_read = new Tango::DevString[1000000];
+	attr_extendedSources_read = new Tango::DevString[1000000];
 	/*----- PROTECTED REGION ID(SFinder::init_device) ENABLED START -----*/
 	
 	//	Initialize device
 	set_state(Tango::ON);
 	set_status("Worker "+device_name +" started");
-	DEBUG_STREAM<<"SFinder::init_device() - Worker "<<device_name<<" started..."<<endl;
+	DEBUG_LOG("Worker "<<device_name<<" started...");
 
 	//## Init default attr values
 	LoadDefaultConfig();
 
-	
+	//## Init the worker thread
+  DEBUG_LOG("Init workr thread...");
+  m_StopThreadFlag= false;
+	m_WorkerThread= 0;
+  m_WorkerThread = new SFinderThread(this);
+  
 	/*----- PROTECTED REGION END -----*/	//	SFinder::init_device
 }
 
@@ -246,6 +297,7 @@ void SFinder::get_device_property()
 	dev_prop.push_back(Tango::DbDatum("psMaxNPix_default"));
 	dev_prop.push_back(Tango::DbDatum("useBoundingBoxCut_default"));
 	dev_prop.push_back(Tango::DbDatum("minBoundingBoxThr_default"));
+	dev_prop.push_back(Tango::DbDatum("brokerList"));
 
 	//	is there at least one property to be read ?
 	if (dev_prop.size()>0)
@@ -601,6 +653,17 @@ void SFinder::get_device_property()
 		//	And try to extract minBoundingBoxThr_default value from database
 		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  minBoundingBoxThr_default;
 
+		//	Try to initialize brokerList from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  brokerList;
+		else {
+			//	Try to initialize brokerList from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  brokerList;
+		}
+		//	And try to extract brokerList value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  brokerList;
+
 	}
 
 	/*----- PROTECTED REGION ID(SFinder::get_device_property_after) ENABLED START -----*/
@@ -672,7 +735,11 @@ void SFinder::read_useLocalBkg(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_useLocalBkg) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_useLocalBkg_read);
-	attr.set_value(&attr_useLocalBkg_write);
+	//attr.set_value(&attr_useLocalBkg_write);
+	Tango::DevBoolean* w_val= new Tango::DevBoolean;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_useLocalBkg
 }
@@ -712,8 +779,12 @@ void SFinder::read_use2ndPassInLocalBkg(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_use2ndPassInLocalBkg) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_use2ndPassInLocalBkg_read);
-	attr.set_value(&attr_use2ndPassInLocalBkg_write);
+	//attr.set_value(&attr_use2ndPassInLocalBkg_write);
 	
+	Tango::DevBoolean* w_val= new Tango::DevBoolean;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_use2ndPassInLocalBkg
 }
 //--------------------------------------------------------
@@ -752,8 +823,12 @@ void SFinder::read_skipNegativePixels(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_skipNegativePixels) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_skipNegativePixels_read);
-	attr.set_value(&attr_skipNegativePixels_write);
+	//attr.set_value(&attr_skipNegativePixels_write);
 	
+	Tango::DevBoolean* w_val= new Tango::DevBoolean;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_skipNegativePixels
 }
 //--------------------------------------------------------
@@ -792,8 +867,13 @@ void SFinder::read_skipOutliersInLocalBkg(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_skipOutliersInLocalBkg) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_skipOutliersInLocalBkg_read);
-	attr.set_value(&attr_skipOutliersInLocalBkg_write);
+	//attr.set_value(&attr_skipOutliersInLocalBkg_write);
 	
+	Tango::DevBoolean* w_val= new Tango::DevBoolean;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
+
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_skipOutliersInLocalBkg
 }
 //--------------------------------------------------------
@@ -831,8 +911,13 @@ void SFinder::read_localBkgMethod(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_localBkgMethod) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_localBkgMethod_read);
-	attr.set_value(&attr_localBkgMethod_write);
+	//attr.set_value(&attr_localBkgMethod_write);
 	
+	Tango::DevShort* w_val= new Tango::DevShort;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
+
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_localBkgMethod
 }
 //--------------------------------------------------------
@@ -872,8 +957,12 @@ void SFinder::read_bkgEstimator(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_bkgEstimator) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_bkgEstimator_read);
-	attr.set_value(&attr_bkgEstimator_write);
+	//attr.set_value(&attr_bkgEstimator_write);
 	
+	Tango::DevShort* w_val= new Tango::DevShort;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_bkgEstimator
 }
 //--------------------------------------------------------
@@ -912,7 +1001,13 @@ void SFinder::read_useBeamInfoInBkg(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_useBeamInfoInBkg) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_useBeamInfoInBkg_read);
-	attr.set_value(&attr_useBeamInfoInBkg_write);
+	//attr.set_value(&attr_useBeamInfoInBkg_write);
+
+	Tango::DevBoolean* w_val= new Tango::DevBoolean;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
+
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_useBeamInfoInBkg
 }
 //--------------------------------------------------------
@@ -952,8 +1047,12 @@ void SFinder::read_localBkgBoxSizeX(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_localBkgBoxSizeX) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_localBkgBoxSizeX_read);
-	attr.set_value(&attr_localBkgBoxSizeX_write);
+	//attr.set_value(&attr_localBkgBoxSizeX_write);
 	
+	Tango::DevFloat* w_val= new Tango::DevFloat;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_localBkgBoxSizeX
 }
 //--------------------------------------------------------
@@ -995,8 +1094,12 @@ void SFinder::read_localBkgBoxSizeY(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_localBkgBoxSizeY) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_localBkgBoxSizeY_read);
-	attr.set_value(&attr_localBkgBoxSizeY_write);
+	//attr.set_value(&attr_localBkgBoxSizeY_write);
 	
+	Tango::DevFloat* w_val= new Tango::DevFloat;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_localBkgBoxSizeY
 }
 //--------------------------------------------------------
@@ -1037,8 +1140,12 @@ void SFinder::read_localBkgGridStepSizeX(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_localBkgGridStepSizeX) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_localBkgGridStepSizeX_read);
-	attr.set_value(&attr_localBkgGridStepSizeX_write);
+	//attr.set_value(&attr_localBkgGridStepSizeX_write);
 	
+	Tango::DevFloat* w_val= new Tango::DevFloat;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_localBkgGridStepSizeX
 }
 //--------------------------------------------------------
@@ -1079,8 +1186,11 @@ void SFinder::read_localBkgGridStepSizeY(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_localBkgGridStepSizeY) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_localBkgGridStepSizeY_read);
-	attr.set_value(&attr_localBkgGridStepSizeY_write);
-	
+	//attr.set_value(&attr_localBkgGridStepSizeY_write);
+	Tango::DevFloat* w_val= new Tango::DevFloat;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_localBkgGridStepSizeY
 }
 //--------------------------------------------------------
@@ -1120,8 +1230,11 @@ void SFinder::read_seedThr(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_seedThr) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_seedThr_read);
-	attr.set_value(&attr_seedThr_write);
-	
+	//attr.set_value(&attr_seedThr_write);
+	Tango::DevFloat* w_val= new Tango::DevFloat;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_seedThr
 }
 //--------------------------------------------------------
@@ -1162,8 +1275,11 @@ void SFinder::read_mergeThr(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_mergeThr) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_mergeThr_read);
-	attr.set_value(&attr_mergeThr_write);
-	
+	//attr.set_value(&attr_mergeThr_write);
+	Tango::DevFloat* w_val= new Tango::DevFloat;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_mergeThr
 }
 //--------------------------------------------------------
@@ -1203,8 +1319,12 @@ void SFinder::read_minNPix(Tango::Attribute &attr)
 	/*----- PROTECTED REGION ID(SFinder::read_minNPix) ENABLED START -----*/
 	//	Set the attribute value
 	//attr.set_value(attr_minNPix_read);
-	attr.set_value(&attr_minNPix_write);
+	//attr.set_value(&attr_minNPix_write);
 	
+	Tango::DevLong* w_val= new Tango::DevLong;
+	std::string attr_name= attr.get_assoc_name();
+	get_device_attr()->get_w_attr_by_name(attr_name.c_str()).get_write_value(*w_val);
+	attr.set_value(w_val,1,0,true);
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_minNPix
 }
 //--------------------------------------------------------
@@ -1861,6 +1981,74 @@ void SFinder::write_minBoundingBoxThr(Tango::WAttribute &attr)
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::write_minBoundingBoxThr
 }
+//--------------------------------------------------------
+/**
+ *	Read attribute runProgress related method
+ *	Description: Run progress info
+ *               [0]: run id
+ *               [1]: status (RUNNING, COMPLETED, ABORTED, FAILED)
+ *               [2]: progress fraction (0-100%)
+ *               [3]: log info (INIT, READ_IMAGE, BKG, COMPACT_SOURCE, EXT_SOURCE)
+ *               [4]: timestamp
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Spectrum max = 10
+ */
+//--------------------------------------------------------
+void SFinder::read_runProgress(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_runProgress(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_runProgress) ENABLED START -----*/
+	//	Set the attribute value
+	attr.set_value(attr_runProgress_read, 10);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_runProgress
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute compactSources related method
+ *	Description: Source list
+ *               [0]: run id
+ *               [1]: source no. 1
+ *               [2]: source no. 2
+ *               ...
+ *               [n] source no. n
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Spectrum max = 1000000
+ */
+//--------------------------------------------------------
+void SFinder::read_compactSources(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_compactSources(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_compactSources) ENABLED START -----*/
+	//	Set the attribute value
+	attr.set_value(attr_compactSources_read, 1000000);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_compactSources
+}
+//--------------------------------------------------------
+/**
+ *	Read attribute extendedSources related method
+ *	Description: Extended source list
+ *               [0]: run id
+ *               [1]: source no. 1
+ *               ...
+ *               [N]: source no. N
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Spectrum max = 1000000
+ */
+//--------------------------------------------------------
+void SFinder::read_extendedSources(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_extendedSources(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_extendedSources) ENABLED START -----*/
+	//	Set the attribute value
+	attr.set_value(attr_extendedSources_read, 1000000);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_extendedSources
+}
 
 //--------------------------------------------------------
 /**
@@ -1885,7 +2073,9 @@ void SFinder::add_dynamic_attributes()
  *               as argument.
  *
  *	@param argin String arg
- *               [0]: filename 
+ *               [0]: filename
+ *               [1]: run guid (set by the broker)
+ *               [2]: configuration string  
  *               
  *               Long arg
  *               [nmaps+0]: tile min x
@@ -1896,8 +2086,7 @@ void SFinder::add_dynamic_attributes()
  *           [0]: ack code
  *           
  *           String arg
- *           [0]: Encoded sources found
- *           [1]: err description
+ *           [0]: err description
  */
 //--------------------------------------------------------
 Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongStringArray *argin)
@@ -1911,19 +2100,21 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 	long int ack= 0;
 	argout= new Tango::DevVarLongStringArray;
 	argout->lvalue.length(1);
-	argout->svalue.length(2);
+	argout->svalue.length(1);
 
 	//Validate args	
 	long int nArgs_s= argin->svalue.length();
 	long int nArgs_l= argin->lvalue.length();
-	if(nArgs_s<=0){
-		WARN_LOG("Missing filename argument given!");
+	if(nArgs_s<=2){
+		WARN_LOG("Missing filename and/or runid arguments!");
 		ack= -1;
-		reply= "Missing filename argument given!";
+		reply= "Missing filename and/or runid arguments!";
 		argout->lvalue[0]= ack;
 		argout->svalue[0] = CORBA::string_dup(reply.c_str());
 		return argout;
 	}
+
+	//Check filename arg
 	if(strcmp(argin->svalue[0],"")==0){
 		WARN_LOG("Empty filename argument given!");
 		ack= -1;
@@ -1932,6 +2123,41 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		argout->svalue[0] = CORBA::string_dup(reply.c_str());
 		return argout;
 	}
+	std::string inputFileName= std::string(argin->svalue[0]); 
+	
+	//Check run id arg
+	if(strcmp(argin->svalue[1],"")==0){
+		WARN_LOG("Empty run id argument given!");
+		ack= -1;
+		reply= "Invalid run id argument given (empty string)!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	std::string runId= std::string(argin->svalue[1]);
+
+	//Check config arg
+	std::string config= "";
+	bool applyConfig= false;
+	if(nArgs_s>2){
+		if(strcmp(argin->svalue[2],"")==0){
+			WARN_LOG("Empty config argument given!");
+			ack= -1;
+			reply= "Invalid config argument given (empty string)!";
+			argout->lvalue[0]= ack;
+			argout->svalue[0] = CORBA::string_dup(reply.c_str());
+			return argout;
+		}
+		else{
+			config= std::string(argin->svalue[2]);
+			applyConfig= true;
+		}
+	}
+	else{
+		WARN_LOG("Empty config argument given, running on current config!");
+	}
+
+	//Check image range args
 	if(nArgs_l%4!=0){
 		WARN_LOG("Invalid image range argument given!");
 		ack= -1;
@@ -1941,7 +2167,6 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		return argout;
 	}
 	
-	std::string inputFileName= std::string(argin->svalue[0]); 
 	long int nTasks= (long int)(nArgs_l/4);	
 	std::vector<long int> tileMinX_list(nTasks,-1);
 	std::vector<long int> tileMaxX_list(nTasks,-1);
@@ -1958,6 +2183,34 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		}
 	}
 	
+
+	//## Set RUNNING state
+	set_state(Tango::RUNNING);
+	set_status("Starting sfinder task");
+
+	//## Apply config?
+	if(applyConfig){
+		if(ApplyConfig(config)<0){
+			WARN_LOG("Configuration failed!");
+			ack= -1;
+			reply= "Configuration failed!";
+			argout->lvalue[0]= ack;
+			argout->svalue[0] = CORBA::string_dup(reply.c_str());
+
+			//Free resource for use
+			set_state(Tango::ON);
+			set_status("Configuration failed, free resource");
+
+			return argout;
+		}
+	}
+
+	//## Start the worker thread
+	m_WorkerThread->Start(inputFileName,runId,tileMinX_list,tileMaxX_list,tileMinY_list,tileMaxY_list);
+	
+
+
+	/*
 	//Set RUNNING state
 	set_state(Tango::RUNNING);
 	set_status("Source finding started");
@@ -2022,12 +2275,6 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 			return argout;
 		}
 	}
-	
-	//Return reply
-	argout->lvalue[0]= ack;
-	argout->svalue[0] = CORBA::string_dup(reply.c_str());
-	argout->svalue[1] = CORBA::string_dup(serialized_sources.c_str());
-	
 
 	//Set free state	
 	set_state(Tango::ON);
@@ -2042,8 +2289,65 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		}
 	}
 	sources.clear();
+	*/
+
+	//Return reply
+	argout->lvalue[0]= ack;
+	argout->svalue[0] = CORBA::string_dup(reply.c_str());
+	
 
 	/*----- PROTECTED REGION END -----*/	//	SFinder::extract_sources
+	return argout;
+}
+//--------------------------------------------------------
+/**
+ *	Command Configure related method
+ *	Description: 
+ *
+ *	@param argin Configuration string
+ *	@returns 
+ */
+//--------------------------------------------------------
+Tango::DevVarLongStringArray *SFinder::configure(Tango::DevString argin)
+{
+	Tango::DevVarLongStringArray *argout;
+	DEBUG_STREAM << "SFinder::Configure()  - " << device_name << endl;
+	/*----- PROTECTED REGION ID(SFinder::configure) ENABLED START -----*/
+	
+	//	Add your own code
+	//Init reply data
+	std::string reply= "Request executed with success";
+	long int ack= 0;
+	argout= new Tango::DevVarLongStringArray;
+	argout->lvalue.length(1);
+	argout->svalue.length(1);
+
+	//Check config arg
+	if(strcmp(argin,"")==0){
+		WARN_LOG("Empty config argument given!");
+		ack= -1;
+		reply= "Invalid config argument given (empty string)!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	std::string config= std::string(argin); 
+
+	//Apply configuration (INIT state set internally)
+	if(ApplyConfig(config)<0){
+		WARN_LOG("Configuration failed!");
+		ack= -1;
+		reply= "Configuration failed!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	
+	//Return reply
+	argout->lvalue[0]= ack;
+	argout->svalue[0] = CORBA::string_dup(reply.c_str());
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::configure
 	return argout;
 }
 //--------------------------------------------------------
@@ -2064,6 +2368,7 @@ void SFinder::add_dynamic_commands()
 
 /*----- PROTECTED REGION ID(SFinder::namespace_ending) ENABLED START -----*/
 
+/*
 //	Additional Methods
 int SFinder::RunSourceTask(std::vector<Source*>& sources,const std::string& filename,long int tileMinX,long int tileMaxX,long int tileMinY,long int tileMaxY){
 
@@ -2462,6 +2767,8 @@ BkgData* SFinder::ComputeStatsAndBkg(Img* img){
 	return bkgData;
 
 }//close ComputeStatsAndBkg()
+*/
+
 
 int SFinder::LoadDefaultConfig(){
 	
@@ -2510,6 +2817,280 @@ int SFinder::LoadDefaultConfig(){
 	return 0;
 
 }//close LoadDefaultConfig()
+
+
+int SFinder::ApplyConfig(std::string& config){
+
+	if(config=="") return -1;
+	
+	//## Set INIT state
+	set_state(Tango::INIT);	
+	set_status("Configuring options..."); 
+	
+
+	//## Parse config json options
+	Json::Reader reader;
+	Json::Value root;
+  if(!reader.parse(config, root)) {
+		ERROR_LOG("Failed to parse config JSON ("<<reader.getFormattedErrorMessages()<<")");
+		return -1;
+	}
+	
+	//## Check top json
+	if(root.isNull() || root.empty()){
+		ERROR_LOG("Failed to parse config JSON (null or empty)!");
+		return -1;
+	}
+
+	//Get option array 
+	Json::Value optionList= root["options"];
+	if(optionList.isNull() || optionList.empty() || !optionList.isArray() ){
+		ERROR_LOG("Failed to parse config JSON option list (null/empty or not an array)!");
+		return -1;
+	}
+	
+
+	//## Loop over options
+	unsigned int nOptions= optionList.size();
+	int nConfiguredAttrs= 0;
+	for(unsigned int i=0;i<nOptions;i++){
+		if(SetAttrFromConfig(optionList[i])<0){
+			continue;
+		}
+		nConfiguredAttrs++;
+	}//end loop options
+
+	INFO_LOG("#"<<nConfiguredAttrs<<" attribute configured...");
+
+	//std::string useLocalBkg_val= root.get("useLocalBkg","").asString();
+ 
+	//## Reset previous state (e.g. ON if a Configuration task was issued, or RUNNING if the config task was issued by the FindSource command)
+	set_state(get_prev_state());
+	set_status("Configuration completed");
+	
+	return 0;
+
+}//close ApplyConfig()
+
+int SFinder::SetAttrFromConfig(Json::Value& optionObj){
+
+	Json::Value optionNameObj= optionObj["name"];
+	Json::Value optionValueObj= optionObj["value"];
+	if(optionNameObj.isNull() || optionValueObj.isNull()){
+		return -1;			
+	}
+	std::string option_name= optionNameObj.asString();
+	DEBUG_LOG("Option Name: "<<option_name);
+
+	//Search attribute with option name
+	try {
+		Tango::WAttribute& attr= get_device_attr()->get_w_attr_by_name(option_name.c_str());
+		std::string attr_name= attr.get_name();
+ 		long attr_type= attr.get_data_type();
+		Tango::AttrDataFormat attr_format= attr.get_data_format();
+
+		DEBUG_LOG("Attr Name/type: "<<attr_name<<"/"<<attr_type);
+		
+		if(attr_format==Tango::SCALAR && SetScalarAttrValue(attr,optionObj)<0){
+			std::stringstream errMsg;
+			errMsg<<"Failed to set scalar attr ("<<attr_name<<")";
+			throw std::runtime_error(errMsg.str().c_str());
+		}
+		if(attr_format==Tango::SPECTRUM && SetSpectrumAttrValue(attr,optionObj)<0){
+			std::stringstream errMsg;
+			errMsg<<"Failed to set spectrum attr ("<<attr_name<<")";
+			throw std::runtime_error(errMsg.str().c_str());
+		}
+		if(attr_format==Tango::IMAGE){
+			std::stringstream errMsg;
+			errMsg<<"Failed to set image attr ("<<attr_name<<")";
+			throw std::runtime_error(errMsg.str().c_str());
+		}
+				
+	}//close try block
+	catch(Tango::DevFailed& e){
+		WARN_LOG("No attribute found with given option name ("<<option_name<<"), skip it!");
+		return -1;
+	}
+	catch(std::exception& e){
+		WARN_LOG("C++ exception (err="<<e.what()<<")!");
+		return -1;
+	}
+
+	return 0;
+
+}//close SetAttrFromConfig()
+
+int SFinder::SetScalarAttrValue(Tango::WAttribute& attr,Json::Value& optionObj){
+
+	Json::Value optionNameObj= optionObj["name"];
+	Json::Value optionValueObj= optionObj["value"];
+
+	std::string attr_name= attr.get_name();
+ 	long attr_type= attr.get_data_type();
+	
+	try {
+		
+		if(attr_type==Tango::DEV_SHORT) {
+			Tango::DevShort attr_val= static_cast<Tango::DevShort>(optionValueObj.asInt());
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_val);
+		}
+		else if(attr_type==Tango::DEV_USHORT){
+			Tango::DevUShort attr_val= static_cast<Tango::DevUShort>(optionValueObj.asUInt());
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_val);
+		}
+		else if(attr_type==Tango::DEV_LONG){
+			Tango::DevLong attr_val= optionValueObj.asInt();
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_val);
+		}
+		else if(attr_type==Tango::DEV_ULONG){
+			Tango::DevULong attr_val= optionValueObj.asUInt();
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_val);
+		}
+		else if(attr_type==Tango::DEV_DOUBLE){ 
+			double attr_val= optionValueObj.asDouble();
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_val);
+		}
+		else if(attr_type==Tango::DEV_FLOAT){ 
+			float attr_val= optionValueObj.asFloat();
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_val);
+		}
+		else if(attr_type==Tango::DEV_STRING){ 
+			std::string attr_val= optionValueObj.asString();
+			Tango::DevString attr_read_val= CORBA::string_dup(attr_val.c_str());
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_read_val);
+		}
+		else if(attr_type==Tango::DEV_BOOLEAN){
+			bool attr_val= optionValueObj.asBool();
+			attr.set_write_value(attr_val);
+			attr.set_value(&attr_val);
+		}
+		else{		
+			std::stringstream errMsg;
+			errMsg<<"Unsupported data type ("<<attr_type<<")";
+			throw std::runtime_error(errMsg.str().c_str());
+		}
+		
+	}//close try block
+	catch(Tango::DevFailed& e){
+		WARN_LOG("Failed to set attribute value (attr="<<attr_name<<" type="<<attr_type<<")!");
+		return -1;
+	}
+	catch(std::exception& e){
+		WARN_LOG("Failed to set attribute value (attr="<<attr_name<<" type="<<attr_type<<"), err="<<e.what()<<"!");
+		return -1;
+	}
+
+	return 0;
+
+}//close SetScalarAttrValue()
+
+
+int SFinder::SetSpectrumAttrValue(Tango::WAttribute& attr,Json::Value& optionObj){
+
+	Json::Value optionNameObj= optionObj["name"];
+	Json::Value optionValueObj= optionObj["value"];
+	if(!optionValueObj.isArray()){
+		WARN_LOG("Failed to set attribute value (given option value is not an array)!");
+		return -1;
+	}
+
+	std::string attr_name= attr.get_name();
+ 	long attr_type= attr.get_data_type();
+
+	try {
+		
+		if(attr_type==Tango::DEV_SHORT) {//DEV_SHORT
+			std::vector<Tango::DevShort> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				Tango::DevShort thisAttrVal= static_cast<Tango::DevShort>(optionValueObj[i].asInt());
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);
+		}
+		else if(attr_type==Tango::DEV_USHORT){//DEV_USHORT
+			std::vector<Tango::DevUShort> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				Tango::DevUShort thisAttrVal= static_cast<Tango::DevUShort>(optionValueObj[i].asUInt());
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);
+		}
+		else if(attr_type==Tango::DEV_LONG){//DEV_LONG
+			std::vector<Tango::DevLong> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				Tango::DevLong thisAttrVal= static_cast<Tango::DevLong>(optionValueObj[i].asInt());
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);
+		}
+		else if(attr_type==Tango::DEV_ULONG){//DEV_ULONG
+			std::vector<Tango::DevULong> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				Tango::DevULong thisAttrVal= static_cast<Tango::DevULong>(optionValueObj[i].asUInt());
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);		
+		}
+		else if(attr_type==Tango::DEV_DOUBLE){ 
+			std::vector<double> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				double thisAttrVal= optionValueObj[i].asDouble();
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);		
+		}
+		else if(attr_type==Tango::DEV_FLOAT){ 
+			std::vector<float> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				double thisAttrVal= optionValueObj[i].asFloat();
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);
+		}
+		else if(attr_type==Tango::DEV_STRING){ 
+			std::vector<std::string> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				std::string thisAttrVal= optionValueObj[i].asString();
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);	
+		}
+		else if(attr_type==Tango::DEV_BOOLEAN){
+			std::vector<bool> attr_val;
+			for(unsigned int i=0;i<optionValueObj.size();i++){
+				bool thisAttrVal= optionValueObj[i].asBool();
+				attr_val.push_back(thisAttrVal);
+			}
+			attr.set_write_value(attr_val);	
+		}
+		else{		
+			std::stringstream errMsg;
+			errMsg<<"Unsupported data type ("<<attr_type<<")";
+			throw std::runtime_error(errMsg.str().c_str());
+		}
+		
+	}//close try block
+	catch(Tango::DevFailed& e){
+		WARN_LOG("Failed to set attribute value (attr="<<attr_name<<" type="<<attr_type<<")!");
+		return -1;
+	}
+	catch(std::exception& e){
+		WARN_LOG("Failed to set attribute value (attr="<<attr_name<<" type="<<attr_type<<"), err="<<e.what()<<"!");
+		return -1;
+	}
+
+	
+	return 0;
+
+}//close SetSpectrumAttrValue()
 
 
 /*----- PROTECTED REGION END -----*/	//	SFinder::namespace_ending

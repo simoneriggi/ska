@@ -654,6 +654,54 @@ bool SFinder::is_minBoundingBoxThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
 	return true;
 }
 
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_runProgress_allowed()
+ *	Description : Execution allowed for runProgress attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_runProgress_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+
+	//	Not any excluded states for runProgress attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::runProgressStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::runProgressStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_compactSources_allowed()
+ *	Description : Execution allowed for compactSources attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_compactSources_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+
+	//	Not any excluded states for compactSources attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::compactSourcesStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::compactSourcesStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_extendedSources_allowed()
+ *	Description : Execution allowed for extendedSources attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_extendedSources_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+
+	//	Not any excluded states for extendedSources attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::extendedSourcesStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::extendedSourcesStateAllowed_READ
+	return true;
+}
+
 
 //=================================================
 //		Commands Allowed Methods
@@ -677,6 +725,21 @@ bool SFinder::is_ExtractSources_allowed(TANGO_UNUSED(const CORBA::Any &any))
 	/*----- PROTECTED REGION END -----*/	//	SFinder::ExtractSourcesStateAllowed
 		return false;
 	}
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_Configure_allowed()
+ *	Description : Execution allowed for Configure attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_Configure_allowed(TANGO_UNUSED(const CORBA::Any &any))
+{
+	//	Not any excluded states for Configure command.
+	/*----- PROTECTED REGION ID(SFinder::ConfigureStateAllowed) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::ConfigureStateAllowed
 	return true;
 }
 

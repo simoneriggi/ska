@@ -10,6 +10,7 @@ set(THIS_SRCS ${THIS_SRCS}
   ${SFINDER_SERVER_SRC_DIR}/SFinder.cpp 
   ${SFINDER_SERVER_SRC_DIR}/SFinderStateMachine.cpp 
   ${SFINDER_SERVER_SRC_DIR}/ClassFactory.cpp
+  ${SFINDER_SERVER_SRC_DIR}/SFinderThread.cpp
 )
 
 file(GLOB_RECURSE THIS_HEADERS ${SFINDER_SERVER_INC_DIR}/*.h)
