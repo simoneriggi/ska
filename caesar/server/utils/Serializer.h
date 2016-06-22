@@ -27,14 +27,17 @@
 #ifndef Serializer_H
 #define Serializer_H
 
-//#ifdef BUILD_CAESAR_SERVER
-	#include <Source.pb.h>
-	#include <msgpack.hpp>
-	#include <tango.h>
-//#endif
-
+#include <Source.pb.h>
 #include <Source.h>
 #include <Contour.h>
+#include <WorkerData.h>
+
+//Tango header
+#include <tango.h>
+
+//Msgpack
+#include <msgpack.hpp>
+
 
 #include <TVector2.h> 
 
@@ -77,13 +80,40 @@ class Serializer : public TObject {
 	public: 
 		
 		//#ifdef BUILD_CAESAR_SERVER
+			//Source --> Buffer
 			static int EncodePointToProtobuf(SourcePB::Point& point_pb,TVector2& point);
 			static int EncodeContourToProtobuf(SourcePB::Contour& contour_pb,Contour* contour);
 			static int EncodePixelToProtobuf(SourcePB::Pixel& pixel_pb,Pixel* pixel);
 			static int EncodeBlobToProtobuf(SourcePB::Blob& blob_pb,Source* source);
-			static int EncodeSourceToProtobuf(SourcePB::Source& source_pb,Source* source);
+			static int EncodeSourceToProtobuf(SourcePB::Source& source_pb,Source* source);		
 			static int SourceToBuffer(SBuffer& buffer,Source* source);
 			
+			//WorkerData --> Buffer
+			static int EncodeWorkerDataToProtobuf(SourcePB::WorkerData& workerData_pb,WorkerData* workerData);
+			static int WorkerDataToBuffer(SBuffer& buffer,WorkerData* workerData);
+
+			
+			//Buffer --> Source
+			static int EncodeProtobufToPoint(TVector2& point,const SourcePB::Point& point_pb);
+			static int EncodeProtobufToContour(Contour& contour,const SourcePB::Contour& contour_pb);
+			static int EncodeProtobufToPixel(Pixel& pixel,const SourcePB::Pixel& pixel_pb);	
+			static int EncodeProtobufToBlob(Source& source,const SourcePB::Blob& blob_pb);
+			static int EncodeProtobufToSource(Source& source,const SourcePB::Source& source_pb);			
+			static int BufferToSource(Source& source,SBuffer& buffer);
+			
+			//Buffer --> WorkerData
+			static int EncodeProtobufToWorkerData(WorkerData& workerData,const SourcePB::WorkerData& workerData_pb);
+			static int BufferToWorkerData(WorkerData& workerData,SBuffer& buffer);
+
+			//Source --> Tango pipe blob
+			static int SourceToTangoPipe(Tango::DevicePipeBlob& pipe_blob,Source* source);
+			static int SourceCollectionToTangoPipe(Tango::DevicePipeBlob& pipe_blob,std::vector<Source*>& sources);
+			static int TangoPipeToSource(Source& source,Tango::DevicePipeBlob& pipe_blob);
+			static int TangoPipeToSourceCollection(std::vector<Source*>& source_list,Tango::DevicePipeBlob& pipe_blob);
+			static int MakeSourceDataPipe(Tango::DevicePipeBlob& pipe_blob,std::string jobId,long int IdX,long int IdY,std::vector<Source*>& sources,std::vector<Source*>& edge_sources);
+
+		
+			//Msgpack
 			static int SourceToBuffer(Source* source,msgpack::sbuffer& buffer);
 			static int SourceToString(Source* source,std::string& msg);
 			static int SourceToDevString(Source* source,Tango::DevString& msg);

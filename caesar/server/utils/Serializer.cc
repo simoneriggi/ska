@@ -70,6 +70,231 @@ Serializer::~Serializer(){
 }
 
 //#ifdef BUILD_CAESAR_SERVER
+int Serializer::SourceToTangoPipe(Tango::DevicePipeBlob& pipe_blob,Source* source){
+
+	//Check source
+	if(!source) return -1;
+	
+	//Encode
+	try {
+		//## Create google protobuf source message
+		SourcePB::Source source_pb;
+		if(EncodeSourceToProtobuf(source_pb,source)<0){
+			throw std::runtime_error("Encoding to protobuf failed!");
+		}
+		Tango::DevLong buffer_size= static_cast<Tango::DevLong>(source_pb.ByteSize());
+
+		//## Encode source buffer to pipe
+		pipe_blob.set_name(source->Name.c_str());
+		
+		std::vector<std::string> field_names {"size","data"};
+		pipe_blob.set_data_elt_names(field_names);
+		//pipe_blob["data"] << source_pb.SerializeAsString();
+		//pipe_blob["size"] << buffer_size;
+
+		pipe_blob<< buffer_size << source_pb.SerializeAsString();
+
+	}//close try block
+	catch(Tango::DevFailed& e){
+		Tango::Except::print_exception(e);
+		ERROR_LOG("Exception occurred while creating and filling source pipe!");
+		return -1;
+	}
+	catch(std::exception &e){
+		ERROR_LOG("Runtime exception occurred (e="<<e.what()<<") while creating and filling source pipe!");
+		return -1;
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception occurred while creating and filling source pipe (name: "<<source->Name<<"!");
+		return -1;
+	}
+
+	return 0;
+
+}//close SourceToTangoPipe()
+
+
+int Serializer::SourceCollectionToTangoPipe(Tango::DevicePipeBlob& pipe_blob,std::vector<Source*>& source_list){
+	
+	//Check source list
+	if(source_list.empty()) return 0;
+
+	//Encode
+	try {
+		//Make source collection blob
+		INFO_LOG("Init source blob collection with "<<source_list.size()<<" elements ...");
+		pipe_blob.set_name("Sources");
+		std::vector<std::string> field_names;
+		for(unsigned int i=0;i<source_list.size();i++){
+			std::string source_name= source_list[i]->Name;
+			field_names.push_back(source_name);
+		}
+		pipe_blob.set_data_elt_names(field_names);
+		
+		//Filling source collection blob
+		INFO_LOG("Filling source blob collection with "<<source_list.size()<<" elements ...");
+		
+		for(unsigned int i=0;i<source_list.size();i++){		
+			std::string source_name= source_list[i]->Name;
+			std::shared_ptr<Tango::DevicePipeBlob> aSourceBlobItem= std::make_shared<Tango::DevicePipeBlob>();
+			if(SourceToTangoPipe(*aSourceBlobItem,source_list[i])<0){
+				std::stringstream errMsg;
+				errMsg<<"Failed to encode source pipe blob no. "<<i<<" in collection!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}
+			pipe_blob << *aSourceBlobItem;
+		}//end loop sources
+
+	}//close try block
+	catch(const Tango::DevFailed& e){
+		Tango::Except::print_exception(e);
+		ERROR_LOG("Exception occurred while creating and filling source collection pipe!");
+		return -1;
+	}
+	catch(std::exception &e){
+		ERROR_LOG("Runtime exception occurred (e="<<e.what()<<") while creating and filling source collection pipe!");
+		return -1;
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception occurred while creating and filling source collection pipe!");
+		return -1;
+	}
+
+	return 0;
+
+}//close SourceCollectionToTangoPipe()
+
+
+int Serializer::MakeSourceDataPipe(Tango::DevicePipeBlob& pipe_blob,std::string runId,long int IdX,long int IdY,std::vector<Source*>& sources,std::vector<Source*>& edge_sources){
+
+	//Encode source collection to pipe blob
+	std::shared_ptr<Tango::DevicePipeBlob> source_blob= std::make_shared<Tango::DevicePipeBlob>();
+	if(SourceCollectionToTangoPipe(*source_blob,sources)<0){
+		ERROR_LOG("Failed to encode source collection to blob!");
+		return -1;
+	}
+	
+	//Encode source collection to pipe blob
+	std::shared_ptr<Tango::DevicePipeBlob> edge_source_blob= std::make_shared<Tango::DevicePipeBlob>();
+	if(SourceCollectionToTangoPipe(*edge_source_blob,edge_sources)<0){
+		ERROR_LOG("Failed to encode edge source collection to blob!");
+		return -1;
+	}
+
+	//Make final blob
+	pipe_blob.set_name("SourceData");
+	std::vector<std::string> field_names {"runId","IdX","IdY","sources","edgeSources"};
+	pipe_blob.set_data_elt_names(field_names);
+	try {
+		pipe_blob << runId << IdX << IdY << *source_blob << *edge_source_blob;
+	}
+	catch(const Tango::DevFailed& e){
+		Tango::Except::print_exception(e);
+		ERROR_LOG("Exception occurred while inserting pipe blob fields!");
+		return -1;
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception occurred while inserting pipe blob fields!");
+		return -1;
+	}
+
+	return 0;
+
+}//close MakeSourceDataPipe()
+
+
+int Serializer::TangoPipeToSource(Source& source,Tango::DevicePipeBlob& pipe_blob){
+
+	//Extract pipe in buffer
+	SBuffer buffer;
+	try {
+		//pipe_blob >> buffer.size >> buffer.data;
+		pipe_blob["size"] >> buffer.size;
+		pipe_blob["data"] >> buffer.data;
+	}
+	catch(const Tango::DevFailed& e){
+		Tango::Except::print_exception(e);
+		ERROR_LOG("Exception occurred while extracting pipe blob fields!");
+		return -1;
+	}
+	catch(std::exception &e){
+		ERROR_LOG("Runtime exception occurred (e="<<e.what()<<") while extracting pipe blob fields!");
+		return -1;
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception occurred while extracting pipe blob fields!");
+		return -1;
+	}
+
+	//Encode buffer to source
+	if(BufferToSource(source,buffer)<0){
+		ERROR_LOG("Failed to encode buffer to source!");
+		return -1;
+	}
+
+	return 0;
+
+}//close TangoPipeToSource()
+
+int Serializer::TangoPipeToSourceCollection(std::vector<Source*>& source_list,Tango::DevicePipeBlob& pipe_blob){
+	
+	//Init
+	source_list.clear();
+
+	Source* aSource= 0;
+	try{
+		//Get blob size
+		size_t nb = pipe_blob.get_data_elt_nb();
+	
+		//Extract blob items into Source
+		for(unsigned int i=0;i<nb;i++){
+			Tango::DevicePipeBlob thisBlob;
+			pipe_blob >> thisBlob;
+
+			aSource= new Source;
+			if(TangoPipeToSource(*aSource,thisBlob)<0){
+				delete aSource;
+				aSource= 0;
+				std::stringstream errMsg;
+				errMsg<<"Failed to encode pipe blob no. "<<i<<" to source in collection!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}
+		}//end loop items in collection
+
+		//Add source to list
+		source_list.push_back(aSource);
+		
+	}//close try block
+	catch(const Tango::DevFailed& e){
+		Tango::Except::print_exception(e);
+		ERROR_LOG("Exception occurred while creating and filling source collection pipe!");
+		for(unsigned int i=0;i<source_list.size();i++){
+			delete source_list[i];
+			source_list[i]= 0;
+		}
+		return -1;
+	}
+	catch(std::exception &e){
+		ERROR_LOG("Runtime exception occurred (e="<<e.what()<<") while creating and filling source collection pipe!");
+		for(unsigned int i=0;i<source_list.size();i++){
+			delete source_list[i];
+			source_list[i]= 0;
+		}
+		return -1;
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception occurred while creating and filling source collection pipe!");
+		for(unsigned int i=0;i<source_list.size();i++){
+			delete source_list[i];
+			source_list[i]= 0;
+		}
+		return -1;
+	}
+
+	return 0;
+
+}//close TangoPipeToSourceCollection()
+
 int Serializer::EncodePointToProtobuf(SourcePB::Point& point_pb,TVector2& point){
 
 	try {
@@ -165,10 +390,12 @@ int Serializer::EncodeContourToProtobuf(SourcePB::Contour& contour_pb,Contour* c
 		}
 	
 		SourcePB::Point* Centroid= new SourcePB::Point;
+		//SourcePB::Point Centroid;
 		if(EncodePointToProtobuf(*Centroid,contour->Centroid)<0){
+		//if(EncodePointToProtobuf(Centroid,contour->Centroid)<0){
 			throw std::runtime_error("Failed to encode ellipse center field");
 		}
-		contour_pb.set_allocated_centroid(EllipseCenter);
+		contour_pb.set_allocated_centroid(Centroid);
 
 		for(unsigned int i=0;i<contour->RealFDs.size();i++){		
  			contour_pb.add_realfds(contour->RealFDs[i]);
@@ -186,7 +413,7 @@ int Serializer::EncodeContourToProtobuf(SourcePB::Contour& contour_pb,Contour* c
  			contour_pb.add_centroiddistancemodfds(contour->CentroidDistanceModFDs[i]);
 		}
 
-		for(unsigned int i=0;i<contour->GetN();i++){		
+		for(int i=0;i<contour->GetN();i++){		
 			SourcePB::Point* thisPoint = contour_pb.add_m_points();
 			if(EncodePointToProtobuf(*thisPoint,*contour->GetPoint(i))<0){
 				std::stringstream errMsg;
@@ -222,7 +449,9 @@ int Serializer::EncodePixelToProtobuf(SourcePB::Pixel& pixel_pb,Pixel* pixel){
 			pixel_pb.set_type(SourcePB::Pixel::eHalo);
 		}
 		else{
-			throw std::runtime_error("Invalid pixel type, failed to encode!");
+			std::stringstream errMsg;
+			errMsg<<"Invalid pixel type ("<<pixel->type<<"), failed to encode!";
+			throw std::runtime_error(errMsg.str().c_str());
 		}
 
 		pixel_pb.set_s(pixel->S);
@@ -350,7 +579,14 @@ int Serializer::EncodeBlobToProtobuf(SourcePB::Blob& blob_pb,Source* source){
 		}
 
 		//Add contout to blob
-		//...
+		for(unsigned int k=0;k<source->GetContours().size();k++){
+			SourcePB::Contour* thisContour = blob_pb.add_m_contours();
+			if(EncodeContourToProtobuf(*thisContour,source->GetContour(k))<0){
+				std::stringstream errMsg;
+				errMsg<<"Contour no. "<<k+1<<" encoding to protobuf failed!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}	
+		}//end loop contours
 
 	}//close try block
 	catch(std::exception const & e) {
@@ -378,6 +614,13 @@ int Serializer::EncodeSourceToProtobuf(SourcePB::Source& source_pb,Source* sourc
 		source_pb.set_m_depthlevel(source->GetDepthLevel());
 		source_pb.set_m_hasnestedsources(source->HasNestedSources());
 		
+		//Set blob field
+		SourcePB::Blob* blob= new SourcePB::Blob;
+		if(EncodeBlobToProtobuf(*blob,source)<0){
+			throw std::runtime_error("Failed to encode blob!");
+		}
+		source_pb.set_allocated_blob(blob);
+
 		//Add nested sources
 		for(int i=0;i<source->GetNestedSourceNumber();i++){
 			SourcePB::Source* thisNestedSource = source_pb.add_m_nestedsources();
@@ -388,111 +631,6 @@ int Serializer::EncodeSourceToProtobuf(SourcePB::Source& source_pb,Source* sourc
 			}
 		}
 
-		//Set blob field
-		SourcePB::Blob* blob= new SourcePB::Blob;
-		if(EncodeBlobToProtobuf(*blob,source)<0){
-			throw std::runtime_error("Failed to encode blob!");
-		}
-		source_pb.set_allocated_blob(blob);
-
-		/*
-		blob->set_haspixelsatedge(source->HasPixelsAtEdge);
-		blob->set_id(source->Id);
-		blob->set_name(source->Name);
-		blob->set_npix(source->NPix);
-		blob->set_mean(source->Mean);
-		blob->set_rms(source->RMS);
-		blob->set_skewness(source->Skewness);	
-		blob->set_median(source->Median);
-		blob->set_medianrms(source->MedianRMS);
-		blob->set_x0(source->X0);
-		blob->set_y0(source->Y0);
-		blob->set_mean_curv(source->Mean_curv);
-		blob->set_rms_curv(source->RMS_curv);
-		blob->set_median_curv(source->Median_curv);
-		blob->set_medianrms_curv(source->MedianRMS_curv);
-		
-		for(unsigned int i=0;i<source->Moments.size();i++) blob->add_moments((source->Moments)[i]);
-		for(unsigned int i=0;i<source->HuMoments.size();i++) blob->add_humoments((source->HuMoments)[i]);
-		for(unsigned int i=0;i<source->ZMMoments.size();i++) blob->add_zmmoments((source->ZMMoments)[i]);
-		blob->set_m_hasstats(source->HasStats());	
-		blob->set_m_hasparameters(source->HasParameters());
-		blob->set_m_m1(source->GetM1());
-		blob->set_m_m2(source->GetM2());
-		blob->set_m_m3(source->GetM3());
-		blob->set_m_m4(source->GetM4());
-		blob->set_m_m1_curv(source->GetM1Curv());
-		blob->set_m_m2_curv(source->GetM2Curv());
-
-		blob->set_m_s(source->GetS());
-		blob->set_m_smax(source->GetSmax());
-		blob->set_m_smin(source->GetSmin());
-		blob->set_m_sxx(source->GetSxx());
-		blob->set_m_syy(source->GetSyy());
-		blob->set_m_sxy(source->GetSxy());
-		blob->set_m_sx(source->GetSx());
-		blob->set_m_sy(source->GetSy());
-		blob->set_m_pixidmax(source->GetSmaxPixId());
-		blob->set_m_pixidmin(source->GetSminPixId());
-		blob->set_m_s_curv(source->GetScurv());
-		blob->set_m_s_edge(source->GetSedge());
-	
-		long int imgsizex, imgsizey;
-		source->GetImageSize(imgsizex,imgsizey);
-		blob->set_m_imagesizex(imgsizex);
-		blob->set_m_imagesizey(imgsizey);
-
-		double xmin, xmax, ymin, ymax;
-		source->GetImageRange(xmin,xmax,ymin,ymax);
-		blob->set_m_imageminx(xmin);
-		blob->set_m_imagemaxx(xmax);
-		blob->set_m_imageminy(ymin);
-		blob->set_m_imagemaxy(ymax);
-
-		double imgSmin, imgSmax;
-		source->GetImageSRange(imgSmin, imgSmax);
-		blob->set_m_imagemins(imgSmin);
-		blob->set_m_imagemaxs(imgSmax);
-
-		double imgSmin_curv, imgSmax_curv;
-		source->GetImageScurvRange(imgSmin_curv, imgSmax_curv);
-		blob->set_m_imageminscurv(imgSmin_curv);
-		blob->set_m_imagemaxscurv(imgSmax_curv);
-
-		double imgSmin_edge, imgSmax_edge;
-		source->GetImageSedgeRange(imgSmin_edge, imgSmax_edge);
-		blob->set_m_imageminsedge(imgSmin_edge);
-		blob->set_m_imagemaxsedge(imgSmax_edge);
-
-		blob->set_m_imagerms(source->GetImageRMS());
-
-		double sxmin, sxmax, symin, symax;
-		source->GetSourceRange(sxmin,sxmax,symin,symax);
-		blob->set_m_xmin(sxmin);
-		blob->set_m_xmax(sxmax);
-		blob->set_m_ymin(symin);
-		blob->set_m_ymax(symax);
-
-		long int ixmin, ixmax, iymin, iymax;
-		source->GetSourcePixelRange(ixmin, ixmax, iymin, iymax);
-		blob->set_m_ix_min(ixmin);
-		blob->set_m_ix_max(ixmax);
-		blob->set_m_iy_min(iymin);
-		blob->set_m_iy_max(iymax);
-		
-		//Add pixel collection to blob
-		for(unsigned int k=0;k<source->GetNPixels();k++){
-			SourcePB::Pixel* thisPixel = blob.add_m_pixels();
-			if(EncodePixelToProtobuf(*thisPixel,source->GetPixel(k))<0){
-				std::stringstream errMsg;
-				errMsg<<"Nested source no. "<<i+1<<" encoding to protobuf failed!";
-				throw std::runtime_error(errMsg.str().c_str());
-			}
-		}
-		source_pb.set_allocated_blob(blob);
-		*/
-
-		
 	}//close try block
 	catch(std::exception const & e) {
 		ERROR_LOG("Source encoding to protobuf failed with status "<<e.what());
@@ -504,134 +642,67 @@ int Serializer::EncodeSourceToProtobuf(SourcePB::Source& source_pb,Source* sourc
 }//close EncodeSourceToProtobuf()
 
 
+int Serializer::EncodeWorkerDataToProtobuf(SourcePB::WorkerData& workerData_pb,WorkerData* workerData){
+
+	//## Check input data
+	if(!workerData) return -1;
+
+	try {
+		//Set timestamp
+		SourcePB::Timestamp* timestamp= new SourcePB::Timestamp;
+		timestamp->set_seconds( ((workerData->info).timestamp).tv_sec );
+		timestamp->set_nanos( ((workerData->info).timestamp).tv_usec*1000 );
+
+		//Set header
+		SourcePB::WorkerDataHeader* headerPB= new SourcePB::WorkerDataHeader;
+		headerPB->set_jobid((workerData->info).jobId);
+		headerPB->set_ix((workerData->info).IdX);
+		headerPB->set_iy((workerData->info).IdY);
+		headerPB->set_allocated_timestamp(timestamp);
+
+		workerData_pb.set_allocated_header(headerPB);
+
+		//Set source collections
+		for(unsigned int i=0;i<(workerData->sources).size();i++){
+			SourcePB::Source* thisSourcePB = workerData_pb.add_sources();
+			if(EncodeSourceToProtobuf(*thisSourcePB,(workerData->sources)[i])<0){
+				std::stringstream errMsg;
+				errMsg<<"Encoding of source no. "<<i+1<<" in collection to protobuf failed!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}
+		}
+
+		for(unsigned int i=0;i<(workerData->edge_sources).size();i++){
+			SourcePB::Source* thisSourcePB = workerData_pb.add_edge_sources();
+			if(EncodeSourceToProtobuf(*thisSourcePB,(workerData->edge_sources)[i])<0){
+				std::stringstream errMsg;
+				errMsg<<"Encoding of edge source no. "<<i+1<<" in collection to protobuf failed!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}
+		}
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Worker data encoding to protobuf failed with status "<<e.what());
+		return -1;
+	}
+
+	return 0;
+
+}//close EncodeWorkerDataToProtobuf()
+
+
 int Serializer::SourceToBuffer(SBuffer& buffer,Source* source){
 
 	//## Check input source
 	if(!source) return -1;
 
 	try {
-		// Create google protobuf source message
+		//## Create google protobuf source message
 		SourcePB::Source source_pb;
 		if(EncodeSourceToProtobuf(source_pb,source)<0){
 			throw std::runtime_error("Encoding failed!");
 		}
 		
-		
-		
-		/*
-		//Create header message
-		MessagePB::Header* header= new MessagePB::Header;
-  	header->set_name(msg.name);
-		header->set_source(msg.source);
-		header->set_id(msg.id);
-		header->set_nmsg(msg.nmsg);
-		header->set_timestamp(msg.time);
-
-		short type= msg.type;
-		if(type==Message::eREQUEST){
-			header->set_type(MessagePB::Header::REQUEST);
-
-			//Create and fill request message
-			MessagePB::Request* request= new MessagePB::Request;
-				
-			//for (std::map<std::string,double>::iterator it=msg.args.begin();it!=msg.args.end();++it){
-			for (std::map<std::string,float>::iterator it=msg.args.begin();it!=msg.args.end();++it){
-      	std::string arg_name= it->first;
-				//double arg_value= it->second;
-				float arg_value= it->second;
-				MessagePB::Argument* thisArg = request->add_args();
-    		thisArg->set_name(arg_name);
-    		thisArg->set_value(arg_value);
-    	}//end loop args
-			for (std::map<std::string,std::string>::iterator it=msg.options.begin();it!=msg.options.end();++it){
-      	std::string option_name= it->first;
-				std::string option_value= it->second;
-      	MessagePB::Option* thisOption = request->add_options();
-    		thisOption->set_name(option_name);
-    		thisOption->set_value(option_value);
-			}//end loop options
-			for (std::map<std::string,Message::DataCollection>::iterator it=msg.data.begin();it!=msg.data.end();++it){
-      	std::string data_name= it->first;
-				Message::DataCollection data_values= it->second;
-			
-				MessagePB::Data* thisDataArray = request->add_data();
-				thisDataArray->set_name(data_name);
-				for(unsigned int j=0;j<data_values.size();j++){
-					thisDataArray->add_value(data_values[j]);	
-				}//end loop data values
-			}//end loop data
-	
-			msg_pb->set_allocated_request(request);	
-
-		}//close if REQUEST
-		else if(type==Message::eREPLY){
-			header->set_type(MessagePB::Header::REPLY);
-
-			//Create and fill reply message
-			MessagePB::Reply* reply= new MessagePB::Reply;
-			reply->set_info(msg.info);
-
-			short ack= msg.ack;	
-			if(ack==Message::eOK) reply->set_ack(MessagePB::Reply::OK);
-			else if(ack==Message::eFAIL) reply->set_ack(MessagePB::Reply::FAIL);
-			else if(ack==Message::eINVALID) reply->set_ack(MessagePB::Reply::INVALID);
-			else {
-				std::stringstream errMsg;
-   	 		errMsg << "ERROR: Invalid ack code (ack="<<ack<<")";
-    		throw std::invalid_argument(errMsg.str().c_str());
-			}
-			
-			for (std::map<std::string,Message::DataCollection>::iterator it=msg.data.begin();it!=msg.data.end();++it){
-      	std::string data_name= it->first;
-				Message::DataCollection data_values= it->second;
-			
-				MessagePB::Data* thisDataArray = reply->add_data();
-				thisDataArray->set_name(data_name);
-				for(unsigned int j=0;j<data_values.size();j++){
-					thisDataArray->add_value(data_values[j]);	
-				}//end loop data values
-			}//end loop data
-
-			msg_pb->set_allocated_reply(reply);	
-
-		}//close if REPLY
-
-		else if(type==Message::eEVENT){
-			header->set_type(MessagePB::Header::EVENT);
-
-			MessagePB::Event* event= new MessagePB::Event;
-			event->set_topic(msg.topic);
-			event->set_info(msg.info);
-			event->set_action(msg.action);
-		
-			int severity_level= msg.severity_level;
-			if(severity_level==Message::eLOG) event->set_level(MessagePB::Event::LOG);
-			else if(severity_level==Message::eALARM) event->set_level(MessagePB::Event::ALARM);
-			else if(severity_level==Message::eCRITICAL) event->set_level(MessagePB::Event::CRITICAL);
-			else{
-				std::stringstream errMsg;
-   	 		errMsg << "ERROR: Invalid severity level (level="<<severity_level<<")";
-    		throw std::invalid_argument(errMsg.str().c_str());
-			}
-
-			for (std::map<std::string,Message::DataCollection>::iterator it=msg.data.begin();it!=msg.data.end();++it){
-      	std::string data_name= it->first;
-				Message::DataCollection data_values= it->second;
-			
-				MessagePB::Data* thisDataArray = event->add_data();
-				thisDataArray->set_name(data_name);
-				for(unsigned int j=0;j<data_values.size();j++){
-					thisDataArray->add_value(data_values[j]);	
-				}//end loop data values
-			}//end loop data
-
-			msg_pb->set_allocated_event(event);	
-
-		}//close if EVENT
-
-		msg_pb->set_allocated_header(header);	
-		*/
-
 		//## Fill buffer 
 		buffer.size = source_pb.ByteSize();
 		buffer.data= source_pb.SerializeAsString();		
@@ -647,8 +718,575 @@ int Serializer::SourceToBuffer(SBuffer& buffer,Source* source){
 }//close SourceToBuffer()
 
 
+int Serializer::WorkerDataToBuffer(SBuffer& buffer,WorkerData* workerData){
+
+	//## Check input data
+	if(!workerData) return -1;
+
+	try {
+		//## Create google protobuf source message
+		SourcePB::WorkerData workerData_pb;
+		if(EncodeWorkerDataToProtobuf(workerData_pb,workerData)<0){
+			throw std::runtime_error("Encoding failed!");
+		}
+		
+		//## Fill buffer 
+		buffer.size = workerData_pb.ByteSize();
+		buffer.data= workerData_pb.SerializeAsString();		
+		
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Source encoding failed with status "<<e.what());
+		return -1;
+	}
+	return 0;
+
+}//close WorkerDataToBuffer()
+
+int Serializer::EncodeProtobufToSource(Source& source,const SourcePB::Source& source_pb){
+
+	try {
+		//Set public fields
+		if(source_pb.has_type()) source.Type= source_pb.type();
+		if(source_pb.has_flag()) source.Flag= source_pb.flag();
+	
+		//Set private source fields
+		if(source_pb.has_m_beamfluxintegral()) source.SetBeamFluxIntegral(source_pb.m_beamfluxintegral());
+		if(source_pb.has_m_isgoodsource()) source.SetGoodSourceFlag(source_pb.m_isgoodsource());
+		if(source_pb.has_m_depthlevel()) source.SetDepthLevel(source_pb.m_depthlevel());
+		if(source_pb.has_m_hasnestedsources()) source.SetHasNestedSources(source_pb.m_hasnestedsources());
+		
+		//Set blob fields
+		if(source_pb.has_blob()){
+			const SourcePB::Blob& blob_pb= source_pb.blob();
+			if(EncodeProtobufToBlob(source,blob_pb)<0){
+				ERROR_LOG("Blob encoding failed!");
+				return -1;
+			}
+		}//close if has blob
+	
+
+		//Set nested sources (to be done after setting blob fields)
+		Source* aNestedSource= 0;
+		std::vector<Source*> nested_sources;
+		for(int i=0;i<source_pb.m_nestedsources_size();i++){
+			const SourcePB::Source& thisNestedSourcePB = source_pb.m_nestedsources(i);
+			aNestedSource= new Source;
+			if(EncodeProtobufToSource(*aNestedSource,thisNestedSourcePB)<0){
+				//Clear sources				
+				for(unsigned int k=0;k<nested_sources.size();k++){
+					delete nested_sources[k];
+					nested_sources[k]= 0;	
+				}
+				nested_sources.clear();
+	
+				std::stringstream errMsg;
+				errMsg<<"Nested source no. "<<i+1<<" encoding from protobuf failed!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}
+			nested_sources.push_back(aNestedSource);
+			source.AddNestedSource(aNestedSource);
+		}//end loop nested source
+
+
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Encoding protobuf to source failed with status "<<e.what());
+		return false;
+	}
+
+
+	return 0;
+
+}//close EncodeProtobufToSource()
+
+
+
+int Serializer::EncodeProtobufToBlob(Source& source,const SourcePB::Blob& blob_pb){
+		
+	try{
+
+		//## Set public fields
+		//Main params
+		if(blob_pb.has_haspixelsatedge()) source.HasPixelsAtEdge= blob_pb.haspixelsatedge();
+		if(blob_pb.has_id()) source.Id= blob_pb.id();
+		if(blob_pb.has_name()) source.Name= blob_pb.name();
+
+		if(blob_pb.has_npix()) source.NPix= blob_pb.npix();		
+		if(blob_pb.has_mean()) source.Mean= blob_pb.mean();
+		if(blob_pb.has_rms()) source.RMS= blob_pb.rms();
+		if(blob_pb.has_skewness()) source.Skewness= blob_pb.skewness();
+		if(blob_pb.has_median()) source.Median= blob_pb.median();
+		if(blob_pb.has_medianrms()) source.MedianRMS= blob_pb.medianrms();
+		if(blob_pb.has_x0()) source.X0= blob_pb.x0();
+		if(blob_pb.has_y0()) source.Y0= blob_pb.y0();
+		
+		//Curvature Moments
+		if(blob_pb.has_mean_curv()) source.Mean_curv= blob_pb.mean_curv();
+		if(blob_pb.has_rms_curv()) source.RMS_curv= blob_pb.rms_curv();
+		if(blob_pb.has_median_curv()) source.Median_curv= blob_pb.median_curv();
+		if(blob_pb.has_medianrms_curv()) source.MedianRMS_curv= blob_pb.medianrms_curv();
+	
+		//2D morphological pars
+		for(int i=0;i<blob_pb.moments_size();i++){
+			(source.Moments).push_back(blob_pb.moments(i));
+		}
+		for(int i=0;i<blob_pb.humoments_size();i++){
+			(source.HuMoments).push_back(blob_pb.humoments(i));
+		}
+		for(int i=0;i<blob_pb.zmmoments_size();i++){
+			(source.ZMMoments).push_back(blob_pb.zmmoments(i));
+		}
+
+		//## Set private fields
+		if(blob_pb.has_m_hasstats()) source.SetHasStats(blob_pb.m_hasstats());
+		if(blob_pb.has_m_hasparameters()) source.SetHasParameters(blob_pb.m_hasparameters());
+
+		if(blob_pb.has_m_m1()) source.SetM1(blob_pb.m_m1());
+		if(blob_pb.has_m_m2()) source.SetM2(blob_pb.m_m2());
+		if(blob_pb.has_m_m3()) source.SetM3(blob_pb.m_m3());
+		if(blob_pb.has_m_m4()) source.SetM4(blob_pb.m_m4());
+		if(blob_pb.has_m_m1_curv()) source.SetM1Curv(blob_pb.m_m1_curv());
+		if(blob_pb.has_m_m2_curv()) source.SetM2Curv(blob_pb.m_m2_curv());
+		if(blob_pb.has_m_s()) source.SetS(blob_pb.m_s());
+		if(blob_pb.has_m_smax()) source.SetSmax(blob_pb.m_smax());
+		if(blob_pb.has_m_smin()) source.SetSmin(blob_pb.m_smin());
+		if(blob_pb.has_m_sxx()) source.SetSxx(blob_pb.m_sxx());
+		if(blob_pb.has_m_syy()) source.SetSyy(blob_pb.m_syy());
+		if(blob_pb.has_m_sxy()) source.SetSxy(blob_pb.m_sxy());
+		if(blob_pb.has_m_sx()) source.SetSx(blob_pb.m_sx());
+		if(blob_pb.has_m_sy()) source.SetSy(blob_pb.m_sy());
+		if(blob_pb.has_m_pixidmax()) source.SetSmaxPixId(blob_pb.m_pixidmax());
+		if(blob_pb.has_m_pixidmin()) source.SetSminPixId(blob_pb.m_pixidmin());
+		if(blob_pb.has_m_s_curv()) source.SetScurv(blob_pb.m_s_curv());
+		if(blob_pb.has_m_s_edge()) source.SetSedge(blob_pb.m_s_edge());
+
+
+		if(blob_pb.has_m_imagesizex() && blob_pb.has_m_imagesizey()) source.SetImageSize(blob_pb.m_imagesizex(),blob_pb.m_imagesizey());
+		if(blob_pb.has_m_imageminx() && blob_pb.has_m_imagemaxx() &&
+			 blob_pb.has_m_imageminy() && blob_pb.has_m_imagemaxy()
+		){
+			source.SetImageRange(blob_pb.m_imageminx(),blob_pb.m_imagemaxx(),blob_pb.m_imageminy(),blob_pb.m_imagemaxy());
+		}
+		if(blob_pb.has_m_imagemins() && blob_pb.has_m_imagemaxs()) {
+			source.SetImageSRange(blob_pb.m_imagemins(),blob_pb.m_imagemaxs());
+		}
+
+		if(blob_pb.has_m_imageminscurv() && blob_pb.has_m_imagemaxscurv()) {
+			source.SetImageScurvRange(blob_pb.m_imageminscurv(),blob_pb.m_imagemaxscurv());
+		}
+
+		if(blob_pb.has_m_imageminsedge() && blob_pb.has_m_imagemaxsedge()) {
+			source.SetImageSedgeRange(blob_pb.m_imageminsedge(),blob_pb.m_imagemaxsedge());
+		}
+
+		if(blob_pb.has_m_imagerms()) source.SetImageRMS(blob_pb.m_imagerms());
+		if( blob_pb.has_m_xmin() && blob_pb.has_m_xmax() &&
+				blob_pb.has_m_ymin() && blob_pb.has_m_ymax()
+		) {
+			source.SetSourceRange(blob_pb.m_xmin(),blob_pb.m_xmax(),blob_pb.m_ymin(),blob_pb.m_ymax());
+		}
+
+		if( blob_pb.has_m_ix_min() && blob_pb.has_m_ix_max() &&
+				blob_pb.has_m_iy_min() && blob_pb.has_m_iy_max()
+		) {
+			source.SetSourcePixelRange(blob_pb.m_ix_min(),blob_pb.m_ix_max(),blob_pb.m_iy_min(),blob_pb.m_iy_max());
+		}
+
+		//Add pixel collection to blob
+		Pixel* aPixel= 0;
+		std::vector<Pixel*> pixel_list;
+		for(int i=0;i<blob_pb.m_pixels_size();i++){
+			const SourcePB::Pixel& thisPixelPB= blob_pb.m_pixels(i);
+			aPixel= new Pixel;
+			if(EncodeProtobufToPixel(*aPixel,thisPixelPB)<0){
+				//Clear pixel list				
+				for(unsigned int k=0;k<pixel_list.size();k++){
+					delete pixel_list[k];
+					pixel_list[k]= 0;	
+				}
+				pixel_list.clear();
+	
+				std::stringstream errMsg;
+				errMsg<<"Pixel no. "<<i+1<<" encoding from protobuf failed!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}
+			pixel_list.push_back(aPixel);
+			source.AddPixel(aPixel);
+		}	
+
+		//Add contour collection to blob
+		Contour* aContour= 0;
+		std::vector<Contour*> contour_list;
+		for(int i=0;i<blob_pb.m_contours_size();i++){
+			const SourcePB::Contour& thisContourPB= blob_pb.m_contours(i);
+			aContour= new Contour;
+			if(EncodeProtobufToContour(*aContour,thisContourPB)<0){
+				//Clear contour list				
+				for(unsigned int k=0;k<contour_list.size();k++){
+					delete contour_list[k];
+					contour_list[k]= 0;	
+				}
+				contour_list.clear();
+	
+				std::stringstream errMsg;
+				errMsg<<"Contour no. "<<i+1<<" encoding from protobuf failed!";
+				throw std::runtime_error(errMsg.str().c_str());
+			}
+			contour_list.push_back(aContour);
+			source.AddContour(aContour);
+		}	
+
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Blob encoding from protobuf failed with status "<<e.what());
+		return -1;
+	}
+
+
+	return 0;
+
+}//close EncodeProtobufToBlob()
+
+
+int Serializer::EncodeProtobufToPixel(Pixel& pixel,const SourcePB::Pixel& pixel_pb){
+
+	try {
+		//Set public source fields
+		if(pixel_pb.has_id()) pixel.id= pixel_pb.id();
+
+		if(pixel_pb.has_type()){
+			if(pixel_pb.type()==SourcePB::Pixel::eNormal) pixel.type= Pixel::eNormal;
+			else if(pixel_pb.type()==SourcePB::Pixel::eSeed) pixel.type= Pixel::eSeed;
+			else if(pixel_pb.type()==SourcePB::Pixel::eHalo) pixel.type= Pixel::eHalo;
+			else{
+				throw std::runtime_error("Invalid pixel type, failed to encode!");
+			}
+		}
+
+		if(pixel_pb.has_s()) pixel.S= pixel_pb.s();
+		if(pixel_pb.has_x()) pixel.x= pixel_pb.x();
+		if(pixel_pb.has_y()) pixel.y= pixel_pb.y();
+		if(pixel_pb.has_ix()) pixel.ix= pixel_pb.ix();
+		if(pixel_pb.has_iy()) pixel.iy= pixel_pb.iy();
+		if(pixel_pb.has_isonedge()) pixel.isOnEdge= pixel_pb.isonedge();
+		if(pixel_pb.has_distancetoedge()) pixel.distanceToEdge= pixel_pb.distancetoedge();
+		if(pixel_pb.has_s()) pixel.S= pixel_pb.s();
+		if(pixel_pb.has_s()) pixel.S= pixel_pb.s();
+		if(pixel_pb.has_s()) pixel.S= pixel_pb.s();
+
+		//Set private fields
+		if(pixel_pb.has_s_curv()) pixel.SetCurv(pixel_pb.s_curv());
+		if(pixel_pb.has_s_edge()) pixel.SetEdge(pixel_pb.s_edge());
+		if(pixel_pb.has_bkglevel() && pixel_pb.has_noiselevel()){
+			pixel.SetBkg(pixel_pb.bkglevel(),pixel_pb.noiselevel());
+		}
+	
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Pixel encoding to protobuf failed with status "<<e.what());
+		return -1;
+	}
+
+
+	return 0;
+
+}//close EncodeProtobufToPixel()
+
+
+int Serializer::EncodeProtobufToContour(Contour& contour,const SourcePB::Contour& contour_pb){
+
+	
+	try {
+		
+		if(contour_pb.has_hasparameters()) contour.HasParameters= contour_pb.hasparameters();
+		if(contour_pb.has_area()) contour.Area= contour_pb.area();
+		if(contour_pb.has_perymeter()) contour.Perymeter= contour_pb.perymeter();
+		if(contour_pb.has_isconvexcontour()) contour.IsConvexContour= contour_pb.isconvexcontour();
+		if(contour_pb.has_circularityratio()) contour.CircularityRatio= contour_pb.circularityratio();
+
+		
+		if(contour_pb.has_boundingboxcenter()) {
+			const SourcePB::Point& BoundingBoxCenterPB= contour_pb.boundingboxcenter();
+			if(EncodeProtobufToPoint(contour.BoundingBoxCenter,BoundingBoxCenterPB)<0){
+				throw std::runtime_error("Failed to encode bounding box center field");	
+			}
+		}
+
+		if(contour_pb.has_boundingboxmaj()) contour.BoundingBoxMaj= contour_pb.boundingboxmaj();
+		if(contour_pb.has_boundingboxmin()) contour.BoundingBoxMin= contour_pb.boundingboxmin();
+		if(contour_pb.has_boundingboxangle()) contour.BoundingBoxAngle= contour_pb.boundingboxangle();
+		if(contour_pb.has_elongation()) contour.Elongation= contour_pb.elongation();
+		if(contour_pb.has_rectangularity()) contour.Rectangularity= contour_pb.rectangularity();
+		if(contour_pb.has_roundness()) contour.Roundness= contour_pb.roundness();
+		if(contour_pb.has_eccentricity()) contour.Eccentricity= contour_pb.eccentricity();
+		if(contour_pb.has_tiltangle()) contour.TiltAngle= contour_pb.tiltangle();
+		if(contour_pb.has_hasellipsefit()) contour.HasEllipseFit= contour_pb.hasellipsefit();
+
+		if(contour_pb.has_ellipsecenter()) {
+			const SourcePB::Point& EllipseCenterPB= contour_pb.ellipsecenter();
+			if(EncodeProtobufToPoint(contour.EllipseCenter,EllipseCenterPB)<0){
+				throw std::runtime_error("Failed to encode ellipse center field");	
+			}
+		}
+
+		if(contour_pb.has_ellipsemajaxis()) contour.EllipseMajAxis= contour_pb.ellipsemajaxis();
+		if(contour_pb.has_ellipseminaxis()) contour.EllipseMinAxis= contour_pb.ellipseminaxis();
+		if(contour_pb.has_ellipserotangle()) contour.EllipseRotAngle= contour_pb.ellipserotangle();
+		if(contour_pb.has_ellipsefitredchi2()) contour.EllipseFitRedChi2= contour_pb.ellipsefitredchi2();
+		if(contour_pb.has_ellipsearearatio()) contour.EllipseAreaRatio= contour_pb.ellipsearearatio();
+		
+		if(contour_pb.has_m00()) contour.m00= contour_pb.m00();
+		if(contour_pb.has_m10()) contour.m10= contour_pb.m10();
+		if(contour_pb.has_m01()) contour.m01= contour_pb.m01();
+		if(contour_pb.has_m20()) contour.m20= contour_pb.m20();
+		if(contour_pb.has_m11()) contour.m11= contour_pb.m11();
+		if(contour_pb.has_m02()) contour.m02= contour_pb.m02();
+		if(contour_pb.has_m30()) contour.m30= contour_pb.m30();
+		if(contour_pb.has_m21()) contour.m21= contour_pb.m21();
+		if(contour_pb.has_m12()) contour.m12= contour_pb.m12();
+		if(contour_pb.has_m03()) contour.m03= contour_pb.m03();
+		
+		if(contour_pb.has_mu20()) contour.m00= contour_pb.mu20();
+		if(contour_pb.has_mu11()) contour.m00= contour_pb.mu11();
+		if(contour_pb.has_mu02()) contour.m00= contour_pb.mu02();
+		if(contour_pb.has_mu30()) contour.m00= contour_pb.mu30();
+		if(contour_pb.has_mu21()) contour.m00= contour_pb.mu21();
+		if(contour_pb.has_mu12()) contour.m00= contour_pb.mu12();
+		if(contour_pb.has_mu03()) contour.m00= contour_pb.mu03();
+
+		if(contour_pb.has_nu20()) contour.m00= contour_pb.nu20();
+		if(contour_pb.has_nu11()) contour.m00= contour_pb.nu11();
+		if(contour_pb.has_nu02()) contour.m00= contour_pb.nu02();
+		if(contour_pb.has_nu30()) contour.m00= contour_pb.nu30();
+		if(contour_pb.has_nu21()) contour.m00= contour_pb.nu21();
+		if(contour_pb.has_nu12()) contour.m00= contour_pb.nu12();
+		if(contour_pb.has_nu03()) contour.m00= contour_pb.nu03();
+		
+	
+		for(int i=0;i<contour_pb.humoments_size();i++){		
+			(contour.HuMoments)[i]= contour_pb.humoments(i);
+		}
+		
+		for(int i=0;i<contour_pb.boundingboxvertex_size();i++){		
+			const SourcePB::Point& thisBoundingBoxVertexPB= contour_pb.boundingboxvertex(i);
+			if(EncodeProtobufToPoint((contour.BoundingBoxVertex)[i],thisBoundingBoxVertexPB)<0){
+				throw std::runtime_error("Failed to encode bounding box vertex field");	
+			}
+		}
+
+		if(contour_pb.has_centroid()) {
+			const SourcePB::Point& CentroidPB= contour_pb.centroid();
+			if(EncodeProtobufToPoint(contour.Centroid,CentroidPB)<0){
+				throw std::runtime_error("Failed to encode centroid field");	
+			}
+		}
+	
+		for(int i=0;i<contour_pb.realfds_size();i++){		
+			(contour.RealFDs).push_back(contour_pb.realfds(i));
+		}
+		for(int i=0;i<contour_pb.imagfds_size();i++){		
+			(contour.ImagFDs).push_back(contour_pb.imagfds(i));
+		}
+		for(int i=0;i<contour_pb.modfds_size();i++){		
+			(contour.ModFDs).push_back(contour_pb.modfds(i));
+		}
+		for(int i=0;i<contour_pb.bendingenergies_size();i++){		
+			(contour.BendingEnergies).push_back(contour_pb.bendingenergies(i));
+		}
+		for(int i=0;i<contour_pb.centroiddistancemodfds_size();i++){		
+			(contour.CentroidDistanceModFDs).push_back(contour_pb.centroiddistancemodfds(i));
+		}
+
+		//Add points
+		for(int i=0;i<contour_pb.m_points_size();i++){		
+			const SourcePB::Point& thisContourPointPB= contour_pb.m_points(i);
+			TVector2 thisContourPoint;
+			if(EncodeProtobufToPoint(thisContourPoint,thisContourPointPB)<0){
+				throw std::runtime_error("Failed to encode centroid field");	
+			}
+			contour.AddPoint(thisContourPoint);
+		}	
+
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Contour encoding from protobuf failed with status "<<e.what());
+		return -1;
+	}
+	
+	return 0;
+
+}//close EncodeProtobufToContour()
+
+int Serializer::EncodeProtobufToPoint(TVector2& point,const SourcePB::Point& point_pb){
+
+	try {
+		if(point_pb.has_x()) point.SetX(point_pb.x());
+		if(point_pb.has_y()) point.SetY(point_pb.y());
+	}
+	catch(std::exception const & e) {
+		ERROR_LOG("Point encoding from protobuf failed with status "<<e.what());
+		return -1;
+	}
+
+	return 0;
+
+}//close EncodeProtobufToPoint()
+
+int Serializer::EncodeProtobufToWorkerData(WorkerData& workerData,const SourcePB::WorkerData& workerData_pb){
+
+	try {
+		
+		//Check for header 
+		if(!workerData_pb.has_header()) {
+			throw std::runtime_error("No header present in the data!");	
+		}
+		const SourcePB::WorkerDataHeader& headerPB= workerData_pb.header();
+
+		//Set header fields
+		//--> timestamp
+		if(headerPB.has_timestamp()) {
+			const SourcePB::Timestamp& timestampPB= headerPB.timestamp();
+			((workerData.info).timestamp).tv_sec= timestampPB.seconds();
+			((workerData.info).timestamp).tv_usec= timestampPB.nanos()*1.e-3;
+		}
+		else{
+			gettimeofday(&((workerData.info).timestamp), NULL);	
+		}
+
+		//--> jobId
+		if(!headerPB.has_jobid()){
+			throw std::runtime_error("Missing jobId in header!");	
+		}
+		(workerData.info).jobId= headerPB.jobid();
+
+		//--> IdX/IdY
+		if(!headerPB.has_ix() || !headerPB.has_iy()){
+			throw std::runtime_error("Missing IdX/IdY in header!");	
+		}
+		long int ix= headerPB.ix();
+		long int iy= headerPB.iy();
+		if(ix<0 || iy<0){
+			throw std::runtime_error("Invalid IdX/IdY in header (negative values)!");	
+		}
+		(workerData.info).IdX= ix;
+		(workerData.info).IdY= iy;
+
+
+		//Parse source collection
+		Source* aSource= 0;
+		for(int i=0;i<workerData_pb.sources_size();i++){		
+			const SourcePB::Source& thisSourcePB= workerData_pb.sources(i);
+			aSource= new Source;
+			if(EncodeProtobufToSource(*aSource,thisSourcePB)<0){
+				delete aSource;
+				aSource= 0;
+				throw std::runtime_error("Failed to encode source in collection from protobuf!");	
+			}
+			(workerData.sources).push_back(aSource);
+		}	
+
+		Source* aEdgeSource= 0;
+		for(int i=0;i<workerData_pb.edge_sources_size();i++){		
+			const SourcePB::Source& thisSourcePB= workerData_pb.edge_sources(i);
+			aEdgeSource= new Source;
+			if(EncodeProtobufToSource(*aEdgeSource,thisSourcePB)<0){
+				delete aEdgeSource;
+				aEdgeSource= 0;
+				throw std::runtime_error("Failed to encode edge source in collection from protobuf!");	
+			}
+			(workerData.edge_sources).push_back(aEdgeSource);
+		}	
+	
+		
+	}//close try block
+	catch(std::exception const & e) {
+		//Clear allocated sources
+		for(unsigned int i=0;i<(workerData.sources).size();i++){
+			delete (workerData.sources)[i];
+			(workerData.sources)[i]= 0;
+		}
+		workerData.sources.clear();
+
+		for(unsigned int i=0;i<(workerData.edge_sources).size();i++){
+			delete (workerData.edge_sources)[i];
+			(workerData.edge_sources)[i]= 0;
+		}
+		workerData.edge_sources.clear();
+
+		ERROR_LOG("Worker data encoding from protobuf failed with status "<<e.what());
+		return -1;
+	}
+
+	return 0;
+
+}//close EncodeProtobufToWorkerData()
+
+
+int Serializer::BufferToSource(Source& source,SBuffer& buffer){
+
+	//## Check for empty data
+	if((buffer.data).empty() || buffer.size<=0) {
+		return -1;
+	}
+
+	try {
+		//## Parse input and encode to protobuf message
+		SourcePB::Source source_pb;
+  	if( !source_pb.ParseFromString(buffer.data) ) {
+			throw std::runtime_error("Parsing to protobuf failed!");
+		}
+
+		//## Convert protobuf to Source
+		if( EncodeProtobufToSource(source,source_pb)<0) {
+			throw std::runtime_error("Encoding from protobuf to source failed!");
+		}
+		
+	}//close try
+	catch(std::exception const & e) {
+		ERROR_LOG("Parsing source from buffer failed with status "<<e.what());
+		return -1;
+	}
+
+	return 0;
+
+}//close BufferToSource()
+
+
+
+int Serializer::BufferToWorkerData(WorkerData& workerData,SBuffer& buffer){
+
+	//## Check for empty data
+	if((buffer.data).empty() || buffer.size<=0) {
+		return -1;
+	}
+
+	try {
+		//## Parse input and encode to protobuf message
+		SourcePB::WorkerData workerData_pb;
+  	if( !workerData_pb.ParseFromString(buffer.data) ) {
+			throw std::runtime_error("Parsing of buffer to WorkerData protobuf failed!");
+		}
+
+		//## Convert protobuf to WorkerData
+		if( EncodeProtobufToWorkerData(workerData,workerData_pb)<0) {
+			throw std::runtime_error("Encoding from protobuf to workerData failed!");
+		}
+		
+	}//close try
+	catch(std::exception const & e) {
+		ERROR_LOG("Parsing workerData from buffer failed with status "<<e.what());
+		return -1;
+	}
+
+	return 0;
+
+}//close WorkerDataToSource()
+
+
 int Serializer::SourceToBuffer(Source* source,msgpack::sbuffer& buffer){
 
+	/*
 	try{	
 		msgpack::pack(&buffer,*source);
 	}
@@ -656,18 +1294,18 @@ int Serializer::SourceToBuffer(Source* source,msgpack::sbuffer& buffer){
 		ERROR_LOG("Source encoding failed (err: "<<e.what()<<")");
 		return -1;
 	}
-
+	*/
 	return 0;
 
 }//close SourceToBuffer()
 
 int Serializer::SourceToString(Source* source,std::string& msg){
-
+	/*
 	msgpack::sbuffer buffer;
 	if(SourceToBuffer(source,buffer)<0) return -1;
 
 	msg= std::string(buffer.data(),buffer.size());
-
+	*/
 	return 0;
 
 }//close SourceToString()
@@ -675,19 +1313,21 @@ int Serializer::SourceToString(Source* source,std::string& msg){
 
 int Serializer::SourceToDevString(Source* source,Tango::DevString& msg){
 
+	/*
 	msgpack::sbuffer buffer;
 	if(SourceToBuffer(source,buffer)<0)	return -1;
 
 	msg= CORBA::string_alloc(buffer.size());
 	memcpy (msg, buffer.data(), buffer.size());	
 	msg[buffer.size()]= 0;
-
+	*/
 	return 0;
 
 }//close SourceToDevString()
 
 int Serializer::SourceCollectionToBuffer(std::vector<Source*>& sources,msgpack::sbuffer& buffer){
 
+	/*
 	try{	
 		msgpack::pack(&buffer,sources);
 	}
@@ -695,113 +1335,39 @@ int Serializer::SourceCollectionToBuffer(std::vector<Source*>& sources,msgpack::
 		ERROR_LOG("Source encoding failed (err: "<<e.what()<<")");
 		return -1;
 	}
-
+	*/
 	return 0;
 
 }//close SourceCollectionToBuffer()
 
 int Serializer::SourceCollectionToString(std::vector<Source*>& sources,std::string& msg){
 
+	/*
 	msgpack::sbuffer buffer;
 	if(SourceCollectionToBuffer(sources,buffer)<0) return -1;
 
 	msg= std::string(buffer.data(),buffer.size());
-
+	*/
 	return 0;
 
 }//close SourceCollectionToString()
 
 int Serializer::SourceCollectionToDevString(std::vector<Source*>& sources,Tango::DevString& msg){
 
+	/*
 	msgpack::sbuffer buffer;
 	if(SourceCollectionToBuffer(sources,buffer)<0)	return -1;
 
 	msg= CORBA::string_alloc(buffer.size());
 	memcpy (msg, buffer.data(), buffer.size());	
 	msg[buffer.size()]= 0;
-
+	*/
 	return 0;
-
+	
 }//close SourceCollectionToDevString()
 
 //#endif
 
-/*
-int Serializer::BufferToSource(msgpack::sbuffer& buffer){
 
-	return 0;
-}
-*/
-
-/*
-
-bool MessageUtils::encodeFromMsgPack(SBuffer buffer,Message& msg){
-
-	//## Check data integrity
-	if(buffer.msg.empty() || buffer.size<=0) return false;
-
-	//## Encode to message
-	try {
-		msgpack::unpacked unpacked_msg;
-  	msgpack::unpack(&unpacked_msg, (buffer.msg).c_str(), buffer.size);	
-  	unpacked_msg.get().convert(&msg);
-	
-		//## Check message validity
-		if(!msg.isValid()) return false;
-	}
-	catch(std::exception const & e) {
-		cout << "ERROR: message encoding failed with status "<<e.what() <<endl;
-		return false;
-	}
-
-	return true;
-
-}//close MessageUtils::encodeFromMsgPack()
-
-
-
-bool MessageUtils::encodeFromMsgPackCollection(SBufferCollection buffers,MessageCollection& msgs){
-
-	bool status= true;
-	msgs.clear();
-	msgs.resize(0);
-
-	for(unsigned int i=0;i<buffers.size();i++){
-		Message thisMsg;
-		bool isValidDecoding= MessageUtils::encodeFromMsgPack(buffers[i],thisMsg);
-		if(!isValidDecoding) status= false; 
-		msgs.push_back(thisMsg);
-	}//end loop buffers
-
-	return status;
-
-}//close MessageUtils::encodeFromMsgPackCollection()
-
-
-
-bool MessageUtils::encodeFromMsgPack(char* buffer,int bufsize,Message& msg){
-
-	//## Check data integrity
-	if(!buffer || bufsize<=0) return false;
-
-	//## Encode to message
-	try {
-		msgpack::unpacked unpacked_msg;
-  	msgpack::unpack(&unpacked_msg, buffer, bufsize);	
-  	unpacked_msg.get().convert(&msg);
-	
-		//## Check message validity
-		if(!msg.isValid()) return false;
-	}
-	catch(std::exception const & e) {
-		cout << "ERROR: message encoding failed with status "<<e.what() <<endl;
-		return false;
-	}
-
-	return true;
-
-}//close encodeFromMsgPack()
-
-*/
 
 }//close namespace

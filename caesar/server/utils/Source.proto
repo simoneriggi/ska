@@ -1,5 +1,18 @@
 package SourcePB;
 
+message Timestamp {
+  // Represents seconds of UTC time since Unix epoch
+  // 1970-01-01T00:00:00Z. Must be from from 0001-01-01T00:00:00Z to
+  // 9999-12-31T23:59:59Z inclusive.
+  optional int64 seconds = 1;
+
+  // Non-negative fractions of a second at nanosecond resolution. Negative
+  // second values with fractions must still have non-negative nanos values
+  // that count forward in time. Must be from 0 to 999,999,999
+  // inclusive.
+  optional int32 nanos = 2;
+}
+
 message Pixel {
 	optional int64 id= 1;
 	enum PixelType {
@@ -189,4 +202,40 @@ message Source {
 	optional bool m_HasNestedSources= 7;
 	repeated Source m_NestedSources= 8;
 }
+
+message WorkerDataHeader {
+	optional string jobId= 1;
+	optional int64 ix= 2;
+	optional int64 iy= 3;
+	optional Timestamp timestamp= 4;
+}
+
+message WorkerData {
+	optional WorkerDataHeader header= 1;
+	repeated Source sources= 2;
+	repeated Source edge_sources= 3;
+}
+
+message WorkerProgressData {
+	optional WorkerDataHeader header= 1;
+	enum JobStatus {
+		UNKNOWN= 1;
+		RUNNING= 2;
+		COMPLETED= 3;
+		FAILED= 4;
+		ABORTED= 5;		
+	}
+	optional JobStatus jobStatus= 2 [default=UNKNOWN];	
+	enum TaskStage {
+		INIT= 1;
+		READ_IMAGE= 2;
+		BKG= 3;
+		COMPACT_SOURCE= 4;
+		EXT_SOURCE= 5;
+	}
+	optional TaskStage stage = 3;
+	optional float progress = 4;
+
+}//close WorkerProgressStatus
+
 
