@@ -6,6 +6,7 @@
 #include <BkgData.h>
 #include <Contour.h>
 #include <Logger.h>
+#include <WorkerData.h>
 #include <Serializer.h>
 
 #include <tango.h>
@@ -81,7 +82,7 @@ void SFinderThread::Run(std::string inputFileName,std::string runId,std::vector<
 	std::vector<Source*> sources;
 	for(long int i=0;i<nTasks;i++){
 		INFO_LOG("Starting source finding task no. "<<i+1<<"...");
-		int status= RunTask(sources,inputFileName,tileMinX_list[i],tileMaxX_list[i],tileMinY_list[i],tileMaxY_list[i]);
+		int status= RunTask(sources,inputFileName,runId,tileMinX_list[i],tileMaxX_list[i],tileMinY_list[i],tileMaxY_list[i]);
 		if(status<0){
 			//Clear sources
 			for(unsigned int k=0;k<sources.size();k++){
@@ -108,7 +109,7 @@ void SFinderThread::Run(std::string inputFileName,std::string runId,std::vector<
 }//close Run()
 
 
-int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& filename,long int tileMinX,long int tileMaxX,long int tileMinY,long int tileMaxY){
+int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& filename,const std::string& runId,long int tileMinX,long int tileMaxX,long int tileMinY,long int tileMaxY){
 
 	//## Read input image
 	INFO_LOG("Reading input image "<<filename<<" X["<<tileMinX<<","<<tileMaxX<<"] Y["<<tileMinY<<","<<tileMaxY<<"]...");
@@ -146,13 +147,26 @@ int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& file
 	
 	//## Find compact sources
 	INFO_LOG("Searching compact sources...");
+
+	WorkerData* compactSourceData= new WorkerData;
+	(compactSourceData->info).jobId= runId;
+	//(compactSourceData->info).IdX= 
+	//(compactSourceData->info).IdY= 
+	
 	std::vector<Source*> compact_sources;
-	if(m_device->attr_searchCompactSources_write && FindCompactSources(compact_sources,inputImg,false,bkgData)<0){
+	//if(m_device->attr_searchCompactSources_write && FindCompactSources(compact_sources,inputImg,false,bkgData)<0){
+	if(m_device->attr_searchCompactSources_write && FindCompactSources(*compactSourceData,inputImg,false,bkgData)<0){
 		ERROR_LOG("Compact source search failed!");
 		return -1;
 	}
 	sources.insert(sources.end(),compact_sources.begin(),compact_sources.end());
 	
+	//--> Push compact source data
+	if(PushWorkerDataEvent(*compactSourceData)<0){
+		ERROR_LOG("Failed to push compact source data event!");
+		return -1;
+	}
+
 	//Check stop thread
 	if(m_stopThread){
 		INFO_LOG("Stopped computation");
@@ -161,6 +175,26 @@ int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& file
 		bkgData= 0;	
 		return -1;
 	}
+
+	
+	
+
+	/*
+	//## Push compact source pipe
+	INFO_LOG("Encoding compact source collection to pipe blob...");
+	if(Serializer::SourceCollectionToTangoPipe(m_device->m_compactSourcesPipeBlob,compact_sources)<0){
+		ERROR_LOG("Failed to encode compact sources to pipe!");
+		inputImg->Delete();
+		delete bkgData;
+		bkgData= 0;
+		return -1;
+	}
+
+	INFO_LOG("Pushing compact source pipe event...");
+	(m_device->m_compactSourcesPipeBlob).set_name("compactSourcesPipeBlob");
+	m_device->push_pipe_event("compactSourcesPipe",&(m_device->m_compactSourcesPipeBlob),true);
+	*/
+
 
 	//...
 	//...
@@ -175,7 +209,8 @@ int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& file
 }//close RunSourceTask()
 
 
-int SFinderThread::FindCompactSources(std::vector<Source*>& sources,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
+//int SFinderThread::FindCompactSources(std::vector<Source*>& sources,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
+int SFinderThread::FindCompactSources(WorkerData& compactSourceData,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
 
 	//## Check input image
 	if(!inputImg) {
@@ -184,7 +219,8 @@ int SFinderThread::FindCompactSources(std::vector<Source*>& sources,Img* inputIm
 	}
 
 	//## Find sources
-	INFO_LOG("Finding compact sources ...");		
+	INFO_LOG("Finding compact sources ...");	
+	std::vector<Source*> sources;	
 	int status= FindSources(sources,inputImg,computeStatsAndBkg,inputBkgData);
 	if(status<0) {
 		ERROR_LOG("Compact source finding failed!");
@@ -208,6 +244,14 @@ int SFinderThread::FindCompactSources(std::vector<Source*>& sources,Img* inputIm
 
 	//## Add detected sources to the list	
 	INFO_LOG("#"<<nSelSources<<" compact sources selected after cuts...");
+	for(unsigned int i=0;i<sources.size();i++){
+		if(sources[i]->IsAtEdge()){
+			(compactSourceData.edge_sources).push_back(sources[i]);
+		}
+		else{
+			(compactSourceData.sources).push_back(sources[i]);
+		}
+	}//end loop 
 
 	return 0;
 
@@ -551,5 +595,44 @@ BkgData* SFinderThread::ComputeStatsAndBkg(Img* img){
 	return bkgData;
 
 }//close ComputeStatsAndBkg()
+
+
+int SFinderThread::PushWorkerProgressEvent(){
+
+	//...
+	//...
+
+	return 0;
+
+}//close PushWorkerProgressEvent()
+
+
+int SFinderThread::PushWorkerDataEvent(WorkerData& workerData){
+
+	//Encode workerData to buffer
+	SBuffer buffer;
+	if(Serializer::WorkerDataToBuffer(buffer,&workerData)<0){
+		ERROR_LOG("Failed to encode worker data to buffer!");
+		return -1;
+	}
+	//Tango::DevString* attr_value= new Tango::DevString;
+	//*attr_value= Tango::string_dup(buffer.data);
+
+	//Set attribute and push event
+	std::vector<std::string> filt_names;
+	std::vector<double> filt_vals;
+	bool release= false;//false by default
+	
+	(m_device->m_mutex)->lock();
+	CORBA::string_free(*m_device->attr_compactSourceData_read);
+	*(m_device->attr_compactSourceData_read)= CORBA::string_alloc(buffer.size);
+	memcpy (m_device->attr_compactSourceData_read, (buffer.data).c_str(), buffer.size);	
+	(m_device->attr_compactSourceData_read)[buffer.size]= 0;
+	m_device->push_event("compactSourceData",filt_names,filt_vals,m_device->attr_compactSourceData_read, 1, 0,release);
+	(m_device->m_mutex)->unlock();
+
+	return 0;
+
+}//close PushWorkerDataEvent()
 
 }//close namespace

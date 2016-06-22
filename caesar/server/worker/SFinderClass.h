@@ -509,6 +509,19 @@ public:
 		{return (static_cast<SFinder *>(dev))->is_minBoundingBoxThr_allowed(ty);}
 };
 
+//	Attribute compactSourceData class definition
+class compactSourceDataAttrib: public Tango::Attr
+{
+public:
+	compactSourceDataAttrib():Attr("compactSourceData",
+			Tango::DEV_STRING, Tango::READ) {};
+	~compactSourceDataAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_compactSourceData(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_compactSourceData_allowed(ty);}
+};
+
 //	Attribute runProgress class definition
 class runProgressAttrib: public Tango::SpectrumAttr
 {
@@ -522,30 +535,23 @@ public:
 		{return (static_cast<SFinder *>(dev))->is_runProgress_allowed(ty);}
 };
 
-//	Attribute compactSources class definition
-class compactSourcesAttrib: public Tango::SpectrumAttr
-{
-public:
-	compactSourcesAttrib():SpectrumAttr("compactSources",
-			Tango::DEV_STRING, Tango::READ, 1000000) {};
-	~compactSourcesAttrib() {};
-	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
-		{(static_cast<SFinder *>(dev))->read_compactSources(att);}
-	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
-		{return (static_cast<SFinder *>(dev))->is_compactSources_allowed(ty);}
-};
 
-//	Attribute extendedSources class definition
-class extendedSourcesAttrib: public Tango::SpectrumAttr
+//=========================================
+//	Define classes for pipes
+//=========================================
+//	Pipe compactSourcesPipe class definition
+class compactSourcesPipeClass: public Tango::Pipe
 {
 public:
-	extendedSourcesAttrib():SpectrumAttr("extendedSources",
-			Tango::DEV_STRING, Tango::READ, 1000000) {};
-	~extendedSourcesAttrib() {};
-	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
-		{(static_cast<SFinder *>(dev))->read_extendedSources(att);}
-	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
-		{return (static_cast<SFinder *>(dev))->is_extendedSources_allowed(ty);}
+	compactSourcesPipeClass(const string &name, Tango::DispLevel level)
+		:Pipe(name, level) {};
+
+	~compactSourcesPipeClass() {};
+
+	virtual bool is_allowed (Tango::DeviceImpl *dev,Tango::PipeReqType _prt)
+		{return (static_cast<SFinder *>(dev))->is_compactSourcesPipe_allowed(_prt);}
+	virtual void read(Tango::DeviceImpl *dev)
+		{(static_cast<SFinder *>(dev))->read_compactSourcesPipe(*this);}
 };
 
 
@@ -596,6 +602,29 @@ public:
 	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
 	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
 	{return (static_cast<SFinder *>(dev))->is_Configure_allowed(any);}
+};
+
+//	Command RegisterMe class definition
+class RegisterMeClass : public Tango::Command
+{
+public:
+	RegisterMeClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out,
+				   const char        *in_desc,
+				   const char        *out_desc,
+				   Tango::DispLevel  level)
+	:Command(name,in,out,in_desc,out_desc, level)	{};
+
+	RegisterMeClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out)
+	:Command(name,in,out)	{};
+	~RegisterMeClass() {};
+	
+	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
+	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
+	{return (static_cast<SFinder *>(dev))->is_RegisterMe_allowed(any);}
 };
 
 

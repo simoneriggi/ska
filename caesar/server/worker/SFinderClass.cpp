@@ -196,6 +196,23 @@ CORBA::Any *ConfigureClass::execute(Tango::DeviceImpl *device, const CORBA::Any 
 	return insert((static_cast<SFinder *>(device))->configure(argin));
 }
 
+//--------------------------------------------------------
+/**
+ * method : 		RegisterMeClass::execute()
+ * description : 	method to trigger the execution of the command.
+ *
+ * @param	device	The device on which the command must be executed
+ * @param	in_any	The command input data
+ *
+ *	returns The command output data (packed in the Any object)
+ */
+//--------------------------------------------------------
+CORBA::Any *RegisterMeClass::execute(Tango::DeviceImpl *device, TANGO_UNUSED(const CORBA::Any &in_any))
+{
+	cout2 << "RegisterMeClass::execute(): arrived" << endl;
+	return insert((static_cast<SFinder *>(device))->register_me());
+}
+
 
 //===================================================================
 //	Properties management
@@ -1667,6 +1684,32 @@ void SFinderClass::attribute_factory(vector<Tango::Attr *> &att_list)
 	minboundingboxthr->set_memorized_init(true);
 	att_list.push_back(minboundingboxthr);
 
+	//	Attribute : compactSourceData
+	compactSourceDataAttrib	*compactsourcedata = new compactSourceDataAttrib();
+	Tango::UserDefaultAttrProp	compactsourcedata_prop;
+	//	description	not set for compactSourceData
+	//	label	not set for compactSourceData
+	//	unit	not set for compactSourceData
+	//	standard_unit	not set for compactSourceData
+	//	display_unit	not set for compactSourceData
+	//	format	not set for compactSourceData
+	//	max_value	not set for compactSourceData
+	//	min_value	not set for compactSourceData
+	//	max_alarm	not set for compactSourceData
+	//	min_alarm	not set for compactSourceData
+	//	max_warning	not set for compactSourceData
+	//	min_warning	not set for compactSourceData
+	//	delta_t	not set for compactSourceData
+	//	delta_val	not set for compactSourceData
+	
+	compactsourcedata->set_default_properties(compactsourcedata_prop);
+	//	Not Polled
+	compactsourcedata->set_disp_level(Tango::OPERATOR);
+	//	Not Memorized
+	compactsourcedata->set_data_ready_event(true);
+	compactsourcedata->set_change_event(true, false);
+	att_list.push_back(compactsourcedata);
+
 	//	Attribute : runProgress
 	runProgressAttrib	*runprogress = new runProgressAttrib();
 	Tango::UserDefaultAttrProp	runprogress_prop;
@@ -1691,58 +1734,6 @@ void SFinderClass::attribute_factory(vector<Tango::Attr *> &att_list)
 	//	Not Memorized
 	att_list.push_back(runprogress);
 
-	//	Attribute : compactSources
-	compactSourcesAttrib	*compactsources = new compactSourcesAttrib();
-	Tango::UserDefaultAttrProp	compactsources_prop;
-	compactsources_prop.set_description("Source list\n[0]: run id\n[1]: source no. 1\n[2]: source no. 2\n...\n[n] source no. n");
-	//	label	not set for compactSources
-	//	unit	not set for compactSources
-	//	standard_unit	not set for compactSources
-	//	display_unit	not set for compactSources
-	//	format	not set for compactSources
-	//	max_value	not set for compactSources
-	//	min_value	not set for compactSources
-	//	max_alarm	not set for compactSources
-	//	min_alarm	not set for compactSources
-	//	max_warning	not set for compactSources
-	//	min_warning	not set for compactSources
-	//	delta_t	not set for compactSources
-	//	delta_val	not set for compactSources
-	
-	compactsources->set_default_properties(compactsources_prop);
-	//	Not Polled
-	compactsources->set_disp_level(Tango::OPERATOR);
-	//	Not Memorized
-	compactsources->set_data_ready_event(true);
-	compactsources->set_change_event(true, false);
-	att_list.push_back(compactsources);
-
-	//	Attribute : extendedSources
-	extendedSourcesAttrib	*extendedsources = new extendedSourcesAttrib();
-	Tango::UserDefaultAttrProp	extendedsources_prop;
-	extendedsources_prop.set_description("Extended source list\n[0]: run id\n[1]: source no. 1\n...\n[N]: source no. N");
-	//	label	not set for extendedSources
-	//	unit	not set for extendedSources
-	//	standard_unit	not set for extendedSources
-	//	display_unit	not set for extendedSources
-	//	format	not set for extendedSources
-	//	max_value	not set for extendedSources
-	//	min_value	not set for extendedSources
-	//	max_alarm	not set for extendedSources
-	//	min_alarm	not set for extendedSources
-	//	max_warning	not set for extendedSources
-	//	min_warning	not set for extendedSources
-	//	delta_t	not set for extendedSources
-	//	delta_val	not set for extendedSources
-	
-	extendedsources->set_default_properties(extendedsources_prop);
-	//	Not Polled
-	extendedsources->set_disp_level(Tango::OPERATOR);
-	//	Not Memorized
-	extendedsources->set_data_ready_event(true);
-	extendedsources->set_change_event(true, false);
-	att_list.push_back(extendedsources);
-
 
 	//	Create a list of static attributes
 	create_static_attribute_list(get_class_attr()->get_attr_list());
@@ -1766,6 +1757,13 @@ void SFinderClass::pipe_factory()
 	//	Add your own code
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinderClass::pipe_factory_before
+	Tango::UserDefaultPipeProp udpp;
+	compactSourcesPipeClass	*pcompactSourcesPipe = new compactSourcesPipeClass("compactSourcesPipe",Tango::OPERATOR);
+	udpp.set_description("Compact source pipe blob");
+	udpp.set_label("compactSources");
+	pcompactSourcesPipe->set_default_properties(udpp);
+	pipe_list.push_back(pcompactSourcesPipe);
+
 	/*----- PROTECTED REGION ID(SFinderClass::pipe_factory_after) ENABLED START -----*/
 	
 	//	Add your own code
@@ -1805,6 +1803,15 @@ void SFinderClass::command_factory()
 			"",
 			Tango::OPERATOR);
 	command_list.push_back(pConfigureCmd);
+
+	//	Command RegisterMe
+	RegisterMeClass	*pRegisterMeCmd =
+		new RegisterMeClass("RegisterMe",
+			Tango::DEV_VOID, Tango::DEVVAR_LONGSTRINGARRAY,
+			"",
+			"",
+			Tango::OPERATOR);
+	command_list.push_back(pRegisterMeCmd);
 
 	/*----- PROTECTED REGION ID(SFinderClass::command_factory_after) ENABLED START -----*/
 	

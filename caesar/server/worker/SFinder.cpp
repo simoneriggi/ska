@@ -101,6 +101,7 @@ using namespace std;
 //  Status          |  Inherited (no method)
 //  ExtractSources  |  extract_sources
 //  Configure       |  configure
+//  RegisterMe      |  register_me
 //================================================================
 
 //================================================================
@@ -136,9 +137,8 @@ using namespace std;
 //  psMaxNPix                 |  Tango::DevLong	Scalar
 //  useBoundingBoxCut         |  Tango::DevBoolean	Scalar
 //  minBoundingBoxThr         |  Tango::DevFloat	Scalar
+//  compactSourceData         |  Tango::DevString	Scalar
 //  runProgress               |  Tango::DevString	Spectrum  ( max = 10)
-//  compactSources            |  Tango::DevString	Spectrum  ( max = 1000000)
-//  extendedSources           |  Tango::DevString	Spectrum  ( max = 1000000)
 //================================================================
 
 namespace SFinder_ns
@@ -201,11 +201,17 @@ void SFinder::delete_device()
 		delete m_WorkerThread;
 		m_WorkerThread = 0;
 	}
+
+	//Delete broker group	
+	if(m_brokerGroup){
+		DEBUG_LOG("Deleting broker group...");
+		delete m_brokerGroup;
+		m_brokerGroup= 0;
+	}
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::delete_device
+	delete[] attr_compactSourceData_read;
 	delete[] attr_runProgress_read;
-	delete[] attr_compactSources_read;
-	delete[] attr_extendedSources_read;
 }
 
 //--------------------------------------------------------
@@ -227,24 +233,40 @@ void SFinder::init_device()
 	//	Get the device properties from database
 	get_device_property();
 	
+	attr_compactSourceData_read = new Tango::DevString[1];
 	attr_runProgress_read = new Tango::DevString[10];
-	attr_compactSources_read = new Tango::DevString[1000000];
-	attr_extendedSources_read = new Tango::DevString[1000000];
 	/*----- PROTECTED REGION ID(SFinder::init_device) ENABLED START -----*/
 	
 	//	Initialize device
 	set_state(Tango::ON);
-	set_status("Worker "+device_name +" started");
+	set_status("Worker " + device_name + " started");
 	DEBUG_LOG("Worker "<<device_name<<" started...");
+
+	try {
+		DEBUG_LOG("Set change event for device "<<device_name<<"...");
+		set_change_event ("State", true, true);
+	}
+	catch(Tango::DevFailed& e){
+		WARN_LOG("Failed to set change event on State attribute");
+	}
+	push_change_event	("State");
+
 
 	//## Init default attr values
 	LoadDefaultConfig();
 
 	//## Init the worker thread
-  DEBUG_LOG("Init workr thread...");
+  DEBUG_LOG("Init worker thread for device "<<device_name<<"...");
   m_StopThreadFlag= false;
 	m_WorkerThread= 0;
   m_WorkerThread = new SFinderThread(this);
+
+	//## Init broker group
+	DEBUG_LOG("Init broker group...");
+	m_brokerGroup= 0;
+	if(InitBrokerGroup()<0){
+		WARN_LOG("Initialization of broker group failed, retry later...");
+	}
   
 	/*----- PROTECTED REGION END -----*/	//	SFinder::init_device
 }
@@ -1983,6 +2005,24 @@ void SFinder::write_minBoundingBoxThr(Tango::WAttribute &attr)
 }
 //--------------------------------------------------------
 /**
+ *	Read attribute compactSourceData related method
+ *	Description: 
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinder::read_compactSourceData(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_compactSourceData(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_compactSourceData) ENABLED START -----*/
+	//	Set the attribute value
+	attr.set_value(attr_compactSourceData_read);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_compactSourceData
+}
+//--------------------------------------------------------
+/**
  *	Read attribute runProgress related method
  *	Description: Run progress info
  *               [0]: run id
@@ -2004,51 +2044,6 @@ void SFinder::read_runProgress(Tango::Attribute &attr)
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_runProgress
 }
-//--------------------------------------------------------
-/**
- *	Read attribute compactSources related method
- *	Description: Source list
- *               [0]: run id
- *               [1]: source no. 1
- *               [2]: source no. 2
- *               ...
- *               [n] source no. n
- *
- *	Data type:	Tango::DevString
- *	Attr type:	Spectrum max = 1000000
- */
-//--------------------------------------------------------
-void SFinder::read_compactSources(Tango::Attribute &attr)
-{
-	DEBUG_STREAM << "SFinder::read_compactSources(Tango::Attribute &attr) entering... " << endl;
-	/*----- PROTECTED REGION ID(SFinder::read_compactSources) ENABLED START -----*/
-	//	Set the attribute value
-	attr.set_value(attr_compactSources_read, 1000000);
-	
-	/*----- PROTECTED REGION END -----*/	//	SFinder::read_compactSources
-}
-//--------------------------------------------------------
-/**
- *	Read attribute extendedSources related method
- *	Description: Extended source list
- *               [0]: run id
- *               [1]: source no. 1
- *               ...
- *               [N]: source no. N
- *
- *	Data type:	Tango::DevString
- *	Attr type:	Spectrum max = 1000000
- */
-//--------------------------------------------------------
-void SFinder::read_extendedSources(Tango::Attribute &attr)
-{
-	DEBUG_STREAM << "SFinder::read_extendedSources(Tango::Attribute &attr) entering... " << endl;
-	/*----- PROTECTED REGION ID(SFinder::read_extendedSources) ENABLED START -----*/
-	//	Set the attribute value
-	attr.set_value(attr_extendedSources_read, 1000000);
-	
-	/*----- PROTECTED REGION END -----*/	//	SFinder::read_extendedSources
-}
 
 //--------------------------------------------------------
 /**
@@ -2066,6 +2061,42 @@ void SFinder::add_dynamic_attributes()
 	/*----- PROTECTED REGION END -----*/	//	SFinder::add_dynamic_attributes
 }
 
+//--------------------------------------------------------
+/**
+ *	Read pipe compactSourcesPipe related method
+ *	Description: Compact source pipe blob
+ */
+//--------------------------------------------------------
+void SFinder::read_compactSourcesPipe(Tango::Pipe &pipe)
+{
+	DEBUG_STREAM << "SFinder::read_compactSourcesPipe(Tango::Pipe &pipe) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_compactSourcesPipe) ENABLED START -----*/
+	
+	//	Add your own code here
+	try {	
+		pipe.set_root_blob_name("compactSourcesPipeBlob");
+		std::vector<std::string> blob_names {"compactSourcesPipeBlob"};
+		pipe.set_data_elt_names(blob_names);
+		
+		DEBUG_LOG("Before pipe set");
+		pipe<<m_compactSourcesPipeBlob;
+		DEBUG_LOG("After pipe set");
+		
+	}//close try block
+	catch(Tango::DevFailed& e){
+		Tango::Except::print_exception(e);
+		ERROR_LOG("Tango exception occurred while setting pipe!");
+	}
+	catch(std::exception &e){
+		ERROR_LOG("Runtime exception occurred (e="<<e.what()<<") while setting pipe!");
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception occurred while setting pipe!");
+	}
+	
+
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_compactSourcesPipe
+}
 //--------------------------------------------------------
 /**
  *	Command ExtractSources related method
@@ -2105,7 +2136,7 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 	//Validate args	
 	long int nArgs_s= argin->svalue.length();
 	long int nArgs_l= argin->lvalue.length();
-	if(nArgs_s<=2){
+	if(nArgs_s<2){
 		WARN_LOG("Missing filename and/or runid arguments!");
 		ack= -1;
 		reply= "Missing filename and/or runid arguments!";
@@ -2348,6 +2379,119 @@ Tango::DevVarLongStringArray *SFinder::configure(Tango::DevString argin)
 	argout->svalue[0] = CORBA::string_dup(reply.c_str());
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::configure
+	return argout;
+}
+//--------------------------------------------------------
+/**
+ *	Command RegisterMe related method
+ *	Description: Register worker in brokers
+ *
+ *	@returns 
+ */
+//--------------------------------------------------------
+Tango::DevVarLongStringArray *SFinder::register_me()
+{
+	Tango::DevVarLongStringArray *argout;
+	DEBUG_STREAM << "SFinder::RegisterMe()  - " << device_name << endl;
+	/*----- PROTECTED REGION ID(SFinder::register_me) ENABLED START -----*/
+	
+	//	Add your own code
+	std::string reply= "Request executed with success";
+	long int ack= 0;
+	argout= new Tango::DevVarLongStringArray;
+	argout->lvalue.length(1);
+	argout->svalue.length(1);
+
+	//Init broker group if not done
+	if(!m_brokerGroup && InitBrokerGroup()<0){
+		WARN_LOG("Failed to initialize broker group, cannot register worker!");
+		ack= -1;
+		reply= "Failed to initialize broker group, cannot register worker!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+
+	//Register worker in brokers	
+	Tango::GroupCmdReplyList cmd_reply;
+	bool last_mode = Tango::GroupReply::enable_exception(true);
+	
+	try {
+		Tango::DeviceData dd;
+		dd << device_name;
+		
+		cmd_reply = m_brokerGroup->command_inout("RegisterWorker", dd);
+	}//close try
+	catch(Tango::DevFailed& e){
+		WARN_LOG("Failed to initialize broker group, cannot register worker!");
+		ack= -1;
+		reply= "Failed to initialize broker group, cannot register worker!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+
+	if (cmd_reply.has_failed()){
+		WARN_LOG("At least one error occurred while registering this worker in the brokers, processing the responses...");
+	}
+
+	//Process responses in the list
+	bool hasFailed= false; 
+	int nErrors= 0;
+	for (unsigned int k=0;k<cmd_reply.size();k++){
+				
+		try {
+			//Extract the data from the k-th reply
+			const Tango::DevVarLongStringArray* out;
+			cmd_reply[k] >> out;
+
+			//Check ack code
+			if(out->svalue.length()<=0 || out->lvalue.length()<=0){
+				throw std::runtime_error("Empty response vector");
+			}			
+			Tango::DevLong ack_code= (out->lvalue)[0];
+			std::string msg_info= std::string(out->svalue[0]);
+			if(ack_code!=0){
+				throw std::runtime_error(msg_info);
+			}
+
+		}//close try block
+		catch (const Tango::DevFailed& e) {
+			nErrors++;
+			ERROR_LOG("Exception while getting response data from "<<k<<" group device "<<cmd_reply[k].dev_name()<<", printing errors...");		
+			for (unsigned int err = 0; err < e.errors.length(); err++) {
+				ERROR_LOG("Error: " << e.errors[err].desc.in());
+			}
+			hasFailed= true;
+		}
+		catch (const std::exception& e) {
+			nErrors++;
+			ERROR_LOG("C++ exception while getting response data from "<<k<<" group device "<<cmd_reply[k].dev_name()<<" (err="<<e.what()<<")");		
+			hasFailed= true;
+		}
+		catch (...) {
+			nErrors++;
+			ERROR_LOG("Unknown exception while getting response data from "<<k<<" group device "<<cmd_reply[k].dev_name());		
+			hasFailed= true;
+		}
+
+	}//end loop replies	
+
+	if(hasFailed){
+		ack= -1;
+		std::stringstream errMsg;
+		errMsg<<nErrors<<" occurred on group responses";
+		reply= errMsg.str();
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+
+	//Return reply
+	argout->lvalue[0]= ack;
+	argout->svalue[0] = CORBA::string_dup(reply.c_str());
+
+	/*----- PROTECTED REGION END -----*/	//	SFinder::register_me
 	return argout;
 }
 //--------------------------------------------------------
@@ -2768,6 +2912,32 @@ BkgData* SFinder::ComputeStatsAndBkg(Img* img){
 
 }//close ComputeStatsAndBkg()
 */
+
+
+int SFinder::InitBrokerGroup(){
+
+	//Clear existing group
+	if(m_brokerGroup){
+		delete m_brokerGroup;
+		m_brokerGroup= 0;
+	}
+	
+	//Create a group
+	try {
+		m_brokerGroup = new Tango::Group("brokers");
+		for(unsigned int i=0;i<brokerList.size();i++){
+			m_brokerGroup->add(brokerList[i]);
+		}//end loop brokers
+	
+	}//close try block
+	catch(Tango::DevFailed& e){
+		ERROR_LOG("Failed to create the broker group!");
+		return -1;
+	}
+
+	return 0;
+
+}//close InitBrokerGroup()
 
 
 int SFinder::LoadDefaultConfig(){

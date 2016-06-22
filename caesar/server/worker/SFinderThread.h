@@ -13,10 +13,12 @@
 #include <Img.h>
 #include <BkgData.h>
 #include <Source.h>
+#include <WorkerData.h>
 namespace Caesar {
 	class Img;
 	class BkgData;
 	class Source;
+	class WorkerData;
 }
 
 
@@ -63,7 +65,7 @@ class SFinderThread : public Tango::LogAdapter {
 		/** 
 		\brief Run source finder task for a single image
  		*/
-		int RunTask(std::vector<Caesar::Source*>& sources,const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
+		int RunTask(std::vector<Caesar::Source*>& sources,const std::string& filename,const std::string& runId,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
 		/** 
 		\brief Read image
  		*/
@@ -75,7 +77,8 @@ class SFinderThread : public Tango::LogAdapter {
 		/** 
 		\brief Find compact sources
  		*/
-		int FindCompactSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
+		//int FindCompactSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
+		int FindCompactSources(Caesar::WorkerData& workerData,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
 		/** 
 		\brief Find sources
  		*/
@@ -88,7 +91,12 @@ class SFinderThread : public Tango::LogAdapter {
 		/** 
 		\brief ThrowProgressEvent
  		*/
-		int ThrowProgressEvent();
+		int PushWorkerProgressEvent();
+
+		/** 
+		\brief PushWorkerDataEvent
+ 		*/
+		int PushWorkerDataEvent(Caesar::WorkerData& workerData);
 		
 
 	private:	

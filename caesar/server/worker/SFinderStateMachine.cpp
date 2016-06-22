@@ -656,6 +656,22 @@ bool SFinder::is_minBoundingBoxThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
 
 //--------------------------------------------------------
 /**
+ *	Method      : SFinder::is_compactSourceData_allowed()
+ *	Description : Execution allowed for compactSourceData attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_compactSourceData_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+
+	//	Not any excluded states for compactSourceData attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::compactSourceDataStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::compactSourceDataStateAllowed_READ
+	return true;
+}
+
+//--------------------------------------------------------
+/**
  *	Method      : SFinder::is_runProgress_allowed()
  *	Description : Execution allowed for runProgress attribute
  */
@@ -670,38 +686,23 @@ bool SFinder::is_runProgress_allowed(TANGO_UNUSED(Tango::AttReqType type))
 	return true;
 }
 
+//=================================================
+//		pipe Allowed Methods
+//=================================================
 //--------------------------------------------------------
 /**
- *	Method      : SFinder::is_compactSources_allowed()
- *	Description : Execution allowed for compactSources attribute
+ *	Method      : SFinder::is_compactSourcesPipe_allowed()
+ *	Description : Execution allowed for compactSourcesPipe pipe
  */
 //--------------------------------------------------------
-bool SFinder::is_compactSources_allowed(TANGO_UNUSED(Tango::AttReqType type))
+bool SFinder::is_compactSourcesPipe_allowed(TANGO_UNUSED(Tango::PipeReqType type))
 {
-
-	//	Not any excluded states for compactSources attribute in read access.
-	/*----- PROTECTED REGION ID(SFinder::compactSourcesStateAllowed_READ) ENABLED START -----*/
+	//	Not any excluded states for compactSourcesPipe pipe in read access.
+	/*----- PROTECTED REGION ID(SFinder::compactSourcesPipeStateAllowed_READ) ENABLED START -----*/
 	
-	/*----- PROTECTED REGION END -----*/	//	SFinder::compactSourcesStateAllowed_READ
+	/*----- PROTECTED REGION END -----*/	//	SFinder::compactSourcesPipeStateAllowed_READ
 	return true;
 }
-
-//--------------------------------------------------------
-/**
- *	Method      : SFinder::is_extendedSources_allowed()
- *	Description : Execution allowed for extendedSources attribute
- */
-//--------------------------------------------------------
-bool SFinder::is_extendedSources_allowed(TANGO_UNUSED(Tango::AttReqType type))
-{
-
-	//	Not any excluded states for extendedSources attribute in read access.
-	/*----- PROTECTED REGION ID(SFinder::extendedSourcesStateAllowed_READ) ENABLED START -----*/
-	
-	/*----- PROTECTED REGION END -----*/	//	SFinder::extendedSourcesStateAllowed_READ
-	return true;
-}
-
 
 //=================================================
 //		Commands Allowed Methods
@@ -740,6 +741,21 @@ bool SFinder::is_Configure_allowed(TANGO_UNUSED(const CORBA::Any &any))
 	/*----- PROTECTED REGION ID(SFinder::ConfigureStateAllowed) ENABLED START -----*/
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::ConfigureStateAllowed
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_RegisterMe_allowed()
+ *	Description : Execution allowed for RegisterMe attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_RegisterMe_allowed(TANGO_UNUSED(const CORBA::Any &any))
+{
+	//	Not any excluded states for RegisterMe command.
+	/*----- PROTECTED REGION ID(SFinder::RegisterMeStateAllowed) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::RegisterMeStateAllowed
 	return true;
 }
 

@@ -83,6 +83,13 @@ class SFinder : public TANGO_BASE_CLASS
 		bool m_StopThreadFlag;	
 		omni_mutex* m_mutex;
 		SFinderThread* m_WorkerThread;
+
+		//Pipes/Blobs
+		Tango::DevicePipeBlob m_compactSourcesPipeBlob;
+		
+		//Broker group
+		Tango::Group* m_brokerGroup;
+
 		
 		//Bkg attributes
 		Tango::DevBoolean	attr_useLocalBkg_write;	
@@ -249,9 +256,8 @@ public:
 	Tango::DevLong	*attr_psMaxNPix_read;
 	Tango::DevBoolean	*attr_useBoundingBoxCut_read;
 	Tango::DevFloat	*attr_minBoundingBoxThr_read;
+	Tango::DevString	*attr_compactSourceData_read;
 	Tango::DevString	*attr_runProgress_read;
-	Tango::DevString	*attr_compactSources_read;
-	Tango::DevString	*attr_extendedSources_read;
 
 //	Constructors and destructors
 public:
@@ -634,6 +640,15 @@ public:
 	virtual void write_minBoundingBoxThr(Tango::WAttribute &attr);
 	virtual bool is_minBoundingBoxThr_allowed(Tango::AttReqType type);
 /**
+ *	Attribute compactSourceData related methods
+ *	Description: 
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Scalar
+ */
+	virtual void read_compactSourceData(Tango::Attribute &attr);
+	virtual bool is_compactSourceData_allowed(Tango::AttReqType type);
+/**
  *	Attribute runProgress related methods
  *	Description: Run progress info
  *               [0]: run id
@@ -647,33 +662,6 @@ public:
  */
 	virtual void read_runProgress(Tango::Attribute &attr);
 	virtual bool is_runProgress_allowed(Tango::AttReqType type);
-/**
- *	Attribute compactSources related methods
- *	Description: Source list
- *               [0]: run id
- *               [1]: source no. 1
- *               [2]: source no. 2
- *               ...
- *               [n] source no. n
- *
- *	Data type:	Tango::DevString
- *	Attr type:	Spectrum max = 1000000
- */
-	virtual void read_compactSources(Tango::Attribute &attr);
-	virtual bool is_compactSources_allowed(Tango::AttReqType type);
-/**
- *	Attribute extendedSources related methods
- *	Description: Extended source list
- *               [0]: run id
- *               [1]: source no. 1
- *               ...
- *               [N]: source no. N
- *
- *	Data type:	Tango::DevString
- *	Attr type:	Spectrum max = 1000000
- */
-	virtual void read_extendedSources(Tango::Attribute &attr);
-	virtual bool is_extendedSources_allowed(Tango::AttReqType type);
 
 
 	//--------------------------------------------------------
@@ -686,6 +674,11 @@ public:
 
 
 
+//	pipe related methods
+public:
+	//	Pipe compactSourcesPipe
+	bool is_compactSourcesPipe_allowed(Tango::PipeReqType);
+	void read_compactSourcesPipe(Tango::Pipe &);
 
 //	Command related methods
 public:
@@ -721,6 +714,14 @@ public:
 	 */
 	virtual Tango::DevVarLongStringArray *configure(Tango::DevString argin);
 	virtual bool is_Configure_allowed(const CORBA::Any &any);
+	/**
+	 *	Command RegisterMe related method
+	 *	Description: Register worker in brokers
+	 *
+	 *	@returns 
+	 */
+	virtual Tango::DevVarLongStringArray *register_me();
+	virtual bool is_RegisterMe_allowed(const CORBA::Any &any);
 
 
 	//--------------------------------------------------------
@@ -735,6 +736,7 @@ public:
 
 //	Additional Method prototypes
 	protected:
+		int InitBrokerGroup();
 		int LoadDefaultConfig();
 		int ApplyConfig(std::string& config);
 		int SetAttrFromConfig(Json::Value& optionObj);
