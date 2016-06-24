@@ -20,7 +20,7 @@ Install the project dependencies:
 * R [https://www.r-project.org/], install also these additional packages: RInside, Rcpp, rrcovHD, truncnorm, FNN, akima
 * log4cxx [https://logging.apache.org/log4cxx/]
 * boost [http://www.boost.org/]
-* python [https://www.python.org/]
+* python (>=2.7) [https://www.python.org/], install also these additional modules: pyfits
 * cmake (>=2.8) [https://cmake.org]  
   
 Make sure you have set the following environment variables to the external library installation dirs 
