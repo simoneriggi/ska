@@ -63,9 +63,23 @@ class Source : public Blob {
  		*/
 		Source();
 		/**
+		* \brief Copy constructor
+		*/
+		Source(const Source& source);
+		/**
 		* \brief Class destructor: free allocated memory
 		*/
 		virtual ~Source();
+
+		/**
+		* \brief Assignment Operator
+		*/
+		Source& operator=(const Source &source);
+		/**
+		* \brief Copy method
+		*/
+		void Copy(TObject& source) const;
+
 
 		enum SourceType {eUnknown=0,eCompact=1,ePointLike=2,eExtended=3};
 		enum SourceFlag {eReal=1,eCandidate=2,eFake=3};
@@ -109,6 +123,11 @@ class Source : public Blob {
 		*/
 		bool HasNestedSources(){return (m_HasNestedSources && m_NestedSources.size()>0);}
 		/**
+		* \brief Set has nested sources
+		*/
+		void SetHasNestedSources(bool val){m_HasNestedSources=val;}
+
+		/**
 		* \brief Get nested sources
 		*/
 		std::vector<Source*>& GetNestedSources(){return m_NestedSources;}
@@ -120,7 +139,7 @@ class Source : public Blob {
 		* \brief Get nested source
 		*/
 		Source* GetNestedSource(int index){
-			if(index<0 || index>=m_NestedSources.size() || m_NestedSources.size()==0) return 0;
+			if(index<0 || index>=(int)m_NestedSources.size() || m_NestedSources.size()==0) return 0;
 			return m_NestedSources[index];
 		}
 		/**
@@ -136,6 +155,9 @@ class Source : public Blob {
 		* \brief Get DS9 ellipse info
 		*/
 		const std::string GetDS9EllipseRegion(bool dumpNestedSourceInfo=false);
+
+	private:
+		void Init();
 
 	public:
 		int Type;
@@ -155,6 +177,7 @@ class Source : public Blob {
 		ClassDef(Source,1)
 
 	public:
+		/*
 		#ifdef BUILD_CAESAR_SERVER
 			MSGPACK_DEFINE(
 				MSGPACK_BASE(Blob),
@@ -162,8 +185,7 @@ class Source : public Blob {
 				m_DepthLevel,m_HasNestedSources
 			)
 		#endif
-//				m_NestedSource,m_NestedSources
-
+		*/
 };//close Source()
 
 typedef std::vector<Source*> SourceCollection;
@@ -177,6 +199,7 @@ typedef std::vector<Source*> SourceCollection;
 }//close namespace
 
 
+/*
 #ifdef BUILD_CAESAR_SERVER
 	#include <msgpack.hpp>
 
@@ -184,20 +207,6 @@ typedef std::vector<Source*> SourceCollection;
 	namespace msgpack {
 	MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
 		namespace adaptor {
-
-			/*
-			template<>
-			struct convert<Source> {
-    		msgpack::object const& operator()(msgpack::object const& o, Source& v) const {
-        	if (o.type != msgpack::type::ARRAY) throw msgpack::type_error();
-        	if (o.via.array.size != 2) throw msgpack::type_error();
-        	v = TVector2(
-            o.via.array.ptr[0].as<double>(),
-            o.via.array.ptr[1].as<double>());
-        	return o;
-    		}
-			};//close struct
-			*/
 	
 			template <>
 			struct pack<Caesar::Source*> {
@@ -226,6 +235,6 @@ typedef std::vector<Source*> SourceCollection;
 	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
 } // namespace msgpack
 #endif
-
+*/
 
 #endif

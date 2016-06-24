@@ -81,9 +81,21 @@ class Blob : public TObject {
  		*/
 		Blob();
 		/**
+		* \brief Copy constructor
+		*/
+		Blob(const Blob& blob);
+		/**
 		* \brief Class destructor: free allocated memory
 		*/
 		virtual ~Blob();
+		/**
+		* \brief Assignment Operator
+		*/
+		Blob& operator=(const Blob &blob);
+		/**
+		* \brief Copy method
+		*/
+		void Copy(TObject& blob) const;
 
 	public:
 		void SetId(int id){Id=id;}
@@ -118,30 +130,48 @@ class Blob : public TObject {
 		//Parameters
 		int ComputeStats(bool computeRobustStats=true,bool forceRecomputing=false);
 		bool HasStats(){return m_HasStats;}
+		void SetHasStats(bool value){m_HasStats=value;}
 		int ComputeMorphologyParams();
 		bool HasParameters(){return m_HasParameters;}
+		void SetHasParameters(bool value){m_HasParameters=value;}
 
 		double GetM1(){return m_M1;}
+		void SetM1(double value){m_M1=value;}
 		double GetM2(){return m_M2;}
+		void SetM2(double value){m_M2=value;}
 		double GetM3(){return m_M3;}
+		void SetM3(double value){m_M3=value;}
 		double GetM4(){return m_M4;}
-		double GetM1Curv(){return m_M1_curv;}
+		void SetM4(double value){m_M4=value;}
+		double GetM1Curv(){return m_M1_curv;}	
+		void SetM1Curv(double value){m_M1_curv=value;}
 		double GetM2Curv(){return m_M2_curv;}
+		void SetM2Curv(double value){m_M2_curv=value;}
 
 		double GetS(){return m_S;}
+		void SetS(double value){m_S=value;}
 		double GetSmax(){return m_Smax;}
+		void SetSmax(double value){m_Smax=value;}
 		double GetSmin(){return m_Smin;}
+		void SetSmin(double value){m_Smin=value;}
 		double GetSxx(){return m_Sxx;}
+		void SetSxx(double value){m_Sxx=value;}
 		double GetSyy(){return m_Syy;}
+		void SetSyy(double value){m_Syy=value;}
 		double GetSxy(){return m_Sxy;}
+		void SetSxy(double value){m_Sxy=value;}
 		double GetSx(){return m_Sx;}
+		void SetSx(double value){m_Sx=value;}
 		double GetSy(){return m_Sy;}
+		void SetSy(double value){m_Sy=value;}
 		long int GetSmaxPixId() {return m_PixIdmax;}
+		void SetSmaxPixId(long int value){m_PixIdmax=value;}
 		long int GetSminPixId() {return m_PixIdmin;}
+		void SetSminPixId(long int value){m_PixIdmin=value;}
 		double GetScurv(){return m_S_curv;}
-		double GetSedge(){return m_S_edge;}
-		
-		
+		void SetScurv(double value){m_S_curv=value;}
+		double GetSedge(){return m_S_edge;}		
+		void SetSedge(double value){m_S_edge=value;}
 		
 		//Image setters/getters
 		void SetImageRange(double xmin,double xmax,double ymin,double ymax){
@@ -178,11 +208,25 @@ class Blob : public TObject {
 			ymin= m_Ymin;
 			ymax= m_Ymax;
 		}
+		void SetSourceRange(double xmin,double xmax,double ymin,double ymax){
+			m_Xmin= xmin; 
+			m_Xmax= xmax;
+			m_Ymin= ymin;
+			m_Ymax= ymax;
+		}
+
 		void GetSourcePixelRange(long int& ixmin,long int& ixmax,long int& iymin,long int& iymax){
 			ixmin= m_Ix_min; 
 			ixmax= m_Ix_max;
 			iymin= m_Iy_min;
 			iymax= m_Iy_max;
+		}
+
+		void SetSourcePixelRange(long int ixmin,long int ixmax,long int iymin,long int iymax){
+			m_Ix_min= ixmin; 
+			m_Ix_max= ixmax;
+			m_Iy_min= iymin;
+			m_Iy_max= iymax;
 		}
 
 		/**
@@ -202,7 +246,19 @@ class Blob : public TObject {
 		* \brief Return contours
 		*/
 		std::vector<Contour*> GetContours(){return m_Contours;}
-		
+		/**
+		* \brief Return contour with index
+		*/
+		Contour* GetContour(int index) {
+			if(index<0 || index>=(int)m_Contours.size() ) return 0;
+			return m_Contours[index];
+		}
+		/**
+		* \brief Add contour
+		*/
+		void AddContour(Contour* aContour){
+			m_Contours.push_back(aContour);
+		}
 
 	private:
 		//Init functions
@@ -304,6 +360,7 @@ class Blob : public TObject {
 	ClassDef(Blob,1)
 
 	public:
+		/*
 		#ifdef BUILD_CAESAR_SERVER
 			MSGPACK_DEFINE(
 				HasPixelsAtEdge,Id,Name,
@@ -321,7 +378,7 @@ class Blob : public TObject {
 				m_Pixels
 			);
 		#endif
-
+		*/
 
 };//close Blob()
 

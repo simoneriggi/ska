@@ -70,7 +70,7 @@ SourceFinder::SourceFinder() {
 
 SourceFinder::~SourceFinder(){
 	
-	if(m_SourceTree) m_SourceTree->Delete();
+	//if(m_SourceTree) m_SourceTree->Delete();
 	if(m_OutputFile) m_OutputFile->Close();
 	if(m_DS9CatalogFilePtr) fclose(m_DS9CatalogFilePtr);
 	//if(m_Application) m_Application->Delete();
@@ -947,6 +947,7 @@ int SourceFinder::Save(){
 		
 		DEBUG_LOG("Closing DS9 file region...");
 		fclose(m_DS9CatalogFilePtr);
+		m_DS9CatalogFilePtr= 0;
 	}//close if SaveDS9Region()
 
 

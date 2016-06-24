@@ -26,6 +26,7 @@
 */
 
 #include <Pixel.h>
+#include <Logger.h>
 
 #include <TObject.h>
 
@@ -48,7 +49,7 @@ ClassImp(Caesar::Pixel)
 
 namespace Caesar {
 
-Pixel::Pixel() {
+Pixel::Pixel() : TObject() {
 	
 	Init();
 	
@@ -60,6 +61,39 @@ Pixel::~Pixel(){
 
 }//close destructor
 
+
+Pixel::Pixel(const Pixel& pixel) : TObject(pixel) {
+  // Contour copy constructor
+	DEBUG_LOG("Copy constuctor called...");
+  Init();
+  ((Pixel&)pixel).Copy(*this);
+}
+
+
+void Pixel::Copy(TObject &obj) const {
+
+	TObject::Copy((Pixel&)obj);
+  ((Pixel&)obj).id = id;
+	((Pixel&)obj).type = type;
+	((Pixel&)obj).S = S;
+	((Pixel&)obj).x = x;
+	((Pixel&)obj).y = y;
+	((Pixel&)obj).ix = ix;
+	((Pixel&)obj).iy = iy;
+	((Pixel&)obj).isOnEdge = isOnEdge;
+	((Pixel&)obj).distanceToEdge = distanceToEdge;
+	((Pixel&)obj).S_curv = S_curv;
+	((Pixel&)obj).S_edge = S_edge;
+	((Pixel&)obj).bkgLevel = bkgLevel;
+	((Pixel&)obj).noiseLevel = noiseLevel;
+
+}//close Copy()
+
+Pixel& Pixel::operator=(const Pixel& pixel) { 
+	// Operator =
+  if (this != &pixel)  ((Pixel&)pixel).Copy(*this);
+  return *this;
+}
 
 void Pixel::Init(){
 

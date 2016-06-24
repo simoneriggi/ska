@@ -53,7 +53,61 @@ ClassImp(Caesar::Source)
 
 namespace Caesar {
 
-Source::Source() {
+
+Source::Source() : Blob() {
+
+	Init();
+
+}//close costructor
+
+Source::~Source(){
+	
+}//close destructor
+
+
+Source::Source(const Source& source) : Blob() {
+  // Contour copy constructor
+	DEBUG_LOG("Copy constuctor called...");
+  Init();
+  ((Source&)source).Copy(*this);
+}
+
+void Source::Copy(TObject &obj) const {
+
+	// Copy this source to source obj
+	Blob::Copy((Source&)obj);
+  ((Source&)obj).Type = Type;
+	((Source&)obj).Flag = Flag;	
+	((Source&)obj).m_BeamFluxIntegral = m_BeamFluxIntegral;
+	((Source&)obj).m_IsGoodSource = m_IsGoodSource;	
+	((Source&)obj).m_DepthLevel = m_DepthLevel;
+	((Source&)obj).m_HasNestedSources = m_HasNestedSources;
+	
+	//Delete first a previously existing vector
+	for(unsigned int i=0;i<(((Source&)obj).m_NestedSources).size();i++){
+		if( (((Source&)obj).m_NestedSources)[i] ){
+			delete (((Source&)obj).m_NestedSources)[i];
+			(((Source&)obj).m_NestedSources)[i]= 0;
+		}
+	}
+	(((Source&)obj).m_NestedSources).clear();
+
+	((Source&)obj).m_NestedSource= 0;
+	for(unsigned int i=0;i<m_NestedSources.size();i++){
+		((Source&)obj).m_NestedSource= new Source;
+		*(((Source&)obj).m_NestedSource)= *(m_NestedSources[i]);
+		(((Source&)obj).m_NestedSources).push_back( ((Source&)obj).m_NestedSource );
+	}
+
+}//close Copy()
+
+Source& Source::operator=(const Source& source) { 
+	// Operator =
+  if (this != &source)  ((Source&)source).Copy(*this);
+  return *this;
+}
+
+void Source::Init(){
 
 	Type= eUnknown;
 	Flag= eCandidate;
@@ -66,11 +120,7 @@ Source::Source() {
 	m_NestedSource= 0;
 	m_NestedSources.clear();
 
-}//close costructor
-
-Source::~Source(){
-	
-}//close destructor
+}//close Init()
 
 
 void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int lineColor){

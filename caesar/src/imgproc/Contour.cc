@@ -55,7 +55,100 @@ ClassImp(Caesar::Contour)
 
 namespace Caesar {
 
-Contour::Contour(){
+Contour::Contour() : TObject() {
+
+	Init();
+
+}//close costructor
+
+
+Contour::~Contour(){
+
+}//close destructor
+
+
+Contour::Contour(const Contour& contour) : TObject(contour) {
+  // Contour copy constructor
+	DEBUG_LOG("Copy constuctor called...");
+  Init();
+  ((Contour&)contour).Copy(*this);
+}
+
+
+void Contour::Copy(TObject &obj) const {
+   
+	// Copy this contour to contour
+  TObject::Copy((Contour&)obj);
+  ((Contour&)obj).HasParameters = HasParameters;
+  ((Contour&)obj).Area = Area;
+  ((Contour&)obj).Perymeter = Perymeter;
+  ((Contour&)obj).IsConvexContour = IsConvexContour;
+	((Contour&)obj).CircularityRatio = CircularityRatio;
+	((Contour&)obj).BoundingBoxCenter = BoundingBoxCenter;
+	((Contour&)obj).BoundingBoxMaj = BoundingBoxMaj;
+	((Contour&)obj).BoundingBoxMin = BoundingBoxMin;
+	((Contour&)obj).BoundingBoxAngle = BoundingBoxAngle;
+	((Contour&)obj).Elongation = Elongation;
+	((Contour&)obj).Rectangularity = Rectangularity;
+	((Contour&)obj).Roundness = Roundness;
+	((Contour&)obj).Eccentricity = Eccentricity;
+	((Contour&)obj).TiltAngle = TiltAngle;
+	((Contour&)obj).HasEllipseFit = HasEllipseFit;
+	((Contour&)obj).EllipseCenter = EllipseCenter;
+	((Contour&)obj).EllipseMajAxis = EllipseMajAxis;
+	((Contour&)obj).EllipseMinAxis = EllipseMinAxis;
+	((Contour&)obj).EllipseRotAngle = EllipseRotAngle;
+	((Contour&)obj).EllipseFitRedChi2 = EllipseFitRedChi2;
+	((Contour&)obj).EllipseAreaRatio = EllipseAreaRatio;
+
+	((Contour&)obj).m00 = m00;	
+	((Contour&)obj).m10 = m10;
+	((Contour&)obj).m01 = m01;
+	((Contour&)obj).m20 = m20;
+	((Contour&)obj).m11 = m11;
+	((Contour&)obj).m02 = m02;
+	((Contour&)obj).m30 = m30;
+	((Contour&)obj).m21 = m21;
+	((Contour&)obj).m12 = m12;
+	((Contour&)obj).m03 = m03;
+	
+	((Contour&)obj).mu20 = mu20;
+	((Contour&)obj).mu11 = mu11;
+	((Contour&)obj).mu02 = mu02;
+	((Contour&)obj).mu30 = mu30;
+	((Contour&)obj).mu21 = mu21;
+	((Contour&)obj).mu12 = mu12;
+	((Contour&)obj).mu03 = mu03;
+	
+	((Contour&)obj).nu20 = nu20;
+	((Contour&)obj).nu11 = nu11;
+	((Contour&)obj).nu02 = nu02;
+	((Contour&)obj).nu30 = nu30;
+	((Contour&)obj).nu21 = nu21;
+	((Contour&)obj).nu12 = nu12;
+	((Contour&)obj).nu03 = nu03;
+
+	((Contour&)obj).HuMoments = HuMoments;
+	((Contour&)obj).BoundingBoxVertex = BoundingBoxVertex;
+	((Contour&)obj).Centroid = Centroid;
+	((Contour&)obj).RealFDs = RealFDs;
+	((Contour&)obj).ImagFDs = ImagFDs;
+	((Contour&)obj).ModFDs = ModFDs;
+	((Contour&)obj).BendingEnergies = BendingEnergies;
+	((Contour&)obj).CentroidDistanceModFDs = CentroidDistanceModFDs;
+
+	((Contour&)obj).m_Points = m_Points;
+
+}//close Copy()
+
+Contour& Contour::operator=(const Contour& contour) { 
+	// Operator =
+  if (this != &contour)  ((Contour&)contour).Copy(*this);
+  return *this;
+}
+
+
+void Contour::Init(){
 
 	m_Points.clear();	
 	HasParameters= false;	
@@ -87,14 +180,7 @@ Contour::Contour(){
 	ImagFDs.clear();
 	ModFDs.clear();
 
-
-}//close costructor
-
-
-Contour::~Contour(){
-
-}//close destructor
-
+}//close Init()
 
 TGraph* Contour::GetGraph(){
 

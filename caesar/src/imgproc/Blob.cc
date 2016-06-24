@@ -61,7 +61,7 @@ ClassImp(Caesar::Blob)
 
 namespace Caesar {
 
-Blob::Blob() {
+Blob::Blob() : TObject() {
 
 	Init();
 	
@@ -73,6 +73,128 @@ Blob::~Blob(){
 	ClearContours();	
 
 }//close destructor
+
+
+Blob::Blob(const Blob& blob) : TObject(blob) {
+  // Contour copy constructor
+	DEBUG_LOG("Copy constuctor called...");
+  Init();
+  ((Blob&)blob).Copy(*this);
+}
+
+
+void Blob::Copy(TObject &obj) const {
+
+	// Copy this blob to blob
+  TObject::Copy((Blob&)obj);
+  ((Blob&)obj).HasPixelsAtEdge = HasPixelsAtEdge;
+	((Blob&)obj).Id = Id;
+	((Blob&)obj).Name = Name;
+	((Blob&)obj).NPix = NPix;
+	((Blob&)obj).Mean = Mean;
+	((Blob&)obj).RMS = RMS;
+	((Blob&)obj).Skewness = Skewness;
+	((Blob&)obj).Median = Median;
+	((Blob&)obj).MedianRMS = MedianRMS;
+	((Blob&)obj).X0 = X0;
+	((Blob&)obj).Y0 = Y0;
+	((Blob&)obj).Mean_curv = Mean_curv;
+	((Blob&)obj).RMS_curv = RMS_curv;
+	((Blob&)obj).Median_curv = Median_curv;
+	((Blob&)obj).MedianRMS_curv = MedianRMS_curv;
+	((Blob&)obj).Moments = Moments;
+	((Blob&)obj).HuMoments = HuMoments;
+	((Blob&)obj).ZMMoments = ZMMoments;
+
+	((Blob&)obj).m_HasStats = m_HasStats;
+	((Blob&)obj).m_HasParameters = m_HasParameters;
+	((Blob&)obj).m_M1 = m_M1;
+	((Blob&)obj).m_M2 = m_M2;
+	((Blob&)obj).m_M3 = m_M3;
+	((Blob&)obj).m_M4 = m_M4;
+	((Blob&)obj).m_M1_curv = m_M1_curv;
+	((Blob&)obj).m_M2_curv = m_M2_curv;
+	((Blob&)obj).m_S = m_S;
+	((Blob&)obj).m_Smax = m_Smax;
+	((Blob&)obj).m_Smin = m_Smin;
+	((Blob&)obj).m_Sxx = m_Sxx;
+	((Blob&)obj).m_Syy = m_Syy;
+	((Blob&)obj).m_Sxy = m_Sxy;
+	((Blob&)obj).m_Sx = m_Sx;
+	((Blob&)obj).m_Sy = m_Sy;
+	((Blob&)obj).m_PixIdmax = m_PixIdmax;
+	((Blob&)obj).m_PixIdmin = m_PixIdmin;
+	((Blob&)obj).m_S_curv = m_S_curv;
+	((Blob&)obj).m_S_edge = m_S_edge;
+
+	((Blob&)obj).m_ImageSizeX = m_ImageSizeX;
+	((Blob&)obj).m_ImageSizeY = m_ImageSizeY;
+	((Blob&)obj).m_ImageMinX = m_ImageMinX;
+	((Blob&)obj).m_ImageMaxX = m_ImageMaxX;
+	((Blob&)obj).m_ImageMinY = m_ImageMinY;
+	((Blob&)obj).m_ImageMaxY = m_ImageMaxY;
+	((Blob&)obj).m_ImageMinS = m_ImageMinS;
+	((Blob&)obj).m_ImageMaxS = m_ImageMaxS;
+	((Blob&)obj).m_ImageMinScurv = m_ImageMinScurv;
+	((Blob&)obj).m_ImageMaxScurv = m_ImageMaxScurv;
+	((Blob&)obj).m_ImageMinSedge = m_ImageMinSedge;
+	((Blob&)obj).m_ImageMaxSedge = m_ImageMaxSedge;
+	((Blob&)obj).m_ImageRMS = m_ImageRMS;
+	
+	((Blob&)obj).m_Xmin = m_Xmin;
+	((Blob&)obj).m_Xmax = m_Xmax;
+	((Blob&)obj).m_Ymin = m_Ymin;
+	((Blob&)obj).m_Ymax = m_Ymax;
+	((Blob&)obj).m_Ix_min = m_Ix_min;
+	((Blob&)obj).m_Ix_max = m_Ix_max;
+	((Blob&)obj).m_Iy_min = m_Iy_min;
+	((Blob&)obj).m_Iy_max = m_Iy_max;
+	((Blob&)obj).HasPixelsAtEdge = HasPixelsAtEdge;
+	((Blob&)obj).HasPixelsAtEdge = HasPixelsAtEdge;
+				
+	//Copy pixel collection
+	//Delete first any existing collection
+	for(unsigned int i=0;i<(((Blob&)obj).m_Pixels).size();i++){
+		if( (((Blob&)obj).m_Pixels)[i] ){
+			delete (((Blob&)obj).m_Pixels)[i];
+			(((Blob&)obj).m_Pixels)[i]= 0;
+		}
+	}
+	(((Blob&)obj).m_Pixels).clear();
+
+	Pixel* aPixel= 0;
+	for(unsigned int i=0;i<m_Pixels.size();i++){
+		aPixel= new Pixel;
+		*aPixel= *(m_Pixels[i]);
+		(((Blob&)obj).m_Pixels).push_back(aPixel);
+	}
+
+		
+	//Copy contour collection
+	//Delete first any existing collection
+	for(unsigned int i=0;i<(((Blob&)obj).m_Contours).size();i++){
+		if( (((Blob&)obj).m_Contours)[i] ){
+			delete (((Blob&)obj).m_Contours)[i];
+			(((Blob&)obj).m_Contours)[i]= 0;
+		}
+	}
+	(((Blob&)obj).m_Contours).clear();
+
+	Contour* aContour= 0;
+	for(unsigned int i=0;i<m_Contours.size();i++){
+		aContour= new Contour;
+		*aContour= *(m_Contours[i]);
+		(((Blob&)obj).m_Contours).push_back(aContour);
+	}
+
+}//close Copy()
+
+Blob& Blob::operator=(const Blob& blob) { 
+	// Operator =
+  if (this != &blob)  ((Blob&)blob).Copy(*this);
+  return *this;
+}
+
 
 void Blob::Init(){
 

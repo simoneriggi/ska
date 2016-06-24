@@ -55,9 +55,6 @@
 
 using namespace std;
 
-#ifdef BUILD_CAESAR_SERVER
-//	MSGPACK_ADD_ENUM(PixelType);
-#endif
 
 namespace Caesar {
 
@@ -66,8 +63,27 @@ class Blob;
 class Pixel : public TObject {
 
 	public:
+		/** 
+		\brief Class constructor: initialize structures.
+ 		*/
 		Pixel();
+		/**
+		* \brief Copy constructor
+		*/
+		Pixel(const Pixel& pixel);
+		/**
+		* \brief Class destructor: free allocated memory
+		*/
 		virtual ~Pixel();
+
+		/**
+		* \brief Assignment Operator
+		*/
+		Pixel& operator=(const Pixel& pixel);
+		/**
+		* \brief Copy method
+		*/
+		void Copy(TObject& pixel) const;
 
 		enum PixelType {eNormal=1,eSeed=2,eHalo=3};
 
@@ -112,7 +128,8 @@ class Pixel : public TObject {
 
 	ClassDef(Pixel,1)
 
-	public:
+	/*
+	public:	
 		#ifdef BUILD_CAESAR_SERVER
 			MSGPACK_DEFINE(
 				id,type,S,x,y,ix,iy,isOnEdge,distanceToEdge,
@@ -120,6 +137,7 @@ class Pixel : public TObject {
 				bkgLevel,noiseLevel
 			)
 		#endif
+	*/
 };
 typedef std::vector<Pixel*> PixelCollection;
 typedef std::map<int,Pixel*> PixelMap;
@@ -129,11 +147,12 @@ typedef std::map<int,Pixel*> PixelMap;
 #pragma link C++ class Pixel+;
 #pragma link C++ class vector<Pixel*>+;
 #pragma link C++ class map<int,Pixel*>+;
+#pragma link C++ enum Pixel::PixelType+;
 #endif
 
 }//close namespace
 
-
+/*
 #ifdef BUILD_CAESAR_SERVER
 	MSGPACK_ADD_ENUM(Caesar::Pixel::PixelType);
 	
@@ -169,7 +188,7 @@ typedef std::map<int,Pixel*> PixelMap;
 	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
 } // namespace msgpack
 #endif
-
+*/
 
 #endif
 

@@ -258,8 +258,8 @@ int BkgFinder::ComputeLocalGridBkg(BkgData* bkgData,Img* img,int estimator,int b
 	}
 
 	//## Check options
-	int Nx= img->GetNbinsX();
-	int Ny= img->GetNbinsY();
+	long int Nx= img->GetNbinsX();
+	long int Ny= img->GetNbinsY();
 	if(boxSizeX<=0 || boxSizeX>=Nx || boxSizeY<=0 || boxSizeY>=Ny) {
 		ERROR_LOG("Invalid box size given (too small or larger than image size)!");
 		return -1;

@@ -58,6 +58,7 @@
 
 using namespace std;
 
+/*
 #ifdef BUILD_CAESAR_SERVER
 	#include <msgpack.hpp>
 
@@ -105,7 +106,7 @@ using namespace std;
 	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
 } // namespace msgpack
 #endif
-
+*/
 
 namespace Caesar {
 
@@ -117,13 +118,24 @@ class Contour : public TObject {
 		\brief Class constructor: initialize structures.
  		*/
     Contour();
-		
+		/**
+		* \brief Copy constructor
+		*/
+		Contour(const Contour& contour);
 		/**
 		* \brief Class destructor: free allocated memory
 		*/
     virtual ~Contour();
+		/**
+		* \brief Assignment Operator
+		*/
+		Contour& operator=(const Contour &contour);
+		/**
+		* \brief Copy method
+		*/
+		void Copy(TObject& contour) const;
 
-		//typedef std::vector<cv::Point2f> Points;
+				
 		typedef std::vector<TVector2> Points;
 		
 
@@ -226,6 +238,7 @@ class Contour : public TObject {
 		}
 
 	private:
+		void Init();
 		void ComputeArea();
 		void ComputePerymeter();
 		void ComputeCircularityRatio();
@@ -364,6 +377,7 @@ class Contour : public TObject {
 	ClassDef(Contour,1)
 
 	public:	
+		/*
 		#ifdef BUILD_CAESAR_SERVER
 			MSGPACK_DEFINE(
 				HasParameters,Area,Perymeter,IsConvexContour,CircularityRatio,
@@ -378,7 +392,7 @@ class Contour : public TObject {
 				m_Points
 			)
 		#endif
-
+		*/
 };//close class
 
 #ifdef __MAKECINT__
