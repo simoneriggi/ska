@@ -34,6 +34,8 @@
 #include <BkgFinder.h>
 #include <MorphFilter.h>
 #include <GraphicsUtils.h>
+#include <CodeUtils.h>
+#include <Logger.h>
 
 //WCSTOOLS
 #include <wcs.h>
@@ -82,6 +84,12 @@ enum WCSType {
 	eLINEAR= 5
 };
 
+enum ImgFilters {
+	eGausFilter= 1,
+	eGuidedFilter= 2,
+	eWaveletFilter= 3,
+	eLoGFilter= 4
+};
 
 class ImgMetaData : public TObject {
 
@@ -263,6 +271,9 @@ class ImgStats : public TObject {
 			clippedMedian= 0;
 			clippedRMS= 0;
 		}
+		void Log(std::string level="INFO"){
+			LOG(level,GetPrintable());
+		}
 		void Print(){
 			cout<<"*** IMG STATS ***"<<endl;
 			cout<<"N="<<n<<" min/max="<<min<<"/"<<max<<endl;
@@ -273,6 +284,18 @@ class ImgStats : public TObject {
 			cout<<"BiWeight Location: "<<bwLocation<<", Scale: "<<bwScale<<endl;		
 			cout<<"Clipped Median: "<<clippedMedian<<" MAD: "<<clippedRMS<<endl;
 			cout<<"*****************"<<endl;
+		}
+		std::string GetPrintable(){
+			std::stringstream ss;
+			ss<<"IMG STATS: ";
+			ss<<"N="<<n<<" min/max="<<min<<"/"<<max<<", ";
+			ss<<"Mean: "<<mean<<" +- "<<meanErr<<", ";
+			ss<<"RMS: "<<rms<<" +- "<<rmsErr<<", ";
+			ss<<"Skewness: "<<skewness<<" +- "<<skewnessErr<<", ";
+			ss<<"Median: "<<median<<", MAD: "<<medianRMS<<", ";
+			ss<<"BiWeight Location: "<<bwLocation<<", Scale: "<<bwScale<<", ";
+			ss<<"Clipped Median: "<<clippedMedian<<" MAD: "<<clippedRMS;
+			return ss.str();
 		}
 
 	public:			
@@ -426,8 +449,14 @@ class Img : public TH2F {
 		void PrintStats(){
 			if(!HasStats()) return;
 			m_Stats->Print();
-		}//close Img::DumpStats()
-		
+		}//close PrintStats()
+		/**
+		* \brief Print stats information 
+		*/
+		void LogStats(std::string level="INFO"){
+			if(!HasStats()) return;
+			m_Stats->Log(level);
+		}//close LogStats()
 
 		//== Meta-Data methods ==
     /**
@@ -442,7 +471,7 @@ class Img : public TH2F {
 		}
 		int SetMetaData(ImgMetaData* data) {
 			if(!data){
-				cerr<<"Img::SetMetaData(): ERROR: Null ptr to given metadata!"<<endl;
+				ERROR_LOG("Null ptr to given metadata!");
 				return -1;
 			}
 			m_MetaData= data;
@@ -517,6 +546,12 @@ class Img : public TH2F {
 		*/
 		int FindExtendedSource_CV(std::vector<Source*>&,BkgData* bkgData=0,int minPixels=10,bool findNegativeExcess=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1);
 
+		/**
+		* \brief Find extended sources with Hierarchical Clustering method
+		*/
+		int FindExtendedSource_HClust(std::vector<Source*>&,Img* saliencyImg,Img* edgeImg);
+
+
 		//== Filter methods ==
 		/**
 		* \brief Get guided filter image
@@ -572,17 +607,17 @@ class Img : public TH2F {
 		* \brief Clone image
 		*/
 		Img* GetCloned(std::string name,bool copyMetaData=true,bool resetStats=true){
-			cout<<"Img::GetCloned(): Start..."<<endl;
+			//cout<<"Img::GetCloned(): Start..."<<endl;
 			//Img* clone= (Img*)this->Clone(name.c_str());
 			Img* clone= new Img;
 			*clone= *this;
 			clone->SetNameTitle(name.c_str(),name.c_str());			
-			cout<<"Img::GetCloned(): After clone..."<<endl;
+			//cout<<"Img::GetCloned(): After clone..."<<endl;
 			//if(copyMetaData) clone->CopyMetaData(m_MetaData);	
 			if(!copyMetaData) clone->ClearMetaData();
-			cout<<"Img::GetCloned(): After copy meta data..."<<endl;			
+			//cout<<"Img::GetCloned(): After copy meta data..."<<endl;			
 			if(resetStats) clone->ResetImgStats(true,true);
-			cout<<"Img::GetCloned(): After reset stats..."<<endl;
+			//cout<<"Img::GetCloned(): After reset stats..."<<endl;
 			return clone;
 		}//close GetCloned()
 		/**
@@ -596,7 +631,7 @@ class Img : public TH2F {
 		/**
 		* \brief Returns a residual image obtained by dilating given sources with a random background
 		*/
-		Img* GetSourceResidual(std::vector<Source*>const& sources,int KernSize=5,int dilateModel=MorphFilter::eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,BkgData* bkgData=0,bool useLocalBkg=false);
+		Img* GetSourceResidual(std::vector<Source*>const& sources,int KernSize=5,int dilateModel=MorphFilter::eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,BkgData* bkgData=0,bool useLocalBkg=false,bool randomize=false,double zThr=20);
 
 		//== Drawing methods
 		/**

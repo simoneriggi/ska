@@ -29,6 +29,7 @@
 
 #include <Img.h>
 
+
 //== IO headers
 #include <FITSReader.h>
 #include <FITSWriter.h>
@@ -55,6 +56,8 @@
 #include <GradientFilter.h>
 #include <MorphFilter.h>
 #include <SaliencyFilter.h>
+
+#include <Logger.h>
 
 #include <TFile.h>
 #include <TH2F.h>
@@ -122,19 +125,18 @@ Img::Img(const char *name,const char *title,int nbinsx,const float *xbins,int nb
 
 Img::Img(const Img &img) : TH2F() {
 	// Copy constructor
-	cout<<"Img::Img(): INFO: Copy constuctor called..."<<endl;
+	DEBUG_LOG("Copy constuctor called...");
   ((Img&)img).Copy(*this);
-	cout<<"done!"<<endl;
 }//close constructor
 
 
 void Img::Copy(TObject& obj) const
 {
-	cout<<"Img::Copy(): INFO: Copying image "<<((Img&)obj).GetName()<<"..."<<endl;
+	//cout<<"Img::Copy(): INFO: Copying image "<<((Img&)obj).GetName()<<"..."<<endl;
 	TH2F::Copy((Img&)obj);
-	cout<<"done!"<<endl;
+	//cout<<"done!"<<endl;
 
-	cout<<"Img::Copy(): INFO: Copying private vars..."<<endl;
+	//cout<<"Img::Copy(): INFO: Copying private vars..."<<endl;
 	((Img&)obj).m_HasMetaData= m_HasMetaData;
 	((Img&)obj).m_HasStats= m_HasStats;
 	((Img&)obj).m_Npix= m_Npix;
@@ -144,20 +146,20 @@ void Img::Copy(TObject& obj) const
 	((Img&)obj).m_M4= m_M4;
 	((Img&)obj).m_PixelMin= m_PixelMin;
 	((Img&)obj).m_PixelMax= m_PixelMax;
-	cout<<"done!"<<endl;
+	//cout<<"done!"<<endl;
 
-	cout<<"Img::Copy(): INFO: Copying meta data..."<<endl;
+	//cout<<"Img::Copy(): INFO: Copying meta data..."<<endl;
 	if(m_MetaData){
 		((Img&)obj).m_MetaData= new ImgMetaData;
 		*((Img&)obj).m_MetaData = *m_MetaData;
 	}
-	cout<<"done!"<<endl;
-	cout<<"Img::Copy(): INFO: Copying stats data..."<<endl;
+	//cout<<"done!"<<endl;
+	//cout<<"Img::Copy(): INFO: Copying stats data..."<<endl;
 	if(m_Stats){
-		((Img&)obj).m_Stats=new ImgStats;
+		((Img&)obj).m_Stats= new ImgStats;
 		*((Img&)obj).m_Stats = *m_Stats;
 	}
-	cout<<"done!"<<endl;
+	//cout<<"done!"<<endl;
 	
 
 	
@@ -167,22 +169,16 @@ void Img::Copy(TObject& obj) const
 
 Img::~Img(){
 
-	cout<<"Img::~Img(): INFO: Deleting stats?"<<endl;
 	if(m_Stats){
-		cout<<"Img::~Img(): INFO: Deleting stats..."<<endl;		
+		DEBUG_LOG("Deleting stats...");	
 		delete m_Stats;
-		cout<<"Img::~Img(): INFO: Set stats to 0..."<<endl;			
 		m_Stats= 0;
-		cout<<"done!"<<endl;
 	}
 
-	cout<<"Img::~Img(): INFO: Deleting meta-data?"<<endl;
 	if(m_MetaData){
-		cout<<"Img::~Img(): INFO: Deleting meta-data..."<<endl;
+		DEBUG_LOG("Deleting meta-data...");
 		delete m_MetaData;
-		cout<<"Img::~Img(): INFO: Set meta-data to 0..."<<endl;
 		m_MetaData= 0;	
-		cout<<"done!"<<endl;
 	}	
  	
 }//close destructor
@@ -236,7 +232,7 @@ int Img::FillPixel(double x,double y,double w,bool useNegativePixInStats){
 		double w_old= GetBinContent(bin);
 
 		if( w_old!=0 ){//bin already filled
-			cerr<<"Img::FillPixel(): WARN: Pixel "<<bin<<" ("<<ix<<","<<iy<<") has been already filled (w="<<w_old<<"), skipping..."<<endl;
+			WARN_LOG("Pixel "<<bin<<" ("<<ix<<","<<iy<<") has been already filled (w="<<w_old<<"), skipping...");
 			return -1;
 		}//close if
 		else{
@@ -408,7 +404,7 @@ int Img::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool force
 		m_Stats= new Caesar::ImgStats;
 	}
 	else{		
-		cerr<<"Img::ComputeStats(): WARN: Image has already stats computed..."<<endl;
+		WARN_LOG("Image has already stats computed...");
 	}
 
 	//## If recomputing is not requested (i.e. some pixels has been reset by the user, just set the stats params!
@@ -419,7 +415,7 @@ int Img::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool force
 	}
 
 	//## Recompute the moments and stats params
-	cout<<"Img::ComputeStats(): INFO: Recomputing stats..."<<endl;	
+	INFO_LOG("Recomputing image stats...");
 
 	//--> Reset stats
 	ResetImgStats(true);
@@ -457,31 +453,19 @@ Img* Img::GetTile(int ix_min,int ix_max,int iy_min,int iy_max){
 	//## Check tile sizes
 	std::string errflag= "";
 	if(ix_min<0 || ix_min>=Nx || ix_min>ix_max){
-		std::stringstream errMsg;
-		errMsg<<"Invalid min tile X given ("<<ix_min<<")";
-		errflag= errMsg.str();
-		cerr<<"Img::GetTile(): ERROR: "<<errflag<<endl;
+		ERROR_LOG("Invalid min tile X given ("<<ix_min<<")");
 		return 0;
 	}
 	if(ix_max<0 || ix_max>=Nx || ix_max<ix_min){
-		std::stringstream errMsg;
-		errMsg<<"Invalid max tile X given ("<<ix_max<<")";
-		errflag= errMsg.str();
-		cerr<<"Img::GetTile(): ERROR: "<<errflag<<endl;
+		ERROR_LOG("Invalid max tile X given ("<<ix_max<<")");
 		return 0;
 	}
 	if(iy_min<0 || iy_min>=Ny || iy_min>iy_max){
-		std::stringstream errMsg;
-		errMsg<<"Invalid min tile Y given ("<<iy_min<<")";
-		errflag= errMsg.str();
-		cerr<<"Img::GetTile(): ERROR: "<<errflag<<endl;
+		ERROR_LOG("Invalid min tile Y given ("<<iy_min<<")");
 		return 0;
 	}
 	if(iy_max<0 || iy_max>=Ny || iy_max<iy_min){
-		std::stringstream errMsg;
-		errMsg<<"Invalid max tile Y given ("<<iy_max<<")";
-		errflag= errMsg.str();
-		cerr<<"Img::GetTile(): ERROR: "<<errflag<<endl;
+		ERROR_LOG("Invalid max tile Y given ("<<iy_max<<")");
 		return 0;
 	}
 
@@ -522,10 +506,10 @@ Img* Img::GetTile(int ix_min,int ix_max,int iy_min,int iy_max){
 BkgData* Img::ComputeBkg(int estimator,bool computeLocalBkg,int boxSizeX,int boxSizeY, double gridStepSizeX,double gridStepSizeY,bool use2ndPass,bool skipOutliers,double seedThr,double mergeThr,int minPixels){
 	
 	//## Compute bkg data
-	cout<<"Img::ComputeBkg(): INFO: Using grid method..."<<endl;
+	DEBUG_LOG("Using grid bkg method...");
 	BkgData* bkgData= BkgFinder::FindBkg(this,estimator,computeLocalBkg, boxSizeX, boxSizeY, gridStepSizeX,gridStepSizeY,use2ndPass,skipOutliers,seedThr,mergeThr,minPixels);	
 	if(!bkgData){
-		cerr<<"Img::ComputeBkg(): ERROR: Computation of local background failed for this image!"<<endl;
+		ERROR_LOG("Computation of local background failed for this image!");
 		return 0;
 	}
 	return bkgData;
@@ -536,7 +520,7 @@ Img* Img::GetSignificanceMap(BkgData* bkgData,bool useLocalBkg){
 
 	//Check image
 	if(!bkgData){
-		cerr<<"Img::GetSignificanceMap(): ERROR: Null ptr to bkg data!"<<endl;
+		ERROR_LOG("Null ptr to bkg data!");
 		return 0;
 	}
 	//Integrity check for local bkg
@@ -544,7 +528,7 @@ Img* Img::GetSignificanceMap(BkgData* bkgData,bool useLocalBkg){
 	int Ny= this->GetNbinsY();
 	if(useLocalBkg){
 		if(!bkgData->HasLocalBkg()){
-			cerr<<"Img::GetSignificanceMap(): ERROR: Local bkg option requested but no local bkg data are available!"<<endl;	
+			ERROR_LOG("Local bkg option requested but no local bkg data are available!");
 			return 0;
 		}
 		if( Nx!=(bkgData->BkgMap)->GetNbinsX() || Ny!=(bkgData->BkgMap)->GetNbinsY() ||
@@ -606,7 +590,7 @@ int Img::FindCompactSource(std::vector<Source*>& sources,Img* floodImg,BkgData* 
 	//Find sources
 	int status= BlobFinder::FindBlobs(this,sources,floodImg,bkgData,seedThr,mergeThr,minPixels,findNegativeExcess,mergeBelowSeed);
 	if(status<0){
-		cerr<<"Img::FindCompactSource(): ERROR: Blob finder failed!"<<endl;
+		ERROR_LOG("Blob finder failed!");
 		for(unsigned int k=0;k<sources.size();k++){
 			if(sources[k]){
 				delete sources[k];
@@ -621,7 +605,7 @@ int Img::FindCompactSource(std::vector<Source*>& sources,Img* floodImg,BkgData* 
 	if(findNestedSources && sources.size()>0){
 		int status= FindNestedSource(sources,bkgData,minPixels,nestedBlobThreshold);
 		if(status<0){
-			cerr<<"Img::FindCompactSource(): WARN: Nested source search failed!"<<endl;
+			WARN_LOG("Nested source search failed!");
 		}
 	}//close if
 
@@ -636,20 +620,20 @@ int Img::FindNestedSource(std::vector<Source*>& sources,BkgData* bkgData,int min
 	//Check if given mother source list is empty
 	int nSources= (int)sources.size();
 	if(nSources<=0){
-		cout<<"Img::FindNestedSource(): WARN: Empty source list given!"<<endl;
+		WARN_LOG("Empty source list given!");
 		return 0;
 	}
 
 	//Find image mask of found sources
 	Img* sourceMask= this->GetSourceMask(sources,false);
 	if(!sourceMask){
-		cerr<<"Img::FindNestedSource(): ERROR: Null ptr to computed source mask!"<<endl;
+		ERROR_LOG("Null ptr to computed source mask!");
 		return -1;
 	}
 
 	Img* curvMap= this->GetLaplacianImage(true);
 	if(!curvMap){
-		cerr<<"Img::FindNestedSource(): ERROR: Null ptr to computed curvature mask!"<<endl;
+		ERROR_LOG("Null ptr to computed curvature mask!");
 		if(sourceMask) sourceMask->Delete();
 		return -1;
 	}
@@ -658,7 +642,7 @@ int Img::FindNestedSource(std::vector<Source*>& sources,BkgData* bkgData,int min
 	double curvMapThr= curvMapRMS*nestedBlobThreshold;
 	Img* blobMask= curvMap->GetBinarizedImage(curvMapThr);
 	if(!blobMask){
-		cerr<<"Img::FindNestedSource(): ERROR: Failed to compute blob mask!"<<endl;
+		ERROR_LOG("Failed to compute blob mask!");
 		if(sourceMask) sourceMask->Delete();
 		if(curvMap) curvMap->Delete();
 		return -1;
@@ -690,7 +674,7 @@ int Img::FindNestedSource(std::vector<Source*>& sources,BkgData* bkgData,int min
 	//Find blob+source mask
 	Img* sourcePlusBlobMask= sourceMask->GetMask(blobMask,true);
 	if(!sourcePlusBlobMask){
-		cerr<<"Img::FindNestedSource(): ERROR: Failed to compute (source+blob) mask!"<<endl;
+		ERROR_LOG("Failed to compute (source+blob) mask!");
 		if(sourceMask) sourceMask->Delete();
 		if(curvMap) curvMap->Delete();
 		if(blobMask) blobMask->Delete();
@@ -702,7 +686,7 @@ int Img::FindNestedSource(std::vector<Source*>& sources,BkgData* bkgData,int min
 	double fgValue= 1;
 	int status= BlobFinder::FindBlobs(this,NestedSources,sourcePlusBlobMask,bkgData,fgValue,fgValue,minPixels,false,false);
 	if(status<0){
-		cerr<<"Img::FindNestedSource(): ERROR: Nested blob finder failed!"<<endl;
+		ERROR_LOG("Nested blob finder failed!");
 		if(sourceMask) sourceMask->Delete();
 		if(blobMask) blobMask->Delete();
 		if(curvMap) curvMap->Delete();
@@ -720,18 +704,18 @@ int Img::FindNestedSource(std::vector<Source*>& sources,BkgData* bkgData,int min
 	//Add nested sources to mother source
 	int nNestedSources= (int)NestedSources.size();
 	if(nNestedSources>=0){
-		cout<<"Img::FindNestedSource(): INFO: #"<<nNestedSources<<" nested sources found!"<<endl;
+		INFO_LOG("#"<<nNestedSources<<" nested sources found!");
 
 		//## Find matching between mother and nested sources
 		for(int j=0;j<nNestedSources;j++){
 			bool isMotherFound= false;
-			cout<<"Img::FindNestedSource(): INFO: Finding matching for nested source no. "<<j<<endl;
+			DEBUG_LOG("Finding matching for nested source no. "<<j);
 			
 			for(int i=0;i<nSources;i++){
 				int sourceId= sources[i]->Id;
 				bool isInside= NestedSources[j]->IsInsideSource(sources[i]);
 				if(isInside){
-					cout<<"Img::FindCompactSource(): INFO: Nested source no. "<<j<<" added to source id="<<sourceId<<" ..."<<endl;
+					DEBUG_LOG("Nested source no. "<<j<<" added to source id="<<sourceId<<" ...");
 					NestedSources[j]->ComputeStats();
 					NestedSources[j]->ComputeMorphologyParams();
 					sources[i]->AddNestedSource(NestedSources[j]);
@@ -740,7 +724,7 @@ int Img::FindNestedSource(std::vector<Source*>& sources,BkgData* bkgData,int min
 				}
 			}//end loop mother sources
 			if(!isMotherFound){
-				cerr<<"Img::FindCompactSource(): WARN: Cannot find mother source for nested source no. "<<j<<"!"<<endl;
+				WARN_LOG("Cannot find mother source for nested source no. "<<j<<"!");
 				NestedSources[j]->Print();
 			}			
 		}//end loop nested sources							
@@ -762,7 +746,7 @@ int Img::FindExtendedSource_CV(std::vector<Source*>& sources,BkgData* bkgData,in
 	//## Compute segmented image
 	Img* segmentedImg= ChanVeseSegmenter::FindSegmentation(this,false,dt,h,lambda1,lambda2,mu,nu,p);
 	if(!segmentedImg){
-		cerr<<"Img::FindExtendedSource_CV(): ERROR: Failed to compute ChanVese image segmentation!"<<endl;
+		ERROR_LOG("Failed to compute ChanVese image segmentation!");
 		return -1;
 	}
 	
@@ -770,7 +754,7 @@ int Img::FindExtendedSource_CV(std::vector<Source*>& sources,BkgData* bkgData,in
 	double fgValue= 1;	
 	int status= this->FindCompactSource(sources,segmentedImg,bkgData,fgValue,fgValue,minPixels,false,false,false);
 	if(status<0){
-		cerr<<"Img::FindExtendedSource_CV(): WARN: Finding sources in Chan-Vese segmented mask failed!"<<endl;
+		ERROR_LOG("Finding sources in Chan-Vese segmented mask failed!");
 		return -1;
 	}
 
@@ -780,7 +764,7 @@ int Img::FindExtendedSource_CV(std::vector<Source*>& sources,BkgData* bkgData,in
 			this->ComputeStats(true,false,false);
 		}	
 		if(!m_Stats){
-			cerr<<"Img::FindExtendedSource_CV(): ERROR: Failed to compute image stats!"<<endl;
+			ERROR_LOG("Failed to compute image stats!");
 			segmentedImg->Delete();
 			for(unsigned int k=0;k<sources.size();k++){
 				if(sources[k]){
@@ -801,12 +785,33 @@ int Img::FindExtendedSource_CV(std::vector<Source*>& sources,BkgData* bkgData,in
 		CodeUtils::DeleteItems(sources, sourcesToBeRemoved);
 	}//close if
 
+	//## Tag sources as extended
+	for(unsigned int i=0;i<sources.size();i++){
+		sources[i]->SetType(Source::eExtended);
+	}//end loop sources
+
 	segmentedImg->Delete();
 	
 	return 0;
 	
 }//close FindExtendedSources_CV()
 
+
+int Img::FindExtendedSource_HClust(std::vector<Source*>&,Img* saliencyImg,Img* edgeImg){
+
+	//Find SLIC partition
+	//SLICData* slicData= SLIC::SPGenerator(this,int regionSize,double regParam, int minRegionSize, bool useLogScaleMapping, Img* edgeImg);
+
+	//Tag regions
+	//int SLICUtils::TagRegions(std::vector<Region*>& regions,Img* binaryMap_bkg,Img* binaryMap_signal)
+
+	//Run segmentation
+	//FindSegmentation(SLICData const& slicData,SLICData& segmSlicData,double SPMergingRegularization,bool SPMergingIncludeSpatialPars,bool use2ndNeighborsInSPMerging,int minMergedSP,double SPMergingRatio, double SPMergingMaxDissRatio,double SPMergingMaxDissRatio_2ndNeighbor,double SPMergingDissThreshold);
+	
+
+	return 0;
+
+}//close FindExtendedSource_HClust()
 
 int Img::ReadFITS(std::string filename,int ix_min,int ix_max,int iy_min,int iy_max){
 		
@@ -816,11 +821,12 @@ int Img::ReadFITS(std::string filename,int ix_min,int ix_max,int iy_min,int iy_m
 		status= FITSReader::Read(filename,*this,fits_info);
 	}
 	else{
-		status= FITSReader::ReadTile(filename,*this,fits_info,ix_min,ix_max,iy_min,iy_max);
+		//status= FITSReader::ReadTile(filename,*this,fits_info,ix_min,ix_max,iy_min,iy_max);
+		status= FITSReader::ReadTileFast(filename,*this,fits_info,ix_min,ix_max,iy_min,iy_max);
 	}
 	
 	if(status<0){
-		cerr<<"Img::ReadFITS(): ERROR: Failed to fill image from FITS file!"<<endl;
+		ERROR_LOG("Failed to fill image from FITS file!");
 		return -1;
 	}
 
@@ -832,7 +838,7 @@ int Img::WriteFITS(std::string outfilename){
 		
 	//## Write fits to file
 	if(FITSWriter::WriteFITS(this,outfilename)<0){
-		cerr<<"Img::WriteFITS(): ERROR: Failed to write image to FITS file!"<<endl;
+		ERROR_LOG("Failed to write image to FITS file!");
 		return -1;
 	}
 	
@@ -844,7 +850,7 @@ int Img::WriteFITS(std::string outfilename){
 TH1D* Img::GetPixelHisto(int nbins,bool normalize){
 
 	if(!HasStats()){
-		cerr<<"Img::GetPixelHisto(): WARN: No stats computed!"<<endl;
+		WARN_LOG("No stats computed!");
 		return 0;
 		//cerr<<"Img::GetPixelHisto(): WARN: No stats computed!"<<endl;
 		//this->ComputeStats(true,false,false);
@@ -878,7 +884,7 @@ double Img::FindOtsuThreshold(int nbins){
 	//## Get histo and normalize
 	TH1D* hist= this->GetPixelHisto(nbins,true);
 	if(!hist) {
-		cerr<<"Img::FindOtsuThreshold(): ERROR: Failed to compute pixel histo, return thr=0!"<<endl;
+		ERROR_LOG("Failed to compute pixel histo, return thr=0!");
 		return 0;
 	}
 
@@ -1006,7 +1012,7 @@ double Img::FindValleyThreshold(int nbins,bool smooth){
 		}
 	}//end loop bins
 
-	cout<<"Img::FindValleyThreshold(): INFO: "<<npeaks<<" valleys detected!"<<endl;
+	DEBUG_LOG("#"<<npeaks<<" valleys detected!");
 	
 	//## Clear stuff
 	if(histo){
@@ -1086,7 +1092,7 @@ Img* Img::GetMask(Img* mask,bool isBinary){
 
 	//## Check input mask
 	if(!mask) {
-		cerr<<"Img::GetMask(): ERROR: Null ptr to given image mask!"<<endl;
+		ERROR_LOG("Null ptr to given image mask!");
 		return 0;
 	}
 		
@@ -1094,7 +1100,7 @@ Img* Img::GetMask(Img* mask,bool isBinary){
 	int Nx= mask->GetNbinsX();
 	int Ny= mask->GetNbinsY();
 	if(Nx!=this->GetNbinsX() || Ny!=this->GetNbinsY()){
-		cerr<<"Img::GetMask(): ERROR: Mask binning is different than current image!"<<endl;
+		ERROR_LOG("Mask binning is different than current image!");
 		return 0;
 	}	
 
@@ -1145,7 +1151,7 @@ Img* Img::GetSourceMask(std::vector<Source*>const& sources,bool isBinary,bool in
 	//## Check source list
 	int nSources= (int)sources.size();
 	if(nSources<=0) {
-		cerr<<"Img::GetSourceMask(): WARN: Source list is empty, returning same image!"<<endl;
+		WARN_LOG("Source list is empty, returning same image!");
 		return maskedImage;	
 	}
 
@@ -1227,20 +1233,21 @@ Img* Img::GetSourceMask(std::vector<Source*>const& sources,bool isBinary,bool in
 }//close Img::GetSourceMask()
 
 
-Img* Img::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg){
+Img* Img::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
 
 	//Clone input image	
 	TString imgName= Form("%s_Residual",std::string(this->GetName()).c_str());	
 	Img* residualImg= this->GetCloned(std::string(imgName),true,true);
 	if(!residualImg){
-		cerr<<"Img::GetSourceResidual(): ERROR: Failed to clone input image!"<<endl;
+		ERROR_LOG("Failed to clone input image!");
 		return 0;
 	}
 
 	//Dilate source pixels
-	int status= MorphFilter::DilateAroundSources(residualImg,sources,KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg);
+	int status= MorphFilter::DilateAroundSources(residualImg,sources,KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
+
 	if(status<0){
-		cerr<<"Img::GetSourceResidual(): ERROR: Failed to dilate sources!"<<endl;
+		ERROR_LOG("Failed to dilate sources!");
 		if(residualImg) residualImg->Delete();
 		return 0;		
 	}
@@ -1284,7 +1291,7 @@ cv::Mat Img::ImgToMat(std::string encoding){
 	if(encoding=="64") mat= cv::Mat::zeros(Ny,Nx,CV_64FC1);
 	else if(encoding=="32") mat= cv::Mat::zeros(Ny,Nx,CV_32FC1);
 	else{
-		cerr<<"Img::ImgToMat(): WARN: Invalid encoding selected, using 64!"<<endl;
+		WARN_LOG("Invalid encoding selected, using default 64bit encoding");
 		mat= cv::Mat::zeros(Ny,Nx,CV_64FC1);
 	}
 
@@ -1358,7 +1365,7 @@ Img* Img::GetNormalizedImage(std::string normScale,int normmin,int normmax,bool 
 		}//end loop x
 	}//close else if
 	else{
-		cerr<<"Img::GetNormalizedImage(): WARN: Invalid norm scale option selected ("<<normScale<<") no transform applied to original image!"<<endl;
+		WARN_LOG("Invalid norm scale option selected ("<<normScale<<") no transform applied to original image!");
 	}
 	
 	return norm_img;
@@ -1372,7 +1379,7 @@ Img* Img::GetGuidedFilterImage(int radius,double eps){
 	Img* img_norm= this->GetNormalizedImage("LINEAR",1,256);
 	img_norm->SetNameTitle("tmpImg","tmpImg");
 	if(!img_norm) {
-		cerr<<"Img::GetGuidedFilterImage(): ERROR: Failed to get normalized image!"<<endl;
+		ERROR_LOG("Failed to get normalized image!");
 		return 0;
 	}
 
@@ -1400,7 +1407,7 @@ Img* Img::GetGuidedFilterImage(int radius,double eps){
 
 std::vector<Img*> Img::GetWaveletDecomposition(int nScales){
 
-	cout<<"Img::GetWaveletDecomposition(): INFO: Computing wavelet decomposition up to scale J="<<nScales<<" ..."<<endl;
+	DEBUG_LOG("Computing wavelet decomposition up to scale J="<<nScales<<" ...");
 	std::vector<Img*> img_decomposition;
 	img_decomposition= WTFilter::GetDecomposition(this,nScales);
 	
@@ -1463,7 +1470,7 @@ Img* Img::GetSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int mi
 	Img* saliencyMap= 0;
 	saliencyMap= SaliencyFilter::ComputeMultiResoSaliencyMap(this,resoMin,resoMax,resoStep,beta,minRegionSize,knnFactor,spatialRegFactor,useRobust,addCurvDist, salientMultiplicityThrFactor,addBkgMap,addNoiseMap,bkgData,saliencyThrFactor,imgThrFactor);
 	if(!saliencyMap){
-		cerr<<"Img::GetSaliencyMap(): ERROR: Saliency map estimation failed!"<<endl;
+		ERROR_LOG("Saliency map estimation failed!");
 		return 0;
 	}
 
@@ -1479,7 +1486,7 @@ int Img::Plot(std::vector<Source*>const& sources,bool useCurrentCanvas,bool draw
 	int ncolors= 999;
 	gStyle->SetNumberContours(ncolors);
 
-	cout<<"Img::Plot(): INFO: paletteStyle="<<paletteStyle<<endl;
+	DEBUG_LOG("paletteStyle="<<paletteStyle);
 
 	switch(paletteStyle){
 		case eRAINBOW :
@@ -1528,7 +1535,7 @@ int Img::Plot(std::vector<Source*>const& sources,bool useCurrentCanvas,bool draw
 	}
 
 	if(!canvas){
-		cerr<<"Img::Plot(): ERROR: Failed to retrieve or set canvas!"<<endl;
+		ERROR_LOG("Failed to retrieve or set canvas!");
 		return -1;
 	}
 
@@ -1591,7 +1598,7 @@ int Img::Plot(std::vector<Source*>const& sources,bool useCurrentCanvas,bool draw
 			yaxis_wcs->Draw("same");
 		}
 		else{
-			cerr<<"Img::Plot(): WARN: Failed to set gAxis!"<<endl;
+			WARN_LOG("Failed to set gAxis!");
 		}
 	}//close if
 
