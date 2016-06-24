@@ -174,6 +174,52 @@ public:
 	{return (static_cast<SFinderBroker *>(dev))->is_PingWorker_allowed(any);}
 };
 
+//	Command SubscribeWorkers class definition
+class SubscribeWorkersClass : public Tango::Command
+{
+public:
+	SubscribeWorkersClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out,
+				   const char        *in_desc,
+				   const char        *out_desc,
+				   Tango::DispLevel  level)
+	:Command(name,in,out,in_desc,out_desc, level)	{};
+
+	SubscribeWorkersClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out)
+	:Command(name,in,out)	{};
+	~SubscribeWorkersClass() {};
+	
+	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
+	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
+	{return (static_cast<SFinderBroker *>(dev))->is_SubscribeWorkers_allowed(any);}
+};
+
+//	Command SubmitSourceFinderJob class definition
+class SubmitSourceFinderJobClass : public Tango::Command
+{
+public:
+	SubmitSourceFinderJobClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out,
+				   const char        *in_desc,
+				   const char        *out_desc,
+				   Tango::DispLevel  level)
+	:Command(name,in,out,in_desc,out_desc, level)	{};
+
+	SubmitSourceFinderJobClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out)
+	:Command(name,in,out)	{};
+	~SubmitSourceFinderJobClass() {};
+	
+	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
+	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
+	{return (static_cast<SFinderBroker *>(dev))->is_SubmitSourceFinderJob_allowed(any);}
+};
+
 
 /**
  *	The SFinderBrokerClass singleton definition

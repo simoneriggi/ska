@@ -52,6 +52,7 @@ static const char *RcsId = "$Id:  $";
 #include <Logger.h>
 #include <Serializer.h>
 #include <WorkerManager.h>
+#include <MathUtils.h>
 using namespace Caesar;
 
 //## Standard headers
@@ -92,15 +93,17 @@ using namespace std;
 //  The following table gives the correspondence
 //  between command and method names.
 //
-//  Command name     |  Method name
+//  Command name           |  Method name
 //================================================================
-//  State            |  Inherited (no method)
-//  Status           |  Inherited (no method)
-//  RegisterWorker   |  register_worker
-//  ListWorkers      |  list_workers
-//  ListFreeWorkers  |  list_free_workers
-//  ListBusyWorkers  |  list_busy_workers
-//  PingWorker       |  ping_worker
+//  State                  |  Inherited (no method)
+//  Status                 |  Inherited (no method)
+//  RegisterWorker         |  register_worker
+//  ListWorkers            |  list_workers
+//  ListFreeWorkers        |  list_free_workers
+//  ListBusyWorkers        |  list_busy_workers
+//  PingWorker             |  ping_worker
+//  SubscribeWorkers       |  subscribe_workers
+//  SubmitSourceFinderJob  |  submit_source_finder_job
 //================================================================
 
 //================================================================
@@ -221,6 +224,7 @@ void SFinderBroker::init_device()
 	m_workerManager= 0;
 	m_workerManager= new WorkerManager();
 
+
 	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::init_device
 }
 
@@ -242,6 +246,7 @@ void SFinderBroker::get_device_property()
 	//	Read device properties from database.
 	Tango::DbData	dev_prop;
 	dev_prop.push_back(Tango::DbDatum("federatedBrokers"));
+	dev_prop.push_back(Tango::DbDatum("maxNTasksPerWorker_default"));
 
 	//	is there at least one property to be read ?
 	if (dev_prop.size()>0)
@@ -266,6 +271,17 @@ void SFinderBroker::get_device_property()
 		}
 		//	And try to extract federatedBrokers value from database
 		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  federatedBrokers;
+
+		//	Try to initialize maxNTasksPerWorker_default from class property
+		cl_prop = ds_class->get_class_property(dev_prop[++i].name);
+		if (cl_prop.is_empty()==false)	cl_prop  >>  maxNTasksPerWorker_default;
+		else {
+			//	Try to initialize maxNTasksPerWorker_default from default device value
+			def_prop = ds_class->get_default_device_property(dev_prop[i].name);
+			if (def_prop.is_empty()==false)	def_prop  >>  maxNTasksPerWorker_default;
+		}
+		//	And try to extract maxNTasksPerWorker_default value from database
+		if (dev_prop[i].is_empty()==false)	dev_prop[i]  >>  maxNTasksPerWorker_default;
 
 	}
 
@@ -358,7 +374,6 @@ Tango::DevVarLongStringArray *SFinderBroker::register_worker(Tango::DevString ar
 	}
 	std::string worker_name= std::string(argin);
 
-
 	
 	//Register worker in list
 	INFO_LOG("Registering worker "<<worker_name<<" in broker...");
@@ -423,7 +438,17 @@ Tango::DevVarStringArray *SFinderBroker::list_free_workers()
 	/*----- PROTECTED REGION ID(SFinderBroker::list_free_workers) ENABLED START -----*/
 	
 	//	Add your own code
-	
+	//Get worker names
+	std::vector<std::string> worker_names;
+	m_workerManager->GetFreeWorkerNames(worker_names);
+
+	//Reply	
+	argout= new Tango::DevVarStringArray;
+	argout->length(worker_names.size());
+	for(unsigned int i=0;i<worker_names.size();i++){
+		(*argout)[i]= CORBA::string_dup(worker_names[i].c_str());
+	}
+
 	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::list_free_workers
 	return argout;
 }
@@ -442,7 +467,16 @@ Tango::DevVarStringArray *SFinderBroker::list_busy_workers()
 	/*----- PROTECTED REGION ID(SFinderBroker::list_busy_workers) ENABLED START -----*/
 	
 	//	Add your own code
-	
+	//Get worker names
+	std::vector<std::string> worker_names;
+	m_workerManager->GetBusyWorkerNames(worker_names);
+
+	//Reply	
+	argout= new Tango::DevVarStringArray;
+	argout->length(worker_names.size());
+	for(unsigned int i=0;i<worker_names.size();i++){
+		(*argout)[i]= CORBA::string_dup(worker_names[i].c_str());
+	}
 	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::list_busy_workers
 	return argout;
 }
@@ -487,6 +521,384 @@ void SFinderBroker::ping_worker(Tango::DevString argin)
 }
 //--------------------------------------------------------
 /**
+ *	Command SubscribeWorkers related method
+ *	Description: Subscribe to worker events
+ *
+ */
+//--------------------------------------------------------
+void SFinderBroker::subscribe_workers()
+{
+	DEBUG_STREAM << "SFinderBroker::SubscribeWorkers()  - " << device_name << endl;
+	/*----- PROTECTED REGION ID(SFinderBroker::subscribe_workers) ENABLED START -----*/
+	
+	//	Add your own code
+	//Perform subscription to workers
+	if(!m_workerManager) return;
+
+	//--> State
+	INFO_LOG("Subscribing to State Change event...");
+	if(m_workerManager->SubscribeGroupToEvent("State",Tango::CHANGE_EVENT,m_workerStateCallBack)<0){
+		WARN_LOG("Failed to subscribe to worker group State event!");
+	}
+	
+	/*
+	INFO_LOG("Subscribing to State Periodic event...");
+	if(m_workerManager->SubscribeGroupToEvent("State",Tango::PERIODIC_EVENT,m_workerStateCallBack)<0){
+		WARN_LOG("Failed to subscribe to worker group State event!");
+	}
+	*/
+
+	return;
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::subscribe_workers
+}
+//--------------------------------------------------------
+/**
+ *	Command SubmitSourceFinderJob related method
+ *	Description: Command source finder job
+ *
+ *	@param argin String arg
+ *               [0]: input image filename
+ *               [1]: config options
+ *               
+ *               Long arg
+ *               [0]: Max number of workers to be allocated
+ *	@returns Long arg
+ *           [0]: ack code
+ *           
+ *           String arg
+ *           [0]: err description
+ */
+//--------------------------------------------------------
+Tango::DevVarLongStringArray *SFinderBroker::submit_source_finder_job(const Tango::DevVarLongStringArray *argin)
+{
+	Tango::DevVarLongStringArray *argout;
+	DEBUG_STREAM << "SFinderBroker::SubmitSourceFinderJob()  - " << device_name << endl;
+	/*----- PROTECTED REGION ID(SFinderBroker::submit_source_finder_job) ENABLED START -----*/
+	
+	//	Add your own code
+	//Init reply
+	std::string reply= "Request executed with success";
+	long int ack= 0;
+	argout= new Tango::DevVarLongStringArray;
+	argout->lvalue.length(1);
+	argout->svalue.length(1);
+
+	//Validate args	
+	long int nArgs_s= argin->svalue.length();
+	long int nArgs_l= argin->lvalue.length();
+	if(nArgs_s<2){
+		WARN_LOG("Missing filename and/or configuration arguments!");
+		ack= -1;
+		reply= "Missing filename and/or configuration arguments!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+
+	//Check filename arg
+	if(strcmp(argin->svalue[0],"")==0){
+		WARN_LOG("Empty filename argument given!");
+		ack= -1;
+		reply= "Invalid filename argument given (empty string)!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	std::string inputFileName= std::string(argin->svalue[0]); 
+
+	//Check config arg
+	if(strcmp(argin->svalue[1],"")==0){
+		WARN_LOG("Empty config argument given!");
+		ack= -1;
+		reply= "Invalid config argument given (empty string)!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	std::string config= std::string(argin->svalue[1]); 
+
+
+	//Get maximum number of workers
+	if(nArgs_l<1){
+		WARN_LOG("Missing maximum number of workers argument!");
+		ack= -1;
+		reply= "Missing maximum number of workers argument!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	Tango::DevLong maxNWorkers= argin->lvalue[0];
+
+
+
+	//## Parse config and get options for tile distribution
+	Json::Value optionList;
+	if(ValidateConfigOptions(optionList,config)<0){
+		WARN_LOG("Invalid config argument given (parsing failed or missing options)!");
+		ack= -1;
+		reply= "Invalid config argument given (parsing failed or missing options)!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	//--> Get tile size X
+	int optionIndex= -1;
+	if(CodeUtils::FindJsonValue(optionIndex,optionList,"tileSizeX","name")<0){
+		WARN_LOG("Missing tileSizeX option!");
+		ack= -1;
+		reply= "Missing tileSizeX option!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;		
+	}
+	long int tileSizeX= (optionList[optionIndex])["value"].asInt64();
+
+	//--> Get tile size Y
+	if(CodeUtils::FindJsonValue(optionIndex,optionList,"tileSizeY","name")<0){
+		WARN_LOG("Missing tileSizeY option!");
+		ack= -1;
+		reply= "Missing tileSizeY option!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;		
+	}
+	long int tileSizeY= (optionList[optionIndex])["value"].asInt64();
+
+	//--> Get useTileOverlap
+	if(CodeUtils::FindJsonValue(optionIndex,optionList,"useTileOverlap","name")<0){
+		WARN_LOG("Missing useTileOverlap option!");
+		ack= -1;
+		reply= "Missing useTileOverlap option!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;		
+	}
+	bool useTileOverlap= (optionList[optionIndex])["value"].asBool();
+
+	//--> Get tileStepSizeX
+	if(CodeUtils::FindJsonValue(optionIndex,optionList,"tileStepSizeX","name")<0){
+		WARN_LOG("Missing tileStepSizeX option!");
+		ack= -1;
+		reply= "Missing tileStepSizeX option!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;		
+	}
+	float tileStepSizeX= (optionList[optionIndex])["value"].asFloat();	
+
+	//--> Get tileStepSizeY
+	if(CodeUtils::FindJsonValue(optionIndex,optionList,"tileStepSizeY","name")<0){
+		WARN_LOG("Missing tileStepSizeY option!");
+		ack= -1;
+		reply= "Missing tileStepSizeY option!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;		
+	}
+	float tileStepSizeY= (optionList[optionIndex])["value"].asFloat();	
+		
+		
+	DEBUG_LOG("Options: tileSizeX/tileSizeY="<<tileSizeX<<"/"<<tileSizeY<<", useTileOverlap? "<<useTileOverlap<<", tileStepSizeX/tileStepSizeY="<<tileStepSizeX<<"/"<<tileStepSizeY);
+
+	//## Read input file and get image size
+	long int Nx= -1;
+	long int Ny= -1;
+	if(SysUtils::GetFITSImageSize(inputFileName,Nx,Ny)<0){
+		ERROR_LOG("Failed to open input file image "<<inputFileName<<" and get image size!");
+		ack= -1;
+		reply= "Failed to open input file image and get image size!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;	
+	}
+	INFO_LOG("Input image opened with success: size="<<Nx<<"x"<<Ny);
+
+	//Check options
+	if(tileSizeX<=0 || tileSizeY<=0) {
+		WARN_LOG("Invalid tileSizeX/tileSizeY options!");
+		ack= -1;
+		reply= "Invalid tileSizeX/tileSizeY options!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;	
+	}
+	if(tileStepSizeX<=0 || tileStepSizeY<=0 || tileStepSizeX>1 || tileStepSizeY>1){
+		WARN_LOG("Invalid tileStepSizeX/tileStepSizeY options!");
+		ack= -1;
+		reply= "Invalid tileStepSizeX/tileStepSizeY options!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	if(!useTileOverlap){
+		tileStepSizeX= 1;
+		tileStepSizeY= 1;	
+	}
+	
+	//## Make the worker schedule
+	//--> Compute the 2D grid 
+	std::vector<long int> ix_min;
+	std::vector<long int> ix_max;
+	std::vector<long int> iy_min;
+	std::vector<long int> iy_max;
+	if(MathUtils::Compute2DGrid(ix_min,ix_max,iy_min,iy_max,Nx,Ny,tileSizeX,tileSizeY,tileStepSizeX,tileStepSizeY)<0){
+		WARN_LOG("Failed to compute a 2D image partition!");
+		ack= -1;
+		reply= "Failed to compute a 2D image partition!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	int nExpectedTasks= ix_min.size()*iy_min.size();
+	INFO_LOG("#"<<nExpectedTasks<<" expected number of tasks ("<<ix_min.size()<<"x"<<iy_min.size()<<")");
+
+	//## Get number of free workers
+	DEBUG_LOG("Getting free worker group (max="<<maxNWorkers<<")");
+	Tango::Group* freeWorkers= new Tango::Group("jobWorkerGroup");
+	bool requireExactly= false;
+	if(m_workerManager->GetFreeWorkers(*freeWorkers,maxNWorkers,requireExactly)<0){
+		WARN_LOG("Cannot find free workers!");
+
+		if(freeWorkers){
+			delete freeWorkers;
+			freeWorkers= 0;
+		}
+		
+		ack= -1;
+		reply= "Cannot find free workers!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	long int nWorkers= freeWorkers->get_size();
+	std::vector<std::string> worker_names= freeWorkers->get_device_list();
+	INFO_LOG("#"<<nWorkers<<" free workers available...");
+	
+	//## Generate a uuid for this job
+	std::string jobId= CodeUtils::GenerateUUID();
+	DEBUG_LOG("Generated jobId: "<<jobId);
+	
+	//## Compute worker tasks (check max number of tasks per worker)
+	DEBUG_LOG("Computing worker task list...");
+	std::vector<WorkerTask*> workerTasks;
+	std::vector< std::vector<WorkerTask*> > taskPerWorkers;
+	for(int i=0;i<nWorkers;i++){
+		taskPerWorkers.push_back( std::vector<WorkerTask*>() );
+	}
+	
+	WorkerTask* aWorkerTask= 0;
+	long int workerCounter= 0;
+	for(unsigned int j=0;j<iy_min.size();j++){
+		for(unsigned int i=0;i<ix_min.size();i++){
+			//Assign worker
+			DEBUG_LOG("Assign task ("<<i<<","<<j<<") to worker no. "<<workerCounter<<"...");
+			std::string thisWorkerName= worker_names[workerCounter];
+			
+			aWorkerTask= new WorkerTask;
+			aWorkerTask->filename= inputFileName;
+			aWorkerTask->jobId= jobId;
+			aWorkerTask->worker_name= thisWorkerName;
+			aWorkerTask->broker_name= device_name;
+			aWorkerTask->IdX= i;
+			aWorkerTask->IdY= j;
+			aWorkerTask->ix_min= ix_min[i];
+			aWorkerTask->ix_max= ix_max[i];
+			aWorkerTask->iy_min= iy_min[j];
+			aWorkerTask->iy_max= iy_max[j];
+			workerTasks.push_back(aWorkerTask);
+			taskPerWorkers[workerCounter].push_back(aWorkerTask);
+
+			if(workerCounter>=nWorkers-1) workerCounter= 0;
+			else workerCounter++;
+		}//end loop x
+	}//end loop y
+	
+	bool hasTooManyTasks= false;
+	for(int i=0;i<nWorkers;i++){
+		long int nTasksPerWorker= (long int)taskPerWorkers[i].size();
+		if(nTasksPerWorker>maxNTasksPerWorker_default){
+			hasTooManyTasks= true;
+			break;
+		}
+	}
+
+	if(hasTooManyTasks){
+		WARN_LOG("Number of tasks per worker exceeds the maximum allowed threshold ("<<maxNTasksPerWorker_default<<")!");
+		
+		//Clear worker group
+		if(freeWorkers){
+			delete freeWorkers;
+			freeWorkers= 0;
+		}
+		
+		//Clear tasks
+		for(int i=0;i<nWorkers;i++) taskPerWorkers[i].clear();
+		for(unsigned int i=0;i<workerTasks.size();i++){
+			if(workerTasks[i]){
+				delete workerTasks[i];
+				workerTasks[i]= 0;
+			}
+		}
+		workerTasks.clear();
+		
+		ack= -1;
+		reply= "Number of tasks per worker exceeds the maximum allowed threshold!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+
+	//## Convert task to group string arguments
+	bool isSerializationFailed= false;
+	std::vector<std::string> tasksArgList;
+	for(int i=0;i<nWorkers;i++) {
+		std::string thisTaskArg= "";
+		if(Serializer::WorkerTasksToJsonString(thisTaskArg,taskPerWorkers[i])<0){
+			isSerializationFailed= true;
+			break;
+		}
+		tasksArgList.push_back(thisTaskArg);
+		DEBUG_LOG("Task argin worker no. "<<i+1<<": "<<thisTaskArg);
+	}//end loop workers
+	
+	if(isSerializationFailed){
+		//Clear worker group
+		if(freeWorkers){
+			delete freeWorkers;
+			freeWorkers= 0;
+		}
+		
+		//Clear tasks
+		for(int i=0;i<nWorkers;i++) taskPerWorkers[i].clear();
+		for(unsigned int i=0;i<workerTasks.size();i++){
+			if(workerTasks[i]){
+				delete workerTasks[i];
+				workerTasks[i]= 0;
+			}
+		}
+		workerTasks.clear();
+		
+		WARN_LOG("Serialization of task argin failed!");
+		ack= -1;
+		reply= "Serialization of task argin failed!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+
+	
+
+
+	//## Return reply
+	argout->lvalue[0]= ack;
+	argout->svalue[0] = CORBA::string_dup(reply.c_str());
+
+	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::submit_source_finder_job
+	return argout;
+}
+//--------------------------------------------------------
+/**
  *	Method      : SFinderBroker::add_dynamic_commands()
  *	Description : Create the dynamic commands if any
  *                for specified device.
@@ -504,6 +916,32 @@ void SFinderBroker::add_dynamic_commands()
 /*----- PROTECTED REGION ID(SFinderBroker::namespace_ending) ENABLED START -----*/
 
 //	Additional Methods
+int SFinderBroker::ValidateConfigOptions(Json::Value& optionList,std::string& config){
+
+	//## Parse config json options
+	Json::Reader reader;
+	Json::Value root;
+  if(!reader.parse(config, root)) {
+		ERROR_LOG("Failed to parse config JSON ("<<reader.getFormattedErrorMessages()<<")");
+		return -1;
+	}
+	
+	//## Check top json
+	if(root.isNull() || root.empty()){
+		ERROR_LOG("Failed to parse config JSON (null or empty)!");
+		return -1;
+	}
+
+	//Get option array 
+	optionList= root["options"];
+	if(optionList.isNull() || optionList.empty() || !optionList.isArray() ){
+		ERROR_LOG("Failed to parse config JSON option list (null/empty or not an array)!");
+		return -1;
+	}
+	
+	return 0;
+
+}//close ValidateConfigOptions()
 
 /*----- PROTECTED REGION END -----*/	//	SFinderBroker::namespace_ending
 } //	namespace

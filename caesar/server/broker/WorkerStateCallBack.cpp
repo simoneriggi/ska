@@ -79,8 +79,9 @@ void WorkerStateCallBack::push_event(Tango::EventData* event) {
 			INFO_LOG("Worker State event received: name="<< event->attr_name << " event " << event->event << " value="<<event_value<<" (err= " << event->err << ")");
 
 			//Update worker state in collection
-			
-	
+			if(device && (device->m_workerManager) && (device->m_workerManager)->UpdateWorkerState(dev_name,event_value)<0 ){
+				ERROR_LOG("Failed to update worker state!");
+			}
 
     }//close if success event 
   }//close try 	
@@ -94,6 +95,8 @@ void WorkerStateCallBack::push_event(Tango::EventData* event) {
 		return;
   }
  
+	return;
+	
 }//close EventCallBack::push_event()
 
 

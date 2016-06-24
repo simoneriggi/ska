@@ -41,6 +41,8 @@
 #include <WorkerStateCallBack.h>
 #include <WorkerManager.h>
 
+#include <json/json.h>
+
 #include <tango.h>
 
 namespace Caesar {
@@ -61,6 +63,7 @@ namespace SFinderBroker_ns
 
 //	Additional Class Declarations
 	class WorkerStateCallBack;
+	
 
 /*----- PROTECTED REGION END -----*/	//	SFinderBroker::Additional Class Declarations
 
@@ -81,6 +84,8 @@ class SFinderBroker : public TANGO_BASE_CLASS
 public:
 	//	federatedBrokers:	List of federated broker devices
 	vector<string>	federatedBrokers;
+	//	maxNTasksPerWorker_default:	Maximum number of tasks per worker allowed by default
+	Tango::DevLong	maxNTasksPerWorker_default;
 
 
 //	Constructors and destructors
@@ -198,6 +203,31 @@ public:
 	 */
 	virtual void ping_worker(Tango::DevString argin);
 	virtual bool is_PingWorker_allowed(const CORBA::Any &any);
+	/**
+	 *	Command SubscribeWorkers related method
+	 *	Description: Subscribe to worker events
+	 *
+	 */
+	virtual void subscribe_workers();
+	virtual bool is_SubscribeWorkers_allowed(const CORBA::Any &any);
+	/**
+	 *	Command SubmitSourceFinderJob related method
+	 *	Description: Command source finder job
+	 *
+	 *	@param argin String arg
+	 *               [0]: input image filename
+	 *               [1]: config options
+	 *               
+	 *               Long arg
+	 *               [0]: Max number of workers to be allocated
+	 *	@returns Long arg
+	 *           [0]: ack code
+	 *           
+	 *           String arg
+	 *           [0]: err description
+	 */
+	virtual Tango::DevVarLongStringArray *submit_source_finder_job(const Tango::DevVarLongStringArray *argin);
+	virtual bool is_SubmitSourceFinderJob_allowed(const CORBA::Any &any);
 
 
 	//--------------------------------------------------------
@@ -211,6 +241,10 @@ public:
 /*----- PROTECTED REGION ID(SFinderBroker::Additional Method prototypes) ENABLED START -----*/
 
 //	Additional Method prototypes
+	protected:
+		int ValidateConfigOptions(Json::Value& optionList,std::string& config);
+
+	friend class WorkerStateCallBack;
 
 /*----- PROTECTED REGION END -----*/	//	SFinderBroker::Additional Method prototypes
 };

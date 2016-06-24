@@ -9,6 +9,11 @@
       <type xsi:type="pogoDsl:StringVectorType"/>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </deviceProperties>
+    <deviceProperties name="maxNTasksPerWorker_default" description="Maximum number of tasks per worker allowed by default">
+      <type xsi:type="pogoDsl:IntType"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+      <DefaultPropValue>10</DefaultPropValue>
+    </deviceProperties>
     <commands name="State" description="This command gets the device state (stored in its device_state data member) and returns it to the caller." execMethod="dev_state" displayLevel="OPERATOR" polledPeriod="0">
       <argin description="none">
         <type xsi:type="pogoDsl:VoidType"/>
@@ -69,6 +74,24 @@
       </argin>
       <argout description="">
         <type xsi:type="pogoDsl:VoidType"/>
+      </argout>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+    </commands>
+    <commands name="SubscribeWorkers" description="Subscribe to worker events" execMethod="subscribe_workers" displayLevel="OPERATOR" polledPeriod="0" isDynamic="false">
+      <argin description="">
+        <type xsi:type="pogoDsl:VoidType"/>
+      </argin>
+      <argout description="">
+        <type xsi:type="pogoDsl:VoidType"/>
+      </argout>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+    </commands>
+    <commands name="SubmitSourceFinderJob" description="Command source finder job" execMethod="submit_source_finder_job" displayLevel="OPERATOR" polledPeriod="0" isDynamic="false">
+      <argin description="String arg&#xA;[0]: input image filename&#xA;[1]: config options&#xA;&#xA;Long arg&#xA;[0]: Max number of workers to be allocated">
+        <type xsi:type="pogoDsl:LongStringArrayType"/>
+      </argin>
+      <argout description="Long arg&#xA;[0]: ack code&#xA;&#xA;String arg&#xA;[0]: err description">
+        <type xsi:type="pogoDsl:LongStringArrayType"/>
       </argout>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </commands>

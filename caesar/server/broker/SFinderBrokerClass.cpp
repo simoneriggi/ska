@@ -248,6 +248,43 @@ CORBA::Any *PingWorkerClass::execute(Tango::DeviceImpl *device, const CORBA::Any
 	return new CORBA::Any();
 }
 
+//--------------------------------------------------------
+/**
+ * method : 		SubscribeWorkersClass::execute()
+ * description : 	method to trigger the execution of the command.
+ *
+ * @param	device	The device on which the command must be executed
+ * @param	in_any	The command input data
+ *
+ *	returns The command output data (packed in the Any object)
+ */
+//--------------------------------------------------------
+CORBA::Any *SubscribeWorkersClass::execute(Tango::DeviceImpl *device, TANGO_UNUSED(const CORBA::Any &in_any))
+{
+	cout2 << "SubscribeWorkersClass::execute(): arrived" << endl;
+	((static_cast<SFinderBroker *>(device))->subscribe_workers());
+	return new CORBA::Any();
+}
+
+//--------------------------------------------------------
+/**
+ * method : 		SubmitSourceFinderJobClass::execute()
+ * description : 	method to trigger the execution of the command.
+ *
+ * @param	device	The device on which the command must be executed
+ * @param	in_any	The command input data
+ *
+ *	returns The command output data (packed in the Any object)
+ */
+//--------------------------------------------------------
+CORBA::Any *SubmitSourceFinderJobClass::execute(Tango::DeviceImpl *device, const CORBA::Any &in_any)
+{
+	cout2 << "SubmitSourceFinderJobClass::execute(): arrived" << endl;
+	const Tango::DevVarLongStringArray *argin;
+	extract(in_any, argin);
+	return insert((static_cast<SFinderBroker *>(device))->submit_source_finder_job(argin));
+}
+
 
 //===================================================================
 //	Properties management
@@ -321,6 +358,20 @@ void SFinderBrokerClass::set_default_property()
 	prop_desc = "List of federated broker devices";
 	prop_def  = "";
 	vect_data.clear();
+	if (prop_def.length()>0)
+	{
+		Tango::DbDatum	data(prop_name);
+		data << vect_data ;
+		dev_def_prop.push_back(data);
+		add_wiz_dev_prop(prop_name, prop_desc,  prop_def);
+	}
+	else
+		add_wiz_dev_prop(prop_name, prop_desc);
+	prop_name = "maxNTasksPerWorker_default";
+	prop_desc = "Maximum number of tasks per worker allowed by default";
+	prop_def  = "10";
+	vect_data.clear();
+	vect_data.push_back("10");
 	if (prop_def.length()>0)
 	{
 		Tango::DbDatum	data(prop_name);
@@ -623,6 +674,24 @@ void SFinderBrokerClass::command_factory()
 			"",
 			Tango::OPERATOR);
 	command_list.push_back(pPingWorkerCmd);
+
+	//	Command SubscribeWorkers
+	SubscribeWorkersClass	*pSubscribeWorkersCmd =
+		new SubscribeWorkersClass("SubscribeWorkers",
+			Tango::DEV_VOID, Tango::DEV_VOID,
+			"",
+			"",
+			Tango::OPERATOR);
+	command_list.push_back(pSubscribeWorkersCmd);
+
+	//	Command SubmitSourceFinderJob
+	SubmitSourceFinderJobClass	*pSubmitSourceFinderJobCmd =
+		new SubmitSourceFinderJobClass("SubmitSourceFinderJob",
+			Tango::DEVVAR_LONGSTRINGARRAY, Tango::DEVVAR_LONGSTRINGARRAY,
+			"String arg\n[0]: input image filename\n[1]: config options\n\nLong arg\n[0]: Max number of workers to be allocated",
+			"Long arg\n[0]: ack code\n\nString arg\n[0]: err description",
+			Tango::OPERATOR);
+	command_list.push_back(pSubmitSourceFinderJobCmd);
 
 	/*----- PROTECTED REGION ID(SFinderBrokerClass::command_factory_after) ENABLED START -----*/
 	

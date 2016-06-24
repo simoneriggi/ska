@@ -130,6 +130,36 @@ bool SFinderBroker::is_PingWorker_allowed(TANGO_UNUSED(const CORBA::Any &any))
 	return true;
 }
 
+//--------------------------------------------------------
+/**
+ *	Method      : SFinderBroker::is_SubscribeWorkers_allowed()
+ *	Description : Execution allowed for SubscribeWorkers attribute
+ */
+//--------------------------------------------------------
+bool SFinderBroker::is_SubscribeWorkers_allowed(TANGO_UNUSED(const CORBA::Any &any))
+{
+	//	Not any excluded states for SubscribeWorkers command.
+	/*----- PROTECTED REGION ID(SFinderBroker::SubscribeWorkersStateAllowed) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::SubscribeWorkersStateAllowed
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinderBroker::is_SubmitSourceFinderJob_allowed()
+ *	Description : Execution allowed for SubmitSourceFinderJob attribute
+ */
+//--------------------------------------------------------
+bool SFinderBroker::is_SubmitSourceFinderJob_allowed(TANGO_UNUSED(const CORBA::Any &any))
+{
+	//	Not any excluded states for SubmitSourceFinderJob command.
+	/*----- PROTECTED REGION ID(SFinderBroker::SubmitSourceFinderJobStateAllowed) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::SubmitSourceFinderJobStateAllowed
+	return true;
+}
+
 
 /*----- PROTECTED REGION ID(SFinderBroker::SFinderBrokerStateAllowed.AdditionalMethods) ENABLED START -----*/
 
