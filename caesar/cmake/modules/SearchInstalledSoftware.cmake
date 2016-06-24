@@ -96,6 +96,18 @@ MESSAGE(STATUS "JSONCPP_INCLUDE_DIR: ${JSONCPP_INCLUDE_DIR}")
 MESSAGE(STATUS "JSONCPP_LIBRARIES: ${JSONCPP_LIBRARIES}")
 
 
+#==================================
+#==   Check for CFITSIO         ===
+#==================================
+MESSAGE(STATUS "Looking for CFITSIO")
+FIND_PACKAGE(CFITSIO REQUIRED)
+if (NOT CFITSIO_FOUND)
+	MESSAGE(SEND_ERROR "CFITSIO library not found!")
+endif()
+MESSAGE(STATUS "CFITSIO_INCLUDE_DIR: ${CFITSIO_INCLUDE_DIR}")
+MESSAGE(STATUS "CFITSIO_LIBRARIES: ${CFITSIO_LIBRARIES}")
+
+
 #===========================================
 #==   Check for Tango Framework          ===
 #===========================================

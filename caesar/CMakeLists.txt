@@ -133,6 +133,7 @@ list (APPEND INCLUDE_DIRS ${WCSTOOL_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${LINTERP_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${LOG4CXX_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
+list (APPEND INCLUDE_DIRS ${CFITSIO_INCLUDE_DIR})
 if(ENABLE_SERVER)
 	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
 	list (APPEND INCLUDE_DIRS ${MSGPACK_INCLUDE_DIRS})
@@ -159,6 +160,7 @@ list (APPEND LINKED_LIBS ${PYTHON_LIBRARIES})
 list (APPEND LINKED_LIBS ${WCSTOOL_LIBRARIES})
 list (APPEND LINKED_LIBS ${LOG4CXX_LIBRARIES})
 list (APPEND LINKED_LIBS ${JSONCPP_LIBRARIES})
+list (APPEND LINKED_LIBS ${CFITSIO_LIBRARIES})
 if(ENABLE_SERVER)
 	list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
 	list (APPEND LINKED_LIBS ${MSGPACK_LIBRARIES})
@@ -331,10 +333,17 @@ target_link_libraries(ROOT2FITS Caesar ${LINKED_LIBS})
 #-----------------------------------------------------------------------------------------------
 ## SFINDER SERVER 
 if(ENABLE_SERVER)
+	## Worker
 	add_executable(SFinderExe ${Main_SFINDER_SERVER_SRCS} ${SFINDER_SERVER_SRCS})
 	target_link_libraries(SFinderExe Caesar ${LINKED_LIBS})
 	add_dependencies(SFinderExe Caesar)
 	set_target_properties(SFinderExe PROPERTIES OUTPUT_NAME SFinder)
+
+	## Broker
+	add_executable(SFinderBrokerExe ${Main_SFINDER_BROKERSERVER_SRCS} ${SFINDER_BROKERSERVER_SRCS})
+	target_link_libraries(SFinderBrokerExe Caesar ${LINKED_LIBS})
+	add_dependencies(SFinderBrokerExe Caesar)
+	set_target_properties(SFinderBrokerExe PROPERTIES OUTPUT_NAME SFinderBroker)
 endif()
 
 

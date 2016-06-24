@@ -225,6 +225,9 @@
 //== SERVER ==
 #pragma link C++ class Caesar::SBuffer+;
 #pragma link C++ class Caesar::Serializer+;
+#pragma link C++ class Caesar::WorkerDataHeader+;
+#pragma link C++ class Caesar::WorkerData+;
+#pragma link C++ class Caesar::WorkerTask+;
 //======================
 
 
