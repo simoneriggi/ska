@@ -31,6 +31,7 @@
 #include <Source.h>
 #include <Contour.h>
 #include <WorkerData.h>
+#include <WorkerTask.h>
 
 //Tango header
 #include <tango.h>
@@ -112,7 +113,14 @@ class Serializer : public TObject {
 			static int TangoPipeToSourceCollection(std::vector<Source*>& source_list,Tango::DevicePipeBlob& pipe_blob);
 			static int MakeSourceDataPipe(Tango::DevicePipeBlob& pipe_blob,std::string jobId,long int IdX,long int IdY,std::vector<Source*>& sources,std::vector<Source*>& edge_sources);
 
-		
+			//WorkerTask collection --> Json
+			static int WorkerTasksToJson(Json::Value& root,std::vector<WorkerTask*>& tasks);
+			static int WorkerTasksToJsonString(std::string& jsonString,std::vector<WorkerTask*>& tasks,bool isMinified=true);
+
+			//Json --> WorkerTask collection
+			static int JsonToWorkerTasks(std::vector<WorkerTask*>& tasks,Json::Value& root);
+			static int JsonStringToWorkerTasks(std::vector<WorkerTask*>& tasks,std::string& jsonString);
+
 			//Msgpack
 			static int SourceToBuffer(Source* source,msgpack::sbuffer& buffer);
 			static int SourceToString(Source* source,std::string& msg);

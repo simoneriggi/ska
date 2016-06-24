@@ -27,6 +27,8 @@
 
 #include <Serializer.h>
 #include <Logger.h>
+#include <CodeUtils.h>
+
 
 #include <TVector2.h>
 
@@ -1282,6 +1284,120 @@ int Serializer::BufferToWorkerData(WorkerData& workerData,SBuffer& buffer){
 	return 0;
 
 }//close WorkerDataToSource()
+
+
+
+
+int Serializer::WorkerTasksToJson(Json::Value& root,std::vector<WorkerTask*>& tasks){
+			
+	Json::Value taskArray;
+	bool hasFailed= false;
+	for (unsigned int i=0;i<tasks.size();i++){
+		Json::Value jsonObj;
+		if(tasks[i]->SerializeToJson(jsonObj)<0){
+			hasFailed= true;
+			break;
+		}
+		taskArray.append(jsonObj);
+	}//end loop
+
+	if(hasFailed){
+		ERROR_LOG("Failed to serialize worker tasks to json object!");
+		return -1;
+	}
+
+	root["tasks"]= taskArray;
+			
+	return 0;
+
+}//close WorkerTasksToJson()
+
+int Serializer::WorkerTasksToJsonString(std::string& jsonString,std::vector<WorkerTask*>& tasks,bool isMinified){
+
+	//Encode first to json object
+	Json::Value jsonObj;
+	if(WorkerTasksToJson(jsonObj,tasks)<0) {
+		ERROR_LOG("Failed to encode worker task collection to json object!");
+		return -1;
+	}
+
+	//Encode to string
+	if(CodeUtils::JsonToString(jsonString,jsonObj,isMinified)<0){
+		ERROR_LOG("Failed to encode json object to string!");
+		return -1;
+	}
+
+	return 0;
+}//close WorkerTasksToJsonString()
+
+
+int Serializer::JsonToWorkerTasks(std::vector<WorkerTask*>& tasks,Json::Value& root){
+
+	//## Check object
+	if(root.isNull() || root.empty()){
+		ERROR_LOG("Invalid JSON (null or empty)!");
+		return -1;
+	}
+
+	//## Check array
+	const Json::Value& taskArray= root["tasks"];
+	if(taskArray.isNull() || taskArray.empty() || !taskArray.isArray()){
+		ERROR_LOG("Invalid json task object (null/empty or not an array)!");
+		return -1;
+	}
+
+	//Loop array and fill values
+	WorkerTask* aWorkerTask= 0;
+	bool hasFailed= false;
+	for (Json::ValueConstIterator it = taskArray.begin(); it != taskArray.end(); ++it) {
+  	const Json::Value& taskItem = *it;
+
+		aWorkerTask= new WorkerTask;
+		if(aWorkerTask->EncodeFromJson(taskItem)<0){
+			hasFailed= true;
+			delete aWorkerTask;
+			aWorkerTask= 0;
+			break;
+		}
+
+		tasks.push_back(aWorkerTask);
+	}//end loop array entries
+
+	//Check if failed
+	if(hasFailed){
+		ERROR_LOG("Failed to encode from Json object!");
+		for(unsigned int i=0;i<tasks.size();i++){
+			if(tasks[i]){
+				delete tasks[i];
+				tasks[i]= 0;
+			}
+		}
+		tasks.clear();
+		return -1;
+	}
+
+	return 0;
+
+}//close JsonToWorkerTasks()
+
+int Serializer::JsonStringToWorkerTasks(std::vector<WorkerTask*>& tasks,std::string& jsonString){
+
+	//Convert input string to json object
+	Json::Reader reader;
+	Json::Value root;
+  if(!reader.parse(jsonString, root)) {
+		ERROR_LOG("Failed to encode string to json ("<<reader.getFormattedErrorMessages()<<")");
+		return -1;
+	}
+
+	//Convert from json object to WorkerTasks
+	if(JsonToWorkerTasks(tasks,root)<0){
+		ERROR_LOG("Failed to convert json object to worker tasks");
+		return -1;
+	}
+	
+	return 0;
+}//close JsonStringToWorkerTasks()
 
 
 int Serializer::SourceToBuffer(Source* source,msgpack::sbuffer& buffer){

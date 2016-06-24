@@ -128,6 +128,7 @@ class WorkerData : public TObject {
 	ClassDef(WorkerData,1)
 };
 
+
 #ifdef __MAKECINT__
 #pragma link C++ class WorkerDataHeader+;
 #pragma link C++ class WorkerData+;

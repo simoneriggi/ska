@@ -6,8 +6,8 @@ message (STATUS "INC_DIR: ${INC_DIR}")
 ## GET SOURCES and HEADERS
 file(GLOB_RECURSE THIS_SRCS ${SRC_DIR}/*.cc)
 file(GLOB_RECURSE THIS_HEADERS ${INC_DIR}/*.h)
-set(THIS_DICT_HEADERS ${THIS_DICT_HEADERS} Serializer.h WorkerData.h WorkerManager.h)
-set(THIS_DICT_SRCS ${THIS_DICT_SRCS} ${SRC_DIR}/Serializer.cc ${SRC_DIR}/WorkerData.cc ${SRC_DIR}/WorkerManager.cc) 
+set(THIS_DICT_HEADERS ${THIS_DICT_HEADERS} Serializer.h WorkerData.h WorkerTask.h WorkerManager.h)
+set(THIS_DICT_SRCS ${THIS_DICT_SRCS} ${SRC_DIR}/Serializer.cc ${SRC_DIR}/WorkerData.cc ${SRC_DIR}/WorkerTask.cc ${SRC_DIR}/WorkerManager.cc) 
 
 set(THIS_HEADERS_WPATH "")
 foreach (_headerFile ${THIS_HEADERS})

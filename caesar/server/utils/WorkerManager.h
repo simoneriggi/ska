@@ -40,6 +40,43 @@
 
 namespace Caesar {
 
+class EvtSubscriptionData {
+
+	public:
+		EvtSubscriptionData(std::string devicename,std::string attrname,Tango::EventType eventtype) 
+			: device_name(devicename), attr_name(attrname),event_type(eventtype) 
+		{
+			is_subscribed= false;
+			subscription_id= -1;
+		};
+		~EvtSubscriptionData(){};
+
+	public:
+		std::string device_name;
+		bool is_subscribed;
+		int subscription_id;
+		std::string attr_name;
+		Tango::EventType event_type; 
+
+};//close EvtSubscriptionData()
+
+struct MatchSubscription {
+	MatchSubscription(const EvtSubscriptionData& subscriptionData) 
+		: m_subscriptionData(subscriptionData) {}
+ 	bool operator()(const EvtSubscriptionData* obj) const {
+		bool areEqual= ( obj->device_name==m_subscriptionData.device_name && 
+										 obj->attr_name==m_subscriptionData.attr_name &&
+										 obj->event_type==m_subscriptionData.event_type);
+  	return areEqual;
+ 	}
+ 	private:
+  	const EvtSubscriptionData& m_subscriptionData;
+};
+
+
+typedef std::vector<EvtSubscriptionData*> Subscriptions;
+
+
 class WorkerManager {
 
 	public :
@@ -64,6 +101,17 @@ class WorkerManager {
 
 		//Get worker names
 		void GetWorkerNames(std::vector<std::string>& worker_names);
+		void GetFreeWorkerNames(std::vector<std::string>& worker_names);
+		void GetBusyWorkerNames(std::vector<std::string>& worker_names);
+
+		//Subscribe to event
+		int SubscribeGroupToEvent(std::string attr_name,Tango::EventType event_type,Tango::CallBack* event_cb);
+
+		//Find subscription
+		EvtSubscriptionData* FindSubscription(int& index,std::string& device_name,std::string& attr_name,Tango::EventType& event_type);
+	
+		//Update worker status
+		int UpdateWorkerState(std::string& device_name,Tango::DevState& state);
 
 	private:
 		void Init();
@@ -73,6 +121,8 @@ class WorkerManager {
 		Tango::Group* m_workers;
 		Tango::Group* m_freeWorkers;
 		Tango::Group* m_busyWorkers;
+		EvtSubscriptionData* m_subscriptionData;
+		Subscriptions m_subscriptions;
 
 };//close WorkerManager
 

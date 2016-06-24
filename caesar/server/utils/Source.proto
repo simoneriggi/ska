@@ -236,6 +236,11 @@ message WorkerProgressData {
 	optional TaskStage stage = 3;
 	optional float progress = 4;
 
-}//close WorkerProgressStatus
+}
+
+
+
+
+
 
 
