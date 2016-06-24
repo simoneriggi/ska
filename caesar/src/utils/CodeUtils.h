@@ -29,10 +29,19 @@
 #ifndef CodeUtils_h
 #define CodeUtils_h 1
 
+#include <Logger.h>
+
 #include <TObject.h>
+
+#include <json/json.h>
 
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/string_generator.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include <cstdlib>
 #include <iomanip>
@@ -55,6 +64,69 @@ using namespace std;
 
 namespace Caesar {
 
+
+template <typename T>
+struct MatchJsonValue {
+	MatchJsonValue(const T& value,const std::string& key) 
+		: m_value(value),m_key(key)
+	{}
+ 			
+	//friend bool operator()(const Json::Value& obj) const {
+	bool operator()(const Json::Value& obj) const {		
+		if(obj[m_key.c_str()].isNull()) return false;
+		return (obj[m_key.c_str()].asString()==m_value);
+ 	}
+
+ 	private:
+  	const T& m_value;
+		const std::string& m_key;
+
+};//close MatchJsonValue()
+
+template <>
+inline bool MatchJsonValue<float>::operator()(const Json::Value& obj) const {	
+	if(obj[m_key.c_str()].isNull()) return false;
+	return (obj[m_key.c_str()].asFloat()==m_value);
+}
+
+
+template <>
+inline bool MatchJsonValue<double>::operator()(const Json::Value& obj) const {	
+	if(obj[m_key.c_str()].isNull()) return false;
+	return (obj[m_key.c_str()].asDouble()==m_value);
+}
+
+template <>
+inline bool MatchJsonValue<std::string>::operator()(const Json::Value& obj) const {	
+ 	if(obj[m_key.c_str()].isNull()) return false;
+	return (obj[m_key.c_str()].asString()==m_value);
+}
+
+template <>
+inline bool MatchJsonValue<bool>::operator()(const Json::Value& obj) const {	
+	if(obj[m_key.c_str()].isNull()) return false;
+	return (obj[m_key.c_str()].asBool()==m_value);
+}
+		
+template <>
+inline bool MatchJsonValue<int>::operator()(const Json::Value& obj) const {	
+	if(obj[m_key.c_str()].isNull()) return false;
+	return (obj[m_key.c_str()].asInt()==m_value);
+}
+		
+template <>
+inline bool MatchJsonValue<long int>::operator()(const Json::Value& obj) const {	
+ 	if(obj[m_key.c_str()].isNull()) return false;
+	return (obj[m_key.c_str()].asInt64()==m_value);
+}
+
+template <>
+inline bool MatchJsonValue<char*>::operator()(const Json::Value& obj) const {	
+	if(obj[m_key.c_str()].isNull()) return false;
+	return (strcmp(obj[m_key.c_str()].asCString(),m_value)==0);
+}
+
+
 class CodeUtils : public TObject {
 
   public:
@@ -70,6 +142,55 @@ class CodeUtils : public TObject {
 
 		
 	public:
+
+		static std::string GenerateUUID(){
+			boost::uuids::uuid random_uuid = boost::uuids::random_generator()();
+			return boost::lexical_cast<std::string>(random_uuid);
+		}
+
+		static int JsonToString(std::string& jsonString,Json::Value& jsonObj,bool isMinified=true){
+			//Encode to string
+			try {
+				if(isMinified){// write in a minified way
+					Json::FastWriter fastWriter;
+					jsonString= fastWriter.write(jsonObj);
+				}
+				else{	// write in a nice readible way
+					Json::StyledWriter formattedWriter;
+					jsonString= formattedWriter.write(jsonObj);
+				}
+			}//close try
+			catch(...){
+				ERROR_LOG("Failed to encode to json string!");
+				return -1;
+			}		
+			return 0;
+		}//close JsonToString()
+
+		/**
+		* \brief Find json option in array by name
+		*/
+		template<typename T>
+		static int FindJsonValue(int& pos,Json::Value& root,T value,std::string key="name"){
+			pos= -1;
+			
+			//Check option name
+			if(key=="") return -1;
+			
+			//Check json (it shall be an array)
+			if(root.isNull() || root.empty() || !root.isArray() ){
+				return -1;
+			}
+				
+			//Find option with given key
+			Json::ValueIterator it= std::find_if(root.begin(),root.end(),MatchJsonValue<T>(value,key));
+			if(it==root.end()){
+				pos= -1;
+				return -1;
+			}	
+			pos= (int)(it-root.begin());
+			return 0;
+		}//close FindJsonOption()
 
 		/**
 		* \brief Find item in a vector and returns item position
@@ -219,45 +340,6 @@ class CodeUtils : public TObject {
 };
 
 
-inline std::string getClassName(std::string fullFuncName,std::string funcName){
-
-	//Init pattern to be searched
-	std::string result= "";
-	//std::string pattern("::(.*)::");//FIX ME!!!
-	std::string pattern("([-A-Za-z0-9_]+)::");
-	pattern+= funcName;
-
-	//Create regex
-	boost::regex expression;
-	try {
-  	expression = pattern;
-  }
-  catch (boost::regex_error& e) {
-  	return result;
-  }
-
-	//Find match
-	boost::smatch matches;
-	if (boost::regex_search(fullFuncName, matches, expression) && matches.size()>1) {
-		result= std::string(matches[1].first, matches[1].second);
-		//result= std::string(matches[matches.size()-1].first, matches[matches.size()-1].second);
-		//for(int i=0;i<matches.size();i++) cout<<"match no. "<<i<<"="<<matches[i]<<endl;
-  }//close if
-	
-	return result;
-
-}//close function
-
-inline std::string getClassNamePrefix(std::string fullFuncName,std::string funcName){
-	std::string className= getClassName(fullFuncName,funcName);
-	std::string sprefix= "::";
-	if(className=="") return className;
-	return className+sprefix;
-}
-
-#define __CLASS__ getClassName(__PRETTY_FUNCTION__,__FUNCTION__)
-#define __CLASS_PREFIX__ getClassNamePrefix(__PRETTY_FUNCTION__,__FUNCTION__)
-#define __DEVICE_CLASS(deviceInstance) deviceInstance->get_device_class()->get_name()
 
 
 #ifdef __MAKECINT__

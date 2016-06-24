@@ -27,6 +27,7 @@
 
 
 #include <CodeUtils.h>
+#include <Logger.h>
 
 #include <TObject.h>
 

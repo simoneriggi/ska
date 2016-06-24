@@ -6,8 +6,8 @@ message (STATUS "INC_DIR: ${INC_DIR}")
 ## GET SOURCES and HEADERS
 file(GLOB_RECURSE THIS_SRCS ${SRC_DIR}/*.cc)
 file(GLOB_RECURSE THIS_HEADERS ${INC_DIR}/*.h)
-set(THIS_DICT_HEADERS ${THIS_DICT_HEADERS} SysUtils.h AstroUtils.h StatsUtils.h CodeUtils.h MathUtils.h GraphicsUtils.h ConfigParser.h Logger.h)
-set(THIS_DICT_SRCS ${THIS_DICT_SRCS} ${SRC_DIR}/SysUtils.cc ${SRC_DIR}/AstroUtils.cc ${SRC_DIR}/StatsUtils.cc ${SRC_DIR}/CodeUtils.cc ${SRC_DIR}/MathUtils.cc ${SRC_DIR}/GraphicsUtils.cc ${SRC_DIR}/ConfigParser.cc ${SRC_DIR}/Logger.cc) 
+set(THIS_DICT_HEADERS ${THIS_DICT_HEADERS} SysUtils.h AstroUtils.h StatsUtils.h CodeUtils.h MathUtils.h GraphicsUtils.h Option.h ConfigParser.h Logger.h)
+set(THIS_DICT_SRCS ${THIS_DICT_SRCS} ${SRC_DIR}/SysUtils.cc ${SRC_DIR}/AstroUtils.cc ${SRC_DIR}/StatsUtils.cc ${SRC_DIR}/CodeUtils.cc ${SRC_DIR}/MathUtils.cc ${SRC_DIR}/GraphicsUtils.cc ${SRC_DIR}/Option.cc ${SRC_DIR}/ConfigParser.cc ${SRC_DIR}/Logger.cc) 
 
 set(THIS_HEADERS_WPATH "")
 foreach (_headerFile ${THIS_HEADERS})

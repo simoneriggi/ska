@@ -78,6 +78,16 @@ class MathUtils : public TObject {
 
 		
 	public:
+
+		/**
+		* \brief Return 2D grid partition given Nx x Ny pixels and box sizes
+		*/
+		static int Compute2DGrid(
+			std::vector<long int>& ix_min,std::vector<long int>& ix_max,
+			std::vector<long int>& iy_min,std::vector<long int>& iy_max,
+			long int Nx,long int Ny,long int boxSizeX,long int boxSizeY,float gridStepSizeX,float gridStepSizeY
+		);
+
 		/**
 		* \brief Perform bilinear interpolation on regular grid
 		*/

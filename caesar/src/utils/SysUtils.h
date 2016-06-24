@@ -85,6 +85,7 @@ class FileInfo : public TObject {
 			cout <<"***********************"<<endl;
 		}
 
+		
 	public: 
 		std::string path;
 		std::string filename;
@@ -150,6 +151,8 @@ class SysUtils : public TObject {
 		static double TimeToNSec (timespec time){
 			return (time.tv_sec*1.e+09 + (double)time.tv_nsec) ;
 		}
+
+		static int GetFITSImageSize(const std::string& filename,long int& Nx,long int& Ny);
 		
 	private:
 	

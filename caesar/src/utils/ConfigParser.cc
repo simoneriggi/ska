@@ -160,6 +160,15 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(tileMinY,double,0,-1.e+6,1.e+6);
 		REGISTER_OPTION(tileMaxY,double,0,-1.e+6,1.e+6);
 
+		//=======================================
+		//==  Distributed processing options   ==
+		//=======================================
+		REGISTER_OPTION(tileSizeX,long int,1000,1,10000000);
+		REGISTER_OPTION(tileSizeY,long int,1000,1,10000000);	
+		REGISTER_OPTION(useTileOverlap,bool,false,false,true);
+		REGISTER_OPTION(tileStepSizeX,double,1,0.001,1);
+		REGISTER_OPTION(tileStepSizeY,double,1,0.001,1);
+
 		//======================
 		//==  Logger options  ==
 		//======================

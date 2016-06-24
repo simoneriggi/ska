@@ -59,6 +59,63 @@ MathUtils::~MathUtils(){
 
 }
 
+int MathUtils::Compute2DGrid(std::vector<long int>& ix_min,std::vector<long int>& ix_max,std::vector<long int>& iy_min,std::vector<long int>& iy_max,long int Nx,long int Ny,long int boxSizeX,long int boxSizeY,float gridStepSizeX,float gridStepSizeY){
+
+	//## Check given arguments
+	if(Nx<=0 || Ny<=0){
+		ERROR_LOG("Invalid Nx/Ny given (negative or zero)!");
+		return -1;
+	}
+	if(boxSizeX<=0 || boxSizeY<=0) {
+		ERROR_LOG("Invalid box size given!");
+		return -1;
+	}
+	if(gridStepSizeX<=0 || gridStepSizeY<=0 || gridStepSizeX>1 || gridStepSizeY>1){
+		ERROR_LOG("Invalid grid step size given (null or negative)!");
+		return -1;
+	}
+
+	//## Check if image size is smaller than required box
+	if(boxSizeX>=Nx || boxSizeY>=Ny) {
+		WARN_LOG("Invalid box size given (too small or larger than image size)!");
+		return -1;
+	}
+
+	long int stepSizeX= std::round(gridStepSizeX*boxSizeX);
+	long int stepSizeY= std::round(gridStepSizeY*boxSizeY);
+	long int indexX= 0;
+	long int indexY= 0;
+	ix_min.clear();
+	ix_max.clear();
+	iy_min.clear();
+	iy_max.clear();
+	
+
+	while(indexY<=Ny){
+		long int offsetY= min(boxSizeY,Ny-1-indexY);
+		long int ymin= indexY;
+		long int ymax= indexY+offsetY;
+		if(ymin>=Ny || offsetY==0) break;	
+		iy_min.push_back(ymin);
+		iy_max.push_back(ymax);
+		indexY+= stepSizeY;
+	}//end while loop Y
+		
+	while(indexX<=Nx){
+		long int offsetX= min(boxSizeX,Nx-1-indexX);
+		long int xmin= indexX;
+		long int xmax= indexX+offsetX;
+		if(xmin>=Nx || offsetX==0) break;	
+		ix_min.push_back(xmin);
+		ix_max.push_back(xmax);
+		indexX+= stepSizeX;
+	}//end while loop Y
+
+	
+	return 0;
+
+}//close Compute2DGrid()
+
 int MathUtils::BiLinearInterpolation(std::vector<double>const& sampled_gridX, std::vector<double>const& sampled_gridY,std::vector<double>const& sampledZ,std::vector<double>const& interp_gridX,std::vector<double>const& interp_gridY,std::vector<double>& interpZ){
 
 	//## Check args

@@ -28,7 +28,7 @@
 #ifndef Logger_h
 #define Logger_h 1
 
-#include <CodeUtils.h>
+//#include <CodeUtils.h>
 
 #include <TObject.h>
 #include <TFITS.h>
@@ -51,6 +51,9 @@
 #include <log4cxx/net/syslogappender.h>
 #include <log4cxx/helpers/exception.h>
 
+//Boost
+#include <boost/regex.hpp>
+#include <boost/lexical_cast.hpp>
 
 //#include <syslog.h>
 
@@ -527,6 +530,51 @@ inline std::string GetDeviceName(){
 	return dev_name;
 }
 #endif
+
+
+inline std::string getClassName(std::string fullFuncName,std::string funcName){
+
+	//Init pattern to be searched
+	std::string result= "";
+	//std::string pattern("::(.*)::");//FIX ME!!!
+	std::string pattern("([-A-Za-z0-9_]+)::");
+	pattern+= funcName;
+
+	//Create regex
+	boost::regex expression;
+	try {
+  	expression = pattern;
+  }
+  catch (boost::regex_error& e) {
+  	return result;
+  }
+
+	//Find match
+	boost::smatch matches;
+	if (boost::regex_search(fullFuncName, matches, expression) && matches.size()>1) {
+		result= std::string(matches[1].first, matches[1].second);
+		//result= std::string(matches[matches.size()-1].first, matches[matches.size()-1].second);
+		//for(int i=0;i<matches.size();i++) cout<<"match no. "<<i<<"="<<matches[i]<<endl;
+  }//close if
+	
+	return result;
+
+}//close function
+
+inline std::string getClassNamePrefix(std::string fullFuncName,std::string funcName){
+	std::string className= getClassName(fullFuncName,funcName);
+	std::string sprefix= "::";
+	if(className=="") return className;
+	return className+sprefix;
+}
+
+#define __CLASS__ getClassName(__PRETTY_FUNCTION__,__FUNCTION__)
+#define __CLASS_PREFIX__ getClassNamePrefix(__PRETTY_FUNCTION__,__FUNCTION__)
+#define __DEVICE_CLASS(deviceInstance) deviceInstance->get_device_class()->get_name()
+
+
+
+
 
 //== LOG MACROS ===
 #define LOG_PREFIX \

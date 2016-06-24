@@ -464,7 +464,7 @@ class Option : public OptionBase {
 		int GetJsonString(std::string& jsonString,bool isMinified=true){
 			Json::Value jsonObj;
 			if(GetJson(jsonObj)<0) {
-				cerr<<"Option::GetJsonString(): ERROR: Failed to encode argument to json object!"<<endl;
+				cerr<<"Option::GetJsonString(): ERROR: Failed to encode option to json object!"<<endl;
 				return -1;
 			}
 			try {
@@ -811,7 +811,7 @@ class OptionFactory : public TObject {
 		int GetJsonString(std::string& jsonString,bool isMinified=true){
 			Json::Value jsonObj;
 			if(GetJson(jsonObj)<0) {
-				cerr<<"OptionFactory::GetJsonString(): ERROR: Failed to encode argument to json object!"<<endl;
+				cerr<<"OptionFactory::GetJsonString(): ERROR: Failed to encode option to json object!"<<endl;
 				return -1;
 			}
 			try {

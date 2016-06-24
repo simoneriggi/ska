@@ -31,6 +31,8 @@
 #include <Logger.h>
 
 
+#include <fitsio.h>
+
 #include <boost/filesystem.hpp>
 
 #include <TObject.h>
@@ -130,6 +132,37 @@ bool SysUtils::CheckFile(std::string path,Caesar::FileInfo& info,bool match_exte
 	return true;
 
 }//close CheckFile()
+
+int SysUtils::GetFITSImageSize(const std::string& filename,long int& Nx,long int& Ny){
+
+	//Init	
+	Nx= 0;
+	Ny= 0;
+	
+	//Open file
+  int status = 0;
+	fitsfile *fptr;//pointer to the FITS file, defined in fitsio.h
+  fits_open_file(&fptr, filename.c_str(), READONLY, &status);
+  if(status){
+		ERROR_LOG("Failed to open given fits file "<<filename<<"!");	
+		return -1;
+	}
+
+  //Read the NAXIS1 and NAXIS2 keyword to get image size
+	int nfound;
+	long naxes[2];
+	fits_read_keys_lng(fptr, "NAXIS", 1, 2, naxes, &nfound, &status);
+  if (status){
+		ERROR_LOG("Failed to get NAXIS keyword from given fits file "<<filename<<"!");	
+		return -1;
+	}
+        
+	Nx= naxes[0];
+	Ny= naxes[1];
+	
+	return 0;
+
+}//close GetFITSImageSize()
 
 }//close namespace
 
