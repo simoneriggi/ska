@@ -80,7 +80,7 @@ class Serializer : public TObject {
 
 	public: 
 		
-		//#ifdef BUILD_CAESAR_SERVER
+			//## SOURCE SERIALIZATION
 			//Source --> Buffer
 			static int EncodePointToProtobuf(SourcePB::Point& point_pb,TVector2& point);
 			static int EncodeContourToProtobuf(SourcePB::Contour& contour_pb,Contour* contour);
@@ -89,11 +89,6 @@ class Serializer : public TObject {
 			static int EncodeSourceToProtobuf(SourcePB::Source& source_pb,Source* source);		
 			static int SourceToBuffer(SBuffer& buffer,Source* source);
 			
-			//WorkerData --> Buffer
-			static int EncodeWorkerDataToProtobuf(SourcePB::WorkerData& workerData_pb,WorkerData* workerData);
-			static int WorkerDataToBuffer(SBuffer& buffer,WorkerData* workerData);
-
-			
 			//Buffer --> Source
 			static int EncodeProtobufToPoint(TVector2& point,const SourcePB::Point& point_pb);
 			static int EncodeProtobufToContour(Contour& contour,const SourcePB::Contour& contour_pb);
@@ -101,18 +96,17 @@ class Serializer : public TObject {
 			static int EncodeProtobufToBlob(Source& source,const SourcePB::Blob& blob_pb);
 			static int EncodeProtobufToSource(Source& source,const SourcePB::Source& source_pb);			
 			static int BufferToSource(Source& source,SBuffer& buffer);
-			
-			//Buffer --> WorkerData
-			static int EncodeProtobufToWorkerData(WorkerData& workerData,const SourcePB::WorkerData& workerData_pb);
-			static int BufferToWorkerData(WorkerData& workerData,SBuffer& buffer);
 
-			//Source --> Tango pipe blob
+			//Source --> Tango pipe
 			static int SourceToTangoPipe(Tango::DevicePipeBlob& pipe_blob,Source* source);
 			static int SourceCollectionToTangoPipe(Tango::DevicePipeBlob& pipe_blob,std::vector<Source*>& sources);
+
+			//Tango pipe --> Source
 			static int TangoPipeToSource(Source& source,Tango::DevicePipeBlob& pipe_blob);
 			static int TangoPipeToSourceCollection(std::vector<Source*>& source_list,Tango::DevicePipeBlob& pipe_blob);
 			static int MakeSourceDataPipe(Tango::DevicePipeBlob& pipe_blob,std::string jobId,long int IdX,long int IdY,std::vector<Source*>& sources,std::vector<Source*>& edge_sources);
 
+			//## WORKER TASK SERIALIZATION #####
 			//WorkerTask collection --> Json
 			static int WorkerTasksToJson(Json::Value& root,std::vector<WorkerTask*>& tasks);
 			static int WorkerTasksToJsonString(std::string& jsonString,std::vector<WorkerTask*>& tasks,bool isMinified=true);
@@ -120,6 +114,18 @@ class Serializer : public TObject {
 			//Json --> WorkerTask collection
 			static int JsonToWorkerTasks(std::vector<WorkerTask*>& tasks,Json::Value& root);
 			static int JsonStringToWorkerTasks(std::vector<WorkerTask*>& tasks,std::string& jsonString);
+
+			//## WORKER DATA SERIALIZATION ###
+			//WorkerData --> Buffer
+			static int EncodeWorkerDataToProtobuf(SourcePB::WorkerData& workerData_pb,WorkerData* workerData);
+			static int WorkerDataToBuffer(SBuffer& buffer,WorkerData* workerData);
+
+			//Buffer --> WorkerData
+			static int EncodeProtobufToWorkerData(WorkerData& workerData,const SourcePB::WorkerData& workerData_pb);
+			static int BufferToWorkerData(WorkerData& workerData,SBuffer& buffer);
+
+
+			
 
 			//Msgpack
 			static int SourceToBuffer(Source* source,msgpack::sbuffer& buffer);
@@ -129,7 +135,7 @@ class Serializer : public TObject {
 			static int SourceCollectionToBuffer(std::vector<Source*>& sources,msgpack::sbuffer& buffer);
 			static int SourceCollectionToString(std::vector<Source*>& sources,std::string& msg);
 			static int SourceCollectionToDevString(std::vector<Source*>& sources,Tango::DevString& msg);
-		//#endif
+		
 
 		
 	public:

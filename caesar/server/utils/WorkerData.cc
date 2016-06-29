@@ -26,6 +26,7 @@
 */
 
 #include <WorkerData.h>
+#include <WorkerTask.h>
 #include <Logger.h>
 #include <Source.h>
 
@@ -46,13 +47,14 @@
 
 using namespace std;
 
-ClassImp(Caesar::WorkerDataHeader)
+//ClassImp(Caesar::WorkerDataHeader)
 ClassImp(Caesar::WorkerData)
 
 namespace Caesar {
 
 //Standard Constructor
 WorkerData::WorkerData() : TObject() {	
+	data_type= eUNKNOWN_DATA;
 	source= 0;
 	sources.clear();
 	edge_source= 0;
@@ -96,7 +98,8 @@ void WorkerData::Copy(TObject &obj) const {
 			
 	TObject::Copy((WorkerData&)obj);
 	((WorkerData&)obj).info = info;
-			
+	((WorkerData&)obj).data_type = data_type;		
+	
 	//Delete first a previously existing vector
 	for(unsigned int i=0;i<(((WorkerData&)obj).sources).size();i++){
 		if( (((WorkerData&)obj).sources)[i] ){

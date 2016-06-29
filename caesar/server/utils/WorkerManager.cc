@@ -122,14 +122,14 @@ int WorkerManager::AddWorker(const std::string& device_name){
 	if(device_name=="") return -1;
 	
 	//Check if device already exists
-	INFO_LOG("Check if device "<<device_name<<" already exist in the list...");
+	DEBUG_LOG("Check if device "<<device_name<<" already exist in the list...");
 	if(HasWorker(device_name)){
 		WARN_LOG("Worker ("<<device_name<<") already added!");
 		return 0;
 	}
 
 	//Add worker in Group (add in busy group initially)
-	INFO_LOG("Adding device "<<device_name<<" to worker group...");
+	DEBUG_LOG("Adding device "<<device_name<<" to worker group...");
 	try{
 		m_workers->add(device_name,20000);
 	}
@@ -276,7 +276,7 @@ int WorkerManager::SubscribeGroupToEvent(std::string attr_name,Tango::EventType 
 	}
 
 	for(unsigned int i=0;i<device_names.size();i++){
-		INFO_LOG("Retrieving worker "<<device_names[i]<<" from Group...");
+		DEBUG_LOG("Retrieving worker "<<device_names[i]<<" from Group...");
 		
 		Tango::DeviceProxy* device= 0;
 		std::string device_name= device_names[i];
@@ -306,14 +306,14 @@ int WorkerManager::SubscribeGroupToEvent(std::string attr_name,Tango::EventType 
 
 		if(subscriptionData){
 			hasSubscription= true;
-			INFO_LOG("Subscription to event "<<attr_name<<" ("<<event_type<<") for device "<<device_name<<" already present, checking if already subscribed...");
+			DEBUG_LOG("Subscription to event "<<attr_name<<" ("<<event_type<<") for device "<<device_name<<" already present, checking if already subscribed...");
 			if(subscriptionData->is_subscribed){
-				INFO_LOG("Subscription to event "<<attr_name<<" ("<<event_type<<") for device "<<device_name<<" already done, go to next device...");
+				DEBUG_LOG("Subscription to event "<<attr_name<<" ("<<event_type<<") for device "<<device_name<<" already done, go to next device...");
 				continue;
 			}
 		}
 		else{
-			INFO_LOG("Subscription to event "<<attr_name<<" ("<<event_type<<") for device "<<device_name<<" not found, adding to the list...");
+			DEBUG_LOG("Subscription to event "<<attr_name<<" ("<<event_type<<") for device "<<device_name<<" not found, adding to the list...");
 		}
 
 		//Subscribe to event

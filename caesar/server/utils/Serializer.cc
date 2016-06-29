@@ -655,14 +655,20 @@ int Serializer::EncodeWorkerDataToProtobuf(SourcePB::WorkerData& workerData_pb,W
 		timestamp->set_seconds( ((workerData->info).timestamp).tv_sec );
 		timestamp->set_nanos( ((workerData->info).timestamp).tv_usec*1000 );
 
-		//Set header
-		SourcePB::WorkerDataHeader* headerPB= new SourcePB::WorkerDataHeader;
-		headerPB->set_jobid((workerData->info).jobId);
-		headerPB->set_ix((workerData->info).IdX);
-		headerPB->set_iy((workerData->info).IdY);
-		headerPB->set_allocated_timestamp(timestamp);
+		//Set task
+		SourcePB::WorkerTask* taskPB= new SourcePB::WorkerTask;
+		if( (workerData->info).SerializeToProtobuf(*taskPB)<0 ){
+			throw std::runtime_error("Failed to serialize task to protobuf!");
+		}
+		workerData_pb.set_allocated_task(taskPB);
 
-		workerData_pb.set_allocated_header(headerPB);
+		//Set source data type
+		if(workerData->data_type==WorkerData::eUNKNOWN_DATA) workerData_pb.set_data_type(SourcePB::WorkerData::eUNKNOWN_DATA);
+		else if(workerData->data_type==WorkerData::eCOMPACT_SOURCE_DATA) workerData_pb.set_data_type(SourcePB::WorkerData::eCOMPACT_SOURCE_DATA);
+		else if(workerData->data_type==WorkerData::eEXTENDED_SOURCE_DATA) workerData_pb.set_data_type(SourcePB::WorkerData::eEXTENDED_SOURCE_DATA);
+		else{
+			throw std::runtime_error("Invalid source data type detected!");	
+		}
 
 		//Set source collections
 		for(unsigned int i=0;i<(workerData->sources).size();i++){
@@ -723,7 +729,9 @@ int Serializer::SourceToBuffer(SBuffer& buffer,Source* source){
 int Serializer::WorkerDataToBuffer(SBuffer& buffer,WorkerData* workerData){
 
 	//## Check input data
-	if(!workerData) return -1;
+	if(!workerData) {
+		return -1;
+	}
 
 	try {
 		//## Create google protobuf source message
@@ -1139,41 +1147,27 @@ int Serializer::EncodeProtobufToWorkerData(WorkerData& workerData,const SourcePB
 
 	try {
 		
-		//Check for header 
-		if(!workerData_pb.has_header()) {
-			throw std::runtime_error("No header present in the data!");	
-		}
-		const SourcePB::WorkerDataHeader& headerPB= workerData_pb.header();
-
-		//Set header fields
-		//--> timestamp
-		if(headerPB.has_timestamp()) {
-			const SourcePB::Timestamp& timestampPB= headerPB.timestamp();
-			((workerData.info).timestamp).tv_sec= timestampPB.seconds();
-			((workerData.info).timestamp).tv_usec= timestampPB.nanos()*1.e-3;
-		}
-		else{
-			gettimeofday(&((workerData.info).timestamp), NULL);	
+		//Check task
+		if(!workerData_pb.has_task()) {
+			throw std::runtime_error("No task info present in the data!");	
 		}
 
-		//--> jobId
-		if(!headerPB.has_jobid()){
-			throw std::runtime_error("Missing jobId in header!");	
+		//Fill task info
+		const SourcePB::WorkerTask& taskPB= workerData_pb.task();
+		if( (workerData.info).EncodeFromProtobuf(taskPB)<0 ){
+			throw std::runtime_error("Failed to encode task info from protobuf!");	
 		}
-		(workerData.info).jobId= headerPB.jobid();
 
-		//--> IdX/IdY
-		if(!headerPB.has_ix() || !headerPB.has_iy()){
-			throw std::runtime_error("Missing IdX/IdY in header!");	
-		}
-		long int ix= headerPB.ix();
-		long int iy= headerPB.iy();
-		if(ix<0 || iy<0){
-			throw std::runtime_error("Invalid IdX/IdY in header (negative values)!");	
-		}
-		(workerData.info).IdX= ix;
-		(workerData.info).IdY= iy;
-
+		//Set source data type
+		if(workerData_pb.has_data_type()) {
+			SourcePB::WorkerData_SourceDataType sourceDataTypePB= workerData_pb.data_type();
+			if(sourceDataTypePB==SourcePB::WorkerData::eUNKNOWN_DATA) workerData.data_type= WorkerData::eUNKNOWN_DATA;
+			else if(sourceDataTypePB==SourcePB::WorkerData::eCOMPACT_SOURCE_DATA) workerData.data_type= WorkerData::eCOMPACT_SOURCE_DATA;
+			else if(sourceDataTypePB==SourcePB::WorkerData::eEXTENDED_SOURCE_DATA) workerData.data_type= WorkerData::eEXTENDED_SOURCE_DATA;
+			else{
+				throw std::runtime_error("Invalid source data type detected!");	
+			}
+		}//close if
 
 		//Parse source collection
 		Source* aSource= 0;

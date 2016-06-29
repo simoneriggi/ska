@@ -27,6 +27,7 @@
 #ifndef WorkerData_H
 #define WorkerData_H
 
+#include <WorkerTask.h>
 #include <Source.h>
 
 #include <string>
@@ -44,7 +45,7 @@
 
 namespace Caesar {
 
-
+/*
 class WorkerDataHeader : public TObject {
 	public:
 		//Standard constructor
@@ -98,6 +99,8 @@ class WorkerDataHeader : public TObject {
 
 	ClassDef(WorkerDataHeader,1)
 };
+*/
+
 
 class WorkerData : public TObject {
 	public:
@@ -110,6 +113,12 @@ class WorkerData : public TObject {
 		//Destructor
 		virtual ~WorkerData();
 
+		enum SourceDataType {
+			eUNKNOWN_DATA= 0,
+			eCOMPACT_SOURCE_DATA= 1,
+			eEXTENDED_SOURCE_DATA= 2
+		};
+
 	public:
 		// Operator =
 		WorkerData& operator=(const WorkerData& data);
@@ -119,7 +128,9 @@ class WorkerData : public TObject {
 
 
 	public: 
-		WorkerDataHeader info; 
+		
+		WorkerTask info;
+		int data_type;
 		Source* source;
 		std::vector<Source*> sources;
 		Source* edge_source;
@@ -130,7 +141,7 @@ class WorkerData : public TObject {
 
 
 #ifdef __MAKECINT__
-#pragma link C++ class WorkerDataHeader+;
+//#pragma link C++ class WorkerDataHeader+;
 #pragma link C++ class WorkerData+;
 #endif
 

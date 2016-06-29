@@ -27,6 +27,7 @@
 #ifndef WorkerTask_H
 #define WorkerTask_H
 
+#include <Source.pb.h>
 #include <json/json.h>
 
 #include <TObject.h>
@@ -65,10 +66,13 @@ class WorkerTask : public TObject {
 		//Copy method
 		void Copy(TObject &obj) const;
 
-		//Serialize to json
+		//Serialize methods
 		int SerializeToJson(Json::Value& jsonObj);
 		int SerializeToJsonString(std::string& jsonString,bool isMinified=true);
+		int SerializeToProtobuf(SourcePB::WorkerTask& taskPB);
 		int EncodeFromJson(const Json::Value& jsonObj);
+		int EncodeFromJsonString(std::string& jsonString);
+		int EncodeFromProtobuf(const SourcePB::WorkerTask& taskPB);
 
 	public:
 		std::string filename; 

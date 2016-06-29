@@ -210,14 +210,35 @@ message WorkerDataHeader {
 	optional Timestamp timestamp= 4;
 }
 
+message WorkerTask {
+	optional string filename= 1;
+	optional string jobId= 2;
+	optional string worker_name= 3;
+	optional string broker_name= 4;
+	optional int64 IdX= 5;
+	optional int64 IdY= 6;
+	optional int64 ix_min= 7;
+	optional int64 ix_max= 8;
+	optional int64 iy_min= 9;
+	optional int64 iy_max= 10;
+	optional Timestamp timestamp= 11;
+		
+}//close WorkerTask
+
 message WorkerData {
-	optional WorkerDataHeader header= 1;
+	optional WorkerTask task= 1;
 	repeated Source sources= 2;
 	repeated Source edge_sources= 3;
+	enum SourceDataType {
+		eUNKNOWN_DATA= 0;
+		eCOMPACT_SOURCE_DATA= 1;
+		eEXTENDED_SOURCE_DATA= 2;
+	}
+	optional SourceDataType data_type= 4 [default=eUNKNOWN_DATA];
 }
 
 message WorkerProgressData {
-	optional WorkerDataHeader header= 1;
+	optional WorkerTask task= 1;
 	enum JobStatus {
 		UNKNOWN= 1;
 		RUNNING= 2;
