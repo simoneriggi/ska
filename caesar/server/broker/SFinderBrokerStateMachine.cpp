@@ -50,6 +50,22 @@ namespace SFinderBroker_ns
 //		Attributes Allowed Methods
 //=================================================
 
+//--------------------------------------------------------
+/**
+ *	Method      : SFinderBroker::is_dynStringAttr_allowed()
+ *	Description : Execution allowed for dynStringAttr attribute
+ */
+//--------------------------------------------------------
+bool SFinderBroker::is_dynStringAttr_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+
+	//	Not any excluded states for dynStringAttr attribute in read access.
+	/*----- PROTECTED REGION ID(SFinderBroker::dynStringAttrStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::dynStringAttrStateAllowed_READ
+	return true;
+}
+
 
 //=================================================
 //		Commands Allowed Methods

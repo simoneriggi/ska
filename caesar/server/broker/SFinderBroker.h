@@ -39,6 +39,7 @@
 #define SFinderBroker_H
 
 #include <WorkerStateCallBack.h>
+#include <WorkerSourceDataCallBack.h>
 #include <WorkerManager.h>
 
 #include <json/json.h>
@@ -63,6 +64,7 @@ namespace SFinderBroker_ns
 
 //	Additional Class Declarations
 	class WorkerStateCallBack;
+	class WorkerSourceDataCallBack;
 	
 
 /*----- PROTECTED REGION END -----*/	//	SFinderBroker::Additional Class Declarations
@@ -77,6 +79,7 @@ class SFinderBroker : public TANGO_BASE_CLASS
 		omni_mutex* m_mutex;
 		Caesar::WorkerManager* m_workerManager;
 		WorkerStateCallBack* m_workerStateCallBack;
+		WorkerSourceDataCallBack* m_workerSourceDataCallBack;
 
 /*----- PROTECTED REGION END -----*/	//	SFinderBroker::Data Members
 
@@ -148,6 +151,22 @@ public:
 	//--------------------------------------------------------
 	virtual void read_attr_hardware(vector<long> &attr_list);
 
+//	Dynamic attribute methods
+public:
+
+	/**
+	 *	Attribute dynStringAttr related methods
+	 *	Description: 
+	 *
+	 *	Data type:	Tango::DevString
+	 *	Attr type:	Scalar
+	 */
+	virtual void read_dynStringAttr(Tango::Attribute &attr);
+	virtual bool is_dynStringAttr_allowed(Tango::AttReqType type);
+	void add_dynStringAttr_dynamic_attribute(string attname);
+	void remove_dynStringAttr_dynamic_attribute(string attname);
+	Tango::DevString *get_dynStringAttr_data_ptr(string &name);
+	map<string,Tango::DevString>	   dynStringAttr_data;
 
 	//--------------------------------------------------------
 	/**
@@ -243,8 +262,12 @@ public:
 //	Additional Method prototypes
 	protected:
 		int ValidateConfigOptions(Json::Value& optionList,std::string& config);
+		int AddJobAttr(std::string& attr_name);
+		int RemoveJobAttr(std::string& attr_name);
+		bool FindAttr(long int& index,std::string& attr_name);
 
 	friend class WorkerStateCallBack;
+	friend class WorkerSourceDataCallBack;
 
 /*----- PROTECTED REGION END -----*/	//	SFinderBroker::Additional Method prototypes
 };

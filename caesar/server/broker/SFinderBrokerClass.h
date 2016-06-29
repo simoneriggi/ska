@@ -57,6 +57,23 @@ namespace SFinderBroker_ns
 /*----- PROTECTED REGION END -----*/	//	SFinderBrokerClass::classes for dynamic creation
 
 //=========================================
+//	Define classes for dynamic attributes
+//=========================================
+//	Attribute dynStringAttr class definition
+class dynStringAttrAttrib: public Tango::Attr
+{
+public:
+	dynStringAttrAttrib(const string &att_name):Attr(att_name.c_str(), 
+			Tango::DEV_STRING, Tango::READ) {};
+	~dynStringAttrAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinderBroker *>(dev))->read_dynStringAttr(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinderBroker *>(dev))->is_dynStringAttr_allowed(ty);}
+};
+
+
+//=========================================
 //	Define classes for commands
 //=========================================
 //	Command RegisterWorker class definition

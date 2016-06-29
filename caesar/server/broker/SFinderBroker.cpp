@@ -44,6 +44,7 @@ static const char *RcsId = "$Id:  $";
 #include <SFinderBrokerClass.h>
 
 #include <WorkerStateCallBack.h>
+#include <WorkerSourceDataCallBack.h>
 
 //Caesar headers
 #include <Img.h>
@@ -183,6 +184,11 @@ void SFinderBroker::delete_device()
 		delete m_workerStateCallBack;
 		m_workerStateCallBack= 0;
 	}
+	if(m_workerSourceDataCallBack){
+		DEBUG_LOG("Deleting worker sourceData callback...");
+		delete m_workerSourceDataCallBack;
+		m_workerSourceDataCallBack= 0;
+	}
 
 	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::delete_device
 }
@@ -219,6 +225,10 @@ void SFinderBroker::init_device()
 	DEBUG_LOG("Init worker state callback ...");
 	m_workerStateCallBack= 0;
 	m_workerStateCallBack= new WorkerStateCallBack(this);
+
+	DEBUG_LOG("Init worker sourceData callback ...");
+	m_workerSourceDataCallBack= 0;
+	m_workerSourceDataCallBack= new WorkerSourceDataCallBack(this);
 
 	DEBUG_LOG("Init worker manager ...");
 	m_workerManager= 0;
@@ -327,6 +337,25 @@ void SFinderBroker::read_attr_hardware(TANGO_UNUSED(vector<long> &attr_list))
 
 //--------------------------------------------------------
 /**
+ *	Read attribute dynStringAttr related method
+ *	Description: 
+ *
+ *	Data type:	Tango::DevString
+ *	Attr type:	Scalar
+ */
+//--------------------------------------------------------
+void SFinderBroker::read_dynStringAttr(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinderBroker::read_dynStringAttr(Tango::Attribute &attr) entering... " << endl;
+	Tango::DevString	*att_value = get_dynStringAttr_data_ptr(attr.get_name());
+	/*----- PROTECTED REGION ID(SFinderBroker::read_dynStringAttr) ENABLED START -----*/
+	//	Set the attribute value
+	attr.set_value(att_value);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::read_dynStringAttr
+}
+//--------------------------------------------------------
+/**
  *	Method      : SFinderBroker::add_dynamic_attributes()
  *	Description : Create the dynamic attributes if any
  *                for specified device.
@@ -334,6 +363,10 @@ void SFinderBroker::read_attr_hardware(TANGO_UNUSED(vector<long> &attr_list))
 //--------------------------------------------------------
 void SFinderBroker::add_dynamic_attributes()
 {
+	//	Example to add dynamic attribute:
+	//	Copy inside the following protected area to create instance(s) at startup.
+	//	add_dynStringAttr_dynamic_attribute("MydynStringAttrAttribute");
+	
 	/*----- PROTECTED REGION ID(SFinderBroker::add_dynamic_attributes) ENABLED START -----*/
 	
 	//	Add your own code to create and add dynamic attributes if any
@@ -536,7 +569,7 @@ void SFinderBroker::subscribe_workers()
 	if(!m_workerManager) return;
 
 	//--> State
-	INFO_LOG("Subscribing to State Change event...");
+	DEBUG_LOG("Subscribing to State Change event...");
 	if(m_workerManager->SubscribeGroupToEvent("State",Tango::CHANGE_EVENT,m_workerStateCallBack)<0){
 		WARN_LOG("Failed to subscribe to worker group State event!");
 	}
@@ -547,6 +580,12 @@ void SFinderBroker::subscribe_workers()
 		WARN_LOG("Failed to subscribe to worker group State event!");
 	}
 	*/
+
+	//--> Source data
+	DEBUG_LOG("Subscribing to sourceData Change event...");
+	if(m_workerManager->SubscribeGroupToEvent("sourceData",Tango::CHANGE_EVENT,m_workerSourceDataCallBack)<0){
+		WARN_LOG("Failed to subscribe to worker group sourceData event!");
+	}
 
 	return;
 	
@@ -887,8 +926,122 @@ Tango::DevVarLongStringArray *SFinderBroker::submit_source_finder_job(const Tang
 		return argout;
 	}
 
-	
+	//## Create group command args and submit job to group
+	std::vector<Tango::DeviceData> din_list;
+	bool isArginCreationFailed= false;
+	for(int i=0;i<nWorkers;i++){
+		try {
+			Tango::DeviceData din;
+			Tango::DevVarStringArray* in = new Tango::DevVarStringArray(); 
+    	in->length(4); 
+			(*in)[0] = CORBA::string_dup(inputFileName.c_str());//filename
+    	(*in)[1] = CORBA::string_dup(jobId.c_str());//jobId
+			(*in)[2] = CORBA::string_dup(tasksArgList[i].c_str());//task config
+			(*in)[3] = CORBA::string_dup(config.c_str());//config
+    	din << in; 
+			din_list.push_back(din);
+		}
+		catch(const Tango::DevFailed& e){
+			WARN_LOG("Creation of command group input argument no. "<<i+1<<" failed!");
+			isArginCreationFailed= true;
+			break;
+		}
+	}//end loop
 
+	if(isArginCreationFailed){
+		WARN_LOG("Creation of command group input arguments failed!");
+
+		//Clear worker group
+		if(freeWorkers){
+			delete freeWorkers;
+			freeWorkers= 0;
+		}
+		
+		//Clear tasks
+		for(int i=0;i<nWorkers;i++) taskPerWorkers[i].clear();
+		for(unsigned int i=0;i<workerTasks.size();i++){
+			if(workerTasks[i]){
+				delete workerTasks[i];
+				workerTasks[i]= 0;
+			}
+		}
+		workerTasks.clear();
+
+		ack= -1;
+		reply= "Creation of command group input arguments failed!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	} 
+
+	
+	//## Submit job to group
+	Tango::GroupCmdReplyList crl;
+	try {
+		//Execute the command
+		crl = freeWorkers->command_inout("ExtractSources", din_list, true);
+		if (crl.has_failed()) {
+			WARN_LOG("Failure occurred in command submission for some of the workers...");
+		}
+	}//close try
+	catch (const Tango::DevFailed& e){
+		ERROR_LOG("Command group submission failed!");
+		crl.reset();
+		
+		//Clear worker group
+		if(freeWorkers){
+			delete freeWorkers;
+			freeWorkers= 0;
+		}
+		
+		//Clear tasks
+		for(int i=0;i<nWorkers;i++) taskPerWorkers[i].clear();
+		for(unsigned int i=0;i<workerTasks.size();i++){
+			if(workerTasks[i]){
+				delete workerTasks[i];
+				workerTasks[i]= 0;
+			}
+		}
+		workerTasks.clear();
+
+		ack= -1;
+		reply= "Command group submission failed!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;	
+	}
+	crl.reset();
+
+	//## Create dynamic attribute for this job
+	if(AddJobAttr(jobId)<0){
+		WARN_LOG("Failed to add dynamic job attribute!");
+
+		//Clear worker group
+		if(freeWorkers){
+			delete freeWorkers;
+			freeWorkers= 0;
+		}
+		
+		//Clear tasks
+		for(int i=0;i<nWorkers;i++) taskPerWorkers[i].clear();
+		for(unsigned int i=0;i<workerTasks.size();i++){
+			if(workerTasks[i]){
+				delete workerTasks[i];
+				workerTasks[i]= 0;
+			}
+		}
+		workerTasks.clear();
+
+		ack= -1;
+		reply= "Failed to add dynamic job attribute!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;			
+	}
+
+	//## Store job data in the list
+	//...
+	
 
 	//## Return reply
 	argout->lvalue[0]= ack;
@@ -942,6 +1095,100 @@ int SFinderBroker::ValidateConfigOptions(Json::Value& optionList,std::string& co
 	return 0;
 
 }//close ValidateConfigOptions()
+
+
+bool SFinderBroker::FindAttr(long int& index,std::string& attr_name){
+
+	index= -1;
+
+	bool hasAttr= false;
+	try{
+		//get_device_attr()->get_attr_by_name(attr_name.c_str());
+		index= get_device_attr()->get_attr_ind_by_name(attr_name.c_str());
+		hasAttr= true;
+	}
+	catch(Tango::DevFailed &e){//an exception is thrown if the attribute is not existing
+		hasAttr= false;
+		index= -1;
+	}
+	catch(...){//an exception is thrown if the attribute is not existing
+		hasAttr= false;
+		index= -1;
+	}
+
+	return hasAttr;
+
+}//clos FindAttr()
+
+int SFinderBroker::AddJobAttr(std::string& attr_name){
+
+	//Check if attribute is already present in the attribute list
+	long int attr_index= -1;
+	bool hasAttr= FindAttr(attr_index,attr_name);	
+	if(hasAttr){
+		WARN_LOG("Attribute "<<attr_name<<" already exists, nothing to be done!");
+		return 0;
+	}
+	DEBUG_LOG("Attribute "<<attr_name<<" is not present is the list, adding it!");
+
+	//Create a new attr, init value and set change event
+	try{
+		add_dynStringAttr_dynamic_attribute(attr_name.c_str());
+			
+		Tango::DevString* attr_value = get_dynStringAttr_data_ptr(attr_name);
+		*attr_value= CORBA::string_dup("");
+	}//close try block
+	catch(const Tango::DevFailed &e){
+		Tango::Except::print_exception(e);
+		WARN_LOG("Adding attr "<<attr_name<<" failed!");
+		return -1;
+	}
+	catch(...){
+		WARN_LOG("Unknown exception while adding "<<attr_name<<"!");
+		return -1;
+	}
+
+	//Set change/data ready event
+	try{
+		set_change_event (attr_name, true, true);
+		set_data_ready_event (attr_name, true);
+	}
+	catch(const Tango::DevFailed &e){
+		Tango::Except::print_exception(e);
+		WARN_LOG("Failed to set change/data ready event to attr "<<attr_name<<"!");
+		return -1;
+	}
+	catch(...){
+		WARN_LOG("Unknown exception while setting change/data ready event to attr "<<attr_name<<"!");
+		return -1;
+	}
+
+	return 0;
+
+}//close AddScalarAttr()
+
+int SFinderBroker::RemoveJobAttr(std::string& attr_name){
+
+	//## Check if attribute is present in attr list
+	long int attr_index= -1;
+	bool hasAttr= FindAttr(attr_index,attr_name);	
+	if(!hasAttr){
+		WARN_LOG("Attribute "<<attr_name<<" does not exists, nothing to be removed!");
+		return 0;
+	}
+	
+	//If attr is present remove it from device attribute_list
+	try{
+		remove_dynStringAttr_dynamic_attribute(attr_name.c_str());
+	}
+	catch(...){
+		ERROR_LOG("Failed to remove attr "<<attr_name<<" from device attr_list!");
+		return -1;
+	}	
+	
+	return 0;
+
+}//close RemoveJobAttr()
 
 /*----- PROTECTED REGION END -----*/	//	SFinderBroker::namespace_ending
 } //	namespace
