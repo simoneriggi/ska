@@ -184,8 +184,8 @@
       <status abstract="true" inherited="true" concrete="true"/>
     </commands>
     <commands name="ExtractSources" description="Find sources in map using the configuration passed &#xA;as argument." execMethod="extract_sources" displayLevel="OPERATOR" polledPeriod="0" isDynamic="false">
-      <argin description="String arg&#xA;[0]: filename&#xA;[1]: run guid (set by the broker)&#xA;[2]: configuration string  &#xA;&#xA;Long arg&#xA;[nmaps+0]: tile min x&#xA;[nmaps+1]: tile max x&#xA;[nmaps+2]: tile min y&#xA;[nmaps+3]: tile max y">
-        <type xsi:type="pogoDsl:LongStringArrayType"/>
+      <argin description="String arg&#xA;[0]: filename (mandatory)&#xA;[1]: run guid (mandatory)&#xA;[2]: task list (mandatory)&#xA;[2]: configuration string  (optional)">
+        <type xsi:type="pogoDsl:StringArrayType"/>
       </argin>
       <argout description="Long arg&#xA;[0]: ack code&#xA;&#xA;String arg&#xA;[0]: err description">
         <type xsi:type="pogoDsl:LongStringArrayType"/>
@@ -210,6 +210,24 @@
       </argin>
       <argout description="">
         <type xsi:type="pogoDsl:LongStringArrayType"/>
+      </argout>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+    </commands>
+    <commands name="Free" description="Free worker (aborting all running tasks)" execMethod="free" displayLevel="OPERATOR" polledPeriod="0" isDynamic="false">
+      <argin description="">
+        <type xsi:type="pogoDsl:VoidType"/>
+      </argin>
+      <argout description="">
+        <type xsi:type="pogoDsl:VoidType"/>
+      </argout>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+    </commands>
+    <commands name="Reserve" description="Reserve resource" execMethod="reserve" displayLevel="OPERATOR" polledPeriod="0" isDynamic="false">
+      <argin description="">
+        <type xsi:type="pogoDsl:VoidType"/>
+      </argin>
+      <argout description="">
+        <type xsi:type="pogoDsl:VoidType"/>
       </argout>
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </commands>
@@ -453,7 +471,7 @@
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="Minimum default bounding box cut (source tagged as bad if below this threshold)" label="" unit="" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
     </attributes>
-    <attributes name="compactSourceData" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
+    <attributes name="sourceData" attType="Scalar" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="" maxY="" allocReadMember="true" isDynamic="false">
       <dataType xsi:type="pogoDsl:StringType"/>
       <changeEvent fire="true" libCheckCriteria="false"/>
       <archiveEvent fire="false" libCheckCriteria="false"/>

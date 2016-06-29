@@ -656,17 +656,17 @@ bool SFinder::is_minBoundingBoxThr_allowed(TANGO_UNUSED(Tango::AttReqType type))
 
 //--------------------------------------------------------
 /**
- *	Method      : SFinder::is_compactSourceData_allowed()
- *	Description : Execution allowed for compactSourceData attribute
+ *	Method      : SFinder::is_sourceData_allowed()
+ *	Description : Execution allowed for sourceData attribute
  */
 //--------------------------------------------------------
-bool SFinder::is_compactSourceData_allowed(TANGO_UNUSED(Tango::AttReqType type))
+bool SFinder::is_sourceData_allowed(TANGO_UNUSED(Tango::AttReqType type))
 {
 
-	//	Not any excluded states for compactSourceData attribute in read access.
-	/*----- PROTECTED REGION ID(SFinder::compactSourceDataStateAllowed_READ) ENABLED START -----*/
+	//	Not any excluded states for sourceData attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::sourceDataStateAllowed_READ) ENABLED START -----*/
 	
-	/*----- PROTECTED REGION END -----*/	//	SFinder::compactSourceDataStateAllowed_READ
+	/*----- PROTECTED REGION END -----*/	//	SFinder::sourceDataStateAllowed_READ
 	return true;
 }
 
@@ -756,6 +756,36 @@ bool SFinder::is_RegisterMe_allowed(TANGO_UNUSED(const CORBA::Any &any))
 	/*----- PROTECTED REGION ID(SFinder::RegisterMeStateAllowed) ENABLED START -----*/
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::RegisterMeStateAllowed
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_Free_allowed()
+ *	Description : Execution allowed for Free attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_Free_allowed(TANGO_UNUSED(const CORBA::Any &any))
+{
+	//	Not any excluded states for Free command.
+	/*----- PROTECTED REGION ID(SFinder::FreeStateAllowed) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::FreeStateAllowed
+	return true;
+}
+
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_Reserve_allowed()
+ *	Description : Execution allowed for Reserve attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_Reserve_allowed(TANGO_UNUSED(const CORBA::Any &any))
+{
+	//	Not any excluded states for Reserve command.
+	/*----- PROTECTED REGION ID(SFinder::ReserveStateAllowed) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::ReserveStateAllowed
 	return true;
 }
 

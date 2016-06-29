@@ -3,30 +3,38 @@
 
 #include <SFinder.h>
 
+
 #include <tango.h>
+
+#include <Logger.h>
+#include <Img.h>
+#include <BkgData.h>
+#include <Source.h>
+#include <WorkerData.h>
+#include <WorkerTask.h>
+namespace Caesar {
+	class Img;
+	class BkgData;
+	class Source;
+	class WorkerData;
+	class WorkerTask;
+	class Logger;
+	class ScopedLogger;
+}
+
 
 #include <thread>
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
 
-#include <Img.h>
-#include <BkgData.h>
-#include <Source.h>
-#include <WorkerData.h>
-namespace Caesar {
-	class Img;
-	class BkgData;
-	class Source;
-	class WorkerData;
-}
 
+using namespace Caesar;
 
 namespace SFinder_ns {
   
 class SFinder;
 
-//class SFinderThread : public omni_thread, public Tango::LogAdapter {
 class SFinderThread : public Tango::LogAdapter {
   
 	private:
@@ -40,44 +48,49 @@ class SFinderThread : public Tango::LogAdapter {
 		/** 
 		\brief Start the thread
  		*/		
-		void Start(std::string filename,std::string runId,std::vector<long int> tileMinX,std::vector<long int> tileMaxX,std::vector<long int> tileMinY,std::vector<long int> tileMaxY){
+		//void Start(std::vector<Caesar::WorkerTask*>& tasks){
+		void Start(const std::vector<Caesar::WorkerTask*> tasks){
 			m_stopThread = false;
-    	m_thread = std::thread(&SFinderThread::Run,this,filename,runId,tileMinX,tileMaxX,tileMinY,tileMaxY);
-			//if(m_thread.joinable()) m_thread.join();
+    	//m_thread = std::thread(&SFinderThread::Run,this,std::ref(tasks));
+			m_thread = std::thread(&SFinderThread::Run,this,tasks);
     }
 		
 		/** 
 		\brief Stop
  		*/
 		void Stop(){
-			DEBUG_STREAM<<"SchedulerThread::Stop(): INFO: Called Stop()..."<<endl;
+			DEBUG_LOG("Called thread Stop()...");
 			std::lock_guard<std::mutex> lock( m_mutex );
 			m_stopThread = true;
 			if(m_thread.joinable()) m_thread.join();
-			DEBUG_STREAM<<"SchedulerThread::Stop(): INFO: done!"<<endl;
+			DEBUG_LOG("Called thread Stop(): done");
 		}
      		
 	private:
 		/** 
 		\brief Main thread function 
  		*/
-		void Run(std::string filename,std::string runId,std::vector<long int> tileMinX,std::vector<long int> tileMaxX,std::vector<long int> tileMinY,std::vector<long int> tileMaxY);
+		//void Run(std::vector<Caesar::WorkerTask*>& tasks);
+		void Run(const std::vector<Caesar::WorkerTask*> tasks);
+
 		/** 
 		\brief Run source finder task for a single image
  		*/
-		int RunTask(std::vector<Caesar::Source*>& sources,const std::string& filename,const std::string& runId,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
+		int RunTask(Caesar::WorkerTask& task);
+
 		/** 
 		\brief Read image
  		*/
     Caesar::Img* ReadImage(const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
+
  		/** 
 		\brief Compute stats & bkg
  		*/
 		Caesar::BkgData* ComputeStatsAndBkg(Caesar::Img* img);
+
 		/** 
 		\brief Find compact sources
  		*/
-		//int FindCompactSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
 		int FindCompactSources(Caesar::WorkerData& workerData,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
 		/** 
 		\brief Find sources
@@ -96,7 +109,8 @@ class SFinderThread : public Tango::LogAdapter {
 		/** 
 		\brief PushWorkerDataEvent
  		*/
-		int PushWorkerDataEvent(Caesar::WorkerData& workerData);
+		//int PushWorkerDataEvent(Caesar::WorkerData& workerData);
+		int PushWorkerDataEvent(Caesar::WorkerData* workerData);
 		
 
 	private:	

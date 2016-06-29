@@ -172,7 +172,7 @@ SFinderClass *SFinderClass::instance()
 CORBA::Any *ExtractSourcesClass::execute(Tango::DeviceImpl *device, const CORBA::Any &in_any)
 {
 	cout2 << "ExtractSourcesClass::execute(): arrived" << endl;
-	const Tango::DevVarLongStringArray *argin;
+	const Tango::DevVarStringArray *argin;
 	extract(in_any, argin);
 	return insert((static_cast<SFinder *>(device))->extract_sources(argin));
 }
@@ -211,6 +211,42 @@ CORBA::Any *RegisterMeClass::execute(Tango::DeviceImpl *device, TANGO_UNUSED(con
 {
 	cout2 << "RegisterMeClass::execute(): arrived" << endl;
 	return insert((static_cast<SFinder *>(device))->register_me());
+}
+
+//--------------------------------------------------------
+/**
+ * method : 		FreeClass::execute()
+ * description : 	method to trigger the execution of the command.
+ *
+ * @param	device	The device on which the command must be executed
+ * @param	in_any	The command input data
+ *
+ *	returns The command output data (packed in the Any object)
+ */
+//--------------------------------------------------------
+CORBA::Any *FreeClass::execute(Tango::DeviceImpl *device, TANGO_UNUSED(const CORBA::Any &in_any))
+{
+	cout2 << "FreeClass::execute(): arrived" << endl;
+	((static_cast<SFinder *>(device))->free());
+	return new CORBA::Any();
+}
+
+//--------------------------------------------------------
+/**
+ * method : 		ReserveClass::execute()
+ * description : 	method to trigger the execution of the command.
+ *
+ * @param	device	The device on which the command must be executed
+ * @param	in_any	The command input data
+ *
+ *	returns The command output data (packed in the Any object)
+ */
+//--------------------------------------------------------
+CORBA::Any *ReserveClass::execute(Tango::DeviceImpl *device, TANGO_UNUSED(const CORBA::Any &in_any))
+{
+	cout2 << "ReserveClass::execute(): arrived" << endl;
+	((static_cast<SFinder *>(device))->reserve());
+	return new CORBA::Any();
 }
 
 
@@ -1684,31 +1720,31 @@ void SFinderClass::attribute_factory(vector<Tango::Attr *> &att_list)
 	minboundingboxthr->set_memorized_init(true);
 	att_list.push_back(minboundingboxthr);
 
-	//	Attribute : compactSourceData
-	compactSourceDataAttrib	*compactsourcedata = new compactSourceDataAttrib();
-	Tango::UserDefaultAttrProp	compactsourcedata_prop;
-	//	description	not set for compactSourceData
-	//	label	not set for compactSourceData
-	//	unit	not set for compactSourceData
-	//	standard_unit	not set for compactSourceData
-	//	display_unit	not set for compactSourceData
-	//	format	not set for compactSourceData
-	//	max_value	not set for compactSourceData
-	//	min_value	not set for compactSourceData
-	//	max_alarm	not set for compactSourceData
-	//	min_alarm	not set for compactSourceData
-	//	max_warning	not set for compactSourceData
-	//	min_warning	not set for compactSourceData
-	//	delta_t	not set for compactSourceData
-	//	delta_val	not set for compactSourceData
+	//	Attribute : sourceData
+	sourceDataAttrib	*sourcedata = new sourceDataAttrib();
+	Tango::UserDefaultAttrProp	sourcedata_prop;
+	//	description	not set for sourceData
+	//	label	not set for sourceData
+	//	unit	not set for sourceData
+	//	standard_unit	not set for sourceData
+	//	display_unit	not set for sourceData
+	//	format	not set for sourceData
+	//	max_value	not set for sourceData
+	//	min_value	not set for sourceData
+	//	max_alarm	not set for sourceData
+	//	min_alarm	not set for sourceData
+	//	max_warning	not set for sourceData
+	//	min_warning	not set for sourceData
+	//	delta_t	not set for sourceData
+	//	delta_val	not set for sourceData
 	
-	compactsourcedata->set_default_properties(compactsourcedata_prop);
+	sourcedata->set_default_properties(sourcedata_prop);
 	//	Not Polled
-	compactsourcedata->set_disp_level(Tango::OPERATOR);
+	sourcedata->set_disp_level(Tango::OPERATOR);
 	//	Not Memorized
-	compactsourcedata->set_data_ready_event(true);
-	compactsourcedata->set_change_event(true, false);
-	att_list.push_back(compactsourcedata);
+	sourcedata->set_data_ready_event(true);
+	sourcedata->set_change_event(true, false);
+	att_list.push_back(sourcedata);
 
 	//	Attribute : runProgress
 	runProgressAttrib	*runprogress = new runProgressAttrib();
@@ -1789,8 +1825,8 @@ void SFinderClass::command_factory()
 	//	Command ExtractSources
 	ExtractSourcesClass	*pExtractSourcesCmd =
 		new ExtractSourcesClass("ExtractSources",
-			Tango::DEVVAR_LONGSTRINGARRAY, Tango::DEVVAR_LONGSTRINGARRAY,
-			"String arg\n[0]: filename\n[1]: run guid (set by the broker)\n[2]: configuration string  \n\nLong arg\n[nmaps+0]: tile min x\n[nmaps+1]: tile max x\n[nmaps+2]: tile min y\n[nmaps+3]: tile max y",
+			Tango::DEVVAR_STRINGARRAY, Tango::DEVVAR_LONGSTRINGARRAY,
+			"String arg\n[0]: filename (mandatory)\n[1]: run guid (mandatory)\n[2]: task list (mandatory)\n[2]: configuration string  (optional)",
 			"Long arg\n[0]: ack code\n\nString arg\n[0]: err description",
 			Tango::OPERATOR);
 	command_list.push_back(pExtractSourcesCmd);
@@ -1812,6 +1848,24 @@ void SFinderClass::command_factory()
 			"",
 			Tango::OPERATOR);
 	command_list.push_back(pRegisterMeCmd);
+
+	//	Command Free
+	FreeClass	*pFreeCmd =
+		new FreeClass("Free",
+			Tango::DEV_VOID, Tango::DEV_VOID,
+			"",
+			"",
+			Tango::OPERATOR);
+	command_list.push_back(pFreeCmd);
+
+	//	Command Reserve
+	ReserveClass	*pReserveCmd =
+		new ReserveClass("Reserve",
+			Tango::DEV_VOID, Tango::DEV_VOID,
+			"",
+			"",
+			Tango::OPERATOR);
+	command_list.push_back(pReserveCmd);
 
 	/*----- PROTECTED REGION ID(SFinderClass::command_factory_after) ENABLED START -----*/
 	

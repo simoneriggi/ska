@@ -61,55 +61,64 @@ SFinderThread::SFinderThread (SFinder* dev)
 SFinderThread::~SFinderThread(){
 	
 	DEBUG_LOG("Shutting down existing thread...");
-	//m_stopThread = true;
-  //if(m_thread.joinable()) m_thread.join();
 	Stop();
 
 }//close destructor
 
 
-void SFinderThread::Run(std::string inputFileName,std::string runId,std::vector<long int> tileMinX_list,std::vector<long int> tileMaxX_list,std::vector<long int> tileMinY_list,std::vector<long int> tileMaxY_list) {
+
+void SFinderThread::Run(const std::vector<Caesar::WorkerTask*> tasks) {
 
 	//## Set RUNNING state
-  INFO_LOG("Starting sfinder thread...");
-	m_device->set_state(Tango::RUNNING);
-	m_device->set_status("Source finding started");
+  INFO_LOG("Starting sfinder thread...");	
+	m_device->UpdateState(Tango::RUNNING,"Source finding started");
 	
 
 	//## Source finding tasks
-	int nTasks= (int)tileMinX_list.size();
-	INFO_LOG("Starting source finding tasks (Ntasks="<<nTasks<<") ...");
-	std::vector<Source*> sources;
+	int nTasks= (int)tasks.size();
+	INFO_LOG("Starting source finding job (#"<<nTasks<<" tasks) ...");
+	
+	bool hasFailed= false;
+
 	for(long int i=0;i<nTasks;i++){
-		INFO_LOG("Starting source finding task no. "<<i+1<<"...");
-		int status= RunTask(sources,inputFileName,runId,tileMinX_list[i],tileMaxX_list[i],tileMinY_list[i],tileMaxY_list[i]);
-		if(status<0){
-			//Clear sources
-			for(unsigned int k=0;k<sources.size();k++){
-				if(sources[k]){
-					delete sources[k];
-					sources[k]= 0;
-				}
-			}
-			sources.clear();
-
-			//Set error reply
+		
+		INFO_LOG("Starting source finding task no. "<<i+1<<" ...");
+		
+		if(RunTask(*(tasks[i]))<0){
 			ERROR_LOG("Source finding task failed for reco task no. "<<i+1<<"!");
-			m_device->set_state(Tango::ON);
-			m_device->set_status("Source finding task failed, freeing resource for usage");
-			return;
+			hasFailed= true;
+			break;
 		}
-
-		INFO_LOG("#"<<sources.size()<<" sources found in task no. "<<i+1<<"...");
 	}//end loop reco
 
-
-	INFO_LOG("Ending sfinder thread...");
+	if(hasFailed){
+		ERROR_LOG("Source finding job failed!");
+	}
+	else {
+		INFO_LOG("Source finding job terminated with success...");
+	}
+	
+	//Set error reply and free resource			
+	m_device->UpdateState(Tango::ON,"Source finding task completed, freeing resource for usage");
 
 }//close Run()
 
 
-int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& filename,const std::string& runId,long int tileMinX,long int tileMaxX,long int tileMinY,long int tileMaxY){
+int SFinderThread::RunTask(WorkerTask& task){
+
+	/*
+	//## Check task
+	if(!task){
+		ERROR_LOG("Null ptr to given task data!");
+		return -1;
+	}
+	*/
+	std::string filename= task.filename;
+	long int tileMinX= task.ix_min;
+	long int tileMaxX= task.ix_max;
+	long int tileMinY= task.iy_min;
+	long int tileMaxY= task.iy_max;
+	
 
 	//## Read input image
 	INFO_LOG("Reading input image "<<filename<<" X["<<tileMinX<<","<<tileMaxX<<"] Y["<<tileMinY<<","<<tileMaxY<<"]...");
@@ -149,20 +158,18 @@ int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& file
 	INFO_LOG("Searching compact sources...");
 
 	WorkerData* compactSourceData= new WorkerData;
-	(compactSourceData->info).jobId= runId;
-	//(compactSourceData->info).IdX= 
-	//(compactSourceData->info).IdY= 
-	
-	std::vector<Source*> compact_sources;
-	//if(m_device->attr_searchCompactSources_write && FindCompactSources(compact_sources,inputImg,false,bkgData)<0){
+	compactSourceData->info= task;
+	compactSourceData->data_type= WorkerData::eCOMPACT_SOURCE_DATA;
 	if(m_device->attr_searchCompactSources_write && FindCompactSources(*compactSourceData,inputImg,false,bkgData)<0){
 		ERROR_LOG("Compact source search failed!");
 		return -1;
 	}
-	sources.insert(sources.end(),compact_sources.begin(),compact_sources.end());
+	INFO_LOG("#"<<(compactSourceData->sources).size()<<" sources found (#"<<(compactSourceData->edge_sources).size()<<"@ edge) ...");
+
 	
 	//--> Push compact source data
-	if(PushWorkerDataEvent(*compactSourceData)<0){
+	INFO_LOG("Pushing compact source data event...");
+	if(PushWorkerDataEvent(compactSourceData)<0){
 		ERROR_LOG("Failed to push compact source data event!");
 		return -1;
 	}
@@ -206,10 +213,9 @@ int SFinderThread::RunTask(std::vector<Source*>& sources,const std::string& file
 
 	return 0;
 
-}//close RunSourceTask()
+}//close RunTask()
 
 
-//int SFinderThread::FindCompactSources(std::vector<Source*>& sources,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
 int SFinderThread::FindCompactSources(WorkerData& compactSourceData,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
 
 	//## Check input image
@@ -512,7 +518,14 @@ Img* SFinderThread::ReadImage(const std::string& filename,long int tileMinX,long
 	//=== FITS reading ===
 	else if(info.extension==".fits"){// Read image from FITS file
 		inputImg= new Img;
-		int status= inputImg->ReadFITS(filename,tileMinX,tileMaxX,tileMinY,tileMaxY); 
+		int status= 0;
+		if(tileMinX!=-1 && tileMaxX!=-1 && tileMinY!=-1 && tileMaxY!=-1){
+		 	status= inputImg->ReadFITS(filename,tileMinX+1,tileMaxX+1,tileMinY+1,tileMaxY+1);//CFITSIO filter assumes image from 1 to N (not from 0 to N-1)
+		}
+		else {
+			status= inputImg->ReadFITS(filename,tileMinX,tileMaxX,tileMinY,tileMaxY);
+		}
+
 		if(status<0){
 			ERROR_LOG("Failed to read image from input file "<<filename<<"!");
 			if(inputImg) inputImg->Delete();
@@ -607,14 +620,23 @@ int SFinderThread::PushWorkerProgressEvent(){
 }//close PushWorkerProgressEvent()
 
 
-int SFinderThread::PushWorkerDataEvent(WorkerData& workerData){
+int SFinderThread::PushWorkerDataEvent(WorkerData* workerData){
+
+	//Check workerData
+	if(!workerData){
+		ERROR_LOG("Null ptr to given worker data!");
+		return -1;
+	}
 
 	//Encode workerData to buffer
-	SBuffer buffer;
-	if(Serializer::WorkerDataToBuffer(buffer,&workerData)<0){
+	SBuffer buffer;	
+	INFO_LOG("Serializing workerData to buffer ...");
+	if(Serializer::WorkerDataToBuffer(buffer,workerData)<0){
 		ERROR_LOG("Failed to encode worker data to buffer!");
 		return -1;
 	}
+	INFO_LOG("Buffer size: "<<buffer.size);
+
 	//Tango::DevString* attr_value= new Tango::DevString;
 	//*attr_value= Tango::string_dup(buffer.data);
 
@@ -624,11 +646,31 @@ int SFinderThread::PushWorkerDataEvent(WorkerData& workerData){
 	bool release= false;//false by default
 	
 	(m_device->m_mutex)->lock();
-	CORBA::string_free(*m_device->attr_compactSourceData_read);
-	*(m_device->attr_compactSourceData_read)= CORBA::string_alloc(buffer.size);
-	memcpy (m_device->attr_compactSourceData_read, (buffer.data).c_str(), buffer.size);	
-	(m_device->attr_compactSourceData_read)[buffer.size]= 0;
-	m_device->push_event("compactSourceData",filt_names,filt_vals,m_device->attr_compactSourceData_read, 1, 0,release);
+	INFO_LOG("Set sourceData attribute ...");
+	try {
+		CORBA::string_free(*m_device->attr_sourceData_read);
+		INFO_LOG("Allocating size for buffer: n="<<buffer.size);
+		*(m_device->attr_sourceData_read)= CORBA::string_alloc(buffer.size);
+		INFO_LOG("Copying data: n="<<buffer.size);
+		memcpy ( *(m_device->attr_sourceData_read), (buffer.data).c_str(), buffer.size+1);	
+		INFO_LOG("Set null termination...");
+		(m_device->attr_sourceData_read)[buffer.size]= 0;
+	}
+	catch(const Tango::DevFailed& e){
+		ERROR_LOG("Failed to set sourceData attribute!");
+		return -1;
+	}
+	catch(const std::exception& e){
+		ERROR_LOG("C++ exception occurred when setting sourceData attribute (err="<<e.what()<<")!");
+		return -1;
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception occurred when setting sourceData attribute!");
+		return -1;
+	}
+
+	INFO_LOG("Push sourceData attribute event...");
+	m_device->push_event("sourceData",filt_names,filt_vals,m_device->attr_sourceData_read, 1, 0,release);
 	(m_device->m_mutex)->unlock();
 
 	return 0;

@@ -509,17 +509,17 @@ public:
 		{return (static_cast<SFinder *>(dev))->is_minBoundingBoxThr_allowed(ty);}
 };
 
-//	Attribute compactSourceData class definition
-class compactSourceDataAttrib: public Tango::Attr
+//	Attribute sourceData class definition
+class sourceDataAttrib: public Tango::Attr
 {
 public:
-	compactSourceDataAttrib():Attr("compactSourceData",
+	sourceDataAttrib():Attr("sourceData",
 			Tango::DEV_STRING, Tango::READ) {};
-	~compactSourceDataAttrib() {};
+	~sourceDataAttrib() {};
 	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
-		{(static_cast<SFinder *>(dev))->read_compactSourceData(att);}
+		{(static_cast<SFinder *>(dev))->read_sourceData(att);}
 	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
-		{return (static_cast<SFinder *>(dev))->is_compactSourceData_allowed(ty);}
+		{return (static_cast<SFinder *>(dev))->is_sourceData_allowed(ty);}
 };
 
 //	Attribute runProgress class definition
@@ -625,6 +625,52 @@ public:
 	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
 	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
 	{return (static_cast<SFinder *>(dev))->is_RegisterMe_allowed(any);}
+};
+
+//	Command Free class definition
+class FreeClass : public Tango::Command
+{
+public:
+	FreeClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out,
+				   const char        *in_desc,
+				   const char        *out_desc,
+				   Tango::DispLevel  level)
+	:Command(name,in,out,in_desc,out_desc, level)	{};
+
+	FreeClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out)
+	:Command(name,in,out)	{};
+	~FreeClass() {};
+	
+	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
+	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
+	{return (static_cast<SFinder *>(dev))->is_Free_allowed(any);}
+};
+
+//	Command Reserve class definition
+class ReserveClass : public Tango::Command
+{
+public:
+	ReserveClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out,
+				   const char        *in_desc,
+				   const char        *out_desc,
+				   Tango::DispLevel  level)
+	:Command(name,in,out,in_desc,out_desc, level)	{};
+
+	ReserveClass(const char   *name,
+	               Tango::CmdArgType in,
+				   Tango::CmdArgType out)
+	:Command(name,in,out)	{};
+	~ReserveClass() {};
+	
+	virtual CORBA::Any *execute (Tango::DeviceImpl *dev, const CORBA::Any &any);
+	virtual bool is_allowed (Tango::DeviceImpl *dev, const CORBA::Any &any)
+	{return (static_cast<SFinder *>(dev))->is_Reserve_allowed(any);}
 };
 
 

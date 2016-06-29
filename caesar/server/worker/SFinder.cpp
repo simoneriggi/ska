@@ -102,6 +102,8 @@ using namespace std;
 //  ExtractSources  |  extract_sources
 //  Configure       |  configure
 //  RegisterMe      |  register_me
+//  Free            |  free
+//  Reserve         |  reserve
 //================================================================
 
 //================================================================
@@ -137,7 +139,7 @@ using namespace std;
 //  psMaxNPix                 |  Tango::DevLong	Scalar
 //  useBoundingBoxCut         |  Tango::DevBoolean	Scalar
 //  minBoundingBoxThr         |  Tango::DevFloat	Scalar
-//  compactSourceData         |  Tango::DevString	Scalar
+//  sourceData                |  Tango::DevString	Scalar
 //  runProgress               |  Tango::DevString	Spectrum  ( max = 10)
 //================================================================
 
@@ -208,9 +210,16 @@ void SFinder::delete_device()
 		delete m_brokerGroup;
 		m_brokerGroup= 0;
 	}
+
+	//## Delete mutex
+	if(m_mutex) {
+  	DEBUG_LOG("Deleting mutex...");
+    delete m_mutex;
+    m_mutex= 0;
+  }
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::delete_device
-	delete[] attr_compactSourceData_read;
+	delete[] attr_sourceData_read;
 	delete[] attr_runProgress_read;
 }
 
@@ -233,15 +242,17 @@ void SFinder::init_device()
 	//	Get the device properties from database
 	get_device_property();
 	
-	attr_compactSourceData_read = new Tango::DevString[1];
+	attr_sourceData_read = new Tango::DevString[1];
 	attr_runProgress_read = new Tango::DevString[10];
 	/*----- PROTECTED REGION ID(SFinder::init_device) ENABLED START -----*/
 	
 	//	Initialize device
-	set_state(Tango::ON);
-	set_status("Worker " + device_name + " started");
-	DEBUG_LOG("Worker "<<device_name<<" started...");
+	//## Init mutex
+	DEBUG_LOG("Init mutex...");
+  m_mutex= 0;
+  m_mutex = new omni_mutex();
 
+	//## Set change state event
 	try {
 		DEBUG_LOG("Set change event for device "<<device_name<<"...");
 		set_change_event ("State", true, true);
@@ -249,9 +260,11 @@ void SFinder::init_device()
 	catch(Tango::DevFailed& e){
 		WARN_LOG("Failed to set change event on State attribute");
 	}
-	push_change_event	("State");
 
-
+	//## Init state
+	DEBUG_LOG("Worker "<<device_name<<" started...");
+	UpdateState(Tango::ON,"Worker " + device_name + " started");
+	
 	//## Init default attr values
 	LoadDefaultConfig();
 
@@ -2005,21 +2018,21 @@ void SFinder::write_minBoundingBoxThr(Tango::WAttribute &attr)
 }
 //--------------------------------------------------------
 /**
- *	Read attribute compactSourceData related method
+ *	Read attribute sourceData related method
  *	Description: 
  *
  *	Data type:	Tango::DevString
  *	Attr type:	Scalar
  */
 //--------------------------------------------------------
-void SFinder::read_compactSourceData(Tango::Attribute &attr)
+void SFinder::read_sourceData(Tango::Attribute &attr)
 {
-	DEBUG_STREAM << "SFinder::read_compactSourceData(Tango::Attribute &attr) entering... " << endl;
-	/*----- PROTECTED REGION ID(SFinder::read_compactSourceData) ENABLED START -----*/
+	DEBUG_STREAM << "SFinder::read_sourceData(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_sourceData) ENABLED START -----*/
 	//	Set the attribute value
-	attr.set_value(attr_compactSourceData_read);
+	attr.set_value(attr_sourceData_read);
 	
-	/*----- PROTECTED REGION END -----*/	//	SFinder::read_compactSourceData
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_sourceData
 }
 //--------------------------------------------------------
 /**
@@ -2104,15 +2117,10 @@ void SFinder::read_compactSourcesPipe(Tango::Pipe &pipe)
  *               as argument.
  *
  *	@param argin String arg
- *               [0]: filename
- *               [1]: run guid (set by the broker)
- *               [2]: configuration string  
- *               
- *               Long arg
- *               [nmaps+0]: tile min x
- *               [nmaps+1]: tile max x
- *               [nmaps+2]: tile min y
- *               [nmaps+3]: tile max y
+ *               [0]: filename (mandatory)
+ *               [1]: run guid (mandatory)
+ *               [2]: task list (mandatory)
+ *               [2]: configuration string  (optional)
  *	@returns Long arg
  *           [0]: ack code
  *           
@@ -2120,7 +2128,7 @@ void SFinder::read_compactSourcesPipe(Tango::Pipe &pipe)
  *           [0]: err description
  */
 //--------------------------------------------------------
-Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongStringArray *argin)
+Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarStringArray *argin)
 {
 	Tango::DevVarLongStringArray *argout;
 	DEBUG_STREAM << "SFinder::ExtractSources()  - " << device_name << endl;
@@ -2133,20 +2141,19 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 	argout->lvalue.length(1);
 	argout->svalue.length(1);
 
-	//Validate args	
-	long int nArgs_s= argin->svalue.length();
-	long int nArgs_l= argin->lvalue.length();
-	if(nArgs_s<2){
-		WARN_LOG("Missing filename and/or runid arguments!");
+	//Validate args
+	long int nArgs= argin->length();
+	if(nArgs<3){
+		WARN_LOG("Missing arguments!");
 		ack= -1;
-		reply= "Missing filename and/or runid arguments!";
+		reply= "Missing arguments!";
 		argout->lvalue[0]= ack;
 		argout->svalue[0] = CORBA::string_dup(reply.c_str());
 		return argout;
 	}
 
 	//Check filename arg
-	if(strcmp(argin->svalue[0],"")==0){
+	if(strcmp((*argin)[0],"")==0){
 		WARN_LOG("Empty filename argument given!");
 		ack= -1;
 		reply= "Invalid filename argument given (empty string)!";
@@ -2154,10 +2161,10 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		argout->svalue[0] = CORBA::string_dup(reply.c_str());
 		return argout;
 	}
-	std::string inputFileName= std::string(argin->svalue[0]); 
-	
+	std::string inputFileName= std::string((*argin)[0]); 
+
 	//Check run id arg
-	if(strcmp(argin->svalue[1],"")==0){
+	if(strcmp((*argin)[1],"")==0){
 		WARN_LOG("Empty run id argument given!");
 		ack= -1;
 		reply= "Invalid run id argument given (empty string)!";
@@ -2165,13 +2172,35 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		argout->svalue[0] = CORBA::string_dup(reply.c_str());
 		return argout;
 	}
-	std::string runId= std::string(argin->svalue[1]);
+	std::string runId= std::string((*argin)[1]);
+
+	//Check tasks arg
+	if(strcmp((*argin)[2],"")==0){
+		WARN_LOG("Empty task list argument given!");
+		ack= -1;
+		reply= "Invalid task list argument given (empty string)!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	std::string tasks= std::string((*argin)[2]);
+
+	std::vector<WorkerTask*> workerTasks;
+	if(Serializer::JsonStringToWorkerTasks(workerTasks,tasks)<0){
+		WARN_LOG("Failed to encode tasks!");
+		ack= -1;
+		reply= "Failed to encode tasks!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+		return argout;
+	}
+	INFO_LOG("# "<<workerTasks.size()<<" tasks requested...");
 
 	//Check config arg
 	std::string config= "";
 	bool applyConfig= false;
-	if(nArgs_s>2){
-		if(strcmp(argin->svalue[2],"")==0){
+	if(nArgs>3){
+		if(strcmp((*argin)[3],"")==0){
 			WARN_LOG("Empty config argument given!");
 			ack= -1;
 			reply= "Invalid config argument given (empty string)!";
@@ -2180,7 +2209,7 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 			return argout;
 		}
 		else{
-			config= std::string(argin->svalue[2]);
+			config= std::string((*argin)[3]);
 			applyConfig= true;
 		}
 	}
@@ -2188,36 +2217,11 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 		WARN_LOG("Empty config argument given, running on current config!");
 	}
 
-	//Check image range args
-	if(nArgs_l%4!=0){
-		WARN_LOG("Invalid image range argument given!");
-		ack= -1;
-		reply= "Invalid image range argument given!";
-		argout->lvalue[0]= ack;
-		argout->svalue[0] = CORBA::string_dup(reply.c_str());
-		return argout;
-	}
-	
-	long int nTasks= (long int)(nArgs_l/4);	
-	std::vector<long int> tileMinX_list(nTasks,-1);
-	std::vector<long int> tileMaxX_list(nTasks,-1);
-	std::vector<long int> tileMinY_list(nTasks,-1);
-	std::vector<long int> tileMaxY_list(nTasks,-1);	
-	if(nArgs_l>0){
-		INFO_LOG("Reading tile image(s)...");
-		for(long int i=0;i<nTasks;i++){
-			long int index= 4*i;
-			tileMinX_list[i]= argin->lvalue[index+0]; 
-			tileMaxX_list[i]= argin->lvalue[index+1];
-			tileMinY_list[i]= argin->lvalue[index+2]; 
-			tileMaxY_list[i]= argin->lvalue[index+3];
-		}
-	}
-	
+	INFO_LOG("filename: "<<inputFileName);
+	INFO_LOG("runId: "<<runId);
+	INFO_LOG("tasks: "<<tasks);
+	INFO_LOG("config: "<<config);
 
-	//## Set RUNNING state
-	set_state(Tango::RUNNING);
-	set_status("Starting sfinder task");
 
 	//## Apply config?
 	if(applyConfig){
@@ -2229,98 +2233,28 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarLongSt
 			argout->svalue[0] = CORBA::string_dup(reply.c_str());
 
 			//Free resource for use
-			set_state(Tango::ON);
-			set_status("Configuration failed, free resource");
-
+			UpdateState(Tango::ON,"Configuration failed, free resource");
+			
 			return argout;
 		}
 	}
 
 	//## Start the worker thread
-	m_WorkerThread->Start(inputFileName,runId,tileMinX_list,tileMaxX_list,tileMinY_list,tileMaxY_list);
-	
+	if(!m_WorkerThread){
+		WARN_LOG("Null ptr to worker thread!");
+		ack= -1;
+		reply= "Null ptr to worker thread!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
 
-
-	/*
-	//Set RUNNING state
-	set_state(Tango::RUNNING);
-	set_status("Source finding started");
-	INFO_LOG("Source finding started");
-
-	
-	//## Source finding tasks
-	INFO_LOG("Starting source finding tasks (Ntasks="<<nTasks<<") ...");
-	std::vector<Source*> sources;
-	for(long int i=0;i<nTasks;i++){
-		INFO_LOG("Starting source finding task no. "<<i+1<<"...");
-		int status= RunSourceTask(sources,inputFileName,tileMinX_list[i],tileMaxX_list[i],tileMinY_list[i],tileMaxY_list[i]);
-		if(status<0){
-			//Clear sources
-			for(unsigned int k=0;k<sources.size();k++){
-				if(sources[k]){
-					delete sources[k];
-					sources[k]= 0;
-				}
-			}
-			sources.clear();
-
-			//Set error reply
-			ERROR_LOG("Source finding task failed for reco task no. "<<i+1<<"!");
-			ack= -1;
-			reply= "Source finding task failed!";
-			argout->lvalue[0]= ack;
-			argout->svalue[0] = CORBA::string_dup(reply.c_str());
-			set_state(Tango::ON);
-			set_status("Source finding task failed!");
-			return argout;
-		}
-
-		INFO_LOG("#"<<sources.size()<<" sources found in task no. "<<i+1<<"...");
-
-	}//end loop reco
-
-	
-	//## Encode source list 
-	std::string serialized_sources= "";
-	if(sources.size()>0){
-		INFO_LOG("Serializing source collection (nsources="<<sources.size()<<")");
-		int status= Serializer::SourceCollectionToString(sources,serialized_sources);
-		if(status<0){
-			//Clear sources
-			for(unsigned int k=0;k<sources.size();k++){
-				if(sources[k]){
-					delete sources[k];
-					sources[k]= 0;
-				}
-			}
-			sources.clear();
-
-			//Set error reply
-			ERROR_LOG("Source serialization failed!");
-			ack= -1;
-			reply= "Source serialization failed!";
-			argout->lvalue[0]= ack;
-			argout->svalue[0] = CORBA::string_dup(reply.c_str());
-			set_state(Tango::ON);
-			set_status("Source serialization failed!");
-			return argout;
-		}
+		//Free resource for use
+		UpdateState(Tango::ON,"Configuration failed, free resource");
+			
+		return argout;
 	}
+	m_WorkerThread->Start(workerTasks);
+	
 
-	//Set free state	
-	set_state(Tango::ON);
-	set_status("Source finding ended");
-	INFO_LOG("Source finding ended");
-
-	//Clear sources
-	for(unsigned int k=0;k<sources.size();k++){
-		if(sources[k]){
-			delete sources[k];
-			sources[k]= 0;
-		}
-	}
-	sources.clear();
-	*/
 
 	//Return reply
 	argout->lvalue[0]= ack;
@@ -2493,6 +2427,47 @@ Tango::DevVarLongStringArray *SFinder::register_me()
 
 	/*----- PROTECTED REGION END -----*/	//	SFinder::register_me
 	return argout;
+}
+//--------------------------------------------------------
+/**
+ *	Command Free related method
+ *	Description: Free worker (aborting all running tasks)
+ *
+ */
+//--------------------------------------------------------
+void SFinder::free()
+{
+	DEBUG_STREAM << "SFinder::Free()  - " << device_name << endl;
+	/*----- PROTECTED REGION ID(SFinder::free) ENABLED START -----*/
+	
+	//	Add your own code
+	//Free resource for use
+	m_WorkerThread->Stop();
+	UpdateState(Tango::ON,"Force free resource");
+
+	return;
+
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::free
+}
+//--------------------------------------------------------
+/**
+ *	Command Reserve related method
+ *	Description: Reserve resource
+ *
+ */
+//--------------------------------------------------------
+void SFinder::reserve()
+{
+	DEBUG_STREAM << "SFinder::Reserve()  - " << device_name << endl;
+	/*----- PROTECTED REGION ID(SFinder::reserve) ENABLED START -----*/
+	
+	//	Add your own code
+	UpdateState(Tango::INIT,"Reserve worker");
+	
+	return;
+
+	/*----- PROTECTED REGION END -----*/	//	SFinder::reserve
 }
 //--------------------------------------------------------
 /**
@@ -2994,21 +2969,21 @@ int SFinder::ApplyConfig(std::string& config){
 	if(config=="") return -1;
 	
 	//## Set INIT state
-	set_state(Tango::INIT);	
-	set_status("Configuring options..."); 
+	UpdateState(Tango::INIT,"Configuring options...");
 	
-
 	//## Parse config json options
 	Json::Reader reader;
 	Json::Value root;
   if(!reader.parse(config, root)) {
 		ERROR_LOG("Failed to parse config JSON ("<<reader.getFormattedErrorMessages()<<")");
+		UpdateState(get_prev_state(),"Configuration completed");
 		return -1;
 	}
 	
 	//## Check top json
 	if(root.isNull() || root.empty()){
 		ERROR_LOG("Failed to parse config JSON (null or empty)!");
+		UpdateState(get_prev_state(),"Configuration completed");
 		return -1;
 	}
 
@@ -3016,10 +2991,10 @@ int SFinder::ApplyConfig(std::string& config){
 	Json::Value optionList= root["options"];
 	if(optionList.isNull() || optionList.empty() || !optionList.isArray() ){
 		ERROR_LOG("Failed to parse config JSON option list (null/empty or not an array)!");
+		UpdateState(get_prev_state(),"Configuration completed");
 		return -1;
 	}
 	
-
 	//## Loop over options
 	unsigned int nOptions= optionList.size();
 	int nConfiguredAttrs= 0;
@@ -3032,15 +3007,37 @@ int SFinder::ApplyConfig(std::string& config){
 
 	INFO_LOG("#"<<nConfiguredAttrs<<" attribute configured...");
 
-	//std::string useLocalBkg_val= root.get("useLocalBkg","").asString();
- 
 	//## Reset previous state (e.g. ON if a Configuration task was issued, or RUNNING if the config task was issued by the FindSource command)
-	set_state(get_prev_state());
-	set_status("Configuration completed");
-	
+	UpdateState(get_prev_state(),"Configuration completed");
+
 	return 0;
 
 }//close ApplyConfig()
+
+int SFinder::UpdateState(Tango::DevState state,const std::string statusMsg){
+
+	//Check input state
+	if(state!=Tango::INIT && state!=Tango::RUNNING && state!=Tango::ON){
+		WARN_LOG("Invalid state given (state="<<state<<")");
+		return -1;
+	}
+	
+	//Set state
+	set_state(state);	
+	set_status(statusMsg.c_str()); 
+	try{
+		DEBUG_LOG("Pushing change event for device "<<device_name<<"...");
+		push_change_event	("State");
+	}
+	catch(Tango::DevFailed& e){
+		WARN_LOG("Failed to push change event on State attribute");
+		return -1;
+	}
+
+	return 0;
+	
+}//close UpdateState()
+
 
 int SFinder::SetAttrFromConfig(Json::Value& optionObj){
 

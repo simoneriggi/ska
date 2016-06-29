@@ -256,7 +256,7 @@ public:
 	Tango::DevLong	*attr_psMaxNPix_read;
 	Tango::DevBoolean	*attr_useBoundingBoxCut_read;
 	Tango::DevFloat	*attr_minBoundingBoxThr_read;
-	Tango::DevString	*attr_compactSourceData_read;
+	Tango::DevString	*attr_sourceData_read;
 	Tango::DevString	*attr_runProgress_read;
 
 //	Constructors and destructors
@@ -640,14 +640,14 @@ public:
 	virtual void write_minBoundingBoxThr(Tango::WAttribute &attr);
 	virtual bool is_minBoundingBoxThr_allowed(Tango::AttReqType type);
 /**
- *	Attribute compactSourceData related methods
+ *	Attribute sourceData related methods
  *	Description: 
  *
  *	Data type:	Tango::DevString
  *	Attr type:	Scalar
  */
-	virtual void read_compactSourceData(Tango::Attribute &attr);
-	virtual bool is_compactSourceData_allowed(Tango::AttReqType type);
+	virtual void read_sourceData(Tango::Attribute &attr);
+	virtual bool is_sourceData_allowed(Tango::AttReqType type);
 /**
  *	Attribute runProgress related methods
  *	Description: Run progress info
@@ -688,22 +688,17 @@ public:
 	 *               as argument.
 	 *
 	 *	@param argin String arg
-	 *               [0]: filename
-	 *               [1]: run guid (set by the broker)
-	 *               [2]: configuration string  
-	 *               
-	 *               Long arg
-	 *               [nmaps+0]: tile min x
-	 *               [nmaps+1]: tile max x
-	 *               [nmaps+2]: tile min y
-	 *               [nmaps+3]: tile max y
+	 *               [0]: filename (mandatory)
+	 *               [1]: run guid (mandatory)
+	 *               [2]: task list (mandatory)
+	 *               [2]: configuration string  (optional)
 	 *	@returns Long arg
 	 *           [0]: ack code
 	 *           
 	 *           String arg
 	 *           [0]: err description
 	 */
-	virtual Tango::DevVarLongStringArray *extract_sources(const Tango::DevVarLongStringArray *argin);
+	virtual Tango::DevVarLongStringArray *extract_sources(const Tango::DevVarStringArray *argin);
 	virtual bool is_ExtractSources_allowed(const CORBA::Any &any);
 	/**
 	 *	Command Configure related method
@@ -722,6 +717,20 @@ public:
 	 */
 	virtual Tango::DevVarLongStringArray *register_me();
 	virtual bool is_RegisterMe_allowed(const CORBA::Any &any);
+	/**
+	 *	Command Free related method
+	 *	Description: Free worker (aborting all running tasks)
+	 *
+	 */
+	virtual void free();
+	virtual bool is_Free_allowed(const CORBA::Any &any);
+	/**
+	 *	Command Reserve related method
+	 *	Description: Reserve resource
+	 *
+	 */
+	virtual void reserve();
+	virtual bool is_Reserve_allowed(const CORBA::Any &any);
 
 
 	//--------------------------------------------------------
@@ -742,6 +751,8 @@ public:
 		int SetAttrFromConfig(Json::Value& optionObj);
 		int SetScalarAttrValue(Tango::WAttribute& attr,Json::Value& optionObj);
 		int SetSpectrumAttrValue(Tango::WAttribute& attr,Json::Value& optionObj);
+
+		int UpdateState(Tango::DevState state,const std::string statusMsg);
 
 		/*
 		int RunSourceTask(std::vector<Caesar::Source*>& sources,const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
