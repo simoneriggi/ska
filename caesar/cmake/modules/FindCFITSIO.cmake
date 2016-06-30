@@ -21,14 +21,14 @@ find_path(CFITSIO_INCLUDE_DIR fitsio.h
   PATH_SUFFIXES libcfitsio3 libcfitsio0 cfitsio
   PATHS
   $ENV{CFITSIO}
-  ${CFITSIO_DIR}/include
+  $ENV{CFITSIO_DIR}/include
   ${GNUWIN32_DIR}/include
 )
 
 find_library(CFITSIO_LIBRARY NAMES cfitsio
   PATHS
   $ENV{CFITSIO}
-  ${CFITSIO_DIR}/lib
+  $ENV{CFITSIO_DIR}/lib
   ${GNUWIN32_DIR}/lib
 )
 if(CFITSIO_LIBRARY)
