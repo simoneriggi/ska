@@ -105,10 +105,10 @@ public:
   
   template <class IterT1, class IterT2, class IterT3>  														
   void init(IterT1 grids_begin, IterT2 grids_len_begin, IterT3 f_begin, IterT3 f_end) {    
-		std::cout<<"init(): Started"<<std::endl;
+		//std::cout<<"init(): Started"<<std::endl;
     set_grids(grids_begin, grids_len_begin, m_bCopyData);
 		set_f_array(f_begin, f_end, m_bCopyData);
-		std::cout<<"init(): End"<<std::endl;
+		//std::cout<<"init(): End"<<std::endl;
   }  
   template <class IterT1, class IterT2, class IterT3, class RefCountIterT>
   void init_refcount(IterT1 grids_begin, IterT2 grids_len_begin, IterT3 f_begin, IterT3 f_end, ArrayRefCountT &refF, RefCountIterT grid_refs_begin) {	    
@@ -120,11 +120,11 @@ public:
 
   template <class IterT1, class IterT2>  
   void set_grids(IterT1 grids_begin, IterT2 grids_len_begin, bool bCopy) {
-		std::cout<<"set_grids(): Started"<<std::endl;
+		//std::cout<<"set_grids(): Started"<<std::endl;
 		m_grid_list.clear();
 		m_grid_ref_list.clear();
 		m_grid_copy_list.clear();
-		std::cout<<"set_grids(): Start loop N="<<N<<std::endl;
+		//std::cout<<"set_grids(): Start loop N="<<N<<std::endl;
 		
 		for (int i=0; i<N; i++) {
 	  	int gridLength = grids_len_begin[i];
@@ -138,7 +138,7 @@ public:
 	    	m_grid_list.push_back(grid_type(gridLength, begin));							// use our copy
 	  	}
     }
-		std::cout<<"set_grids(): End"<<std::endl;
+		//std::cout<<"set_grids(): End"<<std::endl;
   } //close set_grids()
   
   template <class IterT1, class RefCountIterT>  
@@ -286,7 +286,7 @@ public:
 		T y, v0, v1;
 		//mexPrintf("%d\n", n);
 
-		cout<<"interp_vec: start"<<endl;
+		//cout<<"interp_vec: start"<<endl;
 
 	try {
 		for (int i=0; i<n; i++) {			// for each point
@@ -329,20 +329,20 @@ public:
 	  	}
 
 			//== DEBUG ==
-			if(y==0){
-				std::cout<<"interp_vec(): WARN: y==0 (i="<<i<<")"<<std::endl;
-			}
+			//if(y==0){
+			//	std::cout<<"interp_vec(): WARN: y==0 (i="<<i<<")"<<std::endl;
+			//}
 			//==========
 
 	  	*i_result++ = y;
     }//end loop
 	}//close try
 	catch( std::exception &ex ) {
-		cerr << "interp_vec(): ERROR: Exception detected in interpolation: " << ex.what() << endl;
+		//cerr << "interp_vec(): ERROR: Exception detected in interpolation: " << ex.what() << endl;
 		throw std::runtime_error(ex.what());
   } 
 	catch(...) { 
-		cerr << "interp_vec: ERROR: C++ exception (unknown reason) in interpolation!" << endl;
+		//cerr << "interp_vec: ERROR: C++ exception (unknown reason) in interpolation!" << endl;
 		throw std::runtime_error("C++ exception (unknown reason) in interpolation!");
   }	
 
@@ -400,7 +400,7 @@ public:
     vector<T> f(1 << N);
 		array<T,N> x;
 	
-	cout<<"interp_vec: start"<<endl;
+	//cout<<"interp_vec: start"<<endl;
 
 	try {
 		for (int i=0; i<n; i++) {								// loop over each point
@@ -430,15 +430,15 @@ public:
 		}//end loop
 	}//close try
 	catch( std::exception &ex ) {
-		cerr << "interp_vec(): ERROR: Exception detected in interpolation: " << ex.what() << endl;
+		//cerr << "interp_vec(): ERROR: Exception detected in interpolation: " << ex.what() << endl;
 		throw std::runtime_error(ex.what());
   } 
 	catch(...) { 
-		cerr << "interp_vec: ERROR: C++ exception (unknown reason) in interpolation!" << endl;
+		//cerr << "interp_vec: ERROR: C++ exception (unknown reason) in interpolation!" << endl;
 		throw std::runtime_error("C++ exception (unknown reason) in interpolation!");
   }	
 
-		cout<<"interp_vec: END"<<endl;
+		//cout<<"interp_vec: END"<<endl;
 
   }//close interp_vec
 };	

@@ -28,6 +28,7 @@
 #include <WTFilter.h>
 #include <Img.h>
 #include <MathUtils.h>
+#include <WTFilter.h>
 
 #include <TObject.h>
 
@@ -83,7 +84,7 @@ std::vector<Img*> WTFilter::GetDecomposition(Img* image,int nScales){
 	imgCollection.clear();
 	imgCollection.resize(0);
 	if(!image){
-		cerr<<"WTFilter::GetDecomposition(): ERROR: Null prt to given image!"<<endl;
+		ERROR_LOG("Null prt to given image!");
 		return imgCollection;
 	}
 
@@ -108,7 +109,7 @@ std::vector<Img*> WTFilter::GetDecomposition(Img* image,int nScales){
 	F[0]= I;
 
 	for(int n=1;n<nScales+1;n++){
-		cout<<"WTFilter::GetDecomposition(): INFO: Compute convolution at scale "<<n<<" ..."<<endl;
+		DEBUG_LOG("Compute convolution at scale "<<n<<" ...");
 		F[n]= Caesar::MathUtils::GetATrousConvolution(F[n-1],H,n);
 		W[n-1]= F[n-1]-F[n];
 	}//end loop scales

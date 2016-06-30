@@ -151,13 +151,13 @@ class FITSReader : public TObject {
 
 	public:
 	
-		static int Read(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info);
-		static int ReadTile(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info,int xMin,int xMax,int yMin,int yMax);	
-
+		static int Read(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info,bool checkFile=true);
+		static int ReadTile(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info,int xMin,int xMax,int yMin,int yMax,bool checkFile=true);	
+		static int ReadTileFast(std::string filename,Caesar::Img& image,Caesar::FITSFileInfo& fits_info,int ix_min,int ix_max,int iy_min,int iy_max,bool checkFile=true);
 	private:
 
 		static bool ReadHeader(TFITSHDU* hdu,Caesar::FITSFileInfo& fits_info);
-		static TFITSHDU* ReadFile(std::string filename,Caesar::FITSFileInfo& fits_info);
+		static TFITSHDU* ReadFile(std::string filename,Caesar::FITSFileInfo& fits_info,bool checkFile=true);
 		
 	private:
 

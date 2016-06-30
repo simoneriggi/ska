@@ -17,6 +17,8 @@
 // ***********************************************************************
 #include <SourceFinder.h>
 #include <ConfigParser.h>
+#include <Logger.h>
+#include <CodeUtils.h>
 
 #include <RInside.h>
 
@@ -92,13 +94,60 @@ int main(int argc, char *argv[]){
 	PRINT_OPTIONS();
 
 	//=======================
+	//== Init Logger 
+	//=======================
+	//Get main logger options
+	int loggerTarget= 0;
+	if(GET_OPTION_VALUE(loggerTarget,loggerTarget)<0){
+		cerr<<"ERROR: Failed to get loggerTarget option!"<<endl;
+		return -1;
+	}
+	std::string loggerTag= "";
+	std::string logLevel= "";
+	if(GET_OPTION_VALUE(loggerTag,loggerTag)<0){
+		cerr<<"ERROR: Failed to get loggerTag option!"<<endl;
+		return -1;
+	}
+	if(GET_OPTION_VALUE(logLevel,logLevel)<0){
+		cerr<<"ERROR: Failed to get logLevel option!"<<endl;
+		return -1;
+	}
+
+	//Init logger
+	if(loggerTarget==eCONSOLE_TARGET){
+		std::string consoleTarget= "";
+		GET_OPTION_VALUE(consoleTarget,consoleTarget);
+		LoggerManager::Instance().CreateConsoleLogger(logLevel,loggerTag,consoleTarget);
+	}
+	else if(loggerTarget==eFILE_TARGET){
+		std::string logFile= "";
+		std::string maxLogFileSize= "";
+		bool appendToLogFile= false;
+		int maxBackupLogFiles= 1;
+		GET_OPTION_VALUE(logFile,logFile);
+		GET_OPTION_VALUE(appendToLogFile,appendToLogFile);
+		GET_OPTION_VALUE(maxLogFileSize,maxLogFileSize);
+		GET_OPTION_VALUE(maxBackupLogFiles,maxBackupLogFiles);
+		LoggerManager::Instance().CreateFileLogger(logLevel,loggerTag,logFile,appendToLogFile,maxLogFileSize,maxBackupLogFiles);
+	}
+	else if(loggerTarget==eSYSLOG_TARGET){
+		std::string syslogFacility= "";
+		GET_OPTION_VALUE(syslogFacility,syslogFacility);
+		LoggerManager::Instance().CreateSysLogger(logLevel,loggerTag,syslogFacility);
+	}
+	else{
+		cerr<<"ERROR: Failed to initialize logger!"<<endl;
+		return -1;
+	}
+
+	//=======================
 	//== Run SourceFinder
 	//=======================
-	cout<<"INFO: Starting source finding ..."<<endl;
+	INFO_LOG("Starting source finding");
 	SourceFinder finder;
 	finder.Run();
-	cout<<"INFO: End source finding"<<endl;
-	
+	INFO_LOG("End source finding");
+
 	return 0;
 
 }//close main

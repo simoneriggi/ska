@@ -32,13 +32,10 @@
 #include <Source.h>
 #include <Pixel.h>
 #include <BkgData.h>
+#include <Logger.h>
 
 #include <TObject.h>
 #include <TRInterface.h>
-
-//#include <Rcpp.h>
-//#include <RInside.h>
-//using namespace Rcpp;
 
 #include <iomanip>
 #include <iostream>
@@ -67,7 +64,7 @@ MorphFilter::~MorphFilter(){
 Img* MorphFilter::Dilate(Img* img,int KernSize,bool returnPeakImg){
 		
 	if(!img){
-		cerr<<"MorphFilter::Dilate(): Null ptr to given image!"<<endl;
+		ERROR_LOG("Null ptr to given image!");
 		return 0;
 	}
 	int Nx= img->GetNbinsX();
@@ -133,7 +130,7 @@ Img* MorphFilter::Dilate(Img* img,int KernSize,bool returnPeakImg){
 					//peaks.push_back(binId);
 					peakImg->FillPixel(x,y,1);
 					npeaks++;
-					cout<<"Img::Dilate(): INFO: Peaks #"<<npeaks<<" detected @ ("<<x<<","<<y<<")"<<endl;
+					DEBUG_LOG("Peaks #"<<npeaks<<" detected @ ("<<x<<","<<y<<")");
 				}
 			}
 		}//end loop x
@@ -158,13 +155,13 @@ int MorphFilter::FindDilatedSourcePixels(Img* img,Source* source,int KernSize,st
 
 	//## Check input source
 	if(!source) {
-		cerr<<"MorphFilter::DilateAroundSource(): ERROR: Null ptr to input source given!"<<endl;
+		ERROR_LOG("Null ptr to input source given!");
 		return -1;
 	}
 	
 	//## Init dilation kernel
 	if(KernSize%2==0){
-		cerr << "MorphFilter::DilateAroundSource(): ERROR: KernSize should be an odd number!" << endl;
+		ERROR_LOG("KernSize should be an odd number!");
 		return -1;
 	}
 	int dilateSize= KernSize/2;
@@ -177,7 +174,6 @@ int MorphFilter::FindDilatedSourcePixels(Img* img,Source* source,int KernSize,st
 
 	//for(unsigned int l=0;l<sourcePixels.size();l++){
 	for(int l=0;l<source->GetNPixels();l++){
-		//Pixel* thisPixel= sourcePixels[l];
 		Pixel* thisPixel= source->GetPixel(l);
 		int id= thisPixel->id;
 		int binx, biny, binz;
@@ -208,37 +204,63 @@ int MorphFilter::FindDilatedSourcePixels(Img* img,Source* source,int KernSize,st
 	}//end loop pixels		
 	
 	//## Replace selected pixels
-	cout<<"MorphFilter::FindDilatedSourcePixels(): INFO: #"<<nDilatedPixels<<" pixels to be dilated..."<<endl;
+	DEBUG_LOG("#"<<nDilatedPixels<<" pixels to be dilated...");
 		
 	return 0;
 
 }//close FindDilatedSourcePixels()
 
-int MorphFilter::DilateAroundSource(Img* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize){
+int MorphFilter::DilateAroundSource(Img* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
 
 	//## Check input source
 	if(!source) {
-		cerr<<"MorphFilter::DilateAroundSource(): ERROR: Null ptr to input source given!"<<endl;
+		ERROR_LOG("Null ptr to input source given!");
 		return -1;
 	}
 	bool hasNestedSources= source->HasNestedSources();
 	bool hasStats= source->HasStats();
 	if(!hasStats){
-		cerr<<"MorphFilter::DilateAroundSource(): WARN: No stats computed for input source...computing!"<<endl;
+		WARN_LOG("No stats computed for input source...computing!");
 		source->ComputeStats(true,true);
 	}
 	int sourceType= source->Type;
 	double sourceMedian= source->Median;
 	double sourceMedianRMS= source->MedianRMS;
 	
+	//## Skip faint sources
+	//Get pixel seeds
+	bool isFaintSource= false;
+	std::vector<int> seedPixelIndexes= source->GetSeedPixelIndexes();
+	DEBUG_LOG("#"<<seedPixelIndexes.size()<<" seed pixels...");
+
+	double Zmax= -1.e+99;
+	for(unsigned int i=0;i<seedPixelIndexes.size();i++){
+		int index= seedPixelIndexes[i];
+		
+		Pixel* aPixel= source->GetPixel(index);
+		if(!aPixel) continue;
+		int id= aPixel->id;
+		std::pair<double,double> bkgInfo= aPixel->GetBkg();
+		double bkgLevel= bkgInfo.first;
+		double noiseLevel= bkgInfo.second;
+		double w= img->GetBinContent(id);
+		double Z= (w-bkgLevel)/noiseLevel;
+		if(fabs(Z)>Zmax) Zmax= Z;
+	}
+
+	if(Zmax<zThr){
+		INFO_LOG("Source is below significance threshold for dilation (Z="<<Zmax<<"<"<<zThr<<"), skip it!");
+		return 0;	
+	}
+	
+
 	//## Check R interface
 	double sigmaTrunc= 1;//trunc random gaussian to +-sigmaTrunc	
 
 	
 	//RInside* fR= 0;
-	cout<<"MorphFilter::DilateAroundSource(): INFO: Retrieve RInterface instance..."<<endl;
+	DEBUG_LOG("Retrieve RInterface instance...");
 	ROOT::R::TRInterface& fR= ROOT::R::TRInterface::Instance();
-	cout<<"MorphFilter::DilateAroundSource(): INFO: done!"<<endl;
 	std::string randomGenCmd= std::string("rtruncnorm(1, a=-sigmaTrunc, b=sigmaTrunc, mean = 0, sd = 1)");
 	try{
 		/*
@@ -257,11 +279,11 @@ int MorphFilter::DilateAroundSource(Img* img,Source* source,int KernSize,int dil
 	}//close try block
 	
 	catch( std::exception &ex ) {
-		cerr << "MorphFilter::DilateAroundSource(): ERROR: Exception catched: " << ex.what() << endl;
+		ERROR_LOG("Exception catched: " << ex.what());
 		return -1;
   } 
 	catch(...) { 
-		cerr << "MorphFilter::DilateAroundSource(): ERROR: C++ exception (unknown reason)" << endl;
+		ERROR_LOG("C++ exception (unknown reason)");
 		return -1;
   }	
 
@@ -269,14 +291,14 @@ int MorphFilter::DilateAroundSource(Img* img,Source* source,int KernSize,int dil
 	//## Find pixels to be dilated
 	//== MOTHER SOURCE
 	std::vector<int> pixelsToBeDilated;
-	cout<<"MorphFilter::DilateAroundSource(): INFO: hasNestedSources="<<hasNestedSources<<endl;
+	DEBUG_LOG("hasNestedSources="<<hasNestedSources);
 	if(!hasNestedSources && (dilateSourceType==-1 || sourceType==dilateSourceType) ){
-		cout<<"MorphFilter::DilateAroundSource(): INFO: Dilating mother sources..."<<endl;
+		DEBUG_LOG("Dilating mother sources...");
 		FindDilatedSourcePixels(img,source,KernSize,pixelsToBeDilated);	
 	}
 	//== NESTED SOURCES
 	if(skipToNested && hasNestedSources){
-		cout<<"MorphFilter::DilateAroundSource(): INFO: Dilating nested sources..."<<endl;
+		DEBUG_LOG("Dilating nested sources...");
 		std::vector<Source*> nestedSources= source->GetNestedSources();
 		for(unsigned int k=0;k<nestedSources.size();k++){
 			int nestedSourceType= nestedSources[k]->Type;
@@ -353,37 +375,37 @@ int MorphFilter::DilateAroundSource(Img* img,Source* source,int KernSize,int dil
 }//close DilateAroundSource()
 
 
-int MorphFilter::DilateAroundSources(Img* img,std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize){
+int MorphFilter::DilateAroundSources(Img* img,std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
 	
 	//## Check input image
 	if(!img){
-		cerr<<"MorphFilter::DilateAroundSource(): ERROR: Null ptr to given image!"<<endl;
+		ERROR_LOG("Null ptr to given image!");
 		return -1;
 	}
 	
 	//## Check bkg data
 	if(dilateModel==eDilateWithBkg){
 	 	if(!bkgData){
-			cerr<<"MorphFilter::DilateAroundSources(): ERROR: Selected to use bkg dilation but null ptr to bkg data!"<<endl;
+			ERROR_LOG("Selected to use bkg dilation but null ptr to bkg data!");
 			return -1;
 		}
 		if(useLocalBkg && !bkgData->HasLocalBkg()){
-			cerr<<"MorphFilter::DilateAroundSources(): ERROR: Selected to use local bkg but no local bkg data are available!"<<endl;
+			ERROR_LOG("Selected to use local bkg but no local bkg data are available!");
 			return -1;
 		}
 	}//close if
 
 	//## Check source list
 	if(sources.size()<=0){
-		cerr<<"MorphFilter::DilateAroundSources(): WARN: Source list empty, nothing to be dilated!"<<endl;
+		WARN_LOG("Source list empty, nothing to be dilated!");
 		return 0;
 	}
 
 	//## Start dilating sources
 	for(unsigned int k=0;k<sources.size();k++){	
-		int status= DilateAroundSource(img,sources[k],KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize);
+		int status= DilateAroundSource(img,sources[k],KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
 		if(status<0){
-			cerr<<"MorphFilter::DilateAroundSources(): WARN: Source dilation failed for source no. "<<k<<" ..."<<endl;				
+			WARN_LOG("Source dilation failed for source no. "<<k<<" ...");
 		}
 	}//end loop sources
 

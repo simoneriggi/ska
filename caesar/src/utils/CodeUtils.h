@@ -167,6 +167,16 @@ class CodeUtils : public TObject {
 			return 0;
 		}//close JsonToString()
 
+		static int StringToJson(Json::Value& root,std::string& jsonString){
+			
+			Json::Reader reader;
+			if(!reader.parse(jsonString, root)) {
+				ERROR_LOG("Failed to encode string to json ("<<reader.getFormattedErrorMessages()<<")");
+				return -1;
+			}
+			return 0;
+		}//close StringToJson()
+
 		/**
 		* \brief Find json option in array by name
 		*/
