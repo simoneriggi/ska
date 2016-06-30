@@ -39,6 +39,7 @@
 #define SFinder_H
 
 #include <SFinderThread.h>
+#include <SFinderTask.h>
 
 #include <tango.h>
 
@@ -69,6 +70,7 @@ namespace SFinder_ns
 
 //	Additional Class Declarations
 	class SFinderThread;
+	class SFinderTask;
 
 /*----- PROTECTED REGION END -----*/	//	SFinder::Additional Class Declarations
 
@@ -80,9 +82,12 @@ class SFinder : public TANGO_BASE_CLASS
 //	Add your own data members
 	protected:
 		//Thread 
-		bool m_StopThreadFlag;	
+		//bool m_StopThreadFlag;	
 		omni_mutex* m_mutex;
 		SFinderThread* m_WorkerThread;
+
+		//Task
+		SFinderTask* m_WorkerTaskMgr;
 
 		//Pipes/Blobs
 		Tango::DevicePipeBlob m_compactSourcesPipeBlob;
@@ -765,6 +770,7 @@ public:
 
 
 	friend class SFinderThread;
+	friend class SFinderTask;
 
 /*----- PROTECTED REGION END -----*/	//	SFinder::Additional Method prototypes
 };

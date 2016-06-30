@@ -197,6 +197,17 @@ void SFinder::delete_device()
 	DEBUG_STREAM << "SFinder::delete_device() " << device_name << endl;
 	/*----- PROTECTED REGION ID(SFinder::delete_device) ENABLED START -----*/
 	
+
+	// Release the task
+	if (this->m_WorkerTaskMgr) {
+		//Ask the task to quit
+	  this->m_WorkerTaskMgr->exit();
+    //- !!!!! never try to <delete> a yat4tango::DeviceTask, cause
+    //- it commits suicide upon return of its main function !!!!!!
+	  this->m_WorkerTaskMgr = 0;
+	}
+
+
 	//	Delete device allocated objects
 	if (m_WorkerThread) {
 		DEBUG_LOG("Shutting down worker thread...");
@@ -283,9 +294,50 @@ void SFinder::init_device()
 
 	//## Init the worker thread
   DEBUG_LOG("Init worker thread for device "<<device_name<<"...");
-  m_StopThreadFlag= false;
+  //m_StopThreadFlag= false;
 	m_WorkerThread= 0;
   m_WorkerThread = new SFinderThread(this);
+
+	//## Init the worker task 
+	m_WorkerTaskMgr = 0;
+
+	try {
+		//Task configuration
+    yat::Task::Config cfg;
+		cfg.enable_timeout_msg= true;
+		cfg.timeout_msg_period_ms= 3000;
+		cfg.enable_periodic_msg= false;
+		cfg.periodic_msg_period_ms= 10000;
+		//cfg.lock_msg_handling= ...
+		//cfg.lo_wm= ...;//Message queue low water mark. 
+		//cfg.hi_wm= ...;//Message queue high water mark. 
+		cfg.throw_on_post_tmo= true;
+
+		//Allocate the task
+		DEBUG_LOG("Init worker task mgr...");
+    m_WorkerTaskMgr = new (std::nothrow) SFinderTask(cfg,this);
+	  if (!m_WorkerTaskMgr){
+    	throw std::bad_alloc();
+		}
+
+    //Start the task
+    DEBUG_LOG("Starting task ...");
+    m_WorkerTaskMgr->go();
+  }
+	catch (const Tango::DevFailed& e) {
+		Tango::Except::print_exception(e);
+  	ERROR_LOG("Exception while creating task!");
+    set_state (Tango::FAULT);
+  }
+  catch (const std::exception& e) {
+  	ERROR_LOG("C++ exception while initializing task (err="<<e.what()<<")");
+    set_state (Tango::FAULT);
+  }  
+  catch (...) {
+  	ERROR_LOG("Unknown exception while initializing task!");
+    set_state (Tango::FAULT);
+  }
+
 
 	//## Init broker group
 	DEBUG_LOG("Init broker group...");
@@ -2127,7 +2179,7 @@ void SFinder::read_compactSourcesPipe(Tango::Pipe &pipe)
 		DEBUG_LOG("After pipe set");
 		
 	}//close try block
-	catch(Tango::DevFailed& e){
+	catch(const Tango::DevFailed& e){
 		Tango::Except::print_exception(e);
 		ERROR_LOG("Tango exception occurred while setting pipe!");
 	}
@@ -2271,6 +2323,7 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarString
 	}
 
 	//## Start the worker thread
+	/*
 	if(!m_WorkerThread){
 		WARN_LOG("Null ptr to worker thread!");
 		ack= -1;
@@ -2284,7 +2337,36 @@ Tango::DevVarLongStringArray *SFinder::extract_sources(const Tango::DevVarString
 		return argout;
 	}
 	m_WorkerThread->Start(workerTasks);
-	
+	*/
+
+	try {
+		m_WorkerTaskMgr->Start(workerTasks,1000);
+	}
+	catch(const Tango::DevFailed& e){
+		Tango::Except::print_exception(e);
+		ERROR_LOG("Exception while starting source finder task!");
+		ack= -1;
+		reply= "Failed to start source finder task!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+
+		//Free resource for use
+		UpdateState(Tango::ON,"Source finder task start failed, free resource");
+			
+		return argout;
+	}
+	catch(...){
+		ERROR_LOG("Unknown exception while starting source finder task!");
+		ack= -1;
+		reply= "Failed to start source finder task!";
+		argout->lvalue[0]= ack;
+		argout->svalue[0] = CORBA::string_dup(reply.c_str());
+
+		//Free resource for use
+		UpdateState(Tango::ON,"Source finder task start failed, free resource");
+			
+		return argout;
+	}
 
 
 	//Return reply
@@ -2518,406 +2600,6 @@ void SFinder::add_dynamic_commands()
 
 /*----- PROTECTED REGION ID(SFinder::namespace_ending) ENABLED START -----*/
 
-/*
-//	Additional Methods
-int SFinder::RunSourceTask(std::vector<Source*>& sources,const std::string& filename,long int tileMinX,long int tileMaxX,long int tileMinY,long int tileMaxY){
-
-	//## Read input image
-	INFO_LOG("Reading input image "<<filename<<" X["<<tileMinX<<","<<tileMaxX<<"] Y["<<tileMinY<<","<<tileMaxY<<"]...");
-	Img* inputImg= ReadImage(filename,tileMinX,tileMaxX,tileMinY,tileMaxY);
-	if(!inputImg){
-		ERROR_LOG("Reading of input image failed!");
-		return -1;
-	}
-
-	//## Compute input image stats & bkg
-	INFO_LOG("Computing input image stats & bkg...");	
-	BkgData* bkgData= ComputeStatsAndBkg(inputImg);	
-	if(!bkgData){
-		ERROR_LOG("ERROR: Failed to compute stats/bkg info!");
-		inputImg->Delete();
-		return -1;
-	}
-
-	//## Find compact sources
-	INFO_LOG("Searching compact sources...");
-	std::vector<Source*> compact_sources;
-	if(attr_searchCompactSources_write && FindCompactSources(compact_sources,inputImg,false,bkgData)<0){
-		ERROR_LOG("Compact source search failed!");
-		return -1;
-	}
-	sources.insert(sources.end(),compact_sources.begin(),compact_sources.end());
-	
-
-	//...
-	//...
-
-	//## Clear data
-	inputImg->Delete();
-	delete bkgData;
-	bkgData= 0;
-
-	return 0;
-
-}//close RunSourceTask()
-
-
-int SFinder::FindCompactSources(std::vector<Source*>& sources,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
-
-	//## Check input image
-	if(!inputImg) {
-		ERROR_LOG("Null ptr to input image given!");
-		return -1;
-	}
-
-	//## Find sources
-	INFO_LOG("Finding compact sources ...");		
-	int status= FindSources(sources,inputImg,computeStatsAndBkg,inputBkgData);
-	if(status<0) {
-		ERROR_LOG("Compact source finding failed!");
-		return -1;
-	}
-
-	//## Retrieve found sources 
-	int nSources= (int)sources.size();
-	INFO_LOG("#"<<nSources<<" compact sources detected in input image...");
-	if(nSources<=0) return 0;
-
-	//## Apply source selection?
-	int nSelSources= nSources;
-	if(attr_selectCompactSources_write){
-		if(SelectSources(sources)<0){
-			ERROR_LOG("Failed to select sources!");
-			return -1;
-		}
-		nSelSources= sources.size();
-	}//close if source selection
-
-	//## Add detected sources to the list	
-	INFO_LOG("#"<<nSelSources<<" compact sources selected after cuts...");
-
-	return 0;
-
-}//close FindCompactSources()
-
-
-int SFinder::FindSources(std::vector<Source*>& sources,Img* inputImg,bool computeStatsAndBkg,BkgData* inputBkgData){
-
-	//## Check input image
-	if(!inputImg) {
-		ERROR_LOG("Null ptr to input image given!");
-		return -1;
-	}
-
-	//## Compute stats and bkg?
-	BkgData* bkgData= inputBkgData;
-	if(computeStatsAndBkg || !bkgData){
-		INFO_LOG("Computing image stats/bkg...");
-		bkgData= ComputeStatsAndBkg(inputImg);	
-		if(!bkgData){
-			ERROR_LOG("Failed to compute stats/bkg info!");
-			return -1;
-		}
-	}
-
-	//## Compute significance map
-	Img* significanceMap= inputImg->GetSignificanceMap(bkgData,attr_useLocalBkg_write);
-	if(!significanceMap){
-		ERROR_LOG("Failed to compute significance map!");
-		if(!inputBkgData){//delete only if inputBkgData is null (e.g. bkg is computed here)
-			delete bkgData;
-			bkgData= 0;
-		}
-		return -1;
-	}
-
-	//## Find sources
-	INFO_LOG("Finding sources...");	
-	int status= inputImg->FindCompactSource(
-		sources,significanceMap,bkgData,
-		attr_seedThr_write,attr_mergeThr_write,attr_minNPix_write,attr_searchNegativeExcess_write,attr_mergeBelowSeed_write,
-		attr_searchNestedSources_write,attr_nestedBlobThrFactor_write
-	);
-
-	if(status<0) {
-		ERROR_LOG("Source finding failed!");
-		if(!inputBkgData){
-			delete bkgData;
-			bkgData= 0;
-		}
-		significanceMap->Delete();
-		return -1;
-	}
-	int nSources= (int)sources.size();
-	INFO_LOG(nSources<<" sources detected in input image...");	
-	
-	//## Clear allocated data
-	if(!inputBkgData){
-		delete bkgData;
-		bkgData= 0;
-	}
-	significanceMap->Delete();
-		
-	return 0;
-
-}//close FindSources()
-
-
-int SFinder::SelectSources(std::vector<Source*>& sources){
-
-	//## Apply source selection?
-	int nSources= (int)sources.size();
-	if(nSources<=0) return 0;
-	
-	int nSelSources= 0;
-	std::vector<Source*> sources_sel;
-
-	for(int i=0;i<nSources;i++){	
-		std::string sourceName= sources[i]->Name;
-		int sourceId= sources[i]->Id;
-		long int NPix= sources[i]->NPix;
-		double X0= sources[i]->X0;
-		double Y0= sources[i]->Y0;
-
-		//Is bad source (i.e. line-like blob, etc...)?
-		if(!IsGoodSource(sources[i])) {
-			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!");
-			sources[i]->SetGoodSourceFlag(false);
-			continue;
-		}
-			
-		//Is point-like source?
-		if( IsPointLikeSource(sources[i]) ){
-			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as a point-like source ...");
-			sources[i]->SetType(Source::ePointLike);
-		}
-
-		//Tag nested sources
-		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();
-		for(unsigned int j=0;j<nestedSources.size();j++){
-			std::string nestedSourceName= nestedSources[j]->Name;
-			int nestedSourceId= nestedSources[j]->Id;
-			long int nestedNPix= nestedSources[j]->NPix;
-			double nestedX0= nestedSources[j]->X0;
-			double nestedY0= nestedSources[j]->Y0;
-
-			if(!IsGoodSource(nestedSources[j])) {
-				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as bad source, skipped!");
-				nestedSources[j]->SetGoodSourceFlag(false);
-			}
-			if( IsPointLikeSource(nestedSources[j]) ){
-				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as a point-like source ...");
-				nestedSources[j]->SetType(Source::ePointLike);
-			}
-		}//end loop nested sources
-			
-		//Add source to the list	
-		sources_sel.push_back(sources[i]);
-		nSelSources++;
-	}//end loop sources
-
-	INFO_LOG("Added "<<nSelSources<<" compact sources to the selected list...");
-
-	//Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
-	sources.clear();
-	sources.insert(sources.end(),sources_sel.begin(),sources_sel.end());
-	sources_sel.clear();
-
-	return 0;
-
-}//close SelectSources()
-
-bool SFinder::IsGoodSource(Source* aSource){
-	
-	if(!aSource) return false;
-
-	//## Check for pixels 	
-	if(aSource->NPix<=0 || (aSource->GetPixels()).size()<=0) return false;
-
-	//## Check for line-like source
-	if( (aSource->GetContours()).size()<=0) {
-		WARN_LOG("No contour stored for this source, cannot perform check!");
-		return true;
-	}
-
-	double BoundingBoxMin= ((aSource->GetContours())[0])->BoundingBoxMin;
-	if(attr_useBoundingBoxCut_write && BoundingBoxMin<attr_minBoundingBoxThr_write) {
-		DEBUG_LOG("BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<attr_minBoundingBoxThr_write<<")");
-		return false;
-	}
-
-	//## Add other check here ...
-	//...
-
-	return true;
-
-}//close IsGoodSource()
-
-bool SFinder::IsPointLikeSource(Source* aSource){
-
-	if(!aSource) return false;
-	if(!aSource->HasParameters()) {
-		WARN_LOG("No parameters are available for this source (did you compute them?)...point-like check cannot be performed!");
-		return true;
-	}
-
-	std::string sourceName= aSource->Name;
-	int sourceId= aSource->Id;
-
-	//Loop over contours and check if all of them have circular features
-	bool isPointLike= true;
-	std::vector<Contour*> contours= aSource->GetContours();
-
-	for(unsigned int i=0;i<contours.size();i++){
-		Contour* thisContour= contours[i];
-
-		//Test circularity ratio: 1= circle
-		if(attr_useCircRatioCut_write && thisContour->CircularityRatio<attr_psCircRatioThr_write) {
-			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass CircularityRatio cut (CR="<<thisContour->CircularityRatio<<"<"<<attr_psCircRatioThr_write<<")");
-			isPointLike= false;
-			break;
-		}
-
-		//Test elongation (how symmetrical is the shape): 0=circle,square
-		if(attr_useElongCut_write && thisContour->Elongation>attr_psElongThr_write) {
-			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass Elongation cut (ELONG="<<thisContour->CircularityRatio<<">"<<attr_psElongThr_write<<")");
-			isPointLike= false;
-			break;	
-		}
-
-		//Test ellipse fit
-		if(attr_useEllipseAreaRatioCut_write && (thisContour->EllipseAreaRatio<attr_psEllipseAreaRatioMinThr_write || thisContour->EllipseAreaRatio>attr_psEllipseAreaRatioMaxThr_write)) {
-			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass EllipseAreaRatio cut (EAR="<<thisContour->EllipseAreaRatio<<" outside range ["<<attr_psEllipseAreaRatioMinThr_write<<","<<attr_psEllipseAreaRatioMaxThr_write<<"])");
-			isPointLike= false;
-			break;	
-		}
-
-	}//end contour loop
-	
-	//Check number of pixels
-	if(attr_useMaxNPixCut_write && aSource->NPix>attr_psMaxNPix_write){
-		DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nMaxPix cut (NPix="<<aSource->NPix<<">"<<attr_psMaxNPix_write<<")");
-		isPointLike= false;
-	}
-
-	if(!isPointLike) return false;
-
-	return true;
-
-}//close IsPointLikeSource()
-
-Img* SFinder::ReadImage(const std::string& filename,long int tileMinX,long int tileMaxX,long int tileMinY,long int tileMaxY){
-
-	//## Check file
-	FileInfo info;
-	bool match_extension= false;
-	if(!SysUtils::CheckFile(filename,info,match_extension,"")){
-		ERROR_LOG("Invalid input file name specified (invalid file path?)!");
-		return 0;
-	}
-	
-	//=== ROOT reading ===
-	Img* inputImg= 0;
-	if(info.extension==".root"){// Read image from ROOT file
-		TFile* inputFile = new TFile(filename.c_str(),"READ");
-		if(!inputFile || inputFile->IsZombie()){
-			ERROR_LOG("Cannot open input file "<<filename<<"!");
-			return 0;
-		}
-		inputImg=  (Img*)inputFile->Get(filename.c_str());
-		if(!inputImg){
-			ERROR_LOG("Cannot get image from input file "<<filename<<"!");
-			return 0;
-		}
-	}//close if
-
-	//=== FITS reading ===
-	else if(info.extension==".fits"){// Read image from FITS file
-		inputImg= new Img;
-		int status= inputImg->ReadFITS(filename,tileMinX,tileMaxX,tileMinY,tileMaxY); 
-		if(status<0){
-			ERROR_LOG("Failed to read image from input file "<<filename<<"!");
-			if(inputImg) inputImg->Delete();
-			return 0;
-		}
-	}//close else if
-
-	//== Invalid extension ==
-	else{
-		ERROR_LOG("Invalid file extension detected (ext="<<info.extension<<")!");
-		return 0;
-	}
-	inputImg->SetNameTitle("img","img");
-	
-	return inputImg;
-
-}//close ReadImage()
-
-
-BkgData* SFinder::ComputeStatsAndBkg(Img* img){
-
-	//## Check input img
-	if(!img){
-		ERROR_LOG("Null ptr to input image given!");
-		return 0;
-	}
-
-	//## Compute stats
-	INFO_LOG("Computing image stats...");
-	bool computeRobustStats= true;
-	bool skipNegativePix= attr_skipNegativePixels_write;//false
-	bool forceRecomputing= false;
-	if(!img->ComputeStats(computeRobustStats,skipNegativePix,forceRecomputing)<0){
-		ERROR_LOG("Stats computing failed!");
-		return 0;
-	}
-	img->LogStats("INFO");
-
-	//## Set local bkg grid/box
-	//## If MetaData & beam info are available, interpret grid&box options as multiple of beam
-	//## If no info is available (or use of beam info is off) interpret grid&box options as fractions wrt image size
-	double boxSizeX= attr_localBkgBoxSizeX_write;
-	double boxSizeY= attr_localBkgBoxSizeY_write;
-	bool useBeamInfoInBkg= attr_useBeamInfoInBkg_write;
-	long int nPixelsInBeam= 0;
-	if(useBeamInfoInBkg && img->HasMetaData()){
-		nPixelsInBeam= img->GetMetaData()->GetBeamSizeInPixel();	
-	}
-	
-	if(useBeamInfoInBkg && nPixelsInBeam>0){
-		INFO_LOG("Setting bkg boxes as ("<<attr_localBkgBoxSizeX_write<<","<<attr_localBkgBoxSizeY_write<<") x beam (beam="<<nPixelsInBeam<<" pixels) ...");
-		boxSizeX= nPixelsInBeam*attr_localBkgBoxSizeX_write;
-		boxSizeY= nPixelsInBeam*attr_localBkgBoxSizeY_write;
-	}
-	else{
-		WARN_LOG("Beam information is not available or its usage has been turned off, using image fractions...");
-		double Nx= img->GetNbinsX();
-		double Ny= img->GetNbinsY();
-		boxSizeX= attr_localBkgBoxSizeX_write*Nx;
-		boxSizeY= attr_localBkgBoxSizeY_write*Ny;
-	}
-
-	double gridSizeX= attr_localBkgGridStepSizeX_write*boxSizeX;
-	double gridSizeY= attr_localBkgGridStepSizeY_write*boxSizeY;
-	INFO_LOG("Bkg box ("<<boxSizeX<<","<<boxSizeY<<") pixels, Grid step ("<<gridSizeX<<","<<gridSizeY<<") pixels ...");
-		
-	//## Compute Bkg
-	BkgData* bkgData= img->ComputeBkg(
-		attr_bkgEstimator_write,attr_useLocalBkg_write,
-		boxSizeX,boxSizeY,gridSizeX,gridSizeY,
-		attr_use2ndPassInLocalBkg_write,attr_skipOutliersInLocalBkg_write,
-		attr_seedThr_write,attr_mergeThr_write,attr_minNPix_write
-	);
-
-	if(!bkgData) {
-		ERROR_LOG("Bkg computing failed!");
-		return 0;
-	}
-		
-	return bkgData;
-
-}//close ComputeStatsAndBkg()
-*/
 
 
 int SFinder::InitBrokerGroup(){
