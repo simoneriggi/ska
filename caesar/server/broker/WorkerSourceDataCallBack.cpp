@@ -69,14 +69,22 @@ void WorkerSourceDataCallBack::push_event(Tango::EventData* event) {
   try {   	
     if (!event->err) { 
 			//Get event data
-			//std::string event_value;
-			SBuffer buffer;
+			SBuffer buffer;	
+			std::vector<unsigned char> event_value;
 
-			Tango::DeviceAttribute attr_value= *(event->attr_value);
-    	//attr_value >> event_value; 
-			attr_value >> buffer.data;
-			buffer.size= (buffer.data).size(); 
+			//std::string event_value;
 			
+			Tango::DeviceAttribute attr_value= *(event->attr_value);
+    	attr_value >> event_value; 
+			//attr_value >> buffer.data;
+
+			//buffer.data= std::string(event_value,422417);
+			//buffer.size= (buffer.data).size(); 
+			//buffer.size= 422417;//DEBUG
+			
+			buffer.data= std::string(event_value.begin(),event_value.end());
+			buffer.size= event_value.size();
+
 			int status= event->err;
 			std::string dev_name= (event->device)->name();
 			std::string attr_name= event->attr_name;

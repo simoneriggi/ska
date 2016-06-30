@@ -583,10 +583,12 @@ void SFinderBroker::subscribe_workers()
 
 	//--> Source data
 	DEBUG_LOG("Subscribing to sourceData Change event...");
-	if(m_workerManager->SubscribeGroupToEvent("sourceData",Tango::CHANGE_EVENT,m_workerSourceDataCallBack)<0){
+	//if(m_workerManager->SubscribeGroupToEvent("sourceData",Tango::CHANGE_EVENT,m_workerSourceDataCallBack)<0){
+	//	WARN_LOG("Failed to subscribe to worker group sourceData event!");
+	//}
+	if(m_workerManager->SubscribeGroupToEvent("encodedSourceData",Tango::CHANGE_EVENT,m_workerSourceDataCallBack)<0){
 		WARN_LOG("Failed to subscribe to worker group sourceData event!");
 	}
-
 	return;
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinderBroker::subscribe_workers
