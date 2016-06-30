@@ -628,6 +628,7 @@ int SFinderThread::PushWorkerDataEvent(WorkerData* workerData){
 		return -1;
 	}
 
+	/*
 	//Encode workerData to buffer
 	SBuffer buffer;	
 	INFO_LOG("Serializing workerData to buffer ...");
@@ -635,42 +636,76 @@ int SFinderThread::PushWorkerDataEvent(WorkerData* workerData){
 		ERROR_LOG("Failed to encode worker data to buffer!");
 		return -1;
 	}
-	INFO_LOG("Buffer size: "<<buffer.size);
+	INFO_LOG("Buffer size: "<<buffer.size<<", string size="<<(buffer.data).size());
+	*/
 
-	//Tango::DevString* attr_value= new Tango::DevString;
-	//*attr_value= Tango::string_dup(buffer.data);
+		
 
 	//Set attribute and push event
-	std::vector<std::string> filt_names;
-	std::vector<double> filt_vals;
 	bool release= false;//false by default
 	
 	(m_device->m_mutex)->lock();
+
+	
 	INFO_LOG("Set sourceData attribute ...");
+	long int buffer_size= 0;
 	try {
-		CORBA::string_free(*m_device->attr_sourceData_read);
+		//if(*m_device->attr_encodedSourceData_read) CORBA::string_free(*m_device->attr_encodedSourceData_read);
+		//INFO_LOG("Allocating size for buffer: n="<<buffer.size);
+		
+		//Encode workerData to char array
+			
+		INFO_LOG("Serializing workerData to buffer ...");
+		if(Serializer::WorkerDataToCharArray(m_device->attr_encodedSourceData_read,buffer_size,workerData)<0){
+			ERROR_LOG("Failed to encode worker data to char array!");
+			throw std::runtime_error("Failed to encode worker data to char array");
+		}
+		INFO_LOG("Buffer size: "<<buffer_size);
+	
+
+		//std::vector<unsigned char> workerDataCharArray(buffer.data.begin(), buffer.data.end());
+		//INFO_LOG("workerDataCharArray size="<<workerDataCharArray.size());
+			
+		//m_device->attr_encodedSourceData_read= m_device->create_DevVarCharArray( (unsigned char*)(buffer.data.c_str()),buffer.size);
+		//m_device->attr_encodedSourceData_read= m_device->create_DevVarCharArray(buffer.data.c_str(),buffer.size);
+
+		/*
+		if(*m_device->attr_sourceData_read) CORBA::string_free(*m_device->attr_sourceData_read);
 		INFO_LOG("Allocating size for buffer: n="<<buffer.size);
 		*(m_device->attr_sourceData_read)= CORBA::string_alloc(buffer.size);
+		//*(m_device->attr_sourceData_read)= CORBA::string_dup((buffer.data).c_str());
 		INFO_LOG("Copying data: n="<<buffer.size);
 		memcpy ( *(m_device->attr_sourceData_read), (buffer.data).c_str(), buffer.size+1);	
-		INFO_LOG("Set null termination...");
-		(m_device->attr_sourceData_read)[buffer.size]= 0;
+		//INFO_LOG("Set null termination...");
+		//(m_device->attr_sourceData_read)[buffer.size]= 0;
+		*/
 	}
 	catch(const Tango::DevFailed& e){
 		ERROR_LOG("Failed to set sourceData attribute!");
+		(m_device->m_mutex)->unlock();
 		return -1;
 	}
 	catch(const std::exception& e){
 		ERROR_LOG("C++ exception occurred when setting sourceData attribute (err="<<e.what()<<")!");
+		(m_device->m_mutex)->unlock();
 		return -1;
 	}
 	catch(...){
 		ERROR_LOG("Unknown exception occurred when setting sourceData attribute!");
+		(m_device->m_mutex)->unlock();
 		return -1;
 	}
 
 	INFO_LOG("Push sourceData attribute event...");
-	m_device->push_event("sourceData",filt_names,filt_vals,m_device->attr_sourceData_read, 1, 0,release);
+	try {
+		//m_device->push_change_event("sourceData",m_device->attr_sourceData_read, 1, 0,release);
+		m_device->push_change_event("encodedSourceData",m_device->attr_encodedSourceData_read, buffer_size, 0,release);
+	}
+	catch(const Tango::DevFailed& e){
+		ERROR_LOG("Failed to push sourceData event!");
+		(m_device->m_mutex)->unlock();
+		return -1;
+	}	
 	(m_device->m_mutex)->unlock();
 
 	return 0;

@@ -258,6 +258,7 @@ public:
 	Tango::DevFloat	*attr_minBoundingBoxThr_read;
 	Tango::DevString	*attr_sourceData_read;
 	Tango::DevString	*attr_runProgress_read;
+	Tango::DevUChar	*attr_encodedSourceData_read;
 
 //	Constructors and destructors
 public:
@@ -662,6 +663,15 @@ public:
  */
 	virtual void read_runProgress(Tango::Attribute &attr);
 	virtual bool is_runProgress_allowed(Tango::AttReqType type);
+/**
+ *	Attribute encodedSourceData related methods
+ *	Description: 
+ *
+ *	Data type:	Tango::DevUChar
+ *	Attr type:	Spectrum max = 10000000
+ */
+	virtual void read_encodedSourceData(Tango::Attribute &attr);
+	virtual bool is_encodedSourceData_allowed(Tango::AttReqType type);
 
 
 	//--------------------------------------------------------
@@ -751,19 +761,9 @@ public:
 		int SetAttrFromConfig(Json::Value& optionObj);
 		int SetScalarAttrValue(Tango::WAttribute& attr,Json::Value& optionObj);
 		int SetSpectrumAttrValue(Tango::WAttribute& attr,Json::Value& optionObj);
-
 		int UpdateState(Tango::DevState state,const std::string statusMsg);
 
-		/*
-		int RunSourceTask(std::vector<Caesar::Source*>& sources,const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
-		Caesar::Img* ReadImage(const std::string& filename,long int tileMinX=-1,long int tileMaxX=-1,long int tileMinY=-1,long int tileMaxY=-1);
-		Caesar::BkgData* ComputeStatsAndBkg(Caesar::Img* img);
-		int FindSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
-		int FindCompactSources(std::vector<Caesar::Source*>& sources,Caesar::Img* inputImg,bool computeStatsAndBkg=true,Caesar::BkgData* inputBkgData=0);
-		int SelectSources(std::vector<Caesar::Source*>& sources);
-		bool IsGoodSource(Caesar::Source* aSource);
-		bool IsPointLikeSource(Caesar::Source* aSource);
-		*/
+
 	friend class SFinderThread;
 
 /*----- PROTECTED REGION END -----*/	//	SFinder::Additional Method prototypes

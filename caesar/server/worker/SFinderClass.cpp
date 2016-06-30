@@ -1770,6 +1770,32 @@ void SFinderClass::attribute_factory(vector<Tango::Attr *> &att_list)
 	//	Not Memorized
 	att_list.push_back(runprogress);
 
+	//	Attribute : encodedSourceData
+	encodedSourceDataAttrib	*encodedsourcedata = new encodedSourceDataAttrib();
+	Tango::UserDefaultAttrProp	encodedsourcedata_prop;
+	//	description	not set for encodedSourceData
+	//	label	not set for encodedSourceData
+	//	unit	not set for encodedSourceData
+	//	standard_unit	not set for encodedSourceData
+	//	display_unit	not set for encodedSourceData
+	//	format	not set for encodedSourceData
+	//	max_value	not set for encodedSourceData
+	//	min_value	not set for encodedSourceData
+	//	max_alarm	not set for encodedSourceData
+	//	min_alarm	not set for encodedSourceData
+	//	max_warning	not set for encodedSourceData
+	//	min_warning	not set for encodedSourceData
+	//	delta_t	not set for encodedSourceData
+	//	delta_val	not set for encodedSourceData
+	
+	encodedsourcedata->set_default_properties(encodedsourcedata_prop);
+	//	Not Polled
+	encodedsourcedata->set_disp_level(Tango::OPERATOR);
+	//	Not Memorized
+	encodedsourcedata->set_data_ready_event(true);
+	encodedsourcedata->set_change_event(true, false);
+	att_list.push_back(encodedsourcedata);
+
 
 	//	Create a list of static attributes
 	create_static_attribute_list(get_class_attr()->get_attr_list());

@@ -686,6 +686,22 @@ bool SFinder::is_runProgress_allowed(TANGO_UNUSED(Tango::AttReqType type))
 	return true;
 }
 
+//--------------------------------------------------------
+/**
+ *	Method      : SFinder::is_encodedSourceData_allowed()
+ *	Description : Execution allowed for encodedSourceData attribute
+ */
+//--------------------------------------------------------
+bool SFinder::is_encodedSourceData_allowed(TANGO_UNUSED(Tango::AttReqType type))
+{
+
+	//	Not any excluded states for encodedSourceData attribute in read access.
+	/*----- PROTECTED REGION ID(SFinder::encodedSourceDataStateAllowed_READ) ENABLED START -----*/
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::encodedSourceDataStateAllowed_READ
+	return true;
+}
+
 //=================================================
 //		pipe Allowed Methods
 //=================================================

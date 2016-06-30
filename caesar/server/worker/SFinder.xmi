@@ -487,6 +487,14 @@
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
       <properties description="Run progress info&#xA;[0]: run id&#xA;[1]: status (RUNNING, COMPLETED, ABORTED, FAILED)&#xA;[2]: progress fraction (0-100%)&#xA;[3]: log info (INIT, READ_IMAGE, BKG, COMPACT_SOURCE, EXT_SOURCE)&#xA;[4]: timestamp" label="" unit="" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
     </attributes>
+    <attributes name="encodedSourceData" attType="Spectrum" rwType="READ" displayLevel="OPERATOR" polledPeriod="0" maxX="10000000" maxY="" allocReadMember="true" isDynamic="false">
+      <dataType xsi:type="pogoDsl:UCharType"/>
+      <changeEvent fire="true" libCheckCriteria="false"/>
+      <archiveEvent fire="false" libCheckCriteria="false"/>
+      <dataReadyEvent fire="true" libCheckCriteria="true"/>
+      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
+      <properties description="" label="" unit="" standardUnit="" displayUnit="" format="" maxValue="" minValue="" maxAlarm="" minAlarm="" maxWarning="" minWarning="" deltaTime="" deltaValue=""/>
+    </attributes>
     <pipes name="compactSourcesPipe" description="Compact source pipe blob" label="compactSources" rwType="READ" displayLevel="OPERATOR"/>
     <states name="INIT" description="Initializing state: used when reserved of under configuration options">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>

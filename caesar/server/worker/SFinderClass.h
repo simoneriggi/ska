@@ -535,6 +535,19 @@ public:
 		{return (static_cast<SFinder *>(dev))->is_runProgress_allowed(ty);}
 };
 
+//	Attribute encodedSourceData class definition
+class encodedSourceDataAttrib: public Tango::SpectrumAttr
+{
+public:
+	encodedSourceDataAttrib():SpectrumAttr("encodedSourceData",
+			Tango::DEV_UCHAR, Tango::READ, 10000000) {};
+	~encodedSourceDataAttrib() {};
+	virtual void read(Tango::DeviceImpl *dev,Tango::Attribute &att)
+		{(static_cast<SFinder *>(dev))->read_encodedSourceData(att);}
+	virtual bool is_allowed(Tango::DeviceImpl *dev,Tango::AttReqType ty)
+		{return (static_cast<SFinder *>(dev))->is_encodedSourceData_allowed(ty);}
+};
+
 
 //=========================================
 //	Define classes for pipes

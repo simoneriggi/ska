@@ -141,6 +141,7 @@ using namespace std;
 //  minBoundingBoxThr         |  Tango::DevFloat	Scalar
 //  sourceData                |  Tango::DevString	Scalar
 //  runProgress               |  Tango::DevString	Spectrum  ( max = 10)
+//  encodedSourceData         |  Tango::DevUChar	Spectrum  ( max = 10000000)
 //================================================================
 
 namespace SFinder_ns
@@ -221,6 +222,7 @@ void SFinder::delete_device()
 	/*----- PROTECTED REGION END -----*/	//	SFinder::delete_device
 	delete[] attr_sourceData_read;
 	delete[] attr_runProgress_read;
+	delete[] attr_encodedSourceData_read;
 }
 
 //--------------------------------------------------------
@@ -244,6 +246,7 @@ void SFinder::init_device()
 	
 	attr_sourceData_read = new Tango::DevString[1];
 	attr_runProgress_read = new Tango::DevString[10];
+	attr_encodedSourceData_read = new Tango::DevUChar[10000000];
 	/*----- PROTECTED REGION ID(SFinder::init_device) ENABLED START -----*/
 	
 	//	Initialize device
@@ -254,12 +257,22 @@ void SFinder::init_device()
 
 	//## Set change state event
 	try {
-		DEBUG_LOG("Set change event for device "<<device_name<<"...");
+		DEBUG_LOG("Set change event for State attribute of device "<<device_name<<"...");
 		set_change_event ("State", true, true);
 	}
 	catch(Tango::DevFailed& e){
 		WARN_LOG("Failed to set change event on State attribute");
 	}
+
+	//## Set change state event
+	try {
+		DEBUG_LOG("Set change event for sourceData attribute of device "<<device_name<<"...");
+		set_change_event ("sourceData", true, true);
+	}
+	catch(Tango::DevFailed& e){
+		WARN_LOG("Failed to set change event on sourceData attribute");
+	}
+
 
 	//## Init state
 	DEBUG_LOG("Worker "<<device_name<<" started...");
@@ -2057,6 +2070,24 @@ void SFinder::read_runProgress(Tango::Attribute &attr)
 	
 	/*----- PROTECTED REGION END -----*/	//	SFinder::read_runProgress
 }
+//--------------------------------------------------------
+/**
+ *	Read attribute encodedSourceData related method
+ *	Description: 
+ *
+ *	Data type:	Tango::DevUChar
+ *	Attr type:	Spectrum max = 10000000
+ */
+//--------------------------------------------------------
+void SFinder::read_encodedSourceData(Tango::Attribute &attr)
+{
+	DEBUG_STREAM << "SFinder::read_encodedSourceData(Tango::Attribute &attr) entering... " << endl;
+	/*----- PROTECTED REGION ID(SFinder::read_encodedSourceData) ENABLED START -----*/
+	//	Set the attribute value
+	attr.set_value(attr_encodedSourceData_read, 10000000);
+	
+	/*----- PROTECTED REGION END -----*/	//	SFinder::read_encodedSourceData
+}
 
 //--------------------------------------------------------
 /**
@@ -2920,6 +2951,8 @@ int SFinder::LoadDefaultConfig(){
 	//Set default values in attributes (to be called in init_device method)
 	//They will be overwritten after init_device completes with memorized DB values (if any)
 	
+	*attr_sourceData_read= CORBA::string_dup("");
+
 	//--> Bkg options
 	attr_useLocalBkg_write= useLocalBkg_default;
 	attr_use2ndPassInLocalBkg_write= use2ndPassInLocalBkg_default;
