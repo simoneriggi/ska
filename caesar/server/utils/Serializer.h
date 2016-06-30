@@ -119,6 +119,7 @@ class Serializer : public TObject {
 			//WorkerData --> Buffer
 			static int EncodeWorkerDataToProtobuf(SourcePB::WorkerData& workerData_pb,WorkerData* workerData);
 			static int WorkerDataToBuffer(SBuffer& buffer,WorkerData* workerData);
+			static int WorkerDataToCharArray(unsigned char* buffer,long int& buffer_size,WorkerData* workerData);
 
 			//Buffer --> WorkerData
 			static int EncodeProtobufToWorkerData(WorkerData& workerData,const SourcePB::WorkerData& workerData_pb);

@@ -753,6 +753,36 @@ int Serializer::WorkerDataToBuffer(SBuffer& buffer,WorkerData* workerData){
 
 }//close WorkerDataToBuffer()
 
+
+int Serializer::WorkerDataToCharArray(unsigned char* buffer,long int& buffer_size,WorkerData* workerData){
+
+	//## Check input data
+	if(!workerData) {
+		return -1;
+	}
+
+	try {
+		//## Create google protobuf source message
+		SourcePB::WorkerData workerData_pb;
+		if(EncodeWorkerDataToProtobuf(workerData_pb,workerData)<0){
+			throw std::runtime_error("Encoding failed!");
+		}
+		
+		//## Fill buffer 
+		buffer_size = workerData_pb.ByteSize();
+		if(!buffer) buffer = (unsigned char*)malloc(buffer_size);
+		workerData_pb.SerializeToArray(buffer, buffer_size);
+		
+	}//close try blocks
+	catch(std::exception const & e) {
+		ERROR_LOG("Source encoding failed with status "<<e.what());
+		return -1;
+	}
+
+	return 0;
+
+}//close WorkerDataToCharArray()
+
 int Serializer::EncodeProtobufToSource(Source& source,const SourcePB::Source& source_pb){
 
 	try {
@@ -1260,7 +1290,8 @@ int Serializer::BufferToWorkerData(WorkerData& workerData,SBuffer& buffer){
 	try {
 		//## Parse input and encode to protobuf message
 		SourcePB::WorkerData workerData_pb;
-  	if( !workerData_pb.ParseFromString(buffer.data) ) {
+  	//if( !workerData_pb.ParseFromString(buffer.data) ) {
+		if( !workerData_pb.ParseFromArray(buffer.data.c_str(),buffer.size) ) {
 			throw std::runtime_error("Parsing of buffer to WorkerData protobuf failed!");
 		}
 
@@ -1271,13 +1302,13 @@ int Serializer::BufferToWorkerData(WorkerData& workerData,SBuffer& buffer){
 		
 	}//close try
 	catch(std::exception const & e) {
-		ERROR_LOG("Parsing workerData from buffer failed with status "<<e.what());
+		ERROR_LOG("Parsing workerData from buffer failed (err="<<e.what()<<")");
 		return -1;
 	}
 
 	return 0;
 
-}//close WorkerDataToSource()
+}//close BufferToWorkerData()
 
 
 
