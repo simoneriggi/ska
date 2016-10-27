@@ -61,6 +61,17 @@ message (STATUS "Looking for Python")
 find_package (PythonLibs REQUIRED)
 message (STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}, PYTHON_INCLUDE_DIRS: ${PYTHON_INCLUDE_DIRS}")
 
+#------------------------------------
+# -- Check for Python Modules   -----
+#------------------------------------
+include(FindPythonModule)
+# pyfits
+message (STATUS "Looking for Python pyfits module")
+find_python_module(pyfits REQUIRED)
+# astropy
+message (STATUS "Looking for Python astropy module")
+find_python_module(astropy REQUIRED)
+
 
 #==================================
 #==   Check for Log4Cxx         ===
@@ -106,6 +117,38 @@ if (NOT CFITSIO_FOUND)
 endif()
 MESSAGE(STATUS "CFITSIO_INCLUDE_DIR: ${CFITSIO_INCLUDE_DIR}")
 MESSAGE(STATUS "CFITSIO_LIBRARIES: ${CFITSIO_LIBRARIES}")
+
+#=================================
+#==   Check for PROTOBUF       ===
+#=================================
+MESSAGE(STATUS "Looking for Protobuf lib")
+FIND_PACKAGE(Protobuf REQUIRED COMPONENTS protobuf protoc)
+IF (NOT PROTOBUF_FOUND)
+	MESSAGE(SEND_ERROR "Protobuf not found!")
+endif()
+MESSAGE(STATUS "PROTOBUF_INCLUDE_DIR: ${PROTOBUF_INCLUDE_DIRS}")
+MESSAGE(STATUS "PROTOBUF_LIBRARIES: ${PROTOBUF_LIBRARIES}")
+
+
+#=======================================
+#==   SET BUILD APPS OPTION          ===
+#=======================================
+option(BUILD_APPS "Enable building of Caesar applications in apps dir" ON)
+if(BUILD_APPS)
+	add_definitions(-DBUILD_CAESAR_APPS)
+
+	#============================
+	#==   Check for MPI       ===
+	#============================
+	MESSAGE(STATUS "Looking for MPI...")
+	find_package(MPI REQUIRED)
+	IF (NOT MPI_FOUND)
+		MESSAGE(SEND_ERROR "MPI not found!")
+	endif()
+	MESSAGE(STATUS "MPI_INCLUDE_DIR: ${MPI_INCLUDE_DIRS}")
+	MESSAGE(STATUS "MPI_LIBRARIES: ${MPI_LIBRARIES}")
+
+endif()
 
 
 #===========================================
@@ -219,6 +262,54 @@ if(ENABLE_SERVER)
 	MARK_AS_ADVANCED (TANGO_INCLUDE_DIR TANGO_LIBRARIES)
 	MESSAGE(STATUS "TANGO_INCLUDE_DIR: ${TANGO_INCLUDE_DIR}")
 	MESSAGE(STATUS "TANGO_LIBRARIES: ${TANGO_LIBRARIES}")
+
+
+	#=================================
+	#==   Check for YAT4           ===
+	#=================================
+	MESSAGE(STATUS "Looking for YAT Library")
+	if(NOT DEFINED ENV{YAT_ROOT})
+		MESSAGE(SEND_ERROR "YAT_ROOT variable not defined!")
+	endif()
+
+	FIND_PATH (YAT_INCLUDE_DIR
+		NAMES yat/threading/Task.h
+  	HINTS
+  	$ENV{YAT_ROOT}/include
+	)
+	FIND_LIBRARY (YAT_LIBRARIES 
+		NAMES yat
+		HINTS 
+		$ENV{YAT_ROOT}/lib
+	)
+	MARK_AS_ADVANCED (YAT_INCLUDE_DIR YAT_LIBRARIES)
+	MESSAGE(STATUS "YAT_INCLUDE_DIR: ${YAT_INCLUDE_DIR}")
+	MESSAGE(STATUS "YAT_LIBRARIES: ${YAT_LIBRARIES}")
+		
+
+
+	#======================================
+	#==   Check for YAT4TANGO           ===
+	#======================================
+	MESSAGE(STATUS "Looking for YAT4TANGO Library")
+	if(NOT DEFINED ENV{YAT4TANGO_ROOT})
+		MESSAGE(SEND_ERROR "YAT4TANGO_ROOT variable not defined!")
+	endif()
+
+	FIND_PATH (YAT4TANGO_INCLUDE_DIR
+		NAMES yat4tango/DeviceTask.h
+  	HINTS
+  	$ENV{YAT4TANGO_ROOT}/include
+	)
+	FIND_LIBRARY (YAT4TANGO_LIBRARIES 
+		NAMES yat4tango 
+		HINTS 
+		$ENV{YAT4TANGO_ROOT}/lib
+	)
+	MARK_AS_ADVANCED (YAT4TANGO_INCLUDE_DIR YAT4TANGO_LIBRARIES)
+	MESSAGE(STATUS "YAT4TANGO_INCLUDE_DIR: ${YAT4TANGO_INCLUDE_DIR}")
+	MESSAGE(STATUS "YAT4TANGO_LIBRARIES: ${YAT4TANGO_LIBRARIES}")
+		
 
 endif() ### close if enable Tango
 

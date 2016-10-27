@@ -15,7 +15,6 @@ endif()
 # CMAKE VERSIONS
 # -------------------------------------------
 cmake_minimum_required(VERSION 2.8.8 FATAL_ERROR)
-##cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 cmake_policy(SET CMP0005 NEW)
 
 #---------------------------------------------
@@ -89,18 +88,16 @@ set(INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
 set(LINKED_LIBS "")
 
 # Append subdirs (headers & sources files are appended in subdirs)
+add_subdirectory(proto)
 add_subdirectory(src)
-add_subdirectory(task)
-if(ENABLE_SERVER)
-add_subdirectory(server)
+if(BUILD_APPS)
+	add_subdirectory(apps)
 endif()
 
+##if(ENABLE_SERVER)
+	##add_subdirectory(server)
+##endif()
 
-# -- debug --
-#message (STATUS "SRCS: ${SRCS}")
-message (STATUS "HEADERS: ${HEADERS}")
-#message (STATUS "DICT_HEADERS: ${DICT_HEADERS}")
-#------------
 
 #-- WCSTools
 set(WCSTOOL_DIR ${CMAKE_SOURCE_DIR}/external/wcstools/v3.9.2/libwcs)
@@ -134,13 +131,17 @@ list (APPEND INCLUDE_DIRS ${LINTERP_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${LOG4CXX_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
 list (APPEND INCLUDE_DIRS ${CFITSIO_INCLUDE_DIR})
-if(ENABLE_SERVER)
-	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
-	list (APPEND INCLUDE_DIRS ${MSGPACK_INCLUDE_DIRS})
-	list (APPEND INCLUDE_DIRS ${OMNIORB_INCLUDE_DIR})
-	list (APPEND INCLUDE_DIRS ${ZMQ_INCLUDE_DIR})
-	list (APPEND INCLUDE_DIRS ${TANGO_INCLUDE_DIR})
-endif()
+list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
+	
+##if(ENABLE_SERVER)
+##	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
+##	list (APPEND INCLUDE_DIRS ${MSGPACK_INCLUDE_DIRS})
+##	list (APPEND INCLUDE_DIRS ${OMNIORB_INCLUDE_DIR})
+##	list (APPEND INCLUDE_DIRS ${ZMQ_INCLUDE_DIR})
+##	list (APPEND INCLUDE_DIRS ${TANGO_INCLUDE_DIR})
+##	list (APPEND INCLUDE_DIRS ${YAT_INCLUDE_DIR})
+##	list (APPEND INCLUDE_DIRS ${YAT4TANGO_INCLUDE_DIR})
+##endif()
 include_directories(${INCLUDE_DIRS})
 
 # -- debug --
@@ -161,13 +162,16 @@ list (APPEND LINKED_LIBS ${WCSTOOL_LIBRARIES})
 list (APPEND LINKED_LIBS ${LOG4CXX_LIBRARIES})
 list (APPEND LINKED_LIBS ${JSONCPP_LIBRARIES})
 list (APPEND LINKED_LIBS ${CFITSIO_LIBRARIES})
-if(ENABLE_SERVER)
-	list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
-	list (APPEND LINKED_LIBS ${MSGPACK_LIBRARIES})
-	list (APPEND LINKED_LIBS ${OMNIORB_LIBRARIES})
-	list (APPEND LINKED_LIBS ${ZMQ_LIBRARIES})
-	list (APPEND LINKED_LIBS ${TANGO_LIBRARIES})
-endif()
+list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
+##if(ENABLE_SERVER)
+##	list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
+##	list (APPEND LINKED_LIBS ${MSGPACK_LIBRARIES})
+##	list (APPEND LINKED_LIBS ${OMNIORB_LIBRARIES})
+##	list (APPEND LINKED_LIBS ${ZMQ_LIBRARIES})
+##	list (APPEND LINKED_LIBS ${TANGO_LIBRARIES})
+##	list (APPEND LINKED_LIBS ${YAT_LIBRARIES})
+##	list (APPEND LINKED_LIBS ${YAT4TANGO_LIBRARIES})
+##endif()
 message (STATUS "LINKED_LIBS: ${LINKED_LIBS}")
 
 
@@ -203,7 +207,7 @@ message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
 #-----------------------------------------------------------------------------------------------
 #---  GENERATE PROTOBUF SOURCES
 #-----------------------------------------------------------------------------------------------
-if(ENABLE_SERVER)
+#if(ENABLE_SERVER)
 	MESSAGE(STATUS PROTO_FILES: ${PROTO_FILES})
 	MESSAGE(STATUS PROTO_SRCS: ${PROTO_SRCS})
 	MESSAGE(STATUS PROTO_HEADERS: ${PROTO_HEADERS})
@@ -221,7 +225,6 @@ if(ENABLE_SERVER)
 	MESSAGE(STATUS GEN_PROTO_SRCS: ${GEN_PROTO_SRCS})
 	MESSAGE(STATUS GEN_PROTO_HEADERS: ${GEN_PROTO_HEADERS})
 
-	
 	SET(proto_args 
   	PROTOFILES ${PROTO_FILES}
 		OUTPATH ${CMAKE_BINARY_DIR}
@@ -242,11 +245,13 @@ if(ENABLE_SERVER)
 	add_custom_command(
   	OUTPUT proto_generation
     COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
-    DEPENDS always_rebuild
+    ###DEPENDS always_rebuild  ### Decomment this to always generate protobuf files
+		DEPENDS ${PROTO_FILES}
   )
 
 	add_custom_target(ProtobufSchema ALL 
-		DEPENDS proto_generation
+		##DEPENDS proto_generation
+		DEPENDS ${PROTO_FILES}  ## Will generate source files only when proto files are changed
   )
 
 	
@@ -256,7 +261,8 @@ if(ENABLE_SERVER)
   #	BUILD_IN_SOURCE 0
   #	CONFIGURE_COMMAND ""
 	#	BUILD_COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
-	#	INSTALL_COMMAND cp ${GEN_PROTO_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
+	#	INSTALL_COMMAND ""
+	#	#INSTALL_COMMAND cp ${GEN_PROTO_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
 	#)
 
 	#ExternalProject_Add_Step(ProtobufSchema Generation # Names of project and custom step
@@ -265,7 +271,7 @@ if(ENABLE_SERVER)
   #	ALWAYS 1              # No stamp file, step always runs
  	#)
 
-endif()
+#endif()
 
 #-----------------------------------------------------------------------------------------------
 
@@ -309,23 +315,37 @@ target_link_libraries(Caesar PUBLIC ${LINKED_LIBS})
 #-----------------------------------------------------------------------------------------------
 #---  BUILD PROJECT TASKS EXEs
 #-----------------------------------------------------------------------------------------------
-add_executable(FindSource ${Task_FindSource_SRCS})
-target_link_libraries(FindSource Caesar ${LINKED_LIBS})
+if(BUILD_APPS)
+	add_executable(FindSource ${Task_FindSource_SRCS})
+	target_link_libraries(FindSource Caesar ${LINKED_LIBS})
 
-add_executable(FindSourceResidual ${Task_FindSourceResidual_SRCS})
-target_link_libraries(FindSourceResidual Caesar ${LINKED_LIBS})
+	add_executable(FindSourceResidual ${Task_FindSourceResidual_SRCS})
+	target_link_libraries(FindSourceResidual Caesar ${LINKED_LIBS})
 
-add_executable(FindSaliency ${Task_FindSaliency_SRCS})
-target_link_libraries(FindSaliency Caesar ${LINKED_LIBS})
+	add_executable(FindSaliency ${Task_FindSaliency_SRCS})
+	target_link_libraries(FindSaliency Caesar ${LINKED_LIBS})
 
-add_executable(FindBkg ${Task_FindBkg_SRCS})
-target_link_libraries(FindBkg Caesar ${LINKED_LIBS})
+	add_executable(FindBkg ${Task_FindBkg_SRCS})
+	target_link_libraries(FindBkg Caesar ${LINKED_LIBS})
 
-add_executable(FITS2ROOT ${Task_FITS2ROOT_SRCS})
-target_link_libraries(FITS2ROOT Caesar ${LINKED_LIBS})
+	add_executable(FITS2ROOT ${Task_FITS2ROOT_SRCS})
+	target_link_libraries(FITS2ROOT Caesar ${LINKED_LIBS})
 
-add_executable(ROOT2FITS ${Task_ROOT2FITS_SRCS})
-target_link_libraries(ROOT2FITS Caesar ${LINKED_LIBS})
+	add_executable(ROOT2FITS ${Task_ROOT2FITS_SRCS})
+	target_link_libraries(ROOT2FITS Caesar ${LINKED_LIBS})
+
+	
+	include_directories(${MPI_INCLUDE_PATH})
+	add_executable(FindSourceMPI ${Task_FindSourceMPI_SRCS})
+	target_link_libraries(FindSourceMPI Caesar ${LINKED_LIBS} ${MPI_LIBRARIES})
+	if(MPI_COMPILE_FLAGS)
+  	set_target_properties(FindSourceMPI PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+	endif()
+	if(MPI_LINK_FLAGS)
+  	set_target_properties(FindSourceMPI PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
+	endif()
+
+endif()
 #-----------------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------------
@@ -344,6 +364,12 @@ if(ENABLE_SERVER)
 	target_link_libraries(SFinderBrokerExe Caesar ${LINKED_LIBS})
 	add_dependencies(SFinderBrokerExe Caesar)
 	set_target_properties(SFinderBrokerExe PROPERTIES OUTPUT_NAME SFinderBroker)
+
+	## GroupManager
+	add_executable(GroupManagerExe ${Main_SFINDER_GRPMGRSERVER_SRCS} ${SFINDER_GRPMGRSERVER_SRCS})
+	target_link_libraries(GroupManagerExe Caesar ${LINKED_LIBS})
+	add_dependencies(GroupManagerExe Caesar)
+	set_target_properties(GroupManagerExe PROPERTIES OUTPUT_NAME GroupManager)
 endif()
 
 

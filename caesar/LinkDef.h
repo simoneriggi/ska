@@ -151,6 +151,9 @@
 #pragma link C++ class Caesar::OptionFactory+;
 #pragma link C++ class Caesar::ConfigParser+;
 #pragma link C++ MACRO REGISTER_OPTION defined_in Caesar;
+
+#pragma link C++ class Caesar::SBuffer+;
+#pragma link C++ class Caesar::TaskData+;
 //==============
 
 
@@ -220,14 +223,6 @@
 
 //ChanVese segmenter
 #pragma link C++ class Caesar::SourceFinder+;
-//======================
-
-//== SERVER ==
-#pragma link C++ class Caesar::SBuffer+;
-#pragma link C++ class Caesar::Serializer+;
-#pragma link C++ class Caesar::WorkerDataHeader+;
-#pragma link C++ class Caesar::WorkerData+;
-#pragma link C++ class Caesar::WorkerTask+;
 //======================
 
 

@@ -305,9 +305,9 @@ class FileLogger : public Logger {
 		
 	protected:
 		std::string m_filename;
-		int m_maxBackupFiles; 
 		bool m_appendFlag;
 		std::string m_maxFileSize;
+		int m_maxBackupFiles; 
 
 	ClassDef(FileLogger,1)		
 
@@ -331,7 +331,6 @@ class ConsoleLogger : public Logger {
 
 	private:
 		
-
 	public:
 		virtual int Init(){
 			//Create logger
@@ -439,7 +438,7 @@ class LoggerManager : public TObject {
 			m_logger->Init();
 			
 			return 0;
-		}//close CreateFileLogger()
+		}//close CreateConsoleLogger()
 
 		Logger* GetLogger(){return m_logger;}
 		int GetLoggerTarget(){return m_target;}
@@ -477,6 +476,7 @@ class ScopedLogger {
 		ScopedLogger(std::string level,std::string prefix="",std::string device_name="")
   		: m_level(level), m_msgprefix(prefix), m_deviceName(device_name) 
 		{}
+
 			
 		//--> Destructor
   	~ScopedLogger(){ 
@@ -529,6 +529,17 @@ inline std::string GetDeviceName(){
 	}
 	return dev_name;
 }
+
+inline bool areInTangoServer(){
+	try {
+		std::vector<Tango::DeviceImpl*> dev_list= Tango::Util::instance(false)->get_device_list("*");	
+		if(!dev_list.empty()) return true;
+	}
+	catch(Tango::DevFailed& e){
+		return false;
+	}
+	return false;
+}
 #endif
 
 
@@ -571,10 +582,7 @@ inline std::string getClassNamePrefix(std::string fullFuncName,std::string funcN
 #define __CLASS__ getClassName(__PRETTY_FUNCTION__,__FUNCTION__)
 #define __CLASS_PREFIX__ getClassNamePrefix(__PRETTY_FUNCTION__,__FUNCTION__)
 #define __DEVICE_CLASS(deviceInstance) deviceInstance->get_device_class()->get_name()
-
-
-
-
+#define __DEVICE_NAME(deviceInstance) deviceInstance->get_name()
 
 //== LOG MACROS ===
 #define LOG_PREFIX \
@@ -582,21 +590,40 @@ inline std::string getClassNamePrefix(std::string fullFuncName,std::string funcN
 
 #ifdef USE_TANGO
 	#define DEVICE_NAME GetDeviceName()
+	#define __INSIDE_TANGO_SERVER areInTangoServer()
 #else 
 	#define	DEVICE_NAME std::string("")
+	#define __INSIDE_TANGO_SERVER std::string("")
 #endif
 
-#define DEV_LOG(DeviceName, Level, What) \
+#define CAESAR_LOG(DeviceName, Level, What) \
 	ScopedLogger(Level,LOG_PREFIX,DeviceName).stream() << What
 
-#define LOG(Level, What) DEV_LOG(DEVICE_NAME,Level,What)
-//ScopedLogger(Level,LOG_PREFIX).stream() << What
+#define LOG(Level, What) CAESAR_LOG(DEVICE_NAME,Level,What)
 
 #define INFO_LOG(What) LOG("INFO",What)
 #define WARN_LOG(What) LOG("WARN",What)
 #define DEBUG_LOG(What) LOG("DEBUG",What)
 #define ERROR_LOG(What) LOG("ERROR",What)
 #define FATAL_LOG(What) LOG("FATAL",What)
+
+
+
+//--> DEVICE LOG MACROS ===
+#define DEV_LOG(deviceInstance,Level, What) \
+	ScopedLogger(Level,LOG_PREFIX,__DEVICE_NAME(deviceInstance)).stream() << What
+
+#define _INFO_LOG(What) DEV_LOG(this,"INFO",What)
+#define _WARN_LOG(What) DEV_LOG(this,"WARN",What)
+#define _DEBUG_LOG(What) DEV_LOG(this,"DEBUG",What)
+#define _ERROR_LOG(What) DEV_LOG(this,"ERROR",What)
+#define _FATAL_LOG(What) DEV_LOG(this,"FATAL",What)
+
+#define __INFO_LOG(deviceInstance,What) DEV_LOG(deviceInstance,"INFO",What)
+#define __WARN_LOG(deviceInstance,What) DEV_LOG(deviceInstance,"WARN",What)
+#define __DEBUG_LOG(deviceInstance,What) DEV_LOG(deviceInstance,"DEBUG",What)
+#define __ERROR_LOG(deviceInstance,What) DEV_LOG(deviceInstance,"ERROR",What)
+#define __FATAL_LOG(deviceInstance,What) DEV_LOG(deviceInstance,"FATAL",What)
 
 }//close namespace 
 

@@ -813,6 +813,48 @@ int Img::FindExtendedSource_HClust(std::vector<Source*>&,Img* saliencyImg,Img* e
 
 }//close FindExtendedSource_HClust()
 
+int Img::ReadImageFile(std::string filename){
+
+	//## Detect file extension
+	std::string extension= filename.substr(filename.find_last_of(".") + 1);
+	if(extension!= "png" && extension!="jpg" && extension!="bmp" && extension!="gif" ) {
+		ERROR_LOG("Unknown file extension detected: ext="<<extension<<" (valid formats are png/jpg/bmp/gif)!");
+		return -1;
+	}
+	
+	//## Load image from file and set a matrix
+	cv::Mat mat = cv::imread(filename.c_str(), CV_LOAD_IMAGE_COLOR);
+
+	//## Convert to gray scale
+	cv::Mat mat_gray;
+  cvtColor( mat, mat_gray, CV_RGB2GRAY );
+	//mat.convertTo(mat_gray, CV_32FC1);
+
+	//## Fill an image
+	int Nx= mat.cols;
+	int Ny= mat.rows;
+	
+	this->SetBins(Nx,-0.5,Nx-0.5,Ny,-0.5,Ny-0.5);
+	this->Sumw2();
+	this->SetContour(999);
+	
+	for(int j=0;j<mat_gray.rows ;j++){//nBoxY
+		int rowId= Ny-1-j;
+		for(int i=0;i<mat_gray.cols;i++){
+			//int colId= Nx-1-i;
+			int colId= i;
+			unsigned int matrixElement= mat_gray.at<uchar>(j,i);	
+			//float matrixElement= mat_gray.at<float>(j,i);		
+			int ix= colId ;
+			int iy= rowId ;
+			this->FillPixel(ix,iy,matrixElement);
+		}
+	}
+	
+	return 0;
+
+}//close Img::ReadFile()
+
 int Img::ReadFITS(std::string filename,int ix_min,int ix_max,int iy_min,int iy_max){
 		
 	int status= 0;

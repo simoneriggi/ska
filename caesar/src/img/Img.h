@@ -428,6 +428,10 @@ class Img : public TH2F {
 		* \brief Get image subregion or tile
 		*/
 		Img* GetTile(int ix_min,int ix_max,int iy_min,int iy_max);
+		/**
+		* \brief Read image from an image file
+		*/
+		int ReadImageFile(std::string filename);
 
 		
 		//== Stats methods ==
