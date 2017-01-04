@@ -335,9 +335,9 @@ if(BUILD_APPS)
 	target_link_libraries(ROOT2FITS Caesar ${LINKED_LIBS})
 
 	
-	include_directories(${MPI_INCLUDE_PATH})
+	include_directories(${MPI_CXX_INCLUDE_PATH})
 	add_executable(FindSourceMPI ${Task_FindSourceMPI_SRCS})
-	target_link_libraries(FindSourceMPI Caesar ${LINKED_LIBS} ${MPI_LIBRARIES})
+	target_link_libraries(FindSourceMPI Caesar ${LINKED_LIBS} ${MPI_CXX_LIBRARIES})
 	if(MPI_COMPILE_FLAGS)
   	set_target_properties(FindSourceMPI PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
 	endif()
