@@ -27,6 +27,7 @@
 
 
 #include <Source.h>
+//#include <Pixel.h>
 #include <Blob.h>
 #include <Img.h>
 #include <Contour.h>
@@ -181,7 +182,8 @@ const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 		for(int j=0;j<nPoints;j++){
 			TVector2* contPnt= m_Contours[i]->GetPoint(j);
 			if(!contPnt) continue;
-			sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
+			//sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
+			sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
 		}
 	}
 	sstream<<"# text={S"<<Id<<"}";
@@ -196,7 +198,8 @@ const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 				for(int j=0;j<nPoints;j++){
 					TVector2* contPnt= nestedContours[i]->GetPoint(j);
 					if(!contPnt) continue;
-					sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
+					//sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
+					sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
 				}
 			}//end loop contours
 			sstream<<"# text={S"<<Id<<"_Nest"<<k<<"}";
@@ -257,6 +260,107 @@ const std::string Source::GetDS9EllipseRegion(bool dumpNestedSourceInfo){
 	return dsregions;
 
 }//close GetDS9EllipseRegion()
+
+bool Source::IsAdjacentSource(Source* aSource){
+		
+	//Check input sources
+	if(!aSource){
+		ERROR_LOG("Null ptr to given input Source!");
+		return false;
+	}		
+
+	//Check if pixel collections are empty
+	if(GetNPixels()<=0 || aSource->GetNPixels()<=0){
+		return false;
+	}	
+
+	//Find if there are adjacent pixels
+	auto it = std::find_first_of(
+		(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
+		m_Pixels.begin(), m_Pixels.end(),
+		PixelMatcher::AreAdjacent
+	);
+	
+	bool isAdjacent= false;
+	if (it == (aSource->m_Pixels).end() ) {
+		isAdjacent= false;
+  } 
+	else {
+		isAdjacent= true;
+  	DEBUG_LOG("Sources are adjacent (found a match at " << std::distance((aSource->m_Pixels).begin(), it));
+  }
+
+	return isAdjacent;
+
+}//close IsAdjacentSource()
+
+int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,bool computeStatPars,bool computeMorphPars){
+
+	//Check input sources
+	if(!aSource){
+		ERROR_LOG("Null ptr to given input Source!");
+		return -1;
+	}	
+
+	//If adjacency check is enabled check if sources are mergeable (e.g. if there is at least
+	//a pixel adjacent to each other)
+	if(checkIfAdjacent) {
+		bool areAdjacent= IsAdjacentSource(aSource);
+		if(!areAdjacent){
+			WARN_LOG("Sources are not adjacent nor overlapping, no merging will be performed!");
+			return -1;
+		}
+	}
+
+	//Find differences in pixel collections
+	//Pixel found in both collections are not merged to this source
+	//First sort pixel collections (MANDATORY FOR set_difference() routine)
+	std::sort(m_Pixels.begin(), m_Pixels.end(),PixelMatcher());
+	std::sort((aSource->m_Pixels).begin(), (aSource->m_Pixels).end(),PixelMatcher());
+	
+	std::vector<Pixel*> pixelsToBeMerged;
+	std::set_difference (
+		(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
+		m_Pixels.begin(), m_Pixels.end(),
+		std::back_inserter(pixelsToBeMerged),
+		PixelMatcher()
+	);
+  	
+	//If no pixels are to be merged (e.g. all pixels overlapping) return
+	int nMergedPixels= (int)pixelsToBeMerged.size();
+	if(nMergedPixels<=0){
+		WARN_LOG("No pixels to be merged (perfectly overlapping sources?)!");
+		return -1;
+	}
+	INFO_LOG("# "<<nMergedPixels<<"/"<<aSource->GetNPixels()<<" pixels to be merged to this source (Npix="<<this->GetNPixels()<<")...");
+
+	//Now merge the pixels
+	//Source moments will be updated in AddPixel()
+	for(int i=0;i<nMergedPixels;i++){
+		if(this->AddPixel(pixelsToBeMerged[i],copyPixels)<0){
+			WARN_LOG("Failed to add pixel no. "<<i<<" to this source, skip to next pixel in list...");
+			continue;			
+		}
+	}//end loop pixels to be merged
+	
+	//At this stage stats (mean/median/etc...) are invalid and need to be recomputed if desired
+	this->SetHasStats(false);//set stats to false to remember that current stats are not valid anymore and need to be recomputed
+	if(computeStatPars){
+		bool computeRobustStats= true;
+		bool forceRecomputing= false;//no need to re-compute moments (already updated in AddPixel())
+		this->ComputeStats(computeRobustStats,forceRecomputing);
+	}
+
+	//Contour and other parameters are also invalid
+	this->SetHasParameters(false);
+	if(computeMorphPars){
+		this->ComputeMorphologyParams();
+	}
+
+	return 0;
+	
+}//close MergeSource()
+
 
 }//close namespace
 

@@ -76,7 +76,7 @@ int MathUtils::Compute2DGrid(std::vector<long int>& ix_min,std::vector<long int>
 	}
 
 	//## Check if image size is smaller than required box
-	if(boxSizeX>=Nx || boxSizeY>=Ny) {
+	if(boxSizeX>Nx || boxSizeY>Ny) {
 		WARN_LOG("Invalid box size given (too small or larger than image size)!");
 		return -1;
 	}
@@ -92,7 +92,7 @@ int MathUtils::Compute2DGrid(std::vector<long int>& ix_min,std::vector<long int>
 	
 
 	while(indexY<=Ny){
-		long int offsetY= min(boxSizeY,Ny-1-indexY);
+		long int offsetY= min(boxSizeY-1,Ny-1-indexY);
 		long int ymin= indexY;
 		long int ymax= indexY+offsetY;
 		if(ymin>=Ny || offsetY==0) break;	
@@ -102,7 +102,7 @@ int MathUtils::Compute2DGrid(std::vector<long int>& ix_min,std::vector<long int>
 	}//end while loop Y
 		
 	while(indexX<=Nx){
-		long int offsetX= min(boxSizeX,Nx-1-indexX);
+		long int offsetX= min(boxSizeX-1,Nx-1-indexX);
 		long int xmin= indexX;
 		long int xmax= indexX+offsetX;
 		if(xmin>=Nx || offsetX==0) break;	

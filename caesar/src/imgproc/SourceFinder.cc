@@ -136,7 +136,6 @@ int SourceFinder::Init(){
 		return -1;
 	}
 
-
 	//## Create TApplication if interactive run is selected
 	if(!m_Application && m_IsInteractiveRun){
 		m_Application= new TApplication("Application", 0, 0);
@@ -884,6 +883,7 @@ BkgData* SourceFinder::ComputeStatsAndBkg(Img* img){
 		double Ny= img->GetNbinsY();
 		boxSizeX= m_BoxSizeX*Nx;
 		boxSizeY= m_BoxSizeY*Ny;
+		INFO_LOG("Setting bkg boxes as ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
 	}
 
 	double gridSizeX= m_GridSizeX*boxSizeX;

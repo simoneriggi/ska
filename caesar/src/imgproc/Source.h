@@ -156,6 +156,15 @@ class Source : public Blob {
 		*/
 		const std::string GetDS9EllipseRegion(bool dumpNestedSourceInfo=false);
 
+		/**
+		* \brief Check if a given source is adjacent to this
+		*/
+		bool IsAdjacentSource(Source* aSource);
+		/**
+		* \brief Merge this source with given source
+		*/
+		int MergeSource(Source* aSource,bool copyPixels=false,bool checkIfAdjacent=true,bool computeStatPars=true,bool computeMorphPars=true);
+
 	private:
 		void Init();
 
@@ -177,15 +186,7 @@ class Source : public Blob {
 		ClassDef(Source,1)
 
 	public:
-		/*
-		#ifdef BUILD_CAESAR_SERVER
-			MSGPACK_DEFINE(
-				MSGPACK_BASE(Blob),
-				Type,Flag,m_BeamFluxIntegral,m_IsGoodSource,
-				m_DepthLevel,m_HasNestedSources
-			)
-		#endif
-		*/
+		
 };//close Source()
 
 typedef std::vector<Source*> SourceCollection;
@@ -199,42 +200,5 @@ typedef std::vector<Source*> SourceCollection;
 }//close namespace
 
 
-/*
-#ifdef BUILD_CAESAR_SERVER
-	#include <msgpack.hpp>
-
-	//Serialization for TVector2
-	namespace msgpack {
-	MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
-		namespace adaptor {
-	
-			template <>
-			struct pack<Caesar::Source*> {
-    		template <typename Stream>
-    			packer<Stream>& operator()(msgpack::packer<Stream>& o, Caesar::Source* v) const {
-        		return o << static_cast<Caesar::Source*>(v);
-    			}
-			};
-
-			template <>
-			struct object_with_zone<Caesar::Source*> {
-    		void operator()(msgpack::object::with_zone& o, Caesar::Source* v) const {
-        	o << static_cast<Caesar::Source*>(v);
-    		}
-			};
-
-			template <>
-			struct object<Caesar::Source*> {
-    		void operator()(msgpack::object& o, Caesar::Source* v) const {
-        	o << static_cast<Caesar::Source*>(v);
-    		}
-			};
-
-
-		} // namespace adaptor
-	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
-} // namespace msgpack
-#endif
-*/
 
 #endif

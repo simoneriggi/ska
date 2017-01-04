@@ -31,9 +31,6 @@
 #include <Pixel.h>
 #include <Img.h>
 
-#ifdef BUILD_CAESAR_SERVER
-	#include <msgpack.hpp>
-#endif
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -107,7 +104,7 @@ class Blob : public TObject {
 		//PixelCollection GetPixels(){return m_Pixels;}
 		int GetNPixels(){return (int)(m_Pixels.size());}	
 		const PixelCollection& GetPixels() const {return m_Pixels;}
-		void AddPixel(Pixel* pixel);
+		int AddPixel(Pixel* pixel,bool makeCopy=false);
 		bool HasPixels(){return (GetNPixels()>0);}
 		Pixel* GetPixel(int index) {
 			if(!HasPixels() || index<0 || index>=GetNPixels() ) return 0;
@@ -260,6 +257,7 @@ class Blob : public TObject {
 			m_Contours.push_back(aContour);
 		}
 
+
 	private:
 		//Init functions
 		void Init();
@@ -272,6 +270,8 @@ class Blob : public TObject {
 	public:
 		
 		bool HasPixelsAtEdge;
+		long int MinDistanceToEdgeX;
+		long int MinDistanceToEdgeY;
 
 		//Main params
 		long int Id;//Blob id
@@ -358,27 +358,6 @@ class Blob : public TObject {
 		std::vector<Contour*> m_Contours;
 	
 	ClassDef(Blob,1)
-
-	public:
-		/*
-		#ifdef BUILD_CAESAR_SERVER
-			MSGPACK_DEFINE(
-				HasPixelsAtEdge,Id,Name,
-				NPix,Mean,RMS,Skewness,Median,MedianRMS,X0,Y0,
-				Mean_curv,RMS_curv,Median_curv,MedianRMS_curv,
-				Moments,HuMoments,ZMMoments,
-				m_HasStats,m_HasParameters,
-				m_M1,m_M2,m_M3,m_M4,
-				m_M1_curv,m_M2_curv,
-				m_S,m_Smax,m_Smin,m_Sxx,m_Syy,m_Sxy,m_Sx,m_Sy,m_PixIdmax,m_PixIdmin,
-				m_S_curv,m_S_edge,
-				m_ImageSizeX,m_ImageSizeY,m_ImageMinX,m_ImageMaxX,m_ImageMinY,m_ImageMaxY,m_ImageMinS,m_ImageMaxS,
-				m_ImageMinScurv,m_ImageMaxScurv,m_ImageMinSedge,m_ImageMaxSedge,m_ImageRMS,
-				m_Xmin,m_Xmax,m_Ymin,m_Ymax,m_Ix_min,m_Ix_max,m_Iy_min,m_Iy_max,
-				m_Pixels
-			);
-		#endif
-		*/
 
 };//close Blob()
 

@@ -192,8 +192,8 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(localBkgMethod,int,1,1,2);
 		REGISTER_OPTION(bkgEstimator,int,2,1,4);
 		REGISTER_OPTION(useBeamInfoInBkg,bool,true,false,true);
-		REGISTER_OPTION(boxSizeX,double,20,0.2,1000);
-		REGISTER_OPTION(boxSizeY,double,20,0.2,1000);
+		REGISTER_OPTION(boxSizeX,double,20,0.01,1000);
+		REGISTER_OPTION(boxSizeY,double,20,0.01,1000);
 		REGISTER_OPTION(gridSizeX,double,0.2,0.,1.);
 		REGISTER_OPTION(gridSizeY,double,0.2,0.,1.);
 	

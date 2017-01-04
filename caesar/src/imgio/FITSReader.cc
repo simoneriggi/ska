@@ -66,7 +66,10 @@ FITSReader::~FITSReader() {
 
 bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 
-	if(!hdu) return false;
+	if(!hdu) {
+		ERROR_LOG("Null ptr to given FITS HDU!");
+		return false;
+	}
 
 	//##### GET STANDARD & MANDATORY KEYWORDS (if not existing set an invalid header...)
 	// Get image size field
@@ -263,12 +266,13 @@ TFITSHDU* FITSReader::ReadFile(std::string filename,Caesar::FITSFileInfo& fits_i
 		ERROR_LOG("Failed to read FITS HDU!");
 		return 0;
 	}
-  if (hdu == 0) {
+  if (!hdu) {
 		ERROR_LOG("Cannot access the FITS HDU!");
 		return 0;
 	}
 	
 	//## Read file header	
+	INFO_LOG("Reading FITS file header...");
 	if(!ReadHeader(hdu,fits_info)){
 		ERROR_LOG("Failed to read header from FITS file!");
 		return 0;
@@ -382,7 +386,6 @@ int FITSReader::ReadTile(std::string filename,Caesar::Img& image,Caesar::FITSFil
 	//## Read file
 	TFITSHDU* hdu= ReadFile(filename,fits_info,checkFile);
 	if(!hdu){
-		//cerr<<"FITSReader::Read(): ERROR: Failed to read file "<<filename<<"!"<<endl;
 		ERROR_LOG("Failed to read file "<<filename<<"!");
 		return -1;
 	}

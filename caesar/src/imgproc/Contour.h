@@ -58,55 +58,6 @@
 
 using namespace std;
 
-/*
-#ifdef BUILD_CAESAR_SERVER
-	#include <msgpack.hpp>
-
-	//Serialization for TVector2
-	namespace msgpack {
-	MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
-		namespace adaptor {
-
-			template<>
-			struct convert<TVector2> {
-    		msgpack::object const& operator()(msgpack::object const& o, TVector2& v) const {
-        	if (o.type != msgpack::type::ARRAY) throw msgpack::type_error();
-        	if (o.via.array.size != 2) throw msgpack::type_error();
-        	v = TVector2(
-            o.via.array.ptr[0].as<double>(),
-            o.via.array.ptr[1].as<double>());
-        	return o;
-    		}
-			};//close struct
-
-			template<>
-			struct pack<TVector2> {
-    		template <typename Stream>
-    			packer<Stream>& operator()(msgpack::packer<Stream>& o, TVector2 const& v) const {
-      	  	// packing member variables as an array.
-      	  	o.pack_array(2);
-      	  	o.pack(v.X());
-      	  	o.pack(v.Y());
-      	  	return o;
-    			}
-			};//close struct
-
-			template <>
-			struct object_with_zone<TVector2> {
-    		void operator()(msgpack::object::with_zone& o, TVector2 const& v) const {
-      		o.type = type::ARRAY;
-        	o.via.array.size = 2;
-        	o.via.array.ptr = static_cast<msgpack::object*>(
-        	o.zone.allocate_align(sizeof(msgpack::object) * o.via.array.size));
-        	o.via.array.ptr[0] = msgpack::object(v.X(), o.zone);
-      		o.via.array.ptr[1] = msgpack::object(v.Y(), o.zone);
-    		}
-			};//close struct
-		} // namespace adaptor
-	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
-} // namespace msgpack
-#endif
-*/
 
 namespace Caesar {
 
@@ -377,22 +328,7 @@ class Contour : public TObject {
 	ClassDef(Contour,1)
 
 	public:	
-		/*
-		#ifdef BUILD_CAESAR_SERVER
-			MSGPACK_DEFINE(
-				HasParameters,Area,Perymeter,IsConvexContour,CircularityRatio,
-				BoundingBoxMaj,BoundingBoxMin,BoundingBoxAngle,
-				Elongation,Rectangularity,Roundness,Eccentricity,TiltAngle,
-				HasEllipseFit,EllipseMajAxis,EllipseMinAxis,EllipseRotAngle,EllipseFitRedChi2,EllipseAreaRatio,
-				BoundingBoxCenter,EllipseCenter,
-				m00,m10,m01,m20,m11,m02,m30,m21,m12,m03,mu20,mu11,mu02,mu30,mu21,mu12,mu03,
-		 		nu20,nu11,nu02,nu30,nu21,nu12,nu03,
-				HuMoments,BoundingBoxVertex,Centroid,
-				RealFDs,ImagFDs,ModFDs,BendingEnergies,CentroidDistanceModFDs,
-				m_Points
-			)
-		#endif
-		*/
+		
 };//close class
 
 #ifdef __MAKECINT__

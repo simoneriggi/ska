@@ -138,7 +138,7 @@ int SysUtils::GetFITSImageSize(const std::string& filename,long int& Nx,long int
 	//Init	
 	Nx= 0;
 	Ny= 0;
-	
+
 	//Open file
   int status = 0;
 	fitsfile *fptr;//pointer to the FITS file, defined in fitsio.h

@@ -172,7 +172,7 @@ int BlobFinder::FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg,Bkg
 	//## NB2: It could be used to fill blobs in the input map, conditional to another map (i.e. a binary mask)
 	if(!floodImg) floodImg= inputImg;
 
-	//## Check if bkg data are prvided and if local bkg is available
+	//## Check if bkg data are provided and if local bkg is available
 	//## If local bkg is available use it, otherwise use global bkg
 	bool hasBkgData= false;
 	bool hasLocalBkg= false;

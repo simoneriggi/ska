@@ -28,10 +28,6 @@
 #ifndef Pixel_h
 #define Pixel_h 1
 
-#ifdef BUILD_CAESAR_SERVER
-	#include <msgpack.hpp>
-#endif
-
 #include <TObject.h>
 
 #include <cstdlib>
@@ -81,6 +77,19 @@ class Pixel : public TObject {
 		*/
 		Pixel& operator=(const Pixel& pixel);
 		/**
+		* \brief Equality Operator
+		*/
+		bool operator==(const Pixel& pixel) const {
+  		return (this->x == pixel.x && this->y == pixel.y);
+		}
+		/**
+		* \brief < Operator
+		*/
+		bool operator<(const Pixel& pixel) const {
+			return std::tie (this->x,this->y) < std::tie (pixel.x,pixel.y);
+  	}
+
+		/**
 		* \brief Copy method
 		*/
 		void Copy(TObject& pixel) const;
@@ -128,19 +137,22 @@ class Pixel : public TObject {
 
 	ClassDef(Pixel,1)
 
-	/*
-	public:	
-		#ifdef BUILD_CAESAR_SERVER
-			MSGPACK_DEFINE(
-				id,type,S,x,y,ix,iy,isOnEdge,distanceToEdge,
-				S_curv,S_edge,
-				bkgLevel,noiseLevel
-			)
-		#endif
-	*/
 };
 typedef std::vector<Pixel*> PixelCollection;
 typedef std::map<int,Pixel*> PixelMap;
+
+struct PixelMatcher {
+	bool operator()(const Pixel* lhs, const Pixel* rhs) const { 
+		return std::tie (lhs->x,lhs->y) < std::tie (rhs->x,rhs->y);
+	}
+	static bool AreAdjacent(const Pixel* lhs, const Pixel* rhs) {
+		double distX= rhs->x - lhs->x;
+		double distY= rhs->y - lhs->y;
+		bool areAdjacent= (fabs(distX)<=1 && fabs(distY)<=1);
+  	return areAdjacent;
+	}
+};//close PixelMatcher()
+
 
 
 #ifdef __MAKECINT__
@@ -152,43 +164,6 @@ typedef std::map<int,Pixel*> PixelMap;
 
 }//close namespace
 
-/*
-#ifdef BUILD_CAESAR_SERVER
-	MSGPACK_ADD_ENUM(Caesar::Pixel::PixelType);
-	
-	//Serialization for Pixel*
-	namespace msgpack {
-	MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
-		namespace adaptor {
-
-			template <>
-			struct pack<Caesar::Pixel*> {
-    		template <typename Stream>
-    			packer<Stream>& operator()(msgpack::packer<Stream>& o, Caesar::Pixel* v) const {
-        		return o << static_cast<Caesar::Pixel*>(v);
-    			}
-			};
-
-			template <>
-			struct object_with_zone<Caesar::Pixel*> {
-    		void operator()(msgpack::object::with_zone& o, Caesar::Pixel* v) const {
-        	o << static_cast<Caesar::Pixel*>(v);
-    		}
-			};
-
-			template <>
-			struct object<Caesar::Pixel*> {
-    		void operator()(msgpack::object& o, Caesar::Pixel* v) const {
-        	o << static_cast<Caesar::Pixel*>(v);
-    		}
-			};
-
-
-		} // namespace adaptor
-	} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
-} // namespace msgpack
-#endif
-*/
 
 #endif
 

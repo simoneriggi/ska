@@ -356,13 +356,27 @@ void Blob::UpdateMoments(Pixel* pixel){
 
 }//close UpdateMoments()
 
-void Blob::AddPixel(Pixel* aPixel){
+int Blob::AddPixel(Pixel* aPixel,bool makeCopy){
+
+	//Check pixel
+	if(!aPixel){
+		ERROR_LOG("Null ptr to given pixel, nothing will be added!");
+		return -1;
+	}
 
 	//Append pixel to list
-	m_Pixels.push_back(aPixel);
+	Pixel* pix= aPixel;
+	if(makeCopy){
+		Pixel* clonedPixel= new Pixel;
+		*clonedPixel= *aPixel;
+		pix= clonedPixel;
+	}
+	m_Pixels.push_back(pix);
 
 	//Update moment counts
-	UpdateMoments(aPixel);
+	UpdateMoments(pix);
+
+	return 0;
 
 }//close AddPixel()
 
@@ -430,6 +444,20 @@ int Blob::ComputeMorphologyParams(){
 
 	DEBUG_LOG("Computing blob morphology parameters...");
 	if(NPix<=0 || m_Pixels.size()<=0) return -1;
+
+	//## Reset existing pars
+	m_HasParameters= false;
+	DEBUG_LOG("Clear & reset existing contours (if any)...");
+	for(unsigned int i=0;i<m_Contours.size();i++){
+		if(m_Contours[i]){
+			delete m_Contours[i];
+			m_Contours[i]= 0;
+		}
+	}
+	m_Contours.clear();
+	Moments.clear();
+	HuMoments.clear();
+	ZMMoments.clear();
 		
 	//######################################
 	//## Find the source bounding box
@@ -447,6 +475,8 @@ int Blob::ComputeMorphologyParams(){
 	boundingBoxX[1]= xRange[1]+deltaPix;
 	boundingBoxY[0]= yRange[0]-deltaPix;
 	boundingBoxY[1]= yRange[1]+deltaPix;
+	long int nBoxX= boundingBoxX[1]-boundingBoxX[0]+1;
+	long int nBoxY= boundingBoxY[1]-boundingBoxY[0]+1;
 	
 	//Bounding box in (ix,iy) coordinates
 	long int boundingBoxIX[2];
@@ -460,22 +490,33 @@ int Blob::ComputeMorphologyParams(){
 
 	DEBUG_LOG("xRange("<<xRange[0]<<","<<xRange[1]<<"), yRange("<<yRange[0]<<","<<yRange[1]<<")");
 	DEBUG_LOG("ixRange("<<ixRange[0]<<","<<ixRange[1]<<"), iyRange("<<yRange[0]<<","<<iyRange[1]<<")");
-	DEBUG_LOG("boundingBoxX("<<boundingBoxX[0]<<","<<boundingBoxX[1]<<"), boundingBoxY("<<boundingBoxY[0]<<","<<boundingBoxY[1]<<")");
+	DEBUG_LOG("boundingBoxX("<<boundingBoxX[0]<<","<<boundingBoxX[1]<<"), boundingBoxY("<<boundingBoxY[0]<<","<<boundingBoxY[1]<<")"<<"  nBoxX="<<nBoxX<<", nBoxY="<<nBoxY);
 	DEBUG_LOG("boundingBoxIX("<<boundingBoxIX[0]<<","<<boundingBoxIX[1]<<"), boundingBoxIY("<<boundingBoxIY[0]<<","<<boundingBoxIY[1]<<")"<<"  nBoxIX="<<nBoxIX<<", nBoxIY="<<nBoxIY);
 
 	//## Fill image and binarized image
-	cv::Mat binarizedImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_8UC1);
-	cv::Mat rasterImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_64FC1);
+	//cv::Mat binarizedImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_8UC1);
+	//cv::Mat rasterImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_64FC1);
+	cv::Mat binarizedImg = cv::Mat::zeros(nBoxY, nBoxX, CV_8UC1);
+	cv::Mat rasterImg = cv::Mat::zeros(nBoxY, nBoxX, CV_64FC1);
 
 	for(unsigned int k=0;k<m_Pixels.size();k++){
 		Pixel* thisPixel= m_Pixels[k];
 		double thisS= thisPixel->S;	
+		double x= thisPixel->x;
+		double y= thisPixel->y;
+		x-= boundingBoxX[0];
+		y-= boundingBoxY[0];	
+		
 		long int ix= thisPixel->ix;
 		long int iy= thisPixel->iy;	
 		ix-= boundingBoxIX[0];
 		iy-= boundingBoxIY[0];
-		long int rowId= nBoxIY-1-iy;
-		long int colId= nBoxIX-1-ix;
+
+		//long int rowId= nBoxIY-1-iy;
+		//long int colId= nBoxIX-1-ix;
+		long int rowId= nBoxY-1-y;//TEST
+		long int colId= nBoxX-1-x;//TEST
+		
 		binarizedImg.at<uchar>(rowId, colId, 0) = 1;
 		rasterImg.at<double>(rowId, colId, 0) = thisS;		
 	}//end loop pixels
@@ -498,16 +539,23 @@ int Blob::ComputeMorphologyParams(){
 		//Create and fill contour
 		aContour= new Contour;
 
-		
 		std::stringstream sstream;
 		sstream<<"Contour no. "<<i+1<<": (";
 		for(int j=0;j<nContourPts;j++){
 			int contx= contours[i][j].x;
 			int conty= contours[i][j].y;
+
+			/*	
 			int rowId= nBoxIY-1-conty;
 			int colId= nBoxIX-1-contx;
 			int contx_transf= colId + boundingBoxX[0];
 			int conty_transf= rowId + boundingBoxY[0];
+			*/
+			long int rowId= nBoxY-1-conty;
+			long int colId= nBoxX-1-contx;
+			long int contx_transf= colId + boundingBoxX[0];
+			long int conty_transf= rowId + boundingBoxY[0];
+
 			//aContour->AddPoint(cv::Point2f(contx_transf,conty_transf));
 			aContour->AddPoint(TVector2(contx_transf,conty_transf));
 			//cout<<"("<<contx<<","<<conty<<"), ";
