@@ -101,14 +101,14 @@ int main(int argc, char *argv[]){
 	int namelen;
 	MPI_Get_processor_name(processor_name,&namelen);
 	double startTime= MPI_Wtime();
-	cout<<"INFO: Process "<<myid<<" running on processor "<<processor_name<<endl;
+	cout<<"[PROC "<<myid<<"] - INFO: Process "<<myid<<" running on processor "<<processor_name<<endl;
 
 	//=======================
 	//== Read config options 
 	//=======================
-	cout<<"INFO: Get configuration options from file "<<configFileName<<" ..."<<endl;
+	cout<<"[PROC "<<myid<<"] - INFO: Get configuration options from file "<<configFileName<<" ..."<<endl;
 	if(ConfigParser::Instance().Parse(configFileName)<0){
-		cerr<<"ERROR: Failed to parse config options!"<<endl;
+		cerr<<"[PROC "<<myid<<"] - ERROR: Failed to parse config options!"<<endl;
 		return -1;
 	}
 	PRINT_OPTIONS();
@@ -119,17 +119,17 @@ int main(int argc, char *argv[]){
 	//Get main logger options
 	int loggerTarget= 0;
 	if(GET_OPTION_VALUE(loggerTarget,loggerTarget)<0){
-		cerr<<"ERROR: Failed to get loggerTarget option!"<<endl;
+		cerr<<"[PROC "<<myid<<"] - ERROR: Failed to get loggerTarget option!"<<endl;
 		return -1;
 	}
 	std::string loggerTag= "";
 	std::string logLevel= "";
 	if(GET_OPTION_VALUE(loggerTag,loggerTag)<0){
-		cerr<<"ERROR: Failed to get loggerTag option!"<<endl;
+		cerr<<"[PROC "<<myid<<"] - ERROR: Failed to get loggerTag option!"<<endl;
 		return -1;
 	}
 	if(GET_OPTION_VALUE(logLevel,logLevel)<0){
-		cerr<<"ERROR: Failed to get logLevel option!"<<endl;
+		cerr<<"[PROC "<<myid<<"] - ERROR: Failed to get logLevel option!"<<endl;
 		return -1;
 	}
 
@@ -156,21 +156,25 @@ int main(int argc, char *argv[]){
 		LoggerManager::Instance().CreateSysLogger(logLevel,loggerTag,syslogFacility);
 	}
 	else{
-		cerr<<"ERROR: Failed to initialize logger!"<<endl;
+		cerr<<"[PROC "<<myid<<"] - ERROR: Failed to initialize logger!"<<endl;
 		return -1;
 	}
 
 	//=======================
 	//== Run SourceFinder
 	//=======================
-	INFO_LOG("Starting source finding");
-	SourceFinderMPI finder;
-	finder.Run();
-	INFO_LOG("End source finding");
+	INFO_LOG("[PROC "<<myid<<"] - Starting source finding");
+	SourceFinderMPI* finder= new SourceFinderMPI;
+	finder->Run();
+	INFO_LOG("[PROC "<<myid<<"] - End source finding");
 
 	//=======================
 	//== Finalize MPI run
 	//=======================
+	if(finder){
+		delete finder;
+		finder= 0;
+	}
 	MPI_Finalize();
 
 	return 0;

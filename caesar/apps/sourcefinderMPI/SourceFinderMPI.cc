@@ -80,7 +80,12 @@ SourceFinderMPI::SourceFinderMPI() {
 
 
 SourceFinderMPI::~SourceFinderMPI(){
-	
+
+	//Free comm & groups	
+	MPI_Group_free(&m_WorkerGroup);
+	MPI_Comm_free(&m_WorkerComm);
+	MPI_Group_free(&m_WorldGroup);
+
 	//Delete task data
 	for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++) {
 		for(unsigned int j=0;j<m_taskDataPerWorkers[i].size();j++) {
@@ -125,6 +130,8 @@ void SourceFinderMPI::InitOptions(){
 	m_DS9CatalogFileName= "";
 	m_DS9CatalogFilePtr= 0;
 	m_DS9RegionFormat= 1;
+
+	m_TaskInfoTree= 0;
 		
 	//Source 
 	m_Source= 0;
@@ -186,6 +193,14 @@ int SourceFinderMPI::Init(){
 			//Init DS9 catalog
 			if(!m_DS9CatalogFilePtr) m_DS9CatalogFilePtr= fopen(m_DS9CatalogFileName.c_str(),"w");
 
+			//Init task info tree
+			if(!m_TaskInfoTree) m_TaskInfoTree= new TTree("TaskInfo","TaskInfo");
+			m_TaskInfoTree->Branch("xmin",&m_xmin);
+			m_TaskInfoTree->Branch("xmax",&m_xmax);
+			m_TaskInfoTree->Branch("ymin",&m_ymin);
+			m_TaskInfoTree->Branch("ymax",&m_ymax);
+	
+
 		}//close if saveToFile
 	}//close if nproc=0
 
@@ -216,6 +231,12 @@ int SourceFinderMPI::Configure(){
 		GET_OPTION_VALUE(tileMaxX,m_TileMaxX);
 		GET_OPTION_VALUE(tileMinY,m_TileMinY);
 		GET_OPTION_VALUE(tileMaxY,m_TileMaxY);
+	}
+	else {
+		m_TileMinX= 0;
+		m_TileMaxX= 0;
+		m_TileMinY= 0;
+		m_TileMaxY= 0;
 	}
 
 	//Get distributed image options
@@ -272,7 +293,6 @@ int SourceFinderMPI::Configure(){
 	GET_OPTION_VALUE(searchNegativeExcess,m_SearchNegativeExcess);
 	GET_OPTION_VALUE(searchNestedSources,m_SearchNestedSources);
 	GET_OPTION_VALUE(nestedBlobThrFactor,m_NestedBlobThrFactor);
-	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
 	
 	//Get source selection options
 	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
@@ -342,13 +362,13 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 
 	//## Generate a uuid for this job
 	std::string jobId= CodeUtils::GenerateUUID();
-	DEBUG_LOG("Generated jobId: "<<jobId);
+	DEBUG_LOG("[PROC "<<myid<<"] - Generated jobId: "<<jobId);
 	
 	//## Get input image size
 	FileInfo info;
 	bool match_extension= false;
 	if(!SysUtils::CheckFile(m_InputFileName,info,match_extension,"")){
-		ERROR_LOG("Invalid input file name specified (filename="<<m_InputFileName<<"), invalid file path?!");
+		ERROR_LOG("[PROC "<<myid<<"] - Invalid input file name specified (filename="<<m_InputFileName<<"), invalid file path?!");
 		return -1;
 	}
 	
@@ -363,12 +383,12 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 		else{//READ FULL MAP
 			TFile* inputFile= new TFile(m_InputFileName.c_str(),"READ");	
 			if(!inputFile || inputFile->IsZombie()){
-				ERROR_LOG("Failed to open input file image "<<m_InputFileName<<" and get image size!");
+				ERROR_LOG("[PROC "<<myid<<"] - Failed to open input file image "<<m_InputFileName<<" and get image size!");
 				return -1;
 			}
 			Img* inputImg= (Img*)inputFile->Get(m_InputImgName.c_str());
 			if(!inputImg) {
-				ERROR_LOG("Failed to open input file image "<<m_InputFileName<<" and get image size!");
+				ERROR_LOG("[PROC "<<myid<<"] - Failed to open input file image "<<m_InputFileName<<" and get image size!");
 				return -1;	
 			}
 			Nx= inputImg->GetNbinsX();
@@ -382,18 +402,18 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 		}
 		else{//READ FULL MAP
 			if(SysUtils::GetFITSImageSize(m_InputFileName,Nx,Ny)<0){
-				ERROR_LOG("Failed to open input file image "<<m_InputFileName<<" and get image size!");
+				ERROR_LOG("[PROC "<<myid<<"] - Failed to open input file image "<<m_InputFileName<<" and get image size!");
 				return -1;
 			}
-			INFO_LOG("Input image opened with success: size="<<Nx<<"x"<<Ny);
+			INFO_LOG("[PROC "<<myid<<"] - Input image opened with success: size="<<Nx<<"x"<<Ny);
 		}
 	}//close else if		
 	else{
-		ERROR_LOG("Invalid/unsupported file extension ("<<info.extension<<") detected!");
+		ERROR_LOG("[PROC "<<myid<<"] - Invalid/unsupported file extension ("<<info.extension<<") detected!");
 		return -1;
 	}
 
-	INFO_LOG("Image size: "<<Nx<<"x"<<Ny);
+	INFO_LOG("[PROC "<<myid<<"] - Image size: "<<Nx<<"x"<<Ny);
 
 	//## Compute the 2D grid 
 	std::vector<long int> ix_min;
@@ -408,28 +428,29 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 		tileOverlapY= m_TileStepSizeY;
 	}
 
-	INFO_LOG("Computing tile partition: tileOverlap("<<tileOverlapX<<","<<tileOverlapY<<")");
+	INFO_LOG("[PROC "<<myid<<"] - Computing tile partition: tileOverlap("<<tileOverlapX<<","<<tileOverlapY<<")");
 	if(MathUtils::Compute2DGrid(ix_min,ix_max,iy_min,iy_max,Nx,Ny,m_TileSizeX,m_TileSizeY,m_TileStepSizeX,m_TileStepSizeY)<0){
-		WARN_LOG("Failed to compute a 2D image partition!");
+		WARN_LOG("[PROC "<<myid<<"] - Failed to compute a 2D partition from input image!");
 		return -1;
 	}
 	int nExpectedTasks= ix_min.size()*iy_min.size();
-	INFO_LOG("#"<<nExpectedTasks<<" expected number of tasks ("<<ix_min.size()<<"x"<<iy_min.size()<<")");
+	INFO_LOG("[PROC "<<myid<<"] - #"<<nExpectedTasks<<" expected number of tasks ("<<ix_min.size()<<"x"<<iy_min.size()<<")");
 
 	//## Compute worker tasks (check max number of tasks per worker)
-	INFO_LOG("Computing worker task list...");
+	INFO_LOG("[PROC "<<myid<<"] - Computing worker task list...");
 	TaskData* aTaskData= 0;
 	long int workerCounter= 0;
 
 	for(unsigned int j=0;j<iy_min.size();j++){
 		for(unsigned int i=0;i<ix_min.size();i++){
 			//Assign worker
-			DEBUG_LOG("Assign task ("<<i<<","<<j<<") to worker no. "<<workerCounter<<"...");
+			INFO_LOG("[PROC "<<myid<<"] - Assign task ("<<i<<","<<j<<") to worker no. "<<workerCounter<<"...");
 				
 			aTaskData= new TaskData;
 			aTaskData->filename= m_InputFileName;
 			aTaskData->jobId= jobId;
 			aTaskData->workerId= workerCounter;
+			//aTaskData->taskId= workerCounter;
 			aTaskData->ix_min= ix_min[i] + m_TileMinX;
 			aTaskData->ix_max= ix_max[i] + m_TileMinX;
 			aTaskData->iy_min= iy_min[j] + m_TileMinY;
@@ -440,52 +461,166 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 			else workerCounter++;
 		}//end loop x
 	}//end loop y
+
 	
 	//Fill neighbor task list
+	std::vector<int> workerIds;
+
 	for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++){
-
 		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
+		workerIds.push_back(i);
 
-		for(unsigned int j=0;j<m_taskDataPerWorkers[i].size()-1;j++){
+		//Loop over tasks present in this worker
+		int nTasksInWorker= (int)(m_taskDataPerWorkers[i].size()); 
+		//std::stringstream ss;	
+		//ss<<"[PROC "<<myid<<"] - Worker no. "<<i<<", ";
+
+		for(int j=0;j<nTasksInWorker;j++){
 			long int ix_min= m_taskDataPerWorkers[i][j]->ix_min;
 			long int ix_max= m_taskDataPerWorkers[i][j]->ix_max;
 			long int iy_min= m_taskDataPerWorkers[i][j]->iy_min;
 			long int iy_max= m_taskDataPerWorkers[i][j]->iy_max;
-
-			for(unsigned int k=j+1;k<m_taskDataPerWorkers[i].size();k++){
+			
+			//Find first neighbors among tasks inside the same worker
+			for(int k=j+1;k<nTasksInWorker;k++){
 				if(j==k) continue;
 				long int next_ix_min= m_taskDataPerWorkers[i][k]->ix_min;
 				long int next_ix_max= m_taskDataPerWorkers[i][k]->ix_max;
 				long int next_iy_min= m_taskDataPerWorkers[i][k]->iy_min;
 				long int next_iy_max= m_taskDataPerWorkers[i][k]->iy_max;
 				
-				//bool isNeighborInX= ( ix_max>next_ix_min || ix_min<next_ix_max || ix_max==next_ix_min-1 || ix_min==next_ix_max+1 ) && (next_iy_min==iy_min && next_iy_max==iy_max);
-				//bool isNeighborInY= ( iy_max>next_iy_min || iy_min<next_iy_max || iy_max==next_iy_min-1 || iy_min==next_iy_max+1 ) && (next_ix_min==ix_min && next_ix_max==ix_max);
-				bool isNeighborInX= ( ix_max>next_ix_min || ix_max==next_ix_min-1 || ix_min==next_ix_max+1 ) && (next_iy_min==iy_min && next_iy_max==iy_max);
-				bool isNeighborInY= ( iy_max>next_iy_min || iy_max==next_iy_min-1 || iy_min==next_iy_max+1 ) && (next_ix_min==ix_min && next_ix_max==ix_max);
+				bool isAdjacentInX= (ix_max==next_ix_min-1 || ix_min==next_ix_max+1 || (ix_min==next_ix_min && ix_max==next_ix_max));
+				bool isAdjacentInY= (iy_max==next_iy_min-1 || iy_min==next_iy_max+1 || (iy_min==next_iy_min && iy_max==next_iy_max));
+				bool isOverlappingInX= ( (next_ix_min>=ix_min && next_ix_min<=ix_max) || (next_ix_max>=ix_min && next_ix_max<=ix_max) );
+				bool isOverlappingInY= ( (next_iy_min>=iy_min && next_iy_min<=iy_max) || (next_iy_max>=iy_min && next_iy_max<=iy_max) );
+				bool isAdjacent= isAdjacentInX && isAdjacentInY;
+				bool isOverlapping= isOverlappingInX && isOverlappingInY;
+ 
+				/*
+				bool isAdjacentInX= false;
+				bool isAdjacentInY= false;
+				if(m_UseTileOverlap){
+					
+				}
+				else{
+					isAdjacentInX= (ix_max==next_ix_min-1 || ix_min==next_ix_max+1 || (ix_min==next_ix_min && ix_max==next_ix_max) );
+					isAdjacentInY= (iy_max==next_iy_min-1 || iy_min==next_iy_max+1 || (iy_min==next_iy_min && iy_max==next_iy_max) );
 
-				if(isNeighborInX || isNeighborInY) {
+					isNeighborInX= (ix_max==next_ix_min-1 || ix_min==next_ix_max+1) && (iy_min==next_iy_min && iy_max==next_iy_max);
+					isNeighborInY= (iy_max==next_iy_min-1 || iy_min==next_iy_max+1) && (ix_min==next_ix_min && ix_max==next_ix_max);
+				}
+				*/
+
+				std::stringstream ss;	
+				ss<<"[PROC "<<myid<<"] - Worker no. "<<i<<", Task "<<j<<"["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"], NextTask "<<k<<"["<<next_ix_min<<","<<next_ix_max<<"] ["<<next_iy_min<<","<<next_iy_max<<"] ==> isAdjacentInX? "<<isAdjacentInX<<", isAdjacentInY? "<<isAdjacentInY;
+				if(myid==0) INFO_LOG(ss.str());
+
+
+				if(isAdjacent || isOverlapping) {
 					(m_taskDataPerWorkers[i][j]->neighborTaskId).push_back(k);
 					(m_taskDataPerWorkers[i][k]->neighborTaskId).push_back(j);
 					(m_taskDataPerWorkers[i][j]->neighborWorkerId).push_back(i);
 					(m_taskDataPerWorkers[i][k]->neighborWorkerId).push_back(i);
 				}
 
-			}//end loop next task
+			}//end loop next task in worker
+
+
+			//Find neighbors across workers
+			for(unsigned int s=i+1;s<m_taskDataPerWorkers.size();s++){
+				for(unsigned int t=0;t<m_taskDataPerWorkers[s].size();t++){
+					
+					long int next_ix_min= m_taskDataPerWorkers[s][t]->ix_min;
+					long int next_ix_max= m_taskDataPerWorkers[s][t]->ix_max;
+					long int next_iy_min= m_taskDataPerWorkers[s][t]->iy_min;
+					long int next_iy_max= m_taskDataPerWorkers[s][t]->iy_max;
+				
+					bool isAdjacentInX= (ix_max==next_ix_min-1 || ix_min==next_ix_max+1 || (ix_min==next_ix_min && ix_max==next_ix_max));
+					bool isAdjacentInY= (iy_max==next_iy_min-1 || iy_min==next_iy_max+1 || (iy_min==next_iy_min && iy_max==next_iy_max));
+					bool isOverlappingInX= ( (next_ix_min>=ix_min && next_ix_min<=ix_max) || (next_ix_max>=ix_min && next_ix_max<=ix_max) );
+					bool isOverlappingInY= ( (next_iy_min>=iy_min && next_iy_min<=iy_max) || (next_iy_max>=iy_min && next_iy_max<=iy_max) );
+					bool isAdjacent= isAdjacentInX && isAdjacentInY;
+					bool isOverlapping= isOverlappingInX && isOverlappingInY;
+ 
+
+					/*
+					if(m_UseTileOverlap){
+						isAdjacentInX= ( (next_ix_min>=ix_min && next_ix_min<=ix_max) || (next_ix_max>=ix_min && next_ix_max<=ix_max) );
+						isAdjacentInY= ( (next_iy_min>=iy_min && next_iy_min<=iy_max) || (next_iy_max>=iy_min && next_iy_max<=iy_max) );
+					}
+					else{
+						isAdjacentInX= (ix_max==next_ix_min-1 || ix_min==next_ix_max+1 || (ix_min==next_ix_min && ix_max==next_ix_max));
+						isAdjacentInY= (iy_max==next_iy_min-1 || iy_min==next_iy_max+1 || (iy_min==next_iy_min && iy_max==next_iy_max));
+					}
+					*/
+
+					std::stringstream ss;	
+					ss<<"[PROC "<<myid<<"] - Worker no. "<<i<<", Task "<<j<<", NextWorker no. "<<s<<", NextTask "<<t<<"["<<next_ix_min<<","<<next_ix_max<<"] ["<<next_iy_min<<","<<next_iy_max<<"] ==> isAdjacentInX? "<<isAdjacentInX<<", isAdjacentInY? "<<isAdjacentInY;
+					if(myid==0) INFO_LOG(ss.str());
+
+					if(isAdjacent || isOverlapping) {
+						(m_taskDataPerWorkers[i][j]->neighborTaskId).push_back(t);
+						(m_taskDataPerWorkers[s][t]->neighborTaskId).push_back(j);
+						(m_taskDataPerWorkers[i][j]->neighborWorkerId).push_back(s);
+						(m_taskDataPerWorkers[s][t]->neighborWorkerId).push_back(i);
+					}
+				
+				}//end loop tasks in next worker
+			}//end loop workers 
+
 		}//end loop tasks
 	}//end loop workers
 
+	int nWorkers= (int)workerIds.size();
+	std::stringstream ss;
+	ss<<"[PROC "<<myid<<"] - # "<<nWorkers<<" workers {";
+	for(int i=0;i<nWorkers;i++){
+		ss<<workerIds[i]<<",";
+	}
+	ss<<"}";
+	INFO_LOG(ss.str());
+	
+	//Get main processor group
+	MPI_Comm_group(MPI_COMM_WORLD, &m_WorldGroup);
+	
+	// Construct a group containing all of the workers (proc with tasks assigned)
+	MPI_Group_incl(m_WorldGroup, nWorkers, workerIds.data() , &m_WorkerGroup);
+
+	// Create a new communicator based on the group
+	int commTag= 10;
+	MPI_Comm_create_group(MPI_COMM_WORLD, m_WorkerGroup, commTag, &m_WorkerComm);
+
+	worker_ranks = -1, nworkers = -1;
+	// If this rank isn't in the new communicator, it will be
+	// MPI_COMM_NULL. Using MPI_COMM_NULL for MPI_Comm_rank or
+	// MPI_Comm_size is erroneous
+	if (m_WorkerComm!=MPI_COMM_NULL) {
+    MPI_Comm_rank(m_WorkerComm, &worker_ranks);
+    MPI_Comm_size(m_WorkerComm, &nworkers);
+	}
+	else {
+		WARN_LOG("[PROC "<<myid<<"] - Worker MPI communicator is null (this processor has no tasks and was not inserted in the worker group)!");
+	}
+	INFO_LOG("[PROC "<<myid<<"] - WORLD RANK/SIZE: "<<myid<<"/"<<nproc<<" WORKER RANK/SIZE: "<<worker_ranks<<"/"<<nworkers);
+
+
 	//Print
+	if(myid==0){
 	for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++){
 		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
 
-		INFO_LOG("== Worker no. "<<i<<"==");
-		for(unsigned int j=0;j<m_taskDataPerWorkers[i].size()-1;j++){
+		
+		//INFO_LOG("== Worker no. "<<i<<"==");
+		for(unsigned int j=0;j<m_taskDataPerWorkers[i].size();j++){
+			std::stringstream ss;	
+			ss<<"[PROC "<<myid<<"] - Worker no. "<<i<<", ";
+
 			long int ix_min= m_taskDataPerWorkers[i][j]->ix_min;
 			long int ix_max= m_taskDataPerWorkers[i][j]->ix_max;
 			long int iy_min= m_taskDataPerWorkers[i][j]->iy_min;
 			long int iy_max= m_taskDataPerWorkers[i][j]->iy_max;
-			INFO_LOG("Task no. "<<j<<"["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"] neighbors{");	
+			ss<<"Task no. "<<j<<"["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"] neighbors{";
+			//INFO_LOG("Task no. "<<j<<"["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"] neighbors{");	
 			for(unsigned int k=0;k<m_taskDataPerWorkers[i][j]->neighborTaskId.size();k++){
 				long int neighborWorkerId= m_taskDataPerWorkers[i][j]->neighborWorkerId[k];
 				long int neighborTaskId= m_taskDataPerWorkers[i][j]->neighborTaskId[k];
@@ -494,15 +629,19 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 				long int next_iy_min= m_taskDataPerWorkers[neighborWorkerId][neighborTaskId]->iy_min;
 				long int next_iy_max= m_taskDataPerWorkers[neighborWorkerId][neighborTaskId]->iy_max;
 
-				INFO_LOG("("<<neighborWorkerId<<","<<neighborTaskId<<") ["<<next_ix_min<<","<<next_ix_max<<"] ["<<next_iy_min<<","<<next_iy_max<<"]");
-			}
-			INFO_LOG("}");	
-		}
-	}
+				//INFO_LOG("("<<neighborWorkerId<<","<<neighborTaskId<<") ["<<next_ix_min<<","<<next_ix_max<<"] ["<<next_iy_min<<","<<next_iy_max<<"]");
+				ss<<"("<<neighborWorkerId<<","<<neighborTaskId<<") ["<<next_ix_min<<","<<next_ix_max<<"] ["<<next_iy_min<<","<<next_iy_max<<"], ";
+			}	
+			ss<<"}";
+			INFO_LOG(ss.str());	
+		}//end loop tasks
+		
+	}//end loop workers
+	}//close if
 
 
 	bool hasTooManyTasks= false;
-	int maxNTasksPerWorker_default= 100;
+	int maxNTasksPerWorker_default= 10000;
 	for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++){
 		long int nTasksPerWorker= (long int)m_taskDataPerWorkers[i].size();
 		if(nTasksPerWorker>maxNTasksPerWorker_default){
@@ -512,7 +651,7 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 	}
 
 	if(hasTooManyTasks){
-		WARN_LOG("Too many tasks per worker (thr="<<maxNTasksPerWorker_default<<")");
+		WARN_LOG("[PROC "<<myid<<"] - Too many tasks per worker (thr="<<maxNTasksPerWorker_default<<")");
 		return -1;
 	}
 
@@ -527,9 +666,9 @@ int SourceFinderMPI::Run(){
 
 	//## Init options (done by all processors)
 	double initTimerStart= MPI_Wtime();
-	INFO_LOG("Initializing source finder...");
+	INFO_LOG("[PROC "<<myid<<"] - Initializing source finder...");
 	if(Init()<0){
-		ERROR_LOG("Initialization failed!");
+		ERROR_LOG("[PROC "<<myid<<"] - Initialization failed!");
 		return -1;
 	}
 	double initTimerEnd= MPI_Wtime();
@@ -545,18 +684,29 @@ int SourceFinderMPI::Run(){
 		long int iy_max= m_taskDataPerWorkers[myid][j]->iy_max;
 
 		//## Read input image
-		INFO_LOG("Reading input image ["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"]...");
+		INFO_LOG("[PROC "<<myid<<"] - Reading input image ["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"]...");
 		Img* taskImg= ReadImage(ix_min,ix_max,iy_min,iy_max);
 		if(!taskImg){
 			ERROR_LOG("Reading of input image failed, skip to next task...");
 			continue;
 		}
 
+		//## Set image physical boundary in task data
+		long int Nx= taskImg->GetNbinsX();
+		long int Ny= taskImg->GetNbinsY();
+		double xmin= taskImg->GetXaxis()->GetBinCenter(1);
+		double xmax= taskImg->GetXaxis()->GetBinCenter(Nx);
+		double ymin= taskImg->GetYaxis()->GetBinCenter(1);
+		double ymax= taskImg->GetYaxis()->GetBinCenter(Ny);
+		m_taskDataPerWorkers[myid][j]->x_min= xmin;
+		m_taskDataPerWorkers[myid][j]->x_max= xmax;
+		m_taskDataPerWorkers[myid][j]->y_min= ymin;
+		m_taskDataPerWorkers[myid][j]->y_max= ymax;
 		
 		//## Find compact sources
-		INFO_LOG("Searching compact sources...");
+		INFO_LOG("[PROC "<<myid<<"] - Searching compact sources...");
 		if(m_SearchCompactSources && FindCompactSources(m_taskDataPerWorkers[myid][j],taskImg)<0){
-			ERROR_LOG("Compact source search failed!");
+			ERROR_LOG("[PROC "<<myid<<"] - Compact source search failed!");
 			return -1;
 		}
 		
@@ -586,13 +736,21 @@ int SourceFinderMPI::Run(){
 		}
 	}//end loop tasks per worker
 	
-
-	//## Update sources computed in each worker
+	//## Update task info (tile physical range) from workers
 	//## The updated list of task data is available in master processor
 	//## (check if it is better to replace with MPI_Gather and put it available in all workers)
-	if(UpdateSourceFromWorkers()<0){
-		ERROR_LOG("Updating sources from workers failed!");
+	if(UpdateTaskDataFromWorkers()<0){
+		ERROR_LOG("[PROC "<<myid<<"] - Updating task data from workers failed!");
 		return -1;
+	}
+
+	//## Find edge sources
+	MPI_Barrier(MPI_COMM_WORLD);
+	if(myid==0) {
+		if(FindSourcesAtEdge()<0){
+			ERROR_LOG("[PROC "<<myid<<"] - Finding sources at tile edges failed!");
+			return -1;
+		}
 	}
 	
 	
@@ -614,7 +772,311 @@ int SourceFinderMPI::Run(){
 }//close Run()
 
 
-int SourceFinderMPI::UpdateSourceFromWorkers(){
+int SourceFinderMPI::FindSourcesAtEdge(){
+
+	
+	//## Find if sources (both compact and extended) are at tile edge
+	//## Those found at the edge are removed from the list and added to the edge list for further processing
+	double xmin_s, xmax_s, ymin_s, ymax_s;
+	
+	//Loop over workers
+	for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++){
+		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
+
+		//Loop over tasks per worker
+		for(unsigned int j=0;j<m_taskDataPerWorkers[i].size();j++){
+	
+			//Loop over compact sources found
+			std::vector<Source*> sources_not_at_edges;
+			int nSources= (int)((m_taskDataPerWorkers[i][j]->sources).size());
+
+			for(int k=0;k<nSources;k++){
+				//Get source coordinate range
+				(m_taskDataPerWorkers[i][j]->sources)[k]->GetSourceRange(xmin_s,xmax_s,ymin_s,ymax_s);
+
+				INFO_LOG("[PROC "<<myid<<"] - workerId="<<m_taskDataPerWorkers[i][j]->workerId<<", check if compact source no. "<<k<<"(x["<<xmin_s<<","<<xmax_s<<"] y["<<ymin_s<<","<<ymax_s<<"]) is inside neighbour tile...");
+		
+				//Check if source is inside neighbour tile
+				bool isAtEdge= false;
+				for(unsigned int l=0;l<(m_taskDataPerWorkers[i][j]->neighborWorkerId).size();l++){	
+					long int neighborTaskId= (m_taskDataPerWorkers[i][j]->neighborTaskId)[l];
+					long int neighborWorkerId= (m_taskDataPerWorkers[i][j]->neighborWorkerId)[l];
+			
+					long int xmin= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->ix_min;
+					long int xmax= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->ix_max;
+					long int ymin= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->iy_min;
+					long int ymax= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->iy_max;
+
+					bool isAtEdgeX= ( (xmin_s<=xmax && xmin_s>=xmin) || (xmax_s<=xmax && xmax_s>=xmin) );
+					bool isAtEdgeY= ( (ymin_s<=ymax && ymin_s>=ymin) || (ymax_s<=ymax && ymax_s>=ymin) );
+
+					INFO_LOG("[PROC "<<myid<<"] - neighborWorkerId="<<neighborWorkerId<<", neighborTaskId="<<neighborTaskId<<", check if inside neighbor tile no. "<<j<<"(x["<<xmin<<","<<xmax<<"] y["<<ymin<<","<<ymax<<"]), isAtEdgeX="<<isAtEdgeX<<", isAtEdgeY="<<isAtEdgeY);
+
+					if( isAtEdgeX && isAtEdgeY ){
+						isAtEdge= true;
+						break;
+					}
+				}//end loop neighbors
+
+				//Set edge flag in source
+				if(isAtEdge) {
+					(m_taskDataPerWorkers[i][j]->sources)[k]->SetEdgeFlag(true);
+					(m_taskDataPerWorkers[i][j]->sources_edge).push_back( (m_taskDataPerWorkers[i][j]->sources)[k] );
+				}
+				else {
+					(m_taskDataPerWorkers[i][j]->sources)[k]->SetEdgeFlag(false);
+					sources_not_at_edges.push_back( (m_taskDataPerWorkers[i][j]->sources)[k] );
+				}
+			}//end loop sources	
+
+			int nEdgeSources= (int)((m_taskDataPerWorkers[i][j]->sources_edge).size());
+			INFO_LOG("[PROC "<<myid<<"] - #"<<nEdgeSources<<"/"<<nSources<<" compact sources are found at tile edges...");
+	
+			//Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
+			(m_taskDataPerWorkers[i][j]->sources).clear();
+			(m_taskDataPerWorkers[i][j]->sources).insert( 
+				(m_taskDataPerWorkers[i][j]->sources).end(),
+				sources_not_at_edges.begin(),
+				sources_not_at_edges.end()
+			);
+			sources_not_at_edges.clear();
+
+		}//end loop tasks per worker
+	}//end loop workers
+
+	return 0;
+
+}//close FindSourcesAtEdge()
+
+/*
+int SourceFinderMPI::UpdateTaskDataFromWorkers(){
+	
+	//## Returns if no tasks are present for this proc
+	if(m_taskDataPerWorkers[myid].size()==0){
+		INFO_LOG("Proc #"<<myid<<": Nothing to be broadcasted (no tasks assigned to this worker), simply return!");
+		return 0;
+	}
+
+	MPI_Barrier(m_WorkerComm);
+
+	//## If this proc has task data, encode them for sending
+	long int msg_size= 0;
+	char* msg= Serializer::TaskDataCollectionToCharArray(msg_size,m_taskDataPerWorkers[myid]);
+	if(!msg){
+		ERROR_LOG("Proc #"<<myid<<": Failed to encode task data to protobuf!");
+		return -1;
+	}
+	INFO_LOG("Proc #"<<myid<<": Broadcasting a buffer of size "<<msg_size<<" to other processors...");
+	
+
+	//## Gather task data sizes in advance
+	long long int* msg_sizes = (long long int*)malloc(nworkers);
+	MPI_Allgather(&msg_size, 1, MPI_LONG_LONG_INT, msg_sizes, 1, MPI_LONG_LONG_INT, m_WorkerComm);
+		
+	int maxSize= -1;
+	for (int i=0;i<nworkers;i++) {	
+		if(msg_sizes[i]>maxSize) maxSize= msg_sizes[i];
+		INFO_LOG("Proc #"<<myid<<": msg_sizes["<<i<<"]="<<msg_sizes[i]);
+	}
+
+	char* sndBuffer= (char*)malloc(maxSize);
+	for(int i=0;i<maxSize;i++) sndBuffer[i]= '#';
+	memcpy ( sndBuffer, msg, msg_size );
+	
+	//## Allocate recv buffer and gather task data from all workers
+	MPI_Barrier(m_WorkerComm);
+
+	char** recvBuffer = (char**)malloc(nworkers);
+	for(int i=0;i<nworkers;i++){
+		recvBuffer[i] = (char*)malloc(maxSize);
+  	//recvBuffer[i] = (char*)malloc(msg_sizes[i]);
+	}
+
+	INFO_LOG("Proc #"<<myid<<": Gather task data from all workers...");
+	//MPI_Allgather( msg, msg_size, MPI_CHAR, recvBuffer, maxSize, MPI_CHAR, m_WorkerComm);
+	MPI_Allgather( sndBuffer, maxSize, MPI_CHAR, recvBuffer, maxSize, MPI_CHAR, m_WorkerComm);
+
+	
+	//## Update task data with received worker data		
+	INFO_LOG("Proc #"<<myid<<": Update task data with received worker data...");
+	bool isTaskCollectionPreAllocated= true;
+	bool isDecodingFailed= false;
+	for(int i=0;i<nworkers;i++){
+		if(Serializer::CharArrayToTaskDataCollection(m_taskDataPerWorkers[i],recvBuffer[i],msg_sizes[i],isTaskCollectionPreAllocated)<0 ){
+			ERROR_LOG("Proc #"<<myid<<": Failed to decode recv message into task data list!");
+    	isDecodingFailed= true;
+		}
+	}
+	
+
+	//## Free buffers
+	INFO_LOG("Proc #"<<myid<<": Freeing buffers...");
+	if(msg_sizes) free(msg_sizes);
+	for(int i=0;i<nworkers;i++){
+  	if(recvBuffer[i]) free(recvBuffer[i]);
+	}
+	free(recvBuffer);
+	
+	
+	if(isDecodingFailed){
+		return -1;
+	}
+	
+
+	//## All processors call broadcast except those that have not assigned no tasks
+	//MPI_Request requests[nproc];
+
+	//for (int i=0;i<nproc;i++) {	
+		//Skip myself...
+		//if(myid==i) continue;
+
+		//Check if this processor has tasks assigned, otherwise skip!
+		//if(m_taskDataPerWorkers[i].size()==0){
+		//	INFO_LOG("No tasks assigned to worker no. "<<i<<", nothing to be collected, skip to next worker...");
+		//	continue;
+		//}
+
+		//## Read data broadcasted from the i-th process
+		//int bcast_source= i;
+
+		
+		//Read buffer size
+		//INFO_LOG("Proc #"<<myid<<": Getting size of message from process "<<bcast_source<<"... ");
+		//int rcvMsgSize= 0;
+		//MPI_Bcast(&rcvMsgSize, 1, MPI_INT, bcast_source, MPI_COMM_WORLD);
+		
+
+		// Allocate a buffer to hold the incoming data
+		//long int rcvMsgSize= msg_sizes[i];
+		//INFO_LOG("Proc #"<<myid<<": Allocating a message of size "<<rcvMsgSize<<" from process "<<bcast_source<<"... ");
+		//if(rcvMsgSize<=0){
+		//	ERROR_LOG("Proc #"<<myid<<": rcvMsg size is negative!");
+		//	continue;
+		//}
+		//char* recvBuffer= (char*)malloc(rcvMsgSize);
+
+		//Receive data buffer		
+		//MPI_Ibcast(recvBuffer, rcvMsgSize, MPI_CHAR, bcast_source, MPI_COMM_WORLD,&request[i]);
+		//INFO_LOG("Proc #"<<myid<<": Received a message (msg="<<recvBuffer<<", size="<<rcvMsgSize<<") from process "<<bcast_source<<"... ");
+
+		//## Update task data with received worker data	
+		//bool isTaskCollectionPreAllocated= true;
+		//if(Serializer::CharArrayToTaskDataCollection(m_taskDataPerWorkers[bcast_source],recvBuffer,rcvMsgSize,isTaskCollectionPreAllocated)<0 ){
+		//	ERROR_LOG("Proc #"<<myid<<": Failed to decode recv message from process "<<bcast_source<<" into task data list!");
+    //	if(recvBuffer) free(recvBuffer);
+		//}
+
+		//## Free received buffer
+    //if(recvBuffer) free(recvBuffer);
+	//}//end loop processes
+	
+	//MPI_Status status[nproc];
+	//int ierr= MPI_Waitall(nproc, requests, status); 
+  //if(ierr!=MPI_SUCCESS){
+	//	ERROR_LOG("MPI_Waitall failed rank "<<myid);
+	//	return -1;
+	//}
+	
+
+
+	
+	//## All processors call broadcast except those that have not assigned no tasks
+	//if(m_taskDataPerWorkers[myid].size()==0){
+	//	INFO_LOG("Proc #"<<myid<<": Nothing to be broadcasted (no tasks assigned to this worker), simply return!");
+	//	return 0;
+	//}
+
+	//## Put a barrier and gather all task data from workers in the master processor
+	//MPI_Barrier(MPI_COMM_WORLD);
+
+	//## Encode taskData in protobuf and send first data size to other processes
+	//## MPI_Probe is not going to work with bcast
+	//long int msg_size= 0;
+	//char* msg= Serializer::TaskDataCollectionToCharArray(msg_size,m_taskDataPerWorkers[myid]);
+	//if(!msg){
+	//	ERROR_LOG("Proc #"<<myid<<": Failed to encode task data to protobuf!");
+	//	return -1;
+	//}
+
+	//INFO_LOG("Proc #"<<myid<<": Broadcasting msg: "<<msg<<" (size="<<msg_size<<") to other processors...");
+	
+  //MPI_Bcast(&msg_size, 1, MPI_INT, myid, MPI_COMM_WORLD);
+	//MPI_Bcast(msg, msg_size, MPI_CHAR, myid, MPI_COMM_WORLD);
+	
+	//for (int i=0;i<nproc;i++) {	
+		//Skip myself...
+	//	if(myid==i) continue;
+
+		//Check if this processor has tasks assigned, otherwise skip!
+	//	if(m_taskDataPerWorkers[i].size()==0){
+	//		INFO_LOG("No tasks assigned to worker no. "<<i<<", nothing to be collected, skip to next worker...");
+	//		continue;
+	//	}
+
+		//## Read data broadcasted from the i-th process
+	//	int bcast_source= i;
+
+		//Read buffer size
+	//	INFO_LOG("Proc #"<<myid<<": Getting size of message from process "<<bcast_source<<"... ");
+	//	int rcvMsgSize= 0;
+	//	MPI_Bcast(&rcvMsgSize, 1, MPI_INT, bcast_source, MPI_COMM_WORLD);
+		
+		// Allocate a buffer to hold the incoming data
+	//	INFO_LOG("Proc #"<<myid<<": Allocating a message of size "<<rcvMsgSize<<" from process "<<bcast_source<<"... ");
+	//	if(rcvMsgSize<=0){
+	//		ERROR_LOG("Proc #"<<myid<<": rcvMsg size is negative!");
+	//		continue;
+	//	}
+	//	char* recvBuffer= (char*)malloc(rcvMsgSize);
+
+		//Receive data buffer		
+	//	MPI_Bcast(recvBuffer, rcvMsgSize, MPI_CHAR, bcast_source, MPI_COMM_WORLD);
+	//	INFO_LOG("Proc #"<<myid<<": Received a message (msg="<<recvBuffer<<", size="<<rcvMsgSize<<") from process "<<bcast_source<<"... ");
+
+		//## Update task data with received worker data	
+	//	bool isTaskCollectionPreAllocated= true;
+	//	if(Serializer::CharArrayToTaskDataCollection(m_taskDataPerWorkers[bcast_source],recvBuffer,rcvMsgSize,isTaskCollectionPreAllocated)<0 ){
+	//		ERROR_LOG("Proc #"<<myid<<": Failed to decode recv message from process "<<bcast_source<<" into task data list!");
+  //  	if(recvBuffer) free(recvBuffer);
+	//	}
+
+		//## Free received buffer
+  //  if(recvBuffer) free(recvBuffer);
+
+	//}//end loop processes
+	
+
+	//## Synchronize again before getting the results
+  MPI_Barrier(MPI_COMM_WORLD);
+
+	if(msg) free(msg);
+
+	//Print task data
+	INFO_LOG("Proc #"<<myid<<": Printing task data...");
+	for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++){
+		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
+
+		INFO_LOG("== Worker no. "<<i<<"==");
+		for(unsigned int j=0;j<m_taskDataPerWorkers[i].size()-1;j++){
+			long int ix_min= m_taskDataPerWorkers[i][j]->ix_min;
+			long int ix_max= m_taskDataPerWorkers[i][j]->ix_max;
+			long int iy_min= m_taskDataPerWorkers[i][j]->iy_min;
+			long int iy_max= m_taskDataPerWorkers[i][j]->iy_max;
+			double x_min= m_taskDataPerWorkers[i][j]->x_min;
+			double x_max= m_taskDataPerWorkers[i][j]->x_max;
+			double y_min= m_taskDataPerWorkers[i][j]->y_min;
+			double y_max= m_taskDataPerWorkers[i][j]->y_max;
+			INFO_LOG("Task no. "<<j<<"PixelRange["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"] PhysCoordRange["<<x_min<<","<<x_max<<"] ["<<y_min<<","<<y_max<<"]");
+
+		}//end loop tasks
+	}//end loop workers
+	
+	return 0;
+
+}//close UpdateTaskDataFromWorkers()
+*/
+
+int SourceFinderMPI::UpdateTaskDataFromWorkers(){
 
 	//## Put a barrier and collect all sources from workers in the master processor
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -625,29 +1087,28 @@ int SourceFinderMPI::UpdateSourceFromWorkers(){
 		for (int i=1; i<nproc; i++) {
 			//Check if this processor has tasks assigned, otherwise skip!
 			if(m_taskDataPerWorkers[i].size()==0){
-				INFO_LOG("No tasks assigned to worker no. "<<i<<", nothing to be collected, skip to next worker...");
+				INFO_LOG("[PROC "<<myid<<"] - No tasks assigned to worker no. "<<i<<", nothing to be collected, skip to next worker...");
 				continue;
 			}
-
-			MPI_Status status;
-    
+  
 			//## Probe for an incoming message from process zero
-			INFO_LOG("Proc #"<<myid<<": Probing for message from proc "<<i);
-    	//if(MPI_Probe(MPI_ANY_SOURCE, MSG_TAG, MPI_COMM_WORLD, &status)==MPI_SUCCESS){
+			INFO_LOG("[PROC "<<myid<<"] - Probing for message from proc "<<i);
+    	MPI_Status status;
+
 			if(MPI_Probe(i, MSG_TAG, MPI_COMM_WORLD, &status)==MPI_SUCCESS){
-				INFO_LOG("Proc #"<<myid<<": a message has been found with the probe, with tag " << status.MPI_TAG << ", source " << status.MPI_SOURCE);
+				INFO_LOG("[PROC "<<myid<<"] - a message has been found with the probe, with tag " << status.MPI_TAG << ", source " << status.MPI_SOURCE);
 
     		//## When probe returns, the status object has the size and other
     		//## attributes of the incoming message. Get the message size
-				INFO_LOG("Proc #"<<myid<<": Getting size of message... ");
+				INFO_LOG("[PROC "<<myid<<"] - Getting size of message... ");
     	
 				int rcvMsgSize= 0;
     		MPI_Get_count(&status, MPI_CHAR, &rcvMsgSize);
 
 				//## Allocate a buffer to hold the incoming numbers
-				INFO_LOG("Proc #"<<myid<<": Allocating a message of size "<<rcvMsgSize);
+				INFO_LOG("[PROC "<<myid<<"] - Allocating a message of size "<<rcvMsgSize);
 				if(rcvMsgSize<=0){
-					ERROR_LOG("Proc #"<<myid<<": rcvMsg size is negative!");
+					ERROR_LOG("[PROC "<<myid<<"] - rcvMsg size is negative/null!");
 					continue;
 				}
 				char* recvBuffer= (char*)malloc(rcvMsgSize);
@@ -656,12 +1117,12 @@ int SourceFinderMPI::UpdateSourceFromWorkers(){
     		//MPI_Recv(recvBuffer, rcvMsgSize, MPI_CHAR, MPI_ANY_SOURCE, MSG_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 				MPI_Recv(recvBuffer, rcvMsgSize, MPI_CHAR, i, MSG_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    		INFO_LOG("Proc #"<<myid<<": Received a message (msg="<<recvBuffer<<", size="<<rcvMsgSize<<") from proc "<<i);
+    		INFO_LOG("[PROC "<<myid<<"] - Received a message of size "<<rcvMsgSize<<") from process "<<i);
 
 				//## Update task data with received worker data	
 				bool isTaskCollectionPreAllocated= true;
 				if(Serializer::CharArrayToTaskDataCollection(m_taskDataPerWorkers[i],recvBuffer,rcvMsgSize,isTaskCollectionPreAllocated)<0 ){
-					ERROR_LOG("Proc #"<<myid<<": Failed to decode recv message into task data list!");
+					ERROR_LOG("[PROC "<<myid<<"] - Failed to decode recv message into task data list!");
     			if(recvBuffer) free(recvBuffer);
 				}
 
@@ -669,7 +1130,7 @@ int SourceFinderMPI::UpdateSourceFromWorkers(){
     		if(recvBuffer) free(recvBuffer);
 			}//close if
 			else{
-				ERROR_LOG("Proc #"<<myid<<": Message probing failed!");
+				ERROR_LOG("[PROC "<<myid<<"] - Message probing failed!");
 				return -1;
 				//continue;
 			}
@@ -681,12 +1142,12 @@ int SourceFinderMPI::UpdateSourceFromWorkers(){
 		long int msg_size= 0;
 		char* msg= Serializer::TaskDataCollectionToCharArray(msg_size,m_taskDataPerWorkers[myid]);
 		if(!msg){
-			ERROR_LOG("Proc #"<<myid<<": Failed to encode task data to protobuf!");
+			ERROR_LOG("[PROC "<<myid<<"] - Failed to encode task data to protobuf!");
 			return -1;
 		}
 
 		//## Send buffer to master processor	
-		INFO_LOG("Proc #"<<myid<<": Sending msg: "<<msg<<" (size="<<msg_size<<")");
+		INFO_LOG("[PROC "<<myid<<"] - Sending msg: "<<msg<<" (size="<<msg_size<<")");
 		MPI_Send((void*)(msg),msg_size, MPI_CHAR, MASTER_ID, MSG_TAG, MPI_COMM_WORLD);
 
 		//## Free buffer
@@ -695,12 +1156,46 @@ int SourceFinderMPI::UpdateSourceFromWorkers(){
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
+
 	//## Update sources in list
 	if (myid == 0) {
+
+		//Print task data
+		INFO_LOG("[PROC "<<myid<<"] - Printing task data...");
+		for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++){
+			if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
+
+			std::stringstream ss;
+			ss<<"[PROC "<<myid<<"] - Worker no. "<<i<<", ";
+			for(unsigned int j=0;j<m_taskDataPerWorkers[i].size();j++){
+				long int ix_min= m_taskDataPerWorkers[i][j]->ix_min;
+				long int ix_max= m_taskDataPerWorkers[i][j]->ix_max;
+				long int iy_min= m_taskDataPerWorkers[i][j]->iy_min;
+				long int iy_max= m_taskDataPerWorkers[i][j]->iy_max;
+				double x_min= m_taskDataPerWorkers[i][j]->x_min;
+				double x_max= m_taskDataPerWorkers[i][j]->x_max;
+				double y_min= m_taskDataPerWorkers[i][j]->y_min;
+				double y_max= m_taskDataPerWorkers[i][j]->y_max;
+
+				m_xmin= x_min;
+				m_xmax= x_max;
+				m_ymin= y_min;
+				m_ymax= y_max;
+				m_TaskInfoTree->Fill();
+
+				ss<<"Task no. "<<j<<", PixelRange["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"], PhysCoordRange["<<x_min<<","<<x_max<<"] ["<<y_min<<","<<y_max<<"], ";
+			}//end loop tasks
+			INFO_LOG(ss.str());			
+	
+		}//end loop workers
+
 		for(unsigned int i=0;i<m_taskDataPerWorkers.size();i++){
 			for(unsigned int j=0;j<m_taskDataPerWorkers[i].size();j++){
 				m_CompactSources.insert(m_CompactSources.end(),(m_taskDataPerWorkers[i][j]->sources).begin(),(m_taskDataPerWorkers[i][j]->sources).end());
+				m_CompactSources.insert(m_CompactSources.end(),(m_taskDataPerWorkers[i][j]->sources_edge).begin(),(m_taskDataPerWorkers[i][j]->sources_edge).end());
+
 				m_ExtendedSources.insert(m_ExtendedSources.end(),(m_taskDataPerWorkers[i][j]->ext_sources).begin(),(m_taskDataPerWorkers[i][j]->ext_sources).end());
+				m_ExtendedSources.insert(m_ExtendedSources.end(),(m_taskDataPerWorkers[i][j]->ext_sources_edge).begin(),(m_taskDataPerWorkers[i][j]->ext_sources_edge).end());
 			}//end loop tasks
 		}//end loop workers
 		m_SourceCollection.insert(m_SourceCollection.end(),m_CompactSources.begin(),m_CompactSources.end());
@@ -709,7 +1204,7 @@ int SourceFinderMPI::UpdateSourceFromWorkers(){
 
 	return 0;
 
-}//close UpdateSourceFromWorkers()
+}//close UpdateTaskDataFromWorkers()
 
 
 int SourceFinderMPI::MergeSourcesAtEdge(){
@@ -834,51 +1329,7 @@ int SourceFinderMPI::FindCompactSources(TaskData* taskData, Img* img){
 	INFO_LOG("#"<<nSelSources<<" compact sources added to the list...");
 
 
-	//## Find if sources are at tile edge
-	double xmin, xmax, ymin, ymax;
-	std::vector<Source*> sources_not_at_edges;
-
-	for(unsigned int i=0;i<(taskData->sources).size();i++){
-		//Get source coordinate range
-		(taskData->sources)[i]->GetSourceRange(xmin,xmax,ymin,ymax);
-		
-		//Check if source is inside neighbour tile
-		bool isAtEdge= false;
-		for(unsigned int j=0;j<(taskData->neighborWorkerId).size();j++){	
-			long int neighborTaskId= (taskData->neighborTaskId)[j];
-			long int neighborWorkerId= (taskData->neighborWorkerId)[j];
-			
-			long int ix_min= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->ix_min;
-			long int ix_max= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->ix_max;
-			long int iy_min= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->iy_min;
-			long int iy_max= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->iy_max;
-
-			bool isAtEdgeX= ( (xmin<=ix_max && xmin>=ix_min) || (xmax<=ix_max && xmax>=ix_min) );
-			bool isAtEdgeY= ( (ymin<=iy_max && ymin>=iy_min) || (ymax<=iy_max && ymax>=iy_min) );
-
-			if( isAtEdgeX || isAtEdgeY ){
-				isAtEdge= true;
-				break;
-			}
-		}//end loop neighbors
-
-		//Set edge flag in source
-		if(isAtEdge) {
-			(taskData->sources)[i]->SetEdgeFlag(true);
-			(taskData->sources_edge).push_back( (taskData->sources)[i] );
-		}
-		else {
-			(taskData->sources)[i]->SetEdgeFlag(false);
-			sources_not_at_edges.push_back( (taskData->sources)[i] );
-		}
-	}//end loop selected sources	
-
-	INFO_LOG("#"<<(taskData->sources_edge).size()<<"/"<<nSelSources<<" compact sources are found at tile edges...");
 	
-	//Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
-	(taskData->sources).clear();
-	(taskData->sources).insert((taskData->sources).end(),sources_not_at_edges.begin(),sources_not_at_edges.end());
-	sources_not_at_edges.clear();
 
 	//## Add detected sources to the list	
 	//m_SourceCollection.insert(m_SourceCollection.end(),sources.begin(),sources.end());
@@ -1085,113 +1536,6 @@ int SourceFinderMPI::FindExtendedSources_WT(Img* inputImg){
 }//close FindExtendedSources_WT()
 
 int SourceFinderMPI::SelectSources(std::vector<Source*>& sources){
-//int SourceFinderMPI::SelectSources(TaskData* taskData){
-
-	/*
-	//## Check task data
-	if(!taskData){
-		ERROR_LOG("Given input task data is null ptr!");
-		return -1;
-	}
-
-	//## Apply source selection?
-	int nSources= (int)(taskData->sources.size());
-	if(nSources<=0) return 0;
-	
-	int nSelSources= 0;
-	std::vector<Source*> sources_sel;
-
-	for(int i=0;i<nSources;i++){	
-		std::string sourceName= (taskData->sources)[i]->Name;
-		int sourceId= (taskData->sources)[i]->Id;
-		long int NPix= (taskData->sources)[i]->NPix;
-		double X0= (taskData->sources)[i]->X0;
-		double Y0= (taskData->sources)[i]->Y0;
-
-		//Is bad source (i.e. line-like blob, etc...)?
-		if(!IsGoodSource((taskData->sources)[i])) {
-			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!");
-			(taskData->sources)[i]->SetGoodSourceFlag(false);
-			continue;
-		}
-			
-		//Is point-like source?
-		if( IsPointLikeSource((taskData->sources)[i]) ){
-			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as a point-like source ...");
-			(taskData->sources)[i]->SetType(Source::ePointLike);
-		}
-
-		//Tag nested sources
-		std::vector<Source*> nestedSources= (taskData->sources)[i]->GetNestedSources();
-		for(unsigned int j=0;j<nestedSources.size();j++){
-			std::string nestedSourceName= nestedSources[j]->Name;
-			int nestedSourceId= nestedSources[j]->Id;
-			long int nestedNPix= nestedSources[j]->NPix;
-			double nestedX0= nestedSources[j]->X0;
-			double nestedY0= nestedSources[j]->Y0;
-
-			if(!IsGoodSource(nestedSources[j])) {
-				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as bad source, skipped!");
-				nestedSources[j]->SetGoodSourceFlag(false);
-			}
-			if( IsPointLikeSource(nestedSources[j]) ){
-				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as a point-like source ...");
-				nestedSources[j]->SetType(Source::ePointLike);
-			}
-		}//end loop nested sources
-					
-		//Add source to the list	
-		sources_sel.push_back( (taskData->sources)[i] );
-		nSelSources++;
-	}//end loop sources
-
-	INFO_LOG("Added "<<nSelSources<<" bright sources to the selected list...");
-	
-
-	//## Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
-	(taskData->sources).clear();
-
-	//## Find if sources are at tile edge
-	double xmin, xmax, ymin, ymax;
-	for(unsigned int i=0;i<sources_sel.size();i++){	
-		//Get source coordinate range
-		sources_sel[i]->GetSourceRange(xmin,xmax,ymin,ymax);
-		
-		//Check if source is inside neighbour tile
-		bool isAtEdge= false;
-		for(unsigned int j=0;j<(taskData->neighborWorkerId).size();j++){	
-			long int neighborTaskId= (taskData->neighborTaskId)[j];
-			long int neighborWorkerId= (taskData->neighborWorkerId)[j];
-			
-			long int ix_min= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->ix_min;
-			long int ix_max= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->ix_max;
-			long int iy_min= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->iy_min;
-			long int iy_max= (m_taskDataPerWorkers[neighborWorkerId][neighborTaskId])->iy_max;
-
-			bool isAtEdgeX= ( (xmin<=ix_max && xmin>=ix_min) || (xmax<=ix_max && xmax>=ix_min) );
-			bool isAtEdgeY= ( (ymin<=iy_max && ymin>=iy_min) || (ymax<=iy_max && ymax>=iy_min) );
-
-			if( isAtEdgeX || isAtEdgeY ){
-				isAtEdge= true;
-				break;
-			}
-		}//end loop neighbors
-
-		//Set edge flag in source
-		if(isAtEdge) {
-			sources_sel[i]->SetEdgeFlag(true);
-			(taskData->sources_edge).push_back(sources_sel[i]);
-		}
-		else {
-			sources_sel[i]->SetEdgeFlag(false);
-			(taskData->sources).push_back(sources_sel[i]);
-		}
-	}//end loop selected sources
-	
-	//Reset source selection (DO NOT CLEAR MEMORY)
-	sources_sel.clear();
-	*/
-
 	
 	//## Apply source selection?
 	int nSources= (int)sources.size();
@@ -1556,6 +1900,11 @@ int SourceFinderMPI::Save(){
 		if(fConfigInfo) fConfigInfo->Write();
 	}//close if save image to file
 	*/
+
+	//Save task info to file?
+	if(m_TaskInfoTree){
+		m_TaskInfoTree->Write();
+	}
 
 	//cout<<"SourceFinder::Save(): INFO: Closing output file..."<<endl;	
 	DEBUG_LOG("Closing output file...");

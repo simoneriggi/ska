@@ -52,6 +52,8 @@
 #include <time.h>
 #include <ctime>
 
+#include <mpi.h>
+
 
 namespace Caesar {
 
@@ -142,7 +144,8 @@ class SourceFinderMPI : public TObject {
 		bool IsPointLikeSource(Source* aSource);
 		int DrawSources(Img* image,std::vector<Source*>& sources);
 
-		int UpdateSourceFromWorkers();
+		int UpdateTaskDataFromWorkers();
+		int FindSourcesAtEdge();
 		int MergeSourcesAtEdge();
 
 	public:
@@ -168,6 +171,12 @@ class SourceFinderMPI : public TObject {
 		TTree* m_SourceTree;
 		bool m_SaveSources;
 		bool m_SaveResidualMap;
+	
+		TTree* m_TaskInfoTree;
+		double m_xmin;
+		double m_xmax;
+		double m_ymin;
+		double m_ymax;
 
 		//Source
 		Source* m_Source;
@@ -286,6 +295,11 @@ class SourceFinderMPI : public TObject {
 		//MPI vars
 		int nproc;
 		int myid;
+		MPI_Group m_WorldGroup;
+		MPI_Group m_WorkerGroup;
+		MPI_Comm m_WorkerComm;
+		int worker_ranks;
+		int nworkers;
 
 	//ClassDef(SourceFinderMPI,1)
 
