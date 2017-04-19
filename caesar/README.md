@@ -1,4 +1,4 @@
-[![Build Status](http://jenkins.oact.inaf.it:8080/job/Caesar/badge/icon)](http://jenkins.oact.inaf.it:8080/job/Caesar/)
+[![Build Status](http://jenkins.oact.inaf.it:8080/buildStatus/icon?job=Caesar)](http://jenkins.oact.inaf.it:8080/job/Caesar/)
 
 # CAESAR
 
