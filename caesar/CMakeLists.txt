@@ -133,6 +133,9 @@ list (APPEND INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
 list (APPEND INCLUDE_DIRS ${CFITSIO_INCLUDE_DIR})
 list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
 	
+
+list (APPEND INCLUDE_DIRS ${LINTERP_DOWNLOAD_DIR})
+
 ##if(ENABLE_SERVER)
 ##	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
 ##	list (APPEND INCLUDE_DIRS ${MSGPACK_INCLUDE_DIRS})
@@ -245,13 +248,13 @@ message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
 	add_custom_command(
   	OUTPUT proto_generation
     COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
-    ###DEPENDS always_rebuild  ### Decomment this to always generate protobuf files
-		DEPENDS ${PROTO_FILES}
+    DEPENDS always_rebuild  ### Decomment this to always generate protobuf files
+		##DEPENDS ${PROTO_FILES}
   )
 
 	add_custom_target(ProtobufSchema ALL 
-		##DEPENDS proto_generation
-		DEPENDS ${PROTO_FILES}  ## Will generate source files only when proto files are changed
+		DEPENDS proto_generation
+		##DEPENDS ${PROTO_FILES}  ## Will generate source files only when proto files are changed
   )
 
 	
