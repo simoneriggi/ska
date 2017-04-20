@@ -1,4 +1,4 @@
-[![Build Status](http://jenkins.oact.inaf.it:8080/buildStatus/icon?job=SKA/CAESAR)](http://jenkins.oact.inaf.it:8080/job/SKA/CAESAR)
+[![Build Status](http://jenkins.oact.inaf.it:8080/buildStatus/icon?job=SKA/CAESAR)](http://jenkins.oact.inaf.it:8080/me/my-views/view/All/job/SKA/job/CAESAR/)
 
 # CAESAR
 
