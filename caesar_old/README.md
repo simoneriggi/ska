@@ -38,18 +38,10 @@ Make sure you have set the following environment variables to the external libra
 * BOOST_ROOT
 * VLFEAT_INC_DIR, VLFEAT_LIB_DIR: path to VLFEAT headers and libraries 
 
-
-CAESAR depends also on the wcstools and linterp libraries which are already provided in the external/ directory. Note that the provided wcslib was slightly modified with respect to the original release to avoid naming conflicts with the R package.
-
-cmake should find all needed include dirs and libraries used to build the project.
-
-To build and install the project:
+To build the project:
 
 * Clone this repository into your local $SOURCE_DIR  
   ```git clone https://github.com/simoneriggi/ska-dsh_lmc.git $SOURCE_DIR```
-* Create the build and install directories: $BUILD_DIR, $INSTALL_DIR  
-* In the build directory:  
-  ```cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR $SOURCE_DIR```  
+* Enter the source directory $SOURCE_DIR and type:  
   ```make```  
-  ```make install```  
   
