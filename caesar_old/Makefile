@@ -68,7 +68,7 @@ OPENCV_CPPFLAGS = $(shell pkg-config $(OPENCV_DIR)/lib/pkgconfig/opencv.pc --cfl
 
 #VLFEAT_DIR= /home/riggi/Software/VLFeat/lib
 #VLFEAT_CPPFLAGS = -I$(VLFEAT_DIR)
-VLFEAT_CPPFLAGS = -I$(VLFEAT_SRC_DIR)
+VLFEAT_CPPFLAGS = -I$(VLFEAT_INC_DIR)
 
 R_HOME = $(shell R RHOME)
 R_CPPFLAGS = $(shell $(R_HOME)/bin/R CMD config --cppflags)
