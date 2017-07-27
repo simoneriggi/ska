@@ -883,11 +883,12 @@ BkgData* SourceFinder::ComputeStatsAndBkg(Img* img){
 		double Ny= img->GetNbinsY();
 		boxSizeX= m_BoxSizeX*Nx;
 		boxSizeY= m_BoxSizeY*Ny;
-		INFO_LOG("Setting bkg boxes as ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
+		INFO_LOG("Setting bkg boxes to ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
 	}
 
 	double gridSizeX= m_GridSizeX*boxSizeX;
 	double gridSizeY= m_GridSizeY*boxSizeY;
+	INFO_LOG("Setting grid size to ("<<gridSizeX<<","<<gridSizeY<<") pixels ...");
 
 	//## Compute Bkg
 	BkgData* bkgData= img->ComputeBkg(m_BkgEstimator,m_UseLocalBkg,boxSizeX,boxSizeY,gridSizeX,gridSizeY,m_Use2ndPassInLocalBkg,m_SkipOutliersInLocalBkg,m_SeedThr,m_MergeThr,m_NMinPix);
