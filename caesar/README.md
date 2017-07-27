@@ -1,8 +1,10 @@
+[![Build Status](http://jenkins.oact.inaf.it:8080/buildStatus/icon?job=SKA/CAESAR)](http://jenkins.oact.inaf.it:8080/me/my-views/view/All/job/SKA/job/CAESAR/)
+
 # CAESAR
 
 Compact And Extended Source Automated Recognition
 
-##**About**  
+## **About**  
 CAESAR is a C++ software tool for automated source finding in astronomical maps. 
 It is distributed under the GNU General Public License v3.0. 
 If you use CAESAR for your research, it would be nice to acknowledge it in your papers by citing the following paper:
@@ -10,10 +12,10 @@ If you use CAESAR for your research, it would be nice to acknowledge it in your 
 * S. Riggi et al., "Automated detection of extended sources in radio maps:
 progress from the SCORPIO survey", MNRAS (2016) doi: 10.1093/mnras/stw982, arXiv:1605.01852
 
-##**Status**
+## **Status**
 At present CAESAR is still being developed with major functionalities to be integrated in this repository. The API could be therefore subjected to significant changes. 
 
-##**Installation**  
+## **Installation**  
 Install the project dependencies:  
 * ROOT [https://root.cern.ch/], to be built with FITSIO, PyROOT, RInterface options enabled. Make sure that the FindROOT.cmake is present in $ROOTSYS/etc/cmake directory after installation.
 * OpenCV [http://opencv.org/]
