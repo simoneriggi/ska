@@ -11,9 +11,8 @@ If you use CAESAR for your research, please acknowledge it in your papers by cit
 progress from the SCORPIO survey", MNRAS (2016) doi: 10.1093/mnras/stw982, arXiv:1605.01852
 
 ## **Status**
-This is the CAESAR version used in the reference paper. 
-NB: Please note this is an old version. A new CAESAR version is under development (see https://github.com/simoneriggi/ska.git, caesar directory). Some of the functionalities, like 
-extended source search, are yet to be integrated in the new version. The planned major improvements for the new version:
+This is the CAESAR version used in the reference paper.  
+**NB: Please note this is an old version. A new CAESAR version is under development (see https://github.com/simoneriggi/ska.git, caesar directory)**. Some of the functionalities, like extended source search, are yet to be integrated in the new version. The planned major improvements for the new version:
 
 * Build, test and integration system
 * Code refactoring and organization
