@@ -108,10 +108,10 @@ public:
   
   template <class IterT1, class IterT2, class IterT3>  														
   void init(IterT1 grids_begin, IterT2 grids_len_begin, IterT3 f_begin, IterT3 f_end) {    
-		std::cout<<"init(): Started"<<std::endl;
+		//std::cout<<"init(): Started"<<std::endl;
     set_grids(grids_begin, grids_len_begin, m_bCopyData);
 		set_f_array(f_begin, f_end, m_bCopyData);
-		std::cout<<"init(): End"<<std::endl;
+		//std::cout<<"init(): End"<<std::endl;
   }  
   template <class IterT1, class IterT2, class IterT3, class RefCountIterT>
   void init_refcount(IterT1 grids_begin, IterT2 grids_len_begin, IterT3 f_begin, IterT3 f_end, ArrayRefCountT &refF, RefCountIterT grid_refs_begin) {	    
@@ -123,11 +123,11 @@ public:
 
   template <class IterT1, class IterT2>  
   void set_grids(IterT1 grids_begin, IterT2 grids_len_begin, bool bCopy) {
-		std::cout<<"set_grids(): Started"<<std::endl;
+		//std::cout<<"set_grids(): Started"<<std::endl;
 		m_grid_list.clear();
 		m_grid_ref_list.clear();
 		m_grid_copy_list.clear();
-		std::cout<<"set_grids(): Start loop N="<<N<<std::endl;
+		//std::cout<<"set_grids(): Start loop N="<<N<<std::endl;
 		
 		for (int i=0; i<N; i++) {
 	  	int gridLength = grids_len_begin[i];
@@ -141,7 +141,7 @@ public:
 	    	m_grid_list.push_back(grid_type(gridLength, begin));							// use our copy
 	  	}
     }
-		std::cout<<"set_grids(): End"<<std::endl;
+		//std::cout<<"set_grids(): End"<<std::endl;
   } //close set_grids()
   
   template <class IterT1, class RefCountIterT>  

@@ -94,8 +94,16 @@ int main(int argc, char *argv[]){
 	cout<<"INFO: Starting background finder ..."<<endl;
 	Img* BackgroundMap= 0;
 	Img* NoiseMap= 0;
+	Img* SignificanceMap= 0;
 	
 	int status = 0;
+	int Nx= fInputImg->GetNbinsX();
+	int Ny= fInputImg->GetNbinsY();
+	double Xmin= fInputImg->GetXaxis()->GetXmin();
+	double Xmax= fInputImg->GetXaxis()->GetXmax();
+	double Ymin= fInputImg->GetYaxis()->GetXmin();
+	double Ymax= fInputImg->GetYaxis()->GetXmax();
+
 
 	if(ConfigParser::fUseLocalBkg){ 		
 		BkgFinder finder;
@@ -106,11 +114,9 @@ int main(int argc, char *argv[]){
 			finder.SetSegmentationRegularization(ConfigParser::fSPRegularization);
 			finder.SetSegmentationMinRegionArea(ConfigParser::fSPMinArea);
 			finder.SetSegmentationDistanceEps(ConfigParser::fSPMergingDistEps);		
-			//status= finder.FindSuperpixelBkg(fInputImg, (Img::BkgMethod)ConfigParser::fBkgEstimator, ConfigParser::fBoxSize,ConfigParser::fBoxSize, ConfigParser::fGridSize, ConfigParser::fGridSize);
 			bkgMapData= finder.FindSuperpixelBkg(fInputImg, (Img::BkgMethod)ConfigParser::fBkgEstimator, ConfigParser::fBoxSize,ConfigParser::fBoxSize, ConfigParser::fGridSize, ConfigParser::fGridSize);
 		}
 		else if((Img::LocalBkgMethod)ConfigParser::fLocalBkgMethod==Img::eGridBkg){
-			//status= finder.FindGridBkg(fInputImg, (Img::BkgMethod)ConfigParser::fBkgEstimator, ConfigParser::fBoxSize,ConfigParser::fBoxSize, ConfigParser::fGridSize, ConfigParser::fGridSize);
 			bkgMapData= finder.FindGridBkg(fInputImg, (Img::BkgMethod)ConfigParser::fBkgEstimator, ConfigParser::fBoxSize,ConfigParser::fBoxSize, ConfigParser::fGridSize, ConfigParser::fGridSize);
 		}
 		else{
@@ -130,14 +136,51 @@ int main(int argc, char *argv[]){
 		
 	}//close if local bkg
 	else{//compute global background
+
+		//Compute bkg
 		status= fInputImg->ComputeBkg((Img::BkgMethod)ConfigParser::fBkgEstimator);
 		if(status<0) {
 			cerr<<"ERROR: Global background computing failed!"<<endl;
 			return -1;
 		}
 		fInputImg->DumpBkg();
-	}
+
+		//Get bkg data
+		std::vector<Img::BkgData*> bkgData= fInputImg->GetBkgData();
+		if(bkgData.empty()){
+			cerr<<"ERROR: Empty bkg data!"<<endl;
+			return -1;
+		}
+		double bkgLevel= bkgData[0]->bkgLevel;
+		double bkgRMS= bkgData[0]->bkgRMS;
+		
+		//Fill bkg & noise images
+		BackgroundMap= new Img("BkgMap","BkgMap",Nx,Xmin,Xmax,Ny,Xmin,Xmax);
+		NoiseMap= new Img("NoiseMap","NoiseMap",Nx,Xmin,Xmax,Ny,Xmin,Xmax);
+		
+		Img::BkgData bkgInfo;
+		for(int i=0;i<fInputImg->GetNbinsX();i++){
+			double binX= fInputImg->GetXaxis()->GetBinCenter(i+1);
+		
+			for(int j=0;j<fInputImg->GetNbinsY();j++){	
+				double binY= fInputImg->GetYaxis()->GetBinCenter(j+1);
+				double w= fInputImg->GetBinContent(i+1,j+1);		
+				if(w==0) {
+					//cerr<<"WARN: Empty pixel ("<<i<<","<<j<<"), skip it..."<<endl;			
+					continue;
+				}
 	
+				BackgroundMap->FillPixel(binX,binY,bkgLevel);
+				NoiseMap->FillPixel(binX,binY,bkgRMS);
+			}//end loop
+		}//end loop 
+
+	}//close else
+	
+	//## Compute significance map	
+	if(BackgroundMap && NoiseMap){
+		SignificanceMap= fInputImg->GetSignificanceMap(BackgroundMap,NoiseMap);
+	}
 				
 	//## Save to file
 	if(ConfigParser::fSaveToFile && fOutputFile){
@@ -149,6 +192,10 @@ int main(int argc, char *argv[]){
 		if(NoiseMap) {
 			NoiseMap->SetNameTitle("NoiseMap","NoiseMap");
 			NoiseMap->Write();
+		}
+		if(SignificanceMap) {
+			SignificanceMap->SetNameTitle("SignificanceMap","SignificanceMap");
+			SignificanceMap->Write();
 		}
 		fOutputFile->Close();
 	}

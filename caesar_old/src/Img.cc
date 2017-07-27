@@ -119,21 +119,21 @@ Img::Img(const Img &img) : TH2F() {
 
 Img::~Img(){
 
-	cout<<"Img::~Img(): INFO: Deleting image "<<this->GetName()<<" ..."<<endl;
+	//cout<<"Img::~Img(): INFO: Deleting image "<<this->GetName()<<" ..."<<endl;
 	
-	cout<<"Img::~Img(): Deleting pixel stats..."<<endl;
+	//cout<<"Img::~Img(): Deleting pixel stats..."<<endl;
 	if(fPixelStats) {
 		delete fPixelStats;
 		fPixelStats= 0;
 	}
 
-	cout<<"Img::~Img(): Deleting pixel histo..."<<endl;
+	//cout<<"Img::~Img(): Deleting pixel histo..."<<endl;
 	if(fPixelHisto) {
 		delete fPixelHisto;
 		fPixelHisto= 0;
 	}
 
-	cout<<"Img::~Img(): Deleting bkg data..."<<endl;
+	//cout<<"Img::~Img(): Deleting bkg data..."<<endl;
 	for(unsigned int j=0;j<fBkgData.size();j++) {
 		if(fBkgData[j]) {
 			delete fBkgData[j];
@@ -143,7 +143,7 @@ Img::~Img(){
 	fBkgData.clear();
 
 	
-	cout<<"Img::~Img(): Deleting source collection..."<<endl;
+	//cout<<"Img::~Img(): Deleting source collection..."<<endl;
 	for(unsigned int j=0;j<fSourceCollection.size();j++) {
 		if(fSourceCollection[j]) {
 			delete fSourceCollection[j];
@@ -153,29 +153,29 @@ Img::~Img(){
 	fSourceCollection.clear();
 	
 
-	cout<<"Img::~Img(): Deleting bkg map..."<<endl;
+	//cout<<"Img::~Img(): Deleting bkg map..."<<endl;
 	if(fInterpolatedBackgroundLevelMap) {
 		delete fInterpolatedBackgroundLevelMap;
 		fInterpolatedBackgroundLevelMap= 0;
 	}
 	
-	cout<<"Img::~Img(): Deleting bkg noise map..."<<endl;
+	//cout<<"Img::~Img(): Deleting bkg noise map..."<<endl;
 	if(fInterpolatedBackgroundRMSMap) {
 		delete fInterpolatedBackgroundRMSMap;
 		fInterpolatedBackgroundRMSMap= 0;
 	}
 	
-	cout<<"Img::~Img(): Deleting bkg map..."<<endl;
+	//cout<<"Img::~Img(): Deleting bkg map..."<<endl;
 	if(fBackgroundLevelMap) {
 		delete fBackgroundLevelMap;
 		fBackgroundLevelMap= 0;	
 	}
-	cout<<"Img::~Img(): Deleting rms map..."<<endl;
+	//cout<<"Img::~Img(): Deleting rms map..."<<endl;
 	if(fBackgroundRMSMap) {
 		delete fBackgroundRMSMap;
 		fBackgroundRMSMap= 0;
 	}
-	cout<<"Img::~Img(): INFO: End image "<<this->GetName()<<" delete."<<endl;
+	//cout<<"Img::~Img(): INFO: End image "<<this->GetName()<<" delete."<<endl;
  	
 
 }//close destructor
@@ -876,6 +876,56 @@ Img* Img::GetSignificanceMap(bool useLocalBackground){
 	return significanceMap;
 
 }//close Img::GetSignificanceMap()
+
+Img* Img::GetSignificanceMap(Img* BkgMap, Img* NoiseMap){
+
+	//Check image
+	if(!BkgMap || !NoiseMap){
+		cerr<<"Null ptr to bkg/noise maps!"<<endl;
+		return 0;
+	}
+
+	//Integrity checks
+	long int Nx= this->GetNbinsX();
+	long int Ny= this->GetNbinsY();
+	long int Nx_bkg= BkgMap->GetNbinsX();
+	long int Ny_bkg= BkgMap->GetNbinsY();
+	long int Nx_noise= NoiseMap->GetNbinsX();
+	long int Ny_noise= NoiseMap->GetNbinsY();
+	if( Nx!=Nx_bkg || Ny!=Ny_bkg ||
+			Nx!=Nx_noise || Ny!=Ny_noise ||
+			Nx_bkg!=Nx_noise || Ny_bkg!=Ny_noise
+	)
+	{
+		cerr<<"Img::GetSignificanceMap(): ERROR: Bkg/Noise/image maps have different size!"<<endl;			
+		return 0;
+	}
+	
+		
+	//Clone this image and reset content
+	TString imgName= Form("%s_significance",std::string(this->GetName()).c_str());
+	Img* significanceMap= (Img*)this->Clone(imgName);
+	significanceMap->Reset();
+
+	for(int i=0;i<Nx;i++){
+		double binX= this->GetXaxis()->GetBinCenter(i+1);
+		for(int j=0;j<Ny;j++){	
+			double binY= this->GetYaxis()->GetBinCenter(j+1);
+			double w= this->GetBinContent(i+1,j+1);	
+											
+			double bkgLevel= BkgMap->GetBinContent(i+1,j+1);
+			double bkgRMS= NoiseMap->GetBinContent(i+1,j+1);
+			if( w==0 || bkgRMS<=0) continue;
+			
+			double Z= (w-bkgLevel)/bkgRMS;
+			significanceMap->FillPixel(binX,binY,Z);
+		}//end loop
+	}//end loop 
+	
+
+	return significanceMap;
+
+}//close GetSignificanceMap()
 
 
 Source* Img::FindSeededBlob(int seedPixelId,double mergeThr,bool mergeBelowSeed){

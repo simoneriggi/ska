@@ -671,9 +671,13 @@ class Img : public TH2F {
 		}
 
 		/**
-		* \brief Get significance map
+		* \brief Compute significance map
 		*/
 		Img* GetSignificanceMap(bool useLocalBackground=false);
+		/**
+		* \brief Get significance map from bkg & noise maps
+		*/
+		Img* GetSignificanceMap(Img* BkgMap, Img* NoiseMap);
 
 		/**
 		* \brief Get number of pixels in image
@@ -712,8 +716,6 @@ class Img : public TH2F {
 		*/
 		void ResetStats(bool resetMoments=false);
 
-		
-		
 		
   public:
     std::string errflag;
