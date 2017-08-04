@@ -91,6 +91,7 @@ SourceFinder::SourceFinder(){
 	fSegmentedImage= 0;
 	fFinalSegmentedImage= 0;
 	fFinalSignalSegmentedImage= 0;
+	fPreMergingSegmentedImage= 0;
 	fSegmentationContourGraph= 0;
 	fIsInteractive= true;
 	fConfigInfo= 0;
@@ -133,6 +134,8 @@ int SourceFinder::SetConfig(){
 		cerr<<"SourceFinder::SetConfig(): ERROR: Invalid file extension ("<<fInputFileExtension<<")...nothing to be done!"<<endl;
 		return -1;
 	}
+
+	fROOTInputImgName= ConfigParser::fROOTInputImgName;
 
 	//Get output files
 	fOutputFileName= ConfigParser::fOutputFileName;
@@ -241,6 +244,8 @@ int SourceFinder::SetConfig(){
 	fSaliencyNNFactor= ConfigParser::fSaliencyNNFactor;
 	fSaliencyFilterThresholdFactor= ConfigParser::fSaliencyFilterThresholdFactor;
 	fSaliencyNormalizationMode= ConfigParser::fSaliencyNormalizationMode;
+	fSaliencyDissExpFalloffPar= ConfigParser::fSaliencyDissExpFalloffPar;
+	fSaliencySpatialDistRegPar= ConfigParser::fSaliencySpatialDistRegPar;
 
 	//Chan-Vese segmentation options
 	fCVTimeStep= ConfigParser::fCVTimeStep;
@@ -376,7 +381,10 @@ int SourceFinder::Init(){
 	fSLICSegmenter->SetNNFactorInSaliency(fSaliencyNNFactor);
 	fSLICSegmenter->SetFilterThresholdFactorInSaliency(fSaliencyFilterThresholdFactor);
 	fSLICSegmenter->SetSaliencyNormalizationMode(fSaliencyNormalizationMode);
-	
+	fSLICSegmenter->SetDissExpFalloffParInSaliency(fSaliencyDissExpFalloffPar);
+	fSLICSegmenter->SetSpatialDistRegParInSaliency(fSaliencySpatialDistRegPar);
+
+
 	fSLICSegmenter->SetBoxSizeInLocalBkgMap(fBkgBoxSizeX,fBkgBoxSizeX);
 	fSLICSegmenter->SetGridSizeInLocalBkgMap(fBkgGridSizeX,fBkgGridSizeY);
 
@@ -1070,6 +1078,10 @@ int SourceFinder::FindExtendedSource_SPSegmentation_new(Img* inputImg){
 	std::vector<Region*> regions_merged= fSLICSegmenter->GetMergedRegions();//list of merged regions
 	std::vector< std::vector<long> > labels= fSLICSegmenter->GetPixelClusterIds();//pixel labels
 	std::vector< std::vector<long> > labels_merged= fSLICSegmenter->GetMergedPixelClusterIds();//pixel merged labels
+	
+	//Pre-Merging Segmented image
+	fPreMergingSegmentedImage= fSLICSegmenter->GetPreMergingSegmentedMap();
+	fPreMergingSegmentedImage->SetNameTitle("preMergingSegmentedImg","preMergingSegmentedImg");
 
 	//Superpixel segmented image	
 	fSegmentedImage= SLICUtils::GetSegmentedImage(inputImg,regions,false,false,true);
@@ -1079,7 +1091,7 @@ int SourceFinder::FindExtendedSource_SPSegmentation_new(Img* inputImg){
 	}
 	fSegmentedImage->SetNameTitle("segmentedImg","segmentedImg");
 
-	
+
 	//Final segmented image
 	fFinalSegmentedImage= SLICUtils::GetSegmentedImage(inputImg,regions_merged,false,false,true,false);
 	if(!fFinalSegmentedImage){
@@ -1600,9 +1612,9 @@ int SourceFinder::ReadImage(){
 			cerr<<"SourceFinder::ReadImage(): ERROR: Cannot open input file "<<fInputFileName<<"!"<<endl;
 			return -1;
 		}
-		fInputImg=  (Img*)inputFile->Get("FullImage");
+		fInputImg=  (Img*)inputFile->Get(fROOTInputImgName.c_str());
 		if(!fInputImg){
-			cerr<<"SourceFinder::ReadImage(): ERROR: Cannot get image from input file "<<fInputFileName<<"!"<<endl;
+			cerr<<"SourceFinder::ReadImage(): ERROR: Cannot get image "<<fROOTInputImgName<<" from input file "<<fInputFileName<<"!"<<endl;
 			return -1;
 		}
 	}//close if
@@ -1722,6 +1734,7 @@ void SourceFinder::Save(){
 			if(fSumSaliencyMap) fSumSaliencyMap->Write();
 			if(fInitSaliencyMap) fInitSaliencyMap->Write();
 			if(fSegmentationContourGraph) fSegmentationContourGraph->Write();
+			if(fPreMergingSegmentedImage) fPreMergingSegmentedImage->Write();
 		}
 		else{
 			cerr<<"SourceFinder::Save(): WARN: Invalid save image flag specified!"<<endl;

@@ -24,6 +24,7 @@ using namespace std;
 std::string ConfigParser::fInputFileName;
 std::string ConfigParser::fOutputFileName;
 std::string ConfigParser::fDS9CatalogFileName;
+std::string ConfigParser::fROOTInputImgName;
 bool ConfigParser::fSaveToFile;
 bool ConfigParser::fSaveImageToFile;
 int ConfigParser::fSaveImageType;
@@ -124,6 +125,8 @@ bool ConfigParser::fSaliencyUseCurvatureMap;
 double ConfigParser::fSaliencyNNFactor;
 double ConfigParser::fSaliencyFilterThresholdFactor;
 int ConfigParser::fSaliencyNormalizationMode;
+double ConfigParser::fSaliencyDissExpFalloffPar;
+double ConfigParser::fSaliencySpatialDistRegPar;
 
 //CHAN-VESE OPTIONS
 double ConfigParser::fCVTimeStep;
@@ -151,6 +154,7 @@ ConfigParser::ConfigParser(std::string filename){
 	fInputFileName= "";
 	fOutputFileName= "Output.root";
 	fDS9CatalogFileName= "DS9SourceCatalog.reg";
+	fROOTInputImgName= "FullImage";
 	fSaveToFile= true;
 	fSaveImageToFile= false;
 	fSaveImageType= 2;//Residual image
@@ -250,6 +254,8 @@ ConfigParser::ConfigParser(std::string filename){
 	fSaliencyNNFactor= 0.1;
 	fSaliencyFilterThresholdFactor= 0.8;
 	fSaliencyNormalizationMode= 2;//adaptive thr
+	fSaliencyDissExpFalloffPar= 100;
+	fSaliencySpatialDistRegPar= 1;
 
 	//CHAN-VESE OPTIONS
 	fCVTimeStep= 0.1;
@@ -355,6 +361,10 @@ void ConfigParser::ReadConfig() {
 				else if(descriptor.compare("DS9CatalogFile")==0){
 					line >> descriptor >> fDS9CatalogFileName >> fDS9RegionFormat;			
 		  	}
+				else if(descriptor.compare("inputImgName")==0){
+					line >> descriptor >> fROOTInputImgName;			
+		  	}
+
 				else if(descriptor.compare("drawSources")==0){
 					std::string thisFlagValue;
 		    	line >> descriptor >> thisFlagValue;			
@@ -751,6 +761,12 @@ void ConfigParser::ReadConfig() {
 				}
 				else if(descriptor.compare("saliencyNormalizationMode")==0){
 					line >> descriptor >> fSaliencyNormalizationMode;
+				}
+				else if(descriptor.compare("saliencyDissExpFalloffPar")==0){
+					line >> descriptor >> fSaliencyDissExpFalloffPar;
+				}
+				else if(descriptor.compare("saliencySpatialDistRegPar")==0){
+					line >> descriptor >> fSaliencySpatialDistRegPar;
 				}
 
 

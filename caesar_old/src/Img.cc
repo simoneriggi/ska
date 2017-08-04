@@ -2548,11 +2548,11 @@ Img* Img::GetSmoothedSaliencyMap(std::vector<Region*> regions,double sigmaS,doub
 	TMatrixD params_spatial(nRegions,nPars_spatial);
 	params_spatial.Zero();
 
-	cout<<"Img::GetSaliencyMap(): INFO: Compute region pars..."<<endl;
+	cout<<"Img::GetSmoothedSaliencyMap(): INFO: Compute region pars..."<<endl;
 	for(int i=0;i<nRegions;i++){
 		//Compute pars
-		//regions[i]->ComputeParameters(false,true,true);
-		regions[i]->ComputeParameters(false,true,false);
+		//regions[i]->ComputeParameters(false,true,true);//SBAGLIATO
+		regions[i]->ComputeParameters(false,true,false);//GIUSTO
 
 		//Get params vectors
 		Region::Parameters* regionPars= regions[i]->GetParams(addCurvDist);
@@ -2572,7 +2572,7 @@ Img* Img::GetSmoothedSaliencyMap(std::vector<Region*> regions,double sigmaS,doub
 	}//end loop regions
 
 	//## Find min & max
-	cout<<"Img::GetSaliencyMap(): INFO: Compute param min/max..."<<endl;
+	cout<<"Img::GetSmoothedSaliencyMap(): INFO: Compute param min/max..."<<endl;
 	TVectorD params_min(nPars);
 	TVectorD params_max(nPars);
 	params_min.Zero();
@@ -2604,7 +2604,7 @@ Img* Img::GetSmoothedSaliencyMap(std::vector<Region*> regions,double sigmaS,doub
 	}//end loop pars
 
 	//## Normalize parameters to [0,1]	
-	cout<<"Img::GetSaliencyMap(): INFO: Normalize region pars.."<<endl;
+	cout<<"Img::GetSmoothedSaliencyMap(): INFO: Normalize region pars.."<<endl;
 	double NormMin= 0;
 	double NormMax= 1;
 	for(int i=0;i<nRegions;i++){
@@ -2843,7 +2843,7 @@ Img* Img::GetSmoothedSaliencyMap(std::vector<Region*> regions,double sigmaS,doub
 
 }//close GetSmoothedSaliencyMap()
 
-Img* Img::GetSaliencyMap(int reso,double regFactor,int minRegionSize,double knnFactor,bool useRobust,bool addCurvDist,bool interpolate){
+Img* Img::GetSaliencyMap(int reso,double regFactor,int minRegionSize,double knnFactor,bool useRobustPars,double expFalloffPar,double distanceRegPar,bool interpolate){
 
 	//## Compute segmentation in superpixels
 	SLICSegmenter slic;
@@ -2857,7 +2857,7 @@ Img* Img::GetSaliencyMap(int reso,double regFactor,int minRegionSize,double knnF
 	if(nRegions<=0) return 0;
 
 	//## Compute saliency map
-	Img* saliencyMap= GetSaliencyMap(regions,knnFactor,useRobust,addCurvDist,interpolate);
+	Img* saliencyMap= GetSaliencyMap(regions,knnFactor,useRobustPars,expFalloffPar,distanceRegPar,interpolate);
 	if(!saliencyMap){
 		cerr<<"Img::GetSaliencyMap(): ERROR: Failed to compute saliency map!"<<endl;
 		return 0;
@@ -2868,198 +2868,175 @@ Img* Img::GetSaliencyMap(int reso,double regFactor,int minRegionSize,double knnF
 }//close GetSaliencyMap()
 
 
-Img* Img::GetSaliencyMap(std::vector<Region*> regions,double knnFactor,bool useRobust,bool addCurvDist,bool interpolate){
+Img* Img::GetSaliencyMap(std::vector<Region*>& regions,double knnFactor,bool useRobustPars,double expFalloffPar,double distanceRegPar,bool interpolate){
 
 	//## Check regions
-	int nRegions= (int)regions.size();
+	int nRegions= static_cast<int>(regions.size());
 	if(nRegions<=0) return 0;
 
+	//## Compute number of neighbors to be used in saliency calculation
 	int knn_min= 10;
 	int knn_chosen= (int)(std::round(knnFactor*nRegions));//percentage of available regions
 	int knn= std::max(knn_chosen,knn_min);
 
 	int KNN= knn;
 	if(knn>nRegions || knn<0) KNN= nRegions;
-	cout<<"KNN="<<KNN<<endl;
-	
-	//## Compute region parameters (including robust stats)
-	int nPars= 2;
-	int nPars_robust= 2;
-	if(addCurvDist){
-		nPars+= 2;
-		nPars_robust+= 2;
-	}
-	int nPars_spatial= 2;
-	TMatrixD params(nRegions,nPars);
-	params.Zero();
-	TMatrixD params_robust(nRegions,nPars_robust);
-	params_robust.Zero();
-	TMatrixD params_spatial_noNorm(nRegions,nPars_spatial);
-	params_spatial_noNorm.Zero();
-	TMatrixD params_spatial(nRegions,nPars_spatial);
-	params_spatial.Zero();
 
+	//## Get image info
+	double Xmin= this->GetXaxis()->GetXmin();
+	double Xmax= this->GetXaxis()->GetXmax();
+	double Ymin= this->GetYaxis()->GetXmin();
+	double Ymax= this->GetYaxis()->GetXmax();
+	double width= fabs(Xmax-Xmin);
+	double height= fabs(Ymax-Ymin);
+	double diagonal= sqrt(width*width + height*height);
+	//double Xo= Xmin + width/2.;
+ 	//double Yo= Ymin + height/2.;
+
+	//## Compute region pars
 	cout<<"Img::GetSaliencyMap(): INFO: Compute region pars..."<<endl;
-	for(int i=0;i<nRegions;i++){
-		//Compute pars
-		regions[i]->ComputeParameters(false,true,true);//### SBAGLIATO
-		//regions[i]->ComputeParameters(false,true,false);//#### GIUSTO
+	for(int i=0;i<nRegions;i++) regions[i]->ComputeParameters(false,true,false);
 
-		regions[i]->Dump();
+	//## Compute dissimilarity matrix
+	TMatrixD* ColorDistMatrix= new TMatrixD(nRegions,nRegions);
+	ColorDistMatrix->Zero();
 
-		//Get params vectors
-		Region::Parameters* regionPars= regions[i]->GetParams(addCurvDist);
-		TVectorD* parVect= regionPars->pars;
-		TVectorD* parVect_robust= regionPars->robustPars;
-		TVectorD* parVect_spatial= regionPars->spatialPars;
-
-		//Fill param matrix
-		params[i]= *parVect;
-		params_robust[i]= *parVect_robust;
-		params_spatial[i]= *parVect_spatial;
-		params_spatial_noNorm[i]= *parVect_spatial;
-
-		if(parVect) parVect->Delete();
-		if(parVect_robust) parVect_robust->Delete();
-		if(parVect_spatial) parVect_spatial->Delete();
-		
-	}//end loop regions
-
-	//## Find min & max
-	cout<<"Img::GetSaliencyMap(): INFO: Compute param min/max..."<<endl;
-	TVectorD params_min(nPars);
-	TVectorD params_max(nPars);
-	params_min.Zero();
-	params_max.Zero();
-	for(int j=0;j<nPars;j++){
-		TVectorD v = TMatrixDColumn(params,j);
-		params_min(j)= v.Min();
-		params_max(j)= v.Max();
-	}//end loop pars
-
-	TVectorD params_robust_min(nPars_robust);
-	TVectorD params_robust_max(nPars_robust);
-	params_robust_min.Zero();
-	params_robust_max.Zero();
-	for(int j=0;j<nPars_robust;j++){
-		TVectorD v = TMatrixDColumn(params_robust,j);
-		params_robust_min(j)= v.Min();
-		params_robust_max(j)= v.Max();
-	}//end loop pars
-
-	TVectorD params_spatial_min(nPars_spatial);
-	TVectorD params_spatial_max(nPars_spatial);
-	params_spatial_min.Zero();
-	params_spatial_max.Zero();
-	for(int j=0;j<nPars_spatial;j++){
-		TVectorD v = TMatrixDColumn(params_spatial,j);
-		params_spatial_min(j)= v.Min();
-		params_spatial_max(j)= v.Max();
-	}//end loop pars
-
-	//## Normalize parameters to [0,1]	
-	cout<<"Img::GetSaliencyMap(): INFO: Normalize region pars.."<<endl;
-	double NormMin= 0;
-	double NormMax= 1;
-	for(int i=0;i<nRegions;i++){
-		for(int j=0;j<nPars;j++){
-			double parValue= params(i,j); 
-			double parValue_min= params_min(j);
-			double parValue_max= params_max(j);
-			double parValue_norm= NormMin + (NormMax-NormMin)*(parValue-parValue_min)/(parValue_max-parValue_min);
-			params(i,j)= parValue;
-		}//end loop pars
-		for(int j=0;j<nPars_robust;j++){
-			double parValue= params_robust(i,j); 
-			double parValue_min= params_robust_min(j);
-			double parValue_max= params_robust_max(j);
-			double parValue_norm= NormMin + (NormMax-NormMin)*(parValue-parValue_min)/(parValue_max-parValue_min);
-			params_robust(i,j)= parValue;
-		}//end loop pars
-		for(int j=0;j<nPars_spatial;j++){
-			double parValue= params_spatial(i,j); 
-			double parValue_min= params_spatial_min(j);
-			double parValue_max= params_spatial_max(j);
-			double parValue_norm= NormMin + (NormMax-NormMin)*(parValue-parValue_min)/(parValue_max-parValue_min);
-			params_spatial(i,j)= parValue;
-		}//end loop pars
-	}//end loop regions
-
-	params_robust.Print();
-
-	//## Compute mutual region distances
-	TMatrixD* DissimilarityMatrix= new TMatrixD(nRegions,nRegions);
-	DissimilarityMatrix->Zero();
-	TMatrixD* DissimilarityMatrix_robust= new TMatrixD(nRegions,nRegions);
-	DissimilarityMatrix_robust->Zero();
-
+	TMatrixD* SpatialDistMatrix= new TMatrixD(nRegions,nRegions);
+	SpatialDistMatrix->Zero();
+	double dist_c_min= 1.e+99;
+	double dist_c_max= -1.e+99;
+	double dist_s_min= 1.e+99;
+	double dist_s_max= -1.e+99;
+	
 	for(int i=0;i<nRegions-1;i++){
-		TVectorD x_i = TMatrixDRow(params,i);
-		TVectorD xrobust_i = TMatrixDRow(params_robust,i);
-		TVectorD xspatial_i = TMatrixDRow(params_spatial,i);
+
+		//Region pars i-th
+		double mu_i= regions[i]->fMean;
+		double median_i= regions[i]->fMedian;
+		double Xc_i= regions[i]->fX0;
+		double Yc_i= regions[i]->fY0;
+		
 		for(int j=i+1;j<nRegions;j++){
-			TVectorD x_j = TMatrixDRow(params,j);
-			TVectorD xrobust_j = TMatrixDRow(params_robust,j);
-			TVectorD xspatial_j = TMatrixDRow(params_spatial,j);
-			double dist2= (x_i-x_j).Norm2Sqr();
-			double dist2_robust= (xrobust_i-xrobust_j).Norm2Sqr();
-			double dist2_spatial= (xspatial_i-xspatial_j).Norm2Sqr();
-			double dissimilarity= sqrt(dist2)/(1+sqrt(dist2_spatial));
-			double dissimilarity_robust= sqrt(dist2_robust)/(1+sqrt(dist2_spatial));
+
+			//Region pars j-th
+			double n_j= (double)(regions[j]->fNPix);
+			double mu_j= regions[j]->fMean;
+			double median_j= regions[j]->fMedian;
+			double Xc_j= regions[j]->fX0;
+			double Yc_j= regions[j]->fY0;
+					
 			
-			(*DissimilarityMatrix)(i,j)= dissimilarity;
-			(*DissimilarityMatrix)(j,i)= dissimilarity;
-			(*DissimilarityMatrix_robust)(i,j)= dissimilarity_robust;
-			(*DissimilarityMatrix_robust)(j,i)= dissimilarity_robust;
+			//Compute color & spatial distances
+			double dist_c= fabs(mu_i-mu_j);
+			if(useRobustPars) dist_c= fabs(median_i-median_j);
+			double dist_s= sqrt( (Xc_i-Xc_j)*(Xc_i-Xc_j) + (Yc_i-Yc_j)*(Yc_i-Yc_j) ); 
+			
+			(*ColorDistMatrix)(i,j)= dist_c;
+			(*ColorDistMatrix)(j,i)= dist_c;
+
+			(*SpatialDistMatrix)(i,j)= dist_s;
+			(*SpatialDistMatrix)(j,i)= dist_s;
+
+			//Find min & max
+			if(dist_c<dist_c_min) dist_c_min= dist_c;
+			if(dist_c>dist_c_max) dist_c_max= dist_c;
+			if(dist_s<dist_s_min) dist_s_min= dist_s;
+			if(dist_s>dist_s_max) dist_s_max= dist_s;
+	
 		}//end loop regions
 	}//end loop regions
 
+	//## Normalize distances to [0,1]
+	//## Color distances normalized to min & max
+	//## Spatial distances normalized to image diagonal
+	cout<<"Img::GetSaliencyMap(): INFO: Color dist min/max: "<<dist_c_min<<"/"<<dist_c_max<<", Spatial dist min/max: "<<dist_s_min<<"/"<<dist_s_max<<" img size("<<width<<" x "<<height<<" (diagonal="<<diagonal<<")"<<endl;
 	
+	double NormMin= 0;
+	double NormMax= 1;
+
+	for(int i=0;i<nRegions;i++){
+		for(int j=i+1;j<nRegions;j++){
+			
+			double dist_c= (*ColorDistMatrix)(i,j);
+			double dist_c_norm= NormMin + (NormMax-NormMin)*(dist_c-dist_c_min)/(dist_c_max-dist_c_min);
+			double dist_s= (*SpatialDistMatrix)(i,j);
+			double dist_s_norm= NormMin + (NormMax-NormMin)*(dist_s-dist_s_min)/(dist_s_max-dist_s_min);	
+			//double dist_s_norm= dist_s/diagonal;
+
+			(*ColorDistMatrix)(i,j)= dist_c_norm;
+			(*ColorDistMatrix)(j,i)= dist_c_norm;
+
+			(*SpatialDistMatrix)(i,j)= dist_s_norm;
+			(*SpatialDistMatrix)(j,i)= dist_s_norm;
+		}//end loop regions
+	}//end loop regions
+	
+	cout<<"Img::GetSaliencyMap(): INFO: Color dist min/max: "<<ColorDistMatrix->Min()<<"/"<<ColorDistMatrix->Max()<<", Spatial dist min/max: "<<SpatialDistMatrix->Min()<<"/"<<SpatialDistMatrix->Max()<<endl;
+
+	//## Create saliency image
 	TString imgName= Form("%s_saliency",this->GetName());
 	Img* saliencyImg= (Img*)this->Clone(imgName);
 	saliencyImg->SetNameTitle(imgName,imgName);
 	saliencyImg->Reset();
 
+	//## Compute saliency 
+	cout<<"Img::GetSaliencyMap(): INFO: Computing saliency ..."<<endl;	
+	double Smin= 1.e+99;
+	double Smax= -1.e+99;
+	std::vector<double> SList;
+
+	for(int i=0;i<nRegions;i++){
+
+		std::vector<double> dissList;
+
+		for(int j=0;j<nRegions;j++){
+			//if(i==j) continue;
+			double dist_c= (*ColorDistMatrix)(i,j);
+			double dist_s= (*SpatialDistMatrix)(i,j);
+			double dist= dist_c/(1 + distanceRegPar*dist_s);
+			double dissimilarity= exp(-expFalloffPar*dist);
+
+			dissList.push_back(dissimilarity);
+		}//end loop regions
+
+		//Sort color dissimilarities for region i-th to use only K-th neighbors in color
+		std::vector<double> sorted;
+		std::vector<size_t> sort_index;//sorting index
+		Utils::sort(dissList,sorted,sort_index);	
+
+		//Compute saliency over k-th neighbors
+		double S= 0;
+		for(int k=0;k<KNN;k++){
+			size_t index= sort_index[k];
+			double D= dissList[index];	
+			S+= D;
+		}
+		S/= (double)(KNN);
+		SList.push_back(S);
+
+		
+		if(S<Smin) Smin= S;
+		if(S>Smax) Smax= S;
+
+	}//end loop regions
+
+	cout<<"Img::GetSaliencyMap(): INFO: Saliency min/max="<<Smin<<"/"<<Smax<<endl;	
 	
-	//## Compute saliency (METHOD1)
+	//## Delete matrix		
+	if(ColorDistMatrix) ColorDistMatrix->Delete();
+	if(SpatialDistMatrix) SpatialDistMatrix->Delete();
+
+	
+	//## Normalize saliency and fill maps
 	TGraph2D* interpolationGraph= new TGraph2D;
 
 	for(int i=0;i<nRegions;i++){
-		
-		//Sort dissimilarities
-		std::vector<double> dissList;
-		std::vector<double> dissList_robust;
-
-		for(int j=0;j<nRegions;j++){
-			double D= (*DissimilarityMatrix)(i,j);
-			double D_robust= (*DissimilarityMatrix_robust)(i,j);
-			dissList.push_back(D);
-			dissList_robust.push_back(D_robust);
-		}//end loop regions
-
-		std::vector<double> sorted;
-		std::vector<size_t> sort_index;//sorting index
-		Utils::sort( dissList,sorted,sort_index);	
-
-		std::vector<double> sorted_robust;
-		std::vector<size_t> sort_index_robust;//sorting index
-		Utils::sort( dissList_robust,sorted_robust,sort_index_robust);	
-		
-		//Compute saliency over k-th neighbors
-		double sum= 0;
-		double sum_robust= 0;
-		for(int k=0;k<KNN;k++){
-			size_t index= sort_index[k];
-			double diss= dissList[index];
-			size_t index_robust= sort_index_robust[k];
-			double diss_robust= dissList_robust[index_robust];
-			sum+= diss;
-			sum_robust+= diss_robust;
-		}//end loop 
-		double Saliency= 0;
-		if(useRobust) Saliency= 1.-exp(-sum_robust/(double)(KNN));
-		else Saliency= 1.-exp(-sum/(double)(KNN));
 			
+		//Normalize Saliency color
+		double S= SList[i];
+		double Snorm= NormMin + (NormMax-NormMin)*(S-Smin)/(Smax-Smin);
+		double Saliency= 1.-Snorm;
+	
 		//Fill interpolation graph
 		double Cx= regions[i]->fX0;	
 		double Cy= regions[i]->fY0;	
@@ -3071,15 +3048,266 @@ Img* Img::GetSaliencyMap(std::vector<Region*> regions,double knnFactor,bool useR
 			int thisPixelId= (regions[i]->fPixelCollection)[j].id;
 			saliencyImg->SetBinContent(thisPixelId,Saliency);
 		}//end loop pixels in region
+		
 	}//end loop regions
 	
-
-	if(DissimilarityMatrix) DissimilarityMatrix->Delete();
-	if(DissimilarityMatrix_robust) DissimilarityMatrix_robust->Delete();
-
+	
 	//## Interpolate?
 	if(interpolate){
 		cout<<"Img::GetSaliencyMap(): INFO: Interpolating saliency map..."<<endl;
+		
+		for(int i=0;i<saliencyImg->GetNbinsX();i++){	
+			double x= saliencyImg->GetXaxis()->GetBinCenter(i+1);				
+			for(int j=0;j<saliencyImg->GetNbinsY();j++){
+				double y= saliencyImg->GetYaxis()->GetBinCenter(j+1);
+				double interpSaliency= interpolationGraph->Interpolate(x,y);
+				saliencyImg->SetBinContent(i+1,j+1,interpSaliency);
+			}//end loop bins Y
+		}//end loop binsX
+	}//close if
+
+	//## Delete allocated memory
+	if(interpolationGraph) interpolationGraph->Delete();
+
+	return saliencyImg;
+
+}//close GetSaliencyMap()
+
+
+Img* Img::GetSaliencyMap_MultiParVersion(int reso,double regFactor,int minRegionSize,double knnFactor,bool useRobustPars,bool addCurvDist,bool interpolate,double expFalloffPar,double distanceRegPar){
+
+	//## Compute segmentation in superpixels
+	SLICSegmenter slic;
+	int status= slic.RunSegmentation(this,reso,regFactor,minRegionSize,false);
+	if(status<0){
+		cerr<<"Img::GetSaliencyMap(): ERROR: Superpixel segmentation failed!"<<endl;
+		return 0;
+	}
+	std::vector<Region*> regions= slic.GetRegions(); 
+	int nRegions= (int)regions.size();
+	if(nRegions<=0) return 0;
+
+	//## Compute saliency map
+	Img* saliencyMap= GetSaliencyMap_MultiParVersion(regions,knnFactor,useRobustPars,addCurvDist,interpolate,expFalloffPar,distanceRegPar);
+	if(!saliencyMap){
+		cerr<<"Img::GetSaliencyMap(): ERROR: Failed to compute saliency map!"<<endl;
+		return 0;
+	}
+
+	return saliencyMap;
+
+}//close GetSaliencyMap()
+
+Img* Img::GetSaliencyMap_MultiParVersion(std::vector<Region*>& regions,double knnFactor,bool useRobust,bool addCurvDist,bool interpolate,double expFalloffPar,double distanceRegPar){
+
+	//## Check regions
+	int nRegions= static_cast<int>(regions.size());
+	if(nRegions<=0) return 0;
+
+	//## Compute number of neighbors to be used in saliency calculation
+	int knn_min= 10;
+	int knn_chosen= (int)(std::round(knnFactor*nRegions));//percentage of available regions
+	int knn= std::max(knn_chosen,knn_min);
+
+	int KNN= knn;
+	if(knn>nRegions || knn<0) KNN= nRegions;
+	
+	
+	//## Compute region parameters (including robust stats)
+	int nPars= 2;
+	if(addCurvDist) nPars+= 2;
+	int nPars_spatial= 2;
+
+	TMatrixD params(nRegions,nPars);
+	params.Zero();
+	TMatrixD params_spatial(nRegions,nPars_spatial);
+	params_spatial.Zero();
+
+	cout<<"Img::GetSaliencyMap_MultiParVersion(): INFO: Compute region pars..."<<endl;
+	for(int i=0;i<nRegions;i++){
+		//Compute pars
+		//regions[i]->ComputeParameters(false,true,true);//### SBAGLIATO
+		regions[i]->ComputeParameters(false,true,false);//#### GIUSTO
+
+		//regions[i]->Dump();
+
+		//Get params vectors
+		Region::Parameters* regionPars= regions[i]->GetParams(addCurvDist);
+		TVectorD* parVect= regionPars->pars;
+		TVectorD* parVect_robust= regionPars->robustPars;
+		TVectorD* parVect_spatial= regionPars->spatialPars;
+
+		//Fill param matrix
+		if(useRobust) params[i]= *parVect_robust;	 
+		else params[i]= *parVect;
+		params_spatial[i]= *parVect_spatial;
+		
+		//Clear vectors
+		if(parVect) parVect->Delete();
+		if(parVect_robust) parVect_robust->Delete();
+		if(parVect_spatial) parVect_spatial->Delete();
+		
+	}//end loop regions
+
+	//## Find min & max
+	cout<<"Img::GetSaliencyMap_MultiParVersion(): INFO: Compute parameter min/max..."<<endl;
+	TVectorD params_min(nPars);
+	TVectorD params_max(nPars);
+	params_min.Zero();
+	params_max.Zero();
+	for(int j=0;j<nPars;j++){
+		TVectorD v = TMatrixDColumn(params,j);
+		params_min(j)= v.Min();
+		params_max(j)= v.Max();
+	}//end loop pars
+
+	
+	TVectorD params_spatial_min(nPars_spatial);
+	TVectorD params_spatial_max(nPars_spatial);
+	params_spatial_min.Zero();
+	params_spatial_max.Zero();
+	for(int j=0;j<nPars_spatial;j++){
+		TVectorD v = TMatrixDColumn(params_spatial,j);
+		params_spatial_min(j)= v.Min();
+		params_spatial_max(j)= v.Max();
+	}//end loop pars
+
+	
+
+	//## Normalize parameters to [0,1]	
+	cout<<"Img::GetSaliencyMap(): INFO: Normalize region pars.."<<endl;
+	double NormMin= 0;
+	double NormMax= 1;
+	for(int i=0;i<nRegions;i++){
+		for(int j=0;j<nPars;j++){
+			double parValue= params(i,j);
+			double parValue_min= params_min(j);
+			double parValue_max= params_max(j);
+			double parValue_norm= NormMin + (NormMax-NormMin)*(parValue-parValue_min)/(parValue_max-parValue_min);
+			//params(i,j)= parValue;//OLD VERSION
+			params(i,j)= parValue_norm;
+
+		}//end loop pars
+
+		for(int j=0;j<nPars_spatial;j++){
+			double parValue= params_spatial(i,j); 
+			double parValue_min= params_spatial_min(j);
+			double parValue_max= params_spatial_max(j);
+			double parValue_norm= NormMin + (NormMax-NormMin)*(parValue-parValue_min)/(parValue_max-parValue_min);
+			//params_spatial(i,j)= parValue;//OLD VERSION
+
+			params_spatial(i,j)= parValue_norm;//DEBUG
+
+		}//end loop pars
+
+	}//end loop regions
+
+
+	//## Compute mutual region distances
+	TMatrixD* DissimilarityMatrix= new TMatrixD(nRegions,nRegions);
+	DissimilarityMatrix->Zero();
+	
+	for(int i=0;i<nRegions-1;i++){
+		TVectorD x_i = TMatrixDRow(params,i);
+		TVectorD xspatial_i = TMatrixDRow(params_spatial,i);
+		
+		for(int j=i+1;j<nRegions;j++){
+			TVectorD x_j = TMatrixDRow(params,j);
+			TVectorD xspatial_j = TMatrixDRow(params_spatial,j);
+			
+			double dist2_c= (x_i-x_j).Norm2Sqr();
+			double dist_c= sqrt(dist2_c);
+
+			double dist2_spatial= (xspatial_i-xspatial_j).Norm2Sqr();
+			double dist_spatial= sqrt(dist2_spatial);
+			
+			double dist= dist_c/(1.+ distanceRegPar*dist_spatial);
+			double dissimilarity= exp(-expFalloffPar*dist);
+			(*DissimilarityMatrix)(i,j)= dissimilarity;
+			(*DissimilarityMatrix)(j,i)= dissimilarity;
+
+		}//end loop regions
+	}//end loop regions
+
+	
+	//## Compute saliency (METHOD1)
+	double Smin= 1.e+99;
+	double Smax= -1.e+99;
+	std::vector<double> SList;
+	
+	for(int i=0;i<nRegions;i++){
+		
+		//Store dissimilarity in vector
+		std::vector<double> dissList;
+		
+		for(int j=0;j<nRegions;j++){
+			double D= (*DissimilarityMatrix)(i,j);
+			dissList.push_back(D);
+		}//end loop regions
+
+		//Find the KNN neighbors
+		std::vector<double> sorted;
+		std::vector<size_t> sort_index;//sorting index
+		Utils::sort( dissList,sorted,sort_index);	
+
+		//Compute saliency over KNN neighbors
+		double S= 0;
+	
+		for(int k=0;k<KNN;k++){
+			size_t index= sort_index[k];
+			double diss= dissList[index];
+			S+= diss;
+		}//end loop k-th neighbors 
+
+		//Scale by KNN
+		S/= (double)(KNN);
+
+		if(S<Smin) Smin= S;
+		if(S>Smax) Smax= S;
+		SList.push_back(S);
+		
+	}//end loop regions
+	
+	//Delete matrix
+	if(DissimilarityMatrix) DissimilarityMatrix->Delete();
+	
+
+	//## Create saliency map and interpolation graph
+	TString imgName= Form("%s_saliency",this->GetName());
+	Img* saliencyImg= (Img*)this->Clone(imgName);
+	saliencyImg->SetNameTitle(imgName,imgName);
+	saliencyImg->Reset();
+
+	TGraph2D* interpolationGraph= new TGraph2D;
+	
+
+	//Normalize saliency term and fill image
+	for(int i=0;i<nRegions;i++){
+			
+		//Normalize Saliency
+		double S= SList[i];
+		double Snorm= NormMin + (NormMax-NormMin)*(S-Smin)/(Smax-Smin);
+		double Saliency= 1.-Snorm;
+		
+		//Fill interpolation graph
+		double Cx= regions[i]->fX0;	
+		double Cy= regions[i]->fY0;
+		interpolationGraph->SetPoint(i,Cx,Cy,Saliency);
+
+		//Fill image
+		int nPixelsInRegion= (int)regions[i]->fNPix;
+		for(int j=0;j<nPixelsInRegion;j++){//loop on pixels inside region
+			int thisPixelId= (regions[i]->fPixelCollection)[j].id;
+			saliencyImg->SetBinContent(thisPixelId,Saliency);
+		}//end loop pixels in region
+		
+	}//end loop regions
+
+
+	
+	//## Interpolate?
+	if(interpolate){
+		cout<<"Img::GetSaliencyMap_MultiParVersion(): INFO: Interpolating saliency map..."<<endl;
 		for(int i=0;i<saliencyImg->GetNbinsX();i++){	
 			double x= saliencyImg->GetXaxis()->GetBinCenter(i+1);				
 			for(int j=0;j<saliencyImg->GetNbinsY();j++){
@@ -3090,6 +3318,8 @@ Img* Img::GetSaliencyMap(std::vector<Region*> regions,double knnFactor,bool useR
 			}//end loop bins Y
 		}//end loop binsX
 	}//close if
+
+
 
 	/*
 	//## Return interpolated map
@@ -3115,14 +3345,736 @@ Img* Img::GetSaliencyMap(std::vector<Region*> regions,double knnFactor,bool useR
 	else{
 		saliencyMap= saliencyImg;
 	}
-	return saliencyMap;
 	*/
+
+	//Clear memory
+	if(interpolationGraph) interpolationGraph->Delete();
+
 	return saliencyImg;
 
-}//close GetSaliencyMap()
+}//close GetSaliencyMap_MultiParVersion()
 
 
-Img* Img::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,bool useRobust,bool addCurvDist,double thr,bool addCurvMap,bool addBkgMap,bool addNoiseMap,int normalizationAcrossResoMode,double medianThrFactor,double medianImgThrFactor){
+
+Img* Img::GetSaliencyMap_LuoMethod(int reso,double regFactor,int minRegionSize,double expFalloffPar,double distanceRegPar){
+
+	//## Compute segmentation in superpixels
+	SLICSegmenter slic;
+	int status= slic.RunSegmentation(this,reso,regFactor,minRegionSize,false);
+	if(status<0){
+		cerr<<"Img::GetSaliencyMap_LuoMethod(): ERROR: Superpixel segmentation failed!"<<endl;
+		return 0;
+	}
+	std::vector<Region*> regions= slic.GetRegions(); 
+	int nRegions= (int)regions.size();
+	if(nRegions<=0) return 0;
+
+	//## Compute saliency map
+	Img* saliencyMap= GetSaliencyMap_LuoMethod(regions,expFalloffPar,distanceRegPar);
+	if(!saliencyMap){
+		cerr<<"Img::GetSaliencyMap_LuoMethod(): ERROR: Failed to compute saliency map!"<<endl;
+		return 0;
+	}
+
+	return saliencyMap;
+
+}//close GetSaliencyMap_LuoMethod()
+
+/*
+Img* Img::GetSaliencyMap_LuoMethod(std::vector<Region*>& regions,double expFalloffPar){
+
+	//## Check regions
+	int nRegions= (int)regions.size();
+	if(nRegions<=0) return 0;
+
+	//## Compute image center
+	double Xmin= this->GetXaxis()->GetXmin();
+	double Xmax= this->GetXaxis()->GetXmax();
+	double Ymin= this->GetYaxis()->GetXmin();
+	double Ymax= this->GetYaxis()->GetXmax();
+	double width= fabs(Xmax-Xmin);
+	double height= fabs(Ymax-Ymin);
+	double Xo= Xmin + width/2.;
+ 	double Yo= Ymin + height/2.;
+
+	//## Compute region parameters (including robust stats)
+	cout<<"Img::GetSaliencyMap_LuoMethod(): INFO: Compute region pars..."<<endl;
+
+	std::vector<double> Ds_list;
+
+	for(int i=0;i<nRegions;i++){
+		//Compute pars
+		regions[i]->ComputeParameters(false,true,false);
+
+		//Get region pars
+		int n_i= regions[i]->fNPix;
+		double mu_i= regions[i]->fMean;
+		double median_i= regions[i]->fMedian;
+		double Xc_i= regions[i]->fX0;
+		double Yc_i= regions[i]->fY0;
+
+		//Compute spatial distance weight
+		double Ds2_x= ((Xc_i-Xo)/width) * ((Xc_i-Xo)/width);
+		double Ds2_y= ((Yc_i-Yo)/height) * ((Yc_i-Yo)/height);
+		double Ds= sqrt(2.* (Ds2_x+Ds2_y) );//normalized to [0,1]
+
+		Ds_list.push_back(Ds);
+
+	}//end loop regions
+
+
+	//## Compute color distances
+	double EPS= 1.e-6;//a small number to prevent division by 0
+
+	double S_color_min= 1.e+99;
+	double S_color_max= -1.e+99;
+	
+	std::vector<double> S_color_list;
+	std::vector<double> S_spatial_list;
+	
+	
+	for(int i=0;i<nRegions;i++){
+		int ix= i;
+	
+		//Region pars i-th
+		int n_i= regions[i]->fNPix;
+		double mu_i= regions[i]->fMean;
+		double median_i= regions[i]->fMedian;
+		double Xc_i= regions[i]->fX0;
+		double Yc_i= regions[i]->fY0;
+
+		//Accumulator
+		double S_color= 0;
+		double S_spatial= 0;
+		double w_sum= 0;
+		
+		for(int j=0;j<nRegions;j++){
+			if(i==j) continue;
+
+			//Compute index
+			int iy= j;
+			if(j>i) {
+				ix= j;
+				iy= i;
+			}
+			int index= ix*(nRegions-1) - (ix-1)*ix/2 + iy - ix - 1;
+
+			//Region pars j-th
+			double n_j= (double)(regions[j]->fNPix);
+			double mu_j= regions[j]->fMean;
+			double median_j= regions[j]->fMedian;
+			double Xc_j= regions[j]->fX0;
+			double Yc_j= regions[j]->fY0;
+					
+			//Color distance
+			double Dij_color= fabs(mu_i-mu_j);
+			double Dij_color_scaled= Dij_color/n_j;
+			
+			//Compute color saliency term Sij= exp(-Dij/nj)
+			double Sij_color= exp(-expFalloffPar*Dij_color);
+			//double Sij_color= exp(-Dij_color_scaled);
+			S_color+= Sij_color;
+			
+			//Compute spatial weights 
+			double wij= 1./(Dij_color + EPS);
+			w_sum+= wij;
+			
+			//Compute spatial saliency term Sij_s= wj x exp(1-Dj_s)
+			double Dj_spatial= Ds_list[j];
+			double Sij_spatial= wij * exp(1-Dj_spatial);
+			S_spatial+= Sij_spatial;
+			
+		}//end loop regions
+
+		//Fill list
+		S_color_list.push_back(S_color);
+		
+		//Compute color saliency min & max
+		if(S_color<S_color_min) S_color_min= S_color;
+		if(S_color>S_color_max) S_color_max= S_color;
+		
+		//Normalize spatial saliency
+		S_spatial/= w_sum;
+		S_spatial_list.push_back(S_spatial);
+		
+	}//end loop regions
+
+	cout<<"Img::GetSaliencyMap_LuoMethod(): INFO: Saliency min/max: "<<S_color_min<<"/"<<S_color_min<<endl;
+	
+	//Create saliency images
+	TString imgName= Form("%s_saliency",this->GetName());
+	Img* saliencyImg= (Img*)this->Clone(imgName);
+	saliencyImg->SetNameTitle(imgName,imgName);
+	saliencyImg->Reset();
+
+	imgName= Form("%s_saliency_color",this->GetName());
+	Img* saliencyImg_color= (Img*)this->Clone(imgName);
+	saliencyImg_color->SetNameTitle(imgName,imgName);
+	saliencyImg_color->Reset();
+
+	imgName= Form("%s_saliency_spatial",this->GetName());
+	Img* saliencyImg_spatial= (Img*)this->Clone(imgName);
+	saliencyImg_spatial->SetNameTitle(imgName,imgName);
+	saliencyImg_spatial->Reset();
+
+	//Normalize color saliency and fill image
+	double NormMin= 0;
+	double NormMax= 1;
+	for(int i=0;i<nRegions;i++){
+		//Compute color saliency normalized to [0,1]
+		double S_color= S_color_list[i];	
+		double S_color_norm= NormMin + (NormMax-NormMin)*(S_color-S_color_min)/(S_color_max-S_color_min);
+		double Saliency_color= 1-S_color_norm;
+
+		//Get spatial saliency 
+		double Saliency_spatial= S_spatial_list[i];
+		
+		//Compute global saliency
+		double Saliency= Saliency_color*Saliency_spatial;
+		
+		//Fill image
+		int nPixelsInRegion= (int)regions[i]->fNPix;
+
+		
+		for(int j=0;j<nPixelsInRegion;j++){//loop on pixels inside region
+			int thisPixelId= (regions[i]->fPixelCollection)[j].id;
+			saliencyImg_color->SetBinContent(thisPixelId,Saliency_color);
+			saliencyImg_spatial->SetBinContent(thisPixelId,Saliency_spatial);
+			saliencyImg->SetBinContent(thisPixelId,Saliency);
+		}//end loop pixels in region
+		
+	}//end loop regions
+
+	//---- DEBUG ----------------
+	//Plot saliency maps
+	TCanvas* ColorSaliencyPlot= new TCanvas("ColorSaliencyPlot","ColorSaliencyPlot");
+	ColorSaliencyPlot->cd();
+	saliencyImg_color->Draw("COLZ");
+
+	TCanvas* SpatialSaliencyPlot= new TCanvas("SpatialSaliencyPlot","SpatialSaliencyPlot");
+	SpatialSaliencyPlot->cd();
+	saliencyImg_spatial->Draw("COLZ");
+	//-----------------------------	
+
+	return saliencyImg;
+
+}//close GetSaliencyMap_LuoMethod()
+*/
+
+Img* Img::GetSaliencyMap_LuoMethod(std::vector<Region*>& regions,double expFalloffPar,double distanceRegPar){
+
+	//## Check regions
+	int nRegions= (int)regions.size();
+	if(nRegions<=0) return 0;
+
+	//## Compute image center
+	double Xmin= this->GetXaxis()->GetXmin();
+	double Xmax= this->GetXaxis()->GetXmax();
+	double Ymin= this->GetYaxis()->GetXmin();
+	double Ymax= this->GetYaxis()->GetXmax();
+	double width= fabs(Xmax-Xmin);
+	double height= fabs(Ymax-Ymin);
+	double diagonal= sqrt(width*width + height*height);
+	double Xo= Xmin + width/2.;
+ 	double Yo= Ymin + height/2.;
+
+	//## Compute region parameters (including robust stats)
+	cout<<"Img::GetSaliencyMap_LuoMethod(): INFO: Compute region pars..."<<endl;
+	for(int i=0;i<nRegions;i++) regions[i]->ComputeParameters(false,true,false);
+
+	//## Compute dissimilarity matrix
+	TMatrixD* ColorDistMatrix= new TMatrixD(nRegions,nRegions);
+	ColorDistMatrix->Zero();
+
+	TMatrixD* SpatialDistMatrix= new TMatrixD(nRegions,nRegions);
+	SpatialDistMatrix->Zero();
+
+	double dist_c_min= 1.e+99;
+	double dist_c_max= -1.e+99;
+	double dist_s_min= 1.e+99;
+	double dist_s_max= -1.e+99;
+	
+	
+	for(int i=0;i<nRegions-1;i++){
+
+		//Region pars i-th
+		int n_i= regions[i]->fNPix;
+		double mu_i= regions[i]->fMean;
+		double Xc_i= regions[i]->fX0;
+		double Yc_i= regions[i]->fY0;
+		
+		//Scale by number of pixels (DEBUG)
+		//Xc_i/= (double)(n_i);
+		//Yc_i/= (double)(n_i);
+
+		for(int j=i+1;j<nRegions;j++){
+
+			//Region pars j-th
+			double n_j= (double)(regions[j]->fNPix);
+			double mu_j= regions[j]->fMean;
+			double median_j= regions[j]->fMedian;
+			double Xc_j= regions[j]->fX0;
+			double Yc_j= regions[j]->fY0;
+					
+			//Scale by number of pixels (DEBUG)
+			//Xc_j/= (double)(n_j);
+			//Yc_j/= (double)(n_j);
+
+			//Compute color & spatial distances
+			double dist_c= fabs(mu_i-mu_j);
+			double dist_s= sqrt( (Xc_i-Xc_j)*(Xc_i-Xc_j) + (Yc_i-Yc_j)*(Yc_i-Yc_j) ); 
+			
+			(*ColorDistMatrix)(i,j)= dist_c;
+			(*ColorDistMatrix)(j,i)= dist_c;
+
+			(*SpatialDistMatrix)(i,j)= dist_s;
+			(*SpatialDistMatrix)(j,i)= dist_s;
+
+			//Find min & max
+			if(dist_c<dist_c_min) dist_c_min= dist_c;
+			if(dist_c>dist_c_max) dist_c_max= dist_c;
+			if(dist_s<dist_s_min) dist_s_min= dist_s;
+			if(dist_s>dist_s_max) dist_s_max= dist_s;
+	
+		}//end loop regions
+	}//end loop regions
+
+	//## Normalize distances to [0,1]
+	//## Color distances normalized to min & max
+	//## Spatial distances normalized to image diagonal
+	cout<<"Img::GetSaliencyMap_LuoMethod(): INFO: Color dist min/max: "<<dist_c_min<<"/"<<dist_c_max<<", Spatial dist min/max: "<<dist_s_min<<"/"<<dist_s_max<<" img size("<<width<<" x "<<height<<" (diagonal="<<diagonal<<")"<<endl;
+	
+	
+	double NormMin= 0;
+	double NormMax= 1;
+
+	
+	for(int i=0;i<nRegions;i++){
+		for(int j=i+1;j<nRegions;j++){
+			
+			double dist_c= (*ColorDistMatrix)(i,j);
+			double dist_c_norm= NormMin + (NormMax-NormMin)*(dist_c-dist_c_min)/(dist_c_max-dist_c_min);
+			double dist_s= (*SpatialDistMatrix)(i,j);
+			double dist_s_norm= NormMin + (NormMax-NormMin)*(dist_s-dist_s_min)/(dist_s_max-dist_s_min);	
+			//double dist_s_norm= dist_s/diagonal;
+
+			(*ColorDistMatrix)(i,j)= dist_c_norm;
+			(*ColorDistMatrix)(j,i)= dist_c_norm;
+
+			(*SpatialDistMatrix)(i,j)= dist_s_norm;
+			(*SpatialDistMatrix)(j,i)= dist_s_norm;
+		}//end loop regions
+	}//end loop regions
+	
+
+	cout<<"Img::GetSaliencyMap_LuoMethod(): INFO: Color dist min/max: "<<ColorDistMatrix->Min()<<"/"<<ColorDistMatrix->Max()<<", Spatial dist min/max: "<<SpatialDistMatrix->Min()<<"/"<<SpatialDistMatrix->Max()<<endl;
+
+	//## Create saliency image
+	TString imgName= Form("%s_saliency",this->GetName());
+	Img* saliencyImg= (Img*)this->Clone(imgName);
+	saliencyImg->SetNameTitle(imgName,imgName);
+	saliencyImg->Reset();
+
+	imgName= Form("%s_saliency_color",this->GetName());
+	Img* saliencyImg_color= (Img*)this->Clone(imgName);
+	saliencyImg_color->SetNameTitle(imgName,imgName);
+	saliencyImg_color->Reset();
+
+	imgName= Form("%s_saliency_spatial",this->GetName());
+	Img* saliencyImg_spatial= (Img*)this->Clone(imgName);
+	saliencyImg_spatial->SetNameTitle(imgName,imgName);
+	saliencyImg_spatial->Reset();
+
+	//## Compute saliency 
+	cout<<"Img::GetSaliencyMap_LuoMethod(): INFO: Computing saliency ..."<<endl;	
+	double Smin= 1.e+99;
+	double Smax= -1.e+99;
+	double Smin_spatial= 1.e+99;
+	double Smax_spatial= -1.e+99;
+	double Vmin= 1.e+99;
+	double Vmax= -1.e+99;
+	std::vector<double> SList;
+	std::vector<double> SList_spatial;
+	std::vector<double> VList;
+	double EPS= 1.e-6;//a small number to prevent division by 0
+	int KNN= 200;
+
+	for(int i=0;i<nRegions;i++){
+
+		int n_i= regions[i]->fNPix;
+		double S= 0;
+		double W= 0;
+		double S_spatial= 0;
+		double X0_s= 0;
+		double Y0_s= 0;
+		std::vector<double> dissColorList;
+		std::vector<double> dissSpatialList;
+
+		for(int j=0;j<nRegions;j++){
+			if(i==j) continue;
+			double Xc_j= regions[j]->fX0;
+			double Yc_j= regions[j]->fY0;
+			double dist_c= (*ColorDistMatrix)(i,j);
+			double dist_s= (*SpatialDistMatrix)(i,j);
+			double dist= dist_c/(1 + distanceRegPar*dist_s);
+			//double Sij_c= exp(-expFalloffPar*dist_c);
+			double Sij_c= exp(-expFalloffPar*dist);
+
+			//double wij= 1./(dist_c+EPS);
+			double wij= Sij_c;
+			double Sij_s= wij*dist_s*dist_s;//variance
+
+			if(i!=j){
+				W+= wij; 
+				S+= Sij_c;
+				S_spatial+= Sij_s;
+
+				X0_s+= Xc_j*wij/width;
+				Y0_s+= Yc_j*wij/height;
+			}
+
+			dissColorList.push_back(dist_c);
+ 			dissSpatialList.push_back(dist_s);
+
+		}//end loop regions
+
+		S_spatial/= W;
+		X0_s/= W;
+		Y0_s/= W;
+
+		//Sort color dissimilarities for region i-th to use only K-th neighbors in color
+		std::vector<double> sorted;
+		std::vector<size_t> sort_index;//sorting index
+		Utils::sort(dissColorList,sorted,sort_index);	
+
+		//Compute spatial saliency over k-th neighbors
+		double V= 0;
+
+		for(int k=0;k<KNN;k++){
+			size_t index= sort_index[k];
+			double dist_s= dissSpatialList[index];	
+			int n_k= regions[index]->fNPix;	
+			double Vik= (dist_s*dist_s);
+			V+= Vik;
+		}
+		V/= (double)KNN;
+		VList.push_back(V);
+
+		if(V<Vmin) Vmin= V;
+		if(V>Vmax) Vmax= V;
+
+		/*
+		//Calculate spatial variance (Perazzi)
+		double V= 0;
+		for(int j=0;j<nRegions;j++){
+			double Xc_j= regions[j]->fX0;
+			double Yc_j= regions[j]->fY0;
+			double dist_c= (*ColorDistMatrix)(i,j);
+			double dist_s= (*SpatialDistMatrix)(i,j);
+			double Sij_c= exp(-expFalloffPar*dist_c);
+
+			//double wij= 1./(dist_c+EPS);
+			double wij= Sij_c;
+			double Vij= (Xc_j/width-X0_s)*(Xc_j/width-X0_s) + (Yc_j/height-Y0_s)*(Yc_j/height-Y0_s);
+			V+= wij* Vij;
+		}//end loop regions
+		
+		if(V<Vmin) Vmin= V;
+		if(V>Vmax) Vmax= V;
+		*/
+
+		if(S<Smin) Smin= S;
+		if(S>Smax) Smax= S;
+		if(S_spatial<Smin_spatial) Smin_spatial= S_spatial;
+		if(S_spatial>Smax_spatial) Smax_spatial= S_spatial;
+		SList.push_back(S);
+		SList_spatial.push_back(S_spatial);
+		//VList.push_back(V);
+
+	}//end loop regions
+		
+	cout<<"Img::GetSaliencyMap_LuoMethod(): INFO: Saliency min/max="<<Smin<<"/"<<Smax<<", Saliency spatial min/max="<<Smin_spatial<<"/"<<Smax_spatial<<endl;	
+	
+	for(int i=0;i<nRegions;i++){
+			
+		//Normalize Saliency color
+		double S_color= SList[i];
+		double Snorm_color= NormMin + (NormMax-NormMin)*(S_color-Smin)/(Smax-Smin);
+		double Saliency_color= 1.-Snorm_color;
+
+		double S_spatial= SList_spatial[i];
+		double Snorm_spatial= NormMin + (NormMax-NormMin)*(S_spatial-Smin_spatial)/(Smax_spatial-Smin_spatial);
+		//double Saliency_spatial= 1.-Snorm_spatial;
+
+		
+		double V= VList[i];
+		double Vnorm= NormMin + (NormMax-NormMin)*(V-Vmin)/(Vmax-Vmin);
+		double Saliency_spatial= 1.-Vnorm;
+		
+
+		double Saliency= Saliency_color*Saliency_spatial;
+
+		//Fill image
+		int nPixelsInRegion= (int)regions[i]->fNPix;
+		for(int j=0;j<nPixelsInRegion;j++){//loop on pixels inside region
+			int thisPixelId= (regions[i]->fPixelCollection)[j].id;
+			saliencyImg->SetBinContent(thisPixelId,Saliency);
+			saliencyImg_color->SetBinContent(thisPixelId,Saliency_color);
+			saliencyImg_spatial->SetBinContent(thisPixelId,Saliency_spatial);
+		}//end loop pixels in region
+		
+	}//end loop regions
+	
+	//---- DEBUG ----------------
+	//Plot saliency maps
+	TCanvas* ColorSaliencyPlot= new TCanvas("ColorSaliencyPlot","ColorSaliencyPlot");
+	ColorSaliencyPlot->cd();
+	saliencyImg_color->Draw("COLZ");
+
+	TCanvas* SpatialSaliencyPlot= new TCanvas("SpatialSaliencyPlot","SpatialSaliencyPlot");
+	SpatialSaliencyPlot->cd();
+	saliencyImg_spatial->Draw("COLZ");
+	//-----------------------------	
+
+	return saliencyImg;
+
+}//close GetSaliencyMap_LuoMethod()
+
+
+
+Img* Img::GetSaliencyMap_GofermanMethod(int reso,double regFactor,int minRegionSize,double knnFactor,double distanceRegPar,double expFalloffPar){
+
+	//## Compute segmentation in superpixels
+	SLICSegmenter slic;
+	int status= slic.RunSegmentation(this,reso,regFactor,minRegionSize,false);
+	if(status<0){
+		cerr<<"Img::GetSaliencyMap_GofermanMethod(): ERROR: Superpixel segmentation failed!"<<endl;
+		return 0;
+	}
+	std::vector<Region*> regions= slic.GetRegions(); 
+	int nRegions= (int)regions.size();
+	if(nRegions<=0) return 0;
+
+	//## Compute saliency map
+	Img* saliencyMap= GetSaliencyMap_GofermanMethod(regions,knnFactor,distanceRegPar,expFalloffPar);
+	if(!saliencyMap){
+		cerr<<"Img::GetSaliencyMap_GofermanMethod(): ERROR: Failed to compute saliency map!"<<endl;
+		return 0;
+	}
+
+	return saliencyMap;
+
+}//close GetSaliencyMap_GofermanMethod()
+
+
+Img* Img::GetSaliencyMap_GofermanMethod(std::vector<Region*>& regions,double knnFactor,double distanceRegPar,double expFalloffPar){
+
+	//## Check regions
+	int nRegions= (int)regions.size();
+	if(nRegions<=0) return 0;
+
+	//## Compute number of neightbors to be used in saliency estimation
+	int knn_min= 10;
+	int knn_chosen= (int)(std::round(knnFactor*nRegions));//percentage of available regions
+	int knn= std::max(knn_chosen,knn_min);
+	int KNN= knn;
+	if(knn>nRegions || knn<0) KNN= nRegions;
+
+	//## Compute image center
+	double Xmin= this->GetXaxis()->GetXmin();
+	double Xmax= this->GetXaxis()->GetXmax();
+	double Ymin= this->GetYaxis()->GetXmin();
+	double Ymax= this->GetYaxis()->GetXmax();
+	double width= fabs(Xmax-Xmin);
+	double height= fabs(Ymax-Ymin);
+	double diagonal= sqrt(width*width + height*height);
+	double Xo= Xmin + width/2.;
+ 	double Yo= Ymin + height/2.;
+
+	//## Compute region parameters (including robust stats)
+	cout<<"Img::GetSaliencyMap_GofermanMethod(): INFO: Compute region pars..."<<endl;
+	for(int i=0;i<nRegions;i++) regions[i]->ComputeParameters(false,true,false);
+
+	//## Compute dissimilarity matrix
+	TMatrixD* ColorDistMatrix= new TMatrixD(nRegions,nRegions);
+	ColorDistMatrix->Zero();
+
+	TMatrixD* SpatialDistMatrix= new TMatrixD(nRegions,nRegions);
+	SpatialDistMatrix->Zero();
+
+	TMatrixD* DissimilarityMatrix= new TMatrixD(nRegions,nRegions);
+	DissimilarityMatrix->Zero();
+
+	double dist_c_min= 1.e+99;
+	double dist_c_max= -1.e+99;
+	double dist_s_min= 1.e+99;
+	double dist_s_max= -1.e+99;
+	
+	for(int i=0;i<nRegions-1;i++){
+
+		//Region pars i-th
+		int n_i= regions[i]->fNPix;
+		double mu_i= regions[i]->fMean;
+		double Xc_i= regions[i]->fX0;
+		double Yc_i= regions[i]->fY0;
+		
+		//Scale by number of pixels
+		//Xc_i/= (double)(n_i);
+		//Yc_i/= (double)(n_i);
+
+		for(int j=i+1;j<nRegions;j++){
+
+			//Region pars j-th
+			double n_j= (double)(regions[j]->fNPix);
+			double mu_j= regions[j]->fMean;
+			double median_j= regions[j]->fMedian;
+			double Xc_j= regions[j]->fX0;
+			double Yc_j= regions[j]->fY0;
+					
+			//Scale by number of pixels
+			//Xc_j/= (double)(n_j);
+			//Yc_j/= (double)(n_j);
+
+			//Compute color & spatial distances
+			double dist_c= fabs(mu_i-mu_j);
+			double dist_s= sqrt( (Xc_i-Xc_j)*(Xc_i-Xc_j) + (Yc_i-Yc_j)*(Yc_i-Yc_j) ); 
+
+			(*ColorDistMatrix)(i,j)= dist_c;
+			(*ColorDistMatrix)(j,i)= dist_c;
+
+			(*SpatialDistMatrix)(i,j)= dist_s;
+			(*SpatialDistMatrix)(j,i)= dist_s;
+
+			//Find min & max
+			if(dist_c<dist_c_min) dist_c_min= dist_c;
+			if(dist_c>dist_c_max) dist_c_max= dist_c;
+			if(dist_s<dist_s_min) dist_s_min= dist_s;
+			if(dist_s>dist_s_max) dist_s_max= dist_s;
+	
+		}//end loop regions
+	}//end loop regions
+
+	//## Normalize distances to [0,1]
+	//## Color distances normalized to min & max
+	//## Spatial distances normalized to image diagonal
+	cout<<"Img::GetSaliencyMap_GofermanMethod(): INFO: Color dist min/max: "<<dist_c_min<<"/"<<dist_c_max<<", Spatial dist min/max: "<<dist_s_min<<"/"<<dist_s_max<<" img size("<<width<<" x "<<height<<" (diagonal="<<diagonal<<")"<<endl;
+	
+	
+	double NormMin= 0;
+	double NormMax= 1;
+
+	
+	for(int i=0;i<nRegions;i++){
+		for(int j=i+1;j<nRegions;j++){
+			
+			double dist_c= (*ColorDistMatrix)(i,j);
+			double dist_c_norm= NormMin + (NormMax-NormMin)*(dist_c-dist_c_min)/(dist_c_max-dist_c_min);
+			double dist_s= (*SpatialDistMatrix)(i,j);
+			double dist_s_norm= NormMin + (NormMax-NormMin)*(dist_s-dist_s_min)/(dist_s_max-dist_s_min);	
+			//double dist_s_norm= dist_s/diagonal;
+
+			(*ColorDistMatrix)(i,j)= dist_c_norm;
+			(*ColorDistMatrix)(j,i)= dist_c_norm;
+
+			(*SpatialDistMatrix)(i,j)= dist_s_norm;
+			(*SpatialDistMatrix)(j,i)= dist_s_norm;
+		}//end loop regions
+	}//end loop regions
+	
+
+	cout<<"Img::GetSaliencyMap_GofermanMethod(): INFO: Color dist min/max: "<<ColorDistMatrix->Min()<<"/"<<ColorDistMatrix->Max()<<", Spatial dist min/max: "<<SpatialDistMatrix->Min()<<"/"<<SpatialDistMatrix->Max()<<endl;
+
+
+	//## Create saliency image
+	TString imgName= Form("%s_saliency",this->GetName());
+	Img* saliencyImg= (Img*)this->Clone(imgName);
+	saliencyImg->SetNameTitle(imgName,imgName);
+	saliencyImg->Reset();
+
+	//## Compute saliency 
+	cout<<"Img::GetSaliencyMap_GofermanMethod(): INFO: Computing saliency (KNN="<<KNN<<" regions, distanceRegPar="<<distanceRegPar<<")"<<endl;	
+	double Smin= 1.e+99;
+	double Smax= -1.e+99;
+	std::vector<double> SList;
+
+	for(int i=0;i<nRegions;i++){
+		
+		std::vector<double> dissColorList;
+		std::vector<double> dissList;
+		for(int j=0;j<nRegions;j++){
+			//if(i==j) continue;
+			double dist_c= (*ColorDistMatrix)(i,j);
+			double dist_s= (*SpatialDistMatrix)(i,j);
+			double dist= dist_c/(1. + distanceRegPar*dist_s);
+			
+			dissColorList.push_back(dist_c);
+			dissList.push_back(dist);
+		}//end loop regions
+
+		//Sort color dissimilarities for region i-th to use only K-th neighbors in color
+		std::vector<double> sorted;
+		std::vector<size_t> sort_index;//sorting index
+		Utils::sort( dissColorList,sorted,sort_index);	
+
+		//Compute saliency over k-th neighbors
+		double sum= 0;
+
+		for(int k=0;k<KNN;k++){
+			size_t index= sort_index[k];
+			double diss= dissList[index];
+			sum+= diss;
+		}
+		double Sij= sum/(double)(KNN);
+		double Si= exp(-expFalloffPar*Sij);
+		double Saliency= 1.-Si;
+		if(Si<Smin) Smin= Si;
+		if(Si>Smax) Smax= Si;
+		SList.push_back(Si);
+
+		cout<<"Region "<<i<<": sum="<<sum<<", Sij="<<Sij<<", Si="<<Si<<", Saliency="<<Saliency<<endl;
+
+			
+		//Fill image
+		int nPixelsInRegion= (int)regions[i]->fNPix;
+		for(int j=0;j<nPixelsInRegion;j++){//loop on pixels inside region
+			int thisPixelId= (regions[i]->fPixelCollection)[j].id;
+			saliencyImg->SetBinContent(thisPixelId,Saliency);
+		}//end loop pixels in region
+		
+
+	}//end loop regions
+	
+	cout<<"Img::GetSaliencyMap_GofermanMethod(): INFO: Saliency min/max="<<Smin<<"/"<<Smax<<endl;	
+	
+	/*
+	//## Normalize saliency Sij and fill map
+	for(int i=0;i<nRegions;i++){
+		double S= SList[i];
+		double Snorm= NormMin + (NormMax-NormMin)*(S-Smin)/(Smax-Smin);
+
+		//double Saliency= 1.-exp(Snorm);
+		double Saliency= 1.-Snorm;
+			
+		//Fill image
+		int nPixelsInRegion= (int)regions[i]->fNPix;
+		for(int j=0;j<nPixelsInRegion;j++){//loop on pixels inside region
+			int thisPixelId= (regions[i]->fPixelCollection)[j].id;
+			saliencyImg->SetBinContent(thisPixelId,Saliency);
+		}//end loop pixels in region
+
+	}//end loop regions
+	*/
+
+	if(ColorDistMatrix) ColorDistMatrix->Delete();
+	if(SpatialDistMatrix) SpatialDistMatrix->Delete();
+		
+	return saliencyImg;
+
+}//close GetSaliencyMap_GofermanMethod()
+
+
+//Img* Img::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,bool useRobust,bool addCurvDist,double thr,bool addCurvMap,bool addBkgMap,bool addNoiseMap,int normalizationAcrossResoMode,double medianThrFactor,double medianImgThrFactor){
+Img* Img::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,bool useRobustPars,double expFalloffPar, double distanceRegPar,double thr,bool addCurvMap,bool addBkgMap,bool addNoiseMap,int normalizationAcrossResoMode,double medianThrFactor,double medianImgThrFactor){
 
 	//## Check if noise and bkg map are computed
 	if(!fInterpolatedBackgroundLevelMap || !fInterpolatedBackgroundRMSMap) {
@@ -3149,12 +4101,14 @@ Img* Img::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,double be
 	std::vector<Img*> salMaps;
 	std::vector<double> salMapsThresholds;
 	int nbins= 100;
+	bool interpolateSaliency= false;
 	
 	for(int i=0;i<nReso;i++){
 		int reso= resoMin + i*resoStep;
 		cout<<"Img::GetMultiResoSaliencyMap(): INFO: Computing saliency map @ reso "<<reso<<" (step="<<resoStep<<")"<<endl;
 
-		Img* salMap= this->GetSaliencyMap(reso,beta,minRegionSize,knnFactor,useRobust,addCurvDist);
+		//Img* salMap= this->GetSaliencyMap_MultiParVersion(reso,beta,minRegionSize,knnFactor,useRobustPars,addCurvDist);
+		Img* salMap= this->GetSaliencyMap(reso,beta,minRegionSize,knnFactor,useRobustPars,expFalloffPar,distanceRegPar,interpolateSaliency);
 		Img* salMap_norm= salMap->GetNormalizedImage(NormMin,NormMax);
 		saliencyImg_mean->Add(salMap_norm);
 		
@@ -3326,7 +4280,7 @@ Img* Img::GetMultiResoSmoothedSaliencyMap(int resoMin,int resoMax,int resoStep,d
 
 	//## Check if noise and bkg map are computed
 	if(!fInterpolatedBackgroundLevelMap || !fInterpolatedBackgroundRMSMap) {
-		cerr<<"Img::GetMultiResoSaliencyMap(): ERROR: Cannot get local bkg and noise maps (compute first local bkg!)"<<endl;
+		cerr<<"Img::GetMultiResoSmoothedSaliencyMap(): ERROR: Cannot get local bkg and noise maps (compute first local bkg!)"<<endl;
 		return 0;
 	}
 
@@ -3343,7 +4297,7 @@ Img* Img::GetMultiResoSmoothedSaliencyMap(int resoMin,int resoMax,int resoStep,d
 
 	for(int i=0;i<nReso;i++){
 		int reso= resoMin + i*resoStep;
-		cout<<"Img::GetMultiResoSaliencyMap(): INFO: Computing saliency map @ reso "<<reso<<" (step="<<resoStep<<")"<<endl;
+		cout<<"Img::GetMultiResoSmoothedSaliencyMap(): INFO: Computing saliency map @ reso "<<reso<<" (step="<<resoStep<<")"<<endl;
 		
 		Img* salMap= this->GetSmoothedSaliencyMap(reso,beta,minRegionSize,sigmaS,sigmaC,saliencyKFactor,useRobust,addCurvDist);
 		Img* salMap_norm= salMap->GetNormalizedImage(NormMin,NormMax);
@@ -3359,7 +4313,7 @@ Img* Img::GetMultiResoSmoothedSaliencyMap(int resoMin,int resoMax,int resoStep,d
 	//Combine multi-reso saliency maps
 	saliencyImg_mean->Scale(1./(double)nReso);
 	
-	cout<<"Img::GetMultiResoSaliencyMap(): INFO: Normalize saliency sum over reso..."<<endl;
+	cout<<"Img::GetMultiResoSmoothedSaliencyMap(): INFO: Normalize saliency sum over reso..."<<endl;
 	imgName= Form("%s_saliencyCombined",this->GetName());
 	Img* saliencyImg= (Img*)saliencyImg_mean->Clone(imgName);
 	saliencyImg->SetNameTitle(imgName,imgName);
@@ -3391,7 +4345,7 @@ Img* Img::GetMultiResoSmoothedSaliencyMap(int resoMin,int resoMax,int resoStep,d
 	
 	//Normalizee bkg and noise maps
 	if(addBkgMap){
-		cout<<"Img::GetMultiResoSaliencyMap(): INFO: Normalize bkg map..."<<endl;
+		cout<<"Img::GetMultiResoSmoothedSaliencyMap(): INFO: Normalize bkg map..."<<endl;
 		Img* bkgImg= fInterpolatedBackgroundLevelMap->GetNormalizedImage(NormMin,NormMax);
 		saliencyImg->Add(bkgImg);	
 		if(bkgImg) bkgImg->Delete();
@@ -3413,7 +4367,7 @@ Img* Img::GetMultiResoSmoothedSaliencyMap(int resoMin,int resoMax,int resoStep,d
 	}
 
 	//Normalize final map
-	cout<<"Img::GetMultiResoSaliencyMap(): INFO: Normalize final maps..."<<endl;
+	cout<<"Img::GetMultiResoSmoothedSaliencyMap(): INFO: Normalize final maps..."<<endl;
 	imgName= Form("%s_saliencyMultiReso",this->GetName());
 	Img* saliencyMap= saliencyImg->GetNormalizedImage(NormMin,NormMax);
 	saliencyMap->SetNameTitle(imgName,imgName);
@@ -3457,7 +4411,7 @@ Img* Img::GetSaliencyMap_SpectralRes(){
 
 	return SaliencyImg;
 
-}//close GetSaliencyMap()	
+}//close GetSaliencyMap_SpectralRes()	
 
 
 std::vector<Source*> Img::FindMultiScaleBlobs(Img* blobMask,double seedThr,double mergeThr,int minNPix){

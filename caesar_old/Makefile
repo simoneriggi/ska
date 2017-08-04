@@ -23,6 +23,8 @@ MAIN_FINDSOURCE = FindSource.cc
 MAIN_FINDSOURCE_OBJ = $(MAIN_FINDSOURCE:.cc=.o)
 MAIN_FINDBKG = FindBackground.cc
 MAIN_FINDBKG_OBJ = $(MAIN_FINDBKG:.cc=.o)
+MAIN_FINDSALIENCY = FindSaliencyMap.cc
+MAIN_FINDSALIENCY_OBJ = $(MAIN_FINDSALIENCY:.cc=.o)
 
 ## Get platform 32/64 bit
 LBITS   = $(shell getconf LONG_BIT)
@@ -34,6 +36,7 @@ SVN_REVISION_VERSION = -D'SVN_REVISION_VERSION="$(shell svnversion -n .)"'
 EXE = libImg.so
 FINDSOURCE_EXE = FindSource
 FINDBKG_EXE = FindBackground
+FINDSALIENCY_EXE = FindSaliencyMap
 #
 #############################################################
 
@@ -103,7 +106,7 @@ LDFLAGS += $(R_LDFLAGS) $(RBLAS_LDFLAGS) $(RLAPACK_LDFLAGS) $(RCPP_LDFLAGS) $(RI
 ################################################################
 
 
-all: GETOBJS PRINTINFO $(EXE) PUTOBJS $(FINDSOURCE_EXE) $(FINDBKG_EXE)
+all: GETOBJS PRINTINFO $(EXE) PUTOBJS $(FINDSOURCE_EXE) $(FINDBKG_EXE) $(FINDSALIENCY_EXE)
 
 
 PRINTINFO: 
@@ -141,6 +144,10 @@ $(FINDBKG_EXE): $(MAIN_FINDBKG_OBJ)
 	@echo "Building find background pipeline ..."
 	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $^ $(MAIN) $(LDFLAGS) -L$(LIBDIR) -lImg
 
+$(FINDSALIENCY_EXE): $(MAIN_FINDSALIENCY_OBJ)
+	@echo "Building find saliency pipeline ..."
+	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $^ $(MAIN) $(LDFLAGS) -L$(LIBDIR) -lImg
+
 #############################################################
 # gcc can generate the dependency list
 
@@ -150,7 +157,7 @@ Make-depend: $(USER_SRCS)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -MM $^ > $@
 
 clean:
-	- rm -f $(EXE) $(FINDSOURCE_EXE) $(FINDBKG_EXE) *.o $(OBJDIR)/*.o $(SRCDIR)/*.o ClassDictionary.cc ClassDictionary.h ClassDictionary_rdict.pcm $(BINDIR)/*.o *.so $(LIBDIR)/*.so *.ps core Make-depend
+	- rm -f $(EXE) $(FINDSOURCE_EXE) $(FINDBKG_EXE) $(FINDSALIENCY_EXE) *.o $(OBJDIR)/*.o $(SRCDIR)/*.o ClassDictionary.cc ClassDictionary.h ClassDictionary_rdict.pcm $(BINDIR)/*.o *.so $(LIBDIR)/*.so *.ps core Make-depend
 
 
 #############################################################

@@ -213,17 +213,50 @@ class Img : public TH2F {
 		Img* Smooth(int size_x=3,int size_y=3,double sigma_x=1,double sigma_y=1);
 
 		/**
-		* \brief Compute saliency map
+		* \brief Compute saliency map (multi parameter version)
 		*/	
-		Img* GetSaliencyMap(int reso=20,double regFactor=0.01,int minRegionSize=5,double knnFactor=0.1,bool useRobust=false,bool addCurvDist=true,bool interpolate=false);
-		Img* GetSaliencyMap(std::vector<Region*> regions,double knnFactor=0.1,bool useRobust=false,bool addCurvDist=true,bool interpolate=false);
+		Img* GetSaliencyMap_MultiParVersion(int reso=20,double regFactor=0.01,int minRegionSize=5,double knnFactor=0.1,bool useRobust=false,bool addCurvDist=true,bool interpolate=false,double expFalloffPar=100,double distanceRegPar=1);
+		Img* GetSaliencyMap_MultiParVersion(std::vector<Region*>& regions,double knnFactor=0.1,bool useRobust=false,bool addCurvDist=true,bool interpolate=false,double expFalloffPar=100,double distanceRegPar=1);
+	
+		/**
+		* \brief Compute saliency map (single color parameter version)
+		*/
+		Img* GetSaliencyMap(int reso=20,double regFactor=1,int minRegionSize=10,double knnFactor=0.2,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,bool interpolate=false);
+		Img* GetSaliencyMap(std::vector<Region*>& regions,double knnFactor=0.2,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,bool interpolate=false);
+
+		/**
+		* \brief Compute smoothed saliency map (Parazzi et al method)
+		*/
 		Img* GetSmoothedSaliencyMap(std::vector<Region*> regions,double sigmaS=0.5,double sigmaC=0.5,double saliencyKFactor=6,bool useRobust=false,bool addCurvDist=true);
 		Img* GetSmoothedSaliencyMap(int reso=20,double regFactor=0.01,int minRegionSize=5,double sigmaS=0.5,double sigmaC=0.5,double saliencyKFactor=6,bool useRobust=false,bool addCurvDist=true);
 		
+		/**
+		* \brief Compute saliency map according to Luo et al method (ref. Luo et al, EUVIP, Jun 2013, Paris, France. 2013)
+		*/	
+		Img* GetSaliencyMap_LuoMethod(int reso=20,double regFactor=1,int minRegionSize=10,double expFalloffPar=1,double distanceRegPar=1);
+		Img* GetSaliencyMap_LuoMethod(std::vector<Region*>& regions,double expFalloffPar=1,double distanceRegPar=1);
+		
+		/**
+		* \brief Compute saliency map according to Zhang et al method (ref. )
+		*/
+		Img* GetSaliencyMap_GofermanMethod(int reso=20,double regFactor=1,int minRegionSize=10,double knnFactor=0.1,double distanceRegPar=1,double expFalloffPar=1);
+		Img* GetSaliencyMap_GofermanMethod(std::vector<Region*>& regions,double knnFactor=0.1,double distanceRegPar=1,double expFalloffPar=1);
 	
+		/**
+		* \brief Compute saliency map according to spectral method (ref. )
+		*/
 		Img* GetSaliencyMap_SpectralRes();
 		
-		Img* GetMultiResoSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=0.01,int minRegionSize=1,double knnFactor=0.1,bool useRobust=false,bool addCurvDist=true,double thr=0.3,bool addCurvMap=false,bool addBkgMap=true,bool addNoiseMap=true,int normalizationAcrossResoMode=2,double medianThrFactor=2,double medianImgThrFactor=1);
+		/**
+		* \brief Compute multi-resolution saliency map (ref. )
+		*/
+		//Img* GetMultiResoSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=0.01,int minRegionSize=1,double knnFactor=0.1,bool useRobust=false,bool addCurvDist=true,double thr=0.3,bool addCurvMap=false,bool addBkgMap=true,bool addNoiseMap=true,int normalizationAcrossResoMode=2,double medianThrFactor=2,double medianImgThrFactor=1);
+
+		Img* GetMultiResoSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=0.2,bool useRobustPars=false,double expFalloffPar=100, double distanceRegPar=1, double thr=0.3,bool addCurvMap=false,bool addBkgMap=true,bool addNoiseMap=true,int normalizationAcrossResoMode=2,double medianThrFactor=2,double medianImgThrFactor=1);
+		
+		/**
+		* \brief Compute multi-resolution smoothed saliency map (ref. )
+		*/
 		Img* GetMultiResoSmoothedSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=0.01,int minRegionSize=1,double sigmaS=0.5,double sigmaC=0.5,double saliencyKFactor=6,bool useRobust=false,bool addCurvDist=true,double thr=0.3,bool addCurvMap=false,bool addBkgMap=true,bool addNoiseMap=true);
 	
 		/**

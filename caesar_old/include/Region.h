@@ -316,21 +316,29 @@ class Region {
 		std::vector<EdgeInfo> fAroundContourPoints;
 		//std::map<int,std::vector<cv::Point2f>> fAroundContourPointsMap;
 
+	protected:
+		bool m_HasStats;	
+
 	private:
 	
 		friend class sorter;	
 		
-};
+};//close class Region
 
 class sorter {
 	
-public:
-	sorter(bool isAscending,double beta) : beta_(beta),isAscending_(isAscending) {}
-  bool operator()(const Region::NeighborInfo &a, const Region::NeighborInfo &b) const {
-  	return Region::compareNeighborDist(a, b, isAscending_, beta_);
-  }
-	bool isAscending_;
-	double beta_;
+	public:
+		sorter(bool isAscending,double beta) 
+			: beta_(beta), isAscending_(isAscending) {}
+  
+	public:
+		bool operator()(const Region::NeighborInfo &a, const Region::NeighborInfo &b) const {
+  		return Region::compareNeighborDist(a, b, isAscending_, beta_);
+  	}
+
+	private:
+		double beta_;
+		bool isAscending_;
 };
 
 

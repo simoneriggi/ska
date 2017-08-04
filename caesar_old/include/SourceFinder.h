@@ -115,6 +115,7 @@ class SourceFinder {
 		std::string fInputFileName;
 		std::string fInputFileExtension;
 		Img* fInputImg;
+		std::string fROOTInputImgName;
 
 		//Output data
 		FILE* fDS9CatalogFilePtr;
@@ -150,6 +151,7 @@ class SourceFinder {
 		double fDissMedianRMS0;	
 		int fNR;
 		double fMSE;
+		Img* fPreMergingSegmentedImage;
 		Img* fSegmentedImage;
 		Img* fFinalSegmentedImage;
 		Img* fFinalSignalSegmentedImage;
@@ -254,6 +256,8 @@ class SourceFinder {
 		double fSaliencyNNFactor;
 		double fSaliencyFilterThresholdFactor;
 		int fSaliencyNormalizationMode;
+		double fSaliencyDissExpFalloffPar;
+		double fSaliencySpatialDistRegPar;
 
 		//Chan-Vese segmentation
 		ChanVeseSegmentation* fCVSegmentation;

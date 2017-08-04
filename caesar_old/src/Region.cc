@@ -74,6 +74,7 @@ ClassImp(Region)
 Region::Region(){
 
 	fId= -999;
+	m_HasStats= false;
 
 	ResetMoments();
 
@@ -132,6 +133,11 @@ Region::Region(){
 	fAbsDissMin= 1.e+99;
 	fAbsDissMax= -1.e+99;
 	fIsOccluded= false;
+
+	//Added (CHECK FOR BUG!!!)
+  fNPix= 0;
+	fX0= 0;
+	fY0= 0;
 
 }//close costructor
 
@@ -199,6 +205,7 @@ void Region::ResetMoments(){
 	fIy_max= -1.e+99;
 	fColorSum.SetXYZ(0,0,0);
 	fColor.SetXYZ(0,0,0);
+	m_HasStats= false;
 }
 
 
@@ -1115,19 +1122,30 @@ int Region::ComputeParameters(bool computeContours,bool computeRobustStats,bool 
 	if(fNPix<=0) return -1;
 
 	//## Recomputing moments?
+	//cout<<"Npix (before force recomputing)="<<fNPix<<" X0="<<fX0<<", Y0="<<fY0<<endl;
 	if(forceRecomputing){
 		ResetMoments();//reset moments
 		for(unsigned int k=0;k<fPixelCollection.size();k++) UpdateMoments(fPixelCollection[k]);//update moments
+		//cout<<"Npix (after moment reset & update)="<<fNPix<<" X0="<<fX0<<", Y0="<<fY0<<endl;
 	}
-		
-	fX0/= (double)(fNPix);
-	fY0/= (double)(fNPix);
-	fWx0/= fS;
-	fWy0/= fS;
-	fSxx/= fS;
-	fSyy/= fS;
-	fSxy/= fS;
-	fColor*= 1./(double)(fNPix);
+	
+	//## NB: Compute stats parameters only if not already done or if forced
+	//##     This was a bug in older version affecting saliency calculation (the spatial component in region distance) and eventually the extended source extraction!!!
+	//##     Need to introduce a rescaling of spatial vs color distance (a factor 100 more or less?) 
+	if(!m_HasStats || forceRecomputing){
+		fX0/= (double)(fNPix);
+		fY0/= (double)(fNPix);
+		fWx0/= fS;
+		fWy0/= fS;
+		fSxx/= fS;
+		fSyy/= fS;
+		fSxy/= fS;
+		fColor*= 1./(double)(fNPix);
+		m_HasStats= true;
+	}
+
+	//cout<<"Npix (after force recomputing)="<<fNPix<<" X0="<<fX0<<", Y0="<<fY0<<endl;
+	
 
 	fMean= fM1;
 	fMean_curv= fM1_curv;

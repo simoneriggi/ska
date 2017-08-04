@@ -112,7 +112,7 @@ class Utils {
   			// sorted
   			std::vector<T> copy = unordered;
   			ordered.resize(index_map.size());
-  			for(int i = 0; i<index_map.size();i++)
+  			for(unsigned int i=0;i<index_map.size();i++)
 					ordered[i] = copy[index_map[i]];
 			}
 
@@ -163,7 +163,7 @@ class Utils {
 				if(n<=0) return -999;
 
 				std::vector<double> MADs;
-  			for(int j=0;j<n;j++){
+  			for(unsigned int j=0;j<n;j++){
 					double diff= fabs(vec[j]-median);
 					MADs.push_back(diff);
 				}

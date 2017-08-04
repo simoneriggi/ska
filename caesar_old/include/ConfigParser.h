@@ -49,6 +49,7 @@ class ConfigParser {
 		static std::string fInputFileName;
 		static std::string fOutputFileName;
 		static std::string fDS9CatalogFileName;
+		static std::string fROOTInputImgName;
 		static bool fSaveToFile;
 		static bool fSaveImageToFile;
 		static int fSaveImageType;
@@ -150,6 +151,9 @@ class ConfigParser {
 		static double fSaliencyNNFactor;
 		static double fSaliencyFilterThresholdFactor;
 		static int fSaliencyNormalizationMode;
+	
+		static double fSaliencyDissExpFalloffPar;
+		static double fSaliencySpatialDistRegPar;
 
 		//## CHAN-VESE ALGO OPTIONS
 		static double fCVTimeStep;

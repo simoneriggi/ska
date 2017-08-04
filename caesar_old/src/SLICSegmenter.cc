@@ -59,6 +59,7 @@ SLICSegmenter::SLICSegmenter() {
 	fUse2ndNeighborsInSPMerging= true;
 
 	fSaliencyImg= 0;
+	fPreMergingSegmentedImg= 0;
 
 	//Saliency options
 	fSaliencyThresholdFactor= 2;
@@ -659,7 +660,7 @@ int SLICSegmenter::SuperpixelGenerator(int regionSize,double regularization, int
 		(fRegions[k]->fColor).SetXYZ(colors[0],colors[1],colors[2]);
 			
 		//Print regions
-		fRegions[k]->Dump();
+		//fRegions[k]->Dump();
 
 		//cout<<"SLICSegmenter::SuperpixelGenerator(): INFO: Region no. "<<fRegions[k]->fId<<": N="<<nPix<<" C("<<Cx<<","<<Cy<<","<<Cz<<") color("<<fRegions[k]->fColor.X()<<","<<fRegions[k]->fColor.Y()<<","<<fRegions[k]->fColor.Z()<<"), connection(";
 		//for(unsigned int l=0;l<(fRegions[k]->fNeighbourRegions).size();l++) cout<<(fRegions[k]->fNeighbourRegions)[l]<<",";
@@ -788,8 +789,10 @@ int SLICSegmenter::MultiStepSPMerger(){
 
 	//## Compute saliency map 
 	cout<<"SLICSegmenter::MultiStepSPMerger(): INFO: Computing saliency map: reso pars("<<fSaliencyMinReso<<","<<fSaliencyMaxReso<<","<<fSaliencyResoStepSize<<"), knn="<<fSaliencyNNFactor<<", thr="<<fSaliencyFilterThresholdFactor<<" ..."<<endl;
-	fSaliencyImg= fInputImg->GetMultiResoSaliencyMap(fSaliencyMinReso,fSaliencyMaxReso,fSaliencyResoStepSize,fSPRegularization,fSPMinArea,fSaliencyNNFactor,fSaliencyUseRobustPars,fSPMergingUseCurvature,fSaliencyFilterThresholdFactor,fSaliencyUseCurvatureMap,fSaliencyUseBkgMap,fSaliencyUseNoiseMap,fSaliencyNormalizationMode,fSaliencyThresholdFactor,fSaliencyImgThresholdFactor);
+	//fSaliencyImg= fInputImg->GetMultiResoSaliencyMap(fSaliencyMinReso,fSaliencyMaxReso,fSaliencyResoStepSize,fSPRegularization,fSPMinArea,fSaliencyNNFactor,fSaliencyUseRobustPars,fSPMergingUseCurvature,fSaliencyFilterThresholdFactor,fSaliencyUseCurvatureMap,fSaliencyUseBkgMap,fSaliencyUseNoiseMap,fSaliencyNormalizationMode,fSaliencyThresholdFactor,fSaliencyImgThresholdFactor);
+	fSaliencyImg= fInputImg->GetMultiResoSaliencyMap(fSaliencyMinReso,fSaliencyMaxReso,fSaliencyResoStepSize,fSPRegularization,fSPMinArea,fSaliencyNNFactor,fSaliencyUseRobustPars,fSaliencyDissExpFalloffPar,fSaliencySpatialDistRegPar,fSaliencyFilterThresholdFactor,fSaliencyUseCurvatureMap,fSaliencyUseBkgMap,fSaliencyUseNoiseMap,fSaliencyNormalizationMode,fSaliencyThresholdFactor,fSaliencyImgThresholdFactor);
 	
+
 	//## Compute saliency stats
 	if(!fSaliencyImg->ComputeStats(true,false,true)<0){
 		cerr<<"SLICSegmenter::MultiStepSPMerger(): ERROR: Saliency stats computing failed!"<<endl;
@@ -810,6 +813,28 @@ int SLICSegmenter::MultiStepSPMerger(){
 		fRegions[i]->fTag= regions[i]->fTag;
 	}//end loop regions
 	
+
+	//## COmpute the pre-merging segmented image
+	//## 3 channel: 1: bkg, 2: unknown, 3: signal
+	fPreMergingSegmentedImg= (Img*)fSaliencyImg->Clone("PreMergingSegmentedImg");
+	fPreMergingSegmentedImg->Reset();
+
+	for(unsigned int i=0;i<fRegions.size();i++){//loop on regions
+		int regionId= fRegions[i]->fId;	
+		int regionTag= fRegions[i]->fTag;
+		long int nPixelsInRegion= regions[i]->fNPix;
+
+		double binContent= 0;
+		if(regionTag==Region::eBkgTag) binContent= 1;
+		else if(regionTag==Region::eSignalTag) binContent= 3;
+		else if(regionTag==Region::eUntagged) binContent= 2;
+		
+		for(long int j=0;j<nPixelsInRegion;j++){//loop on pixels inside region
+			int thisPixelId= (fRegions[i]->fPixelCollection)[j].id;
+			fPreMergingSegmentedImg->SetBinContent(thisPixelId,binContent);
+		}//end loop pixels in region	
+	}//end loop regions
+
 	//## Create the mapping of regionId and vector index
 	cout<<"SLICSegmenter::MultiStepSPMerger(): INFO: Create the mapping of regionId and region list index..."<<endl;
 	std::map<int,int> regionIdMap;

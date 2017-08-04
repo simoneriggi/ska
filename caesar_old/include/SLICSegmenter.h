@@ -93,6 +93,11 @@ class SLICSegmenter {
 		Img* GetSaliencyMap(){return fSaliencyImg;}
 
 		/**
+		\brief Get the pre-merging segmented map
+ 		*/
+		Img* GetPreMergingSegmentedMap(){return fPreMergingSegmentedImg;}
+
+		/**
 		\brief Get the list of segmented regions
  		*/
 		std::vector<Region*> GetRegions() {return fRegions;}
@@ -209,6 +214,15 @@ class SLICSegmenter {
  		*/
 		void SetMinNPixInSaliencyThresholding(int value){fNPixMin=value;}
 
+		/**
+		\brief Set saliency dissimilarity exponential falloff par
+ 		*/
+		void SetDissExpFalloffParInSaliency(double value){fSaliencyDissExpFalloffPar= value;}
+		/**
+		\brief Set saliency spatial dist regularization par
+ 		*/
+		void SetSpatialDistRegParInSaliency(double value){fSaliencySpatialDistRegPar= value;}
+		
 
 		/**
 		\brief Set box size in bkg map computation
@@ -324,6 +338,7 @@ class SLICSegmenter {
 
 		//Saliency image
 		Img* fSaliencyImg;
+		Img* fPreMergingSegmentedImg;
 		
 		//Merging info
 		std::vector<SPMergingInfo> fSPMergingInfo;
@@ -378,6 +393,8 @@ class SLICSegmenter {
 		double fSaliencyNNFactor;
 		double fSaliencyFilterThresholdFactor;
 		int fSaliencyNormalizationMode;
+		double fSaliencyDissExpFalloffPar;
+		double fSaliencySpatialDistRegPar;
 
 		int fNPixMin;
 	
