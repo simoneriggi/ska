@@ -4131,102 +4131,111 @@ Img* Img::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,double be
 	imgName= Form("%s_saliencyCombined",this->GetName());
 	Img* saliencyImg= (Img*)saliencyImg_mean->Clone(imgName);
 	saliencyImg->SetNameTitle(imgName,imgName);
-	saliencyImg->Reset();
 
-	double minSaliency= saliencyImg_mean->GetMinimum();
-	double imgMedianThr= medianImgThrFactor*imgMedian;
+
+	//Multi-resolution combination
+	if(nReso>1){
+		saliencyImg->Reset();
+
+		double minSaliency= saliencyImg_mean->GetMinimum();
+		double imgMedianThr= medianImgThrFactor*imgMedian;
 	
-	if(normalizationAcrossResoMode==1){//normalization with fixed threshold
-		for(int i=0;i<saliencyImg->GetNbinsX();i++){
-			for(int j=0;j<saliencyImg->GetNbinsY();j++){
-				double imgBinContent= this->GetBinContent(i+1,j+1);
-				if(imgBinContent==0) continue;
-				bool isPositiveExcess= (imgBinContent>imgMedianThr);
-				double w= saliencyImg_mean->GetBinContent(i+1,j+1);
-				double wmin= 1.e+99;
-				double wmax= -1.e+99;
-				for(int k=0;k<salMaps.size();k++){
-					double thisw= salMaps[k]->GetBinContent(i+1,j+1);
-					if(thisw<wmin) wmin= thisw;
-					if(thisw>=wmax) wmax= thisw;
-				}//end loop multi reso
-				if(w>=thr && isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,wmax);
-				else if(w>=thr && !isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,minSaliency);
-				else saliencyImg->SetBinContent(i+1,j+1,wmin);
-			}//end loop bins Y
-		}//end loop bins X
-	}//close if
+		if(normalizationAcrossResoMode==1){//normalization with fixed threshold
+			for(int i=0;i<saliencyImg->GetNbinsX();i++){
+				for(int j=0;j<saliencyImg->GetNbinsY();j++){
+					double imgBinContent= this->GetBinContent(i+1,j+1);
+					//if(imgBinContent==0) continue;//GIUSTO
+					//bool isPositiveExcess= (imgBinContent>imgMedianThr);//GIUSTO
+					bool isPositiveExcess= (imgBinContent>imgMedianThr && imgBinContent!=0);
+					double w= saliencyImg_mean->GetBinContent(i+1,j+1);
+					double wmin= 1.e+99;
+					double wmax= -1.e+99;
+					for(int k=0;k<salMaps.size();k++){
+						double thisw= salMaps[k]->GetBinContent(i+1,j+1);
+						if(thisw<wmin) wmin= thisw;
+						if(thisw>=wmax) wmax= thisw;
+					}//end loop multi reso
+					if(w>=thr && isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,wmax);
+					else if(w>=thr && !isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,minSaliency);
+					else saliencyImg->SetBinContent(i+1,j+1,wmin);
+				}//end loop bins Y
+			}//end loop bins X
+		}//close if
 	
-	else if(normalizationAcrossResoMode==2){//normalization with adaptive threshold
+		else if(normalizationAcrossResoMode==2){//normalization with adaptive threshold
 
-		double salientMultiplicityFactorThr= thr;//this parameter is the fixed threshold in the previous mode
-		int salientMultiplicityThr= std::round(salientMultiplicityFactorThr*nReso);
+			double salientMultiplicityFactorThr= thr;//this parameter is the fixed threshold in the previous mode
+			int salientMultiplicityThr= std::round(salientMultiplicityFactorThr*nReso);
 
-		for(int i=0;i<saliencyImg->GetNbinsX();i++){
-			for(int j=0;j<saliencyImg->GetNbinsY();j++){
-				double imgBinContent= this->GetBinContent(i+1,j+1);	
-				if(imgBinContent==0) continue;
-				bool isPositiveExcess= (imgBinContent>imgMedianThr);
-				double w= saliencyImg_mean->GetBinContent(i+1,j+1);
-				double wmin= 1.e+99;
-				double wmax= -1.e+99;
-				int saliencyMultiplicity= 0;
-				for(int k=0;k<salMaps.size();k++){
-					double thisw= salMaps[k]->GetBinContent(i+1,j+1);
-					double thisThreshold= salMapsThresholds[k];
-					if(thisw>thisThreshold) saliencyMultiplicity++;
-					if(thisw<wmin) wmin= thisw;
-					if(thisw>=wmax) wmax= thisw;
-				}//end loop multi reso
-				if(saliencyMultiplicity>=salientMultiplicityThr && isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,wmax);
-				else if(saliencyMultiplicity>=salientMultiplicityThr && !isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,minSaliency);
-				else saliencyImg->SetBinContent(i+1,j+1,wmin);
-			}//end loop bins Y
-		}//end loop bins X
-	}//close else if
+			for(int i=0;i<saliencyImg->GetNbinsX();i++){
+				for(int j=0;j<saliencyImg->GetNbinsY();j++){
+					double imgBinContent= this->GetBinContent(i+1,j+1);	
+					//if(imgBinContent==0) continue;//GIUSTO
+					//bool isPositiveExcess= (imgBinContent>imgMedianThr);//GIUSTO
+					bool isPositiveExcess= (imgBinContent>imgMedianThr && imgBinContent!=0);
+					double w= saliencyImg_mean->GetBinContent(i+1,j+1);
+					double wmin= 1.e+99;
+					double wmax= -1.e+99;
+					int saliencyMultiplicity= 0;
+					for(int k=0;k<salMaps.size();k++){
+						double thisw= salMaps[k]->GetBinContent(i+1,j+1);
+						double thisThreshold= salMapsThresholds[k];
+						if(thisw>thisThreshold) saliencyMultiplicity++;
+						if(thisw<wmin) wmin= thisw;
+						if(thisw>=wmax) wmax= thisw;
+					}//end loop multi reso
+					if(saliencyMultiplicity>=salientMultiplicityThr && isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,wmax);
+					else if(saliencyMultiplicity>=salientMultiplicityThr && !isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,minSaliency);
+					else saliencyImg->SetBinContent(i+1,j+1,wmin);
+				}//end loop bins Y
+			}//end loop bins X
+		}//close else if
 	
-	else if(normalizationAcrossResoMode==3){//normalization with max across scales
-		for(int i=0;i<saliencyImg->GetNbinsX();i++){
-			for(int j=0;j<saliencyImg->GetNbinsY();j++){
-				double imgBinContent= this->GetBinContent(i+1,j+1);
-				if(imgBinContent==0) continue;				
-				bool isPositiveExcess= (imgBinContent>imgMedianThr);
-				double w= saliencyImg_mean->GetBinContent(i+1,j+1);
-				double wmin= 1.e+99;
-				double wmax= -1.e+99;
-				for(int k=0;k<salMaps.size();k++){
-					double thisw= salMaps[k]->GetBinContent(i+1,j+1);
-					if(thisw<wmin) wmin= thisw;
-					if(thisw>=wmax) wmax= thisw;
-				}//end loop multi reso
-				if(isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,wmax);
-				else saliencyImg->SetBinContent(i+1,j+1,wmin);
-			}//end loop bins Y
-		}//end loop bins X
-	}//close else if
-	else if(normalizationAcrossResoMode==4){//normalization with mean of scales
-		for(int i=0;i<saliencyImg->GetNbinsX();i++){
-			for(int j=0;j<saliencyImg->GetNbinsY();j++){
-				double imgBinContent= this->GetBinContent(i+1,j+1);
-				if(imgBinContent==0) continue;								
-				double w= saliencyImg_mean->GetBinContent(i+1,j+1);
-				saliencyImg->SetBinContent(i+1,j+1,w);
-			}//end loop bins Y
-		}//end loop bins X
-	}//close else if
-	else {//default normalization with mean of scales
-		for(int i=0;i<saliencyImg->GetNbinsX();i++){
-			for(int j=0;j<saliencyImg->GetNbinsY();j++){
-				double imgBinContent= this->GetBinContent(i+1,j+1);
-				if(imgBinContent==0) continue;				
-				double w= saliencyImg_mean->GetBinContent(i+1,j+1);
-				saliencyImg->SetBinContent(i+1,j+1,w);	
-			}//end loop bins Y
-		}//end loop bins X
+		else if(normalizationAcrossResoMode==3){//normalization with max across scales
+			for(int i=0;i<saliencyImg->GetNbinsX();i++){
+				for(int j=0;j<saliencyImg->GetNbinsY();j++){
+					double imgBinContent= this->GetBinContent(i+1,j+1);
+					//if(imgBinContent==0) continue;		//GIUSTO		
+					//bool isPositiveExcess= (imgBinContent>imgMedianThr);//GIUSTO
+					bool isPositiveExcess= (imgBinContent>imgMedianThr && imgBinContent!=0);
+					double w= saliencyImg_mean->GetBinContent(i+1,j+1);
+					double wmin= 1.e+99;
+					double wmax= -1.e+99;
+					for(int k=0;k<salMaps.size();k++){
+						double thisw= salMaps[k]->GetBinContent(i+1,j+1);
+						if(thisw<wmin) wmin= thisw;
+						if(thisw>=wmax) wmax= thisw;
+					}//end loop multi reso
+					if(isPositiveExcess) saliencyImg->SetBinContent(i+1,j+1,wmax);
+					else saliencyImg->SetBinContent(i+1,j+1,wmin);
+				}//end loop bins Y
+			}//end loop bins X
+		}//close else if
+		else if(normalizationAcrossResoMode==4){//normalization with mean of scales
+			for(int i=0;i<saliencyImg->GetNbinsX();i++){
+				for(int j=0;j<saliencyImg->GetNbinsY();j++){
+					double imgBinContent= this->GetBinContent(i+1,j+1);
+					//if(imgBinContent==0) continue;//GIUSTO					
+					double w= saliencyImg_mean->GetBinContent(i+1,j+1);
+					saliencyImg->SetBinContent(i+1,j+1,w);
+				}//end loop bins Y
+			}//end loop bins X
+		}//close else if
+		else {//default normalization with mean of scales
+			for(int i=0;i<saliencyImg->GetNbinsX();i++){
+				for(int j=0;j<saliencyImg->GetNbinsY();j++){
+					double imgBinContent= this->GetBinContent(i+1,j+1);
+					//if(imgBinContent==0) continue;//GIUSTO				
+					double w= saliencyImg_mean->GetBinContent(i+1,j+1);
+					saliencyImg->SetBinContent(i+1,j+1,w);	
+				}//end loop bins Y
+			}//end loop bins X
 
-	}//close else
+		}//close else
+	}//close if multi-resolution
 
-
+	
+	//Clear scale saliency maps
 	for(unsigned int k=0;k<salMaps.size();k++){
 		if(salMaps[k]) salMaps[k]->Delete();		
 	}
