@@ -2,9 +2,9 @@
 #include(ExternalProject)
 #include(FindPackageHandleStandardArgs)
 
-#-------------------------
-# -- Check for ROOT-------
-#-------------------------
+#==================================
+#==    Check for ROOT           ===
+#==================================
 message(STATUS "Looking for ROOT")
 
 if(NOT DEFINED ENV{ROOTSYS})
@@ -27,26 +27,26 @@ include(${ROOT_USE_FILE}) ### NOT WORKING!!
 message (STATUS "ROOT HEADERS: ${ROOT_INCLUDE_DIRS}, LIBS: ${ROOT_LIBRARIES}")
 #--------------------------------
 
-#-------------------------
-# -- Check for BOOST -----
-#-------------------------
+#===============================
+#==    Check for BOOST       ===
+#===============================
 find_package(Boost REQUIRED COMPONENTS filesystem system regex thread log log_setup)
 add_definitions(-DBOOST_LOG_USE_NATIVE_SYSLOG -DBOOST_LOG_DYN_LINK)
 message (STATUS "BOOST HEADERS: ${Boost_INCLUDE_DIRS}, LIBS: ${Boost_LIBRARIES}")
 #-------------------------
 
-#-------------------------
-# -- Check for OPENCV -----
-#-------------------------
+#=================================
+#==    Check for OPENCV        ===
+#=================================
 find_package(OpenCV REQUIRED)
 message (STATUS "OPENCV HEADERS: ${OpenCV_INCLUDE_DIRS}, LIBS: ${OpenCV_LIBS}, ${OpenCV_LIB_COMPONENTS}")
 find_package(OpenCV2 REQUIRED)
 message (STATUS "OPENCV2 HEADERS: ${OpenCV2_INCLUDE_DIRS}, LIBS: ${OpenCV2_LIBRARIES}")
 #-------------------------
 
-#-----------------------------
-# -- Check for R PROJECT -----
-#-----------------------------
+#=================================
+#==   Check for R PROJECT      ===
+#=================================
 message (STATUS "Looking for R")
 find_package (R REQUIRED COMPONENTS base RInside Rcpp rrcovHD truncnorm FNN akima)
 message (STATUS "R_INCLUDE_DIR: ${R_INCLUDE_DIR}")
@@ -54,16 +54,16 @@ message (STATUS "R_LIBRARIES: ${R_LIBRARIES}")
 #-------------------------
 
 
-#-----------------------------
-# -- Check for Python    -----
-#-----------------------------
+#==================================
+#==    Check for Python         ===
+#==================================
 message (STATUS "Looking for Python")
 find_package (PythonLibs REQUIRED)
 message (STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}, PYTHON_INCLUDE_DIRS: ${PYTHON_INCLUDE_DIRS}")
 
-#------------------------------------
-# -- Check for Python Modules   -----
-#------------------------------------
+#==================================
+#== Check for Python Modules    ===
+#==================================
 include(FindPythonModule)
 # pyfits
 message (STATUS "Looking for Python pyfits module")
@@ -151,6 +151,31 @@ if(BUILD_APPS)
 
 endif()
 
+#=======================================
+#==   SET BUILD APPS OPTION          ===
+#=======================================
+option(BUILD_WITH_OPENMP "Enable building of Caesar with OpenMP" OFF)
+if(BUILD_WITH_OPENMP)
+	MESSAGE(STATUS "Looking for OpenMP")
+	include(FindOpenMP)
+	if(OPENMP_FOUND)
+		MESSAGE(STATUS "OpenMP found, defining preprocessor flag OPENMP_ENABLED")
+		add_definitions(-DOPENMP_ENABLED=1)
+	endif()
+endif()
+
+
+#======================================
+#==   Check for Google Test         ===
+#======================================
+if (ENABLE_TEST)
+	MESSAGE(STATUS "Looking for GoogleTest")
+	add_definitions(-DENABLE_TEST)
+	enable_testing()
+	FIND_PACKAGE(GTest REQUIRED)
+	MESSAGE(STATUS "GTEST_INCLUDE_DIRS: ${GTEST_INCLUDE_DIRS}")
+	MESSAGE(STATUS "GTEST_LIBRARIES: ${GTEST_BOTH_LIBRARIES}")
+endif()
 
 #===========================================
 #==   Check for Tango Framework          ===
