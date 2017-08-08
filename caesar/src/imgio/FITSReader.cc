@@ -37,6 +37,12 @@
 #include <TVectorD.h>
 
 
+#ifdef OPENMP_ENABLED
+  #include <omp.h>
+#else
+  #define omp_get_thread_num() 0
+#endif
+
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -75,14 +81,12 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	// Get image size field
 	int Nchannels= 0;
 	if(hdu->GetKeywordValue("NAXIS")=="") {
-		//cerr<<"FITSReader::ReadHeader(): ERROR: Invalid header detected (no NAXIS keyword)!"<<endl;
 		WARN_LOG("Invalid header detected (no NAXIS keyword)!");
 		return false;
 	}			
 
 	Nchannels= hdu->GetKeywordValue("NAXIS").Atoi();//nchannels
 	if(Nchannels!=2){
-		//cerr<<"FITSReader::ReadHeader(): ERROR: Not supported number of channels ("<<Nchannels<<"), only 2 channel images are supported!"<<endl;
 		ERROR_LOG("Unsupported number of channels ("<<Nchannels<<"), only 2 channel images are supported!");
 		return false;	
 	}	
@@ -90,7 +94,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	int Nx= 0;
 	int Ny= 0;
 	if(hdu->GetKeywordValue("NAXIS1")=="" || hdu->GetKeywordValue("NAXIS2")=="") {
-		//cerr<<"FITSReader::ReadHeader(): ERROR: Invalid header detected (no NAXIS keywords found!"<<endl;
 		ERROR_LOG("Invalid header detected (no NAXIS keywords found!");
 		return false;
 	}
@@ -100,7 +103,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	// Get pixel content unit
 	std::string BUnit= "";
 	if(hdu->GetKeywordValue("BUNIT")=="") {
-		//cerr<<"FITSReader::ReadHeader(): WARNING: BUNIT keyword not found in header!"<<endl;
 		WARN_LOG("BUNIT keyword not found in header!");
 	}
 	else{
@@ -113,7 +115,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	std::string CoordTypeX= "";
 	std::string CoordTypeY= "";
 	if(hdu->GetKeywordValue("CTYPE1")=="" || hdu->GetKeywordValue("CTYPE2")=="") {
-		//cerr<<"FITSReader::ReadHeader(): WARNING: CTYPE keyword not found in header!"<<endl;
 		WARN_LOG("CTYPE keyword not found in header!");
 	}
 	else{
@@ -130,7 +131,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	double CenterPixIdX= 0;
 	double CenterPixIdY= 0;
 	if(hdu->GetKeywordValue("CRPIX1")=="" || hdu->GetKeywordValue("CRPIX2")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: CRPIX keyword not found in header!"<<endl;
 		WARN_LOG("CRPIX keyword not found in header!");
 	}
 	else{
@@ -142,7 +142,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	double CenterPixX= 0;
 	double CenterPixY= 0;
 	if(hdu->GetKeywordValue("CRVAL1")=="" || hdu->GetKeywordValue("CRVAL2")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: CRVAL keyword not found in header!"<<endl;
 		WARN_LOG("CRVAL keyword not found in header!");
 	}
 	else{
@@ -153,7 +152,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	double PixStepX= 0;
 	double PixStepY= 0;
 	if(hdu->GetKeywordValue("CDELT1")=="" || hdu->GetKeywordValue("CDELT2")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: CDELT keyword not found in header!"<<endl;
 		WARN_LOG("CDELT keyword not found in header!");
 	}
 	else{
@@ -166,7 +164,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	double Bmin= 0;
 	double Bpa= 0;
 	if(hdu->GetKeywordValue("BMAJ")=="" || hdu->GetKeywordValue("BMIN")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: BMAJ/BMIN keywords not found in header!"<<endl;
 		WARN_LOG("BMAJ/BMIN keywords not found in header!");
 	}
 	else{
@@ -175,7 +172,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	}
 
 	if(hdu->GetKeywordValue("BPA")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: BPA keyword not found in header, setting to zero!"<<endl;
 		WARN_LOG("BPA keyword not found in header, setting to zero!");
 		Bpa= 0;
 	}
@@ -191,7 +187,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	double RotX= 0;
 	double RotY= 0;
 	if(hdu->GetKeywordValue("CROTA1")=="" || hdu->GetKeywordValue("CROTA2")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: CROTA keyword not found in header, setting rotation to 0!"<<endl;	
 		WARN_LOG("CROTA keyword not found in header, setting rotation to 0!");
 	}
 	else{
@@ -203,7 +198,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	double ObsRA= -999;
 	double ObsDEC= -999;
 	if(hdu->GetKeywordValue("OBSRA")=="" || hdu->GetKeywordValue("OBSDEC")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: OBSRA/OBSDEC keywords not found in header, setting them to fake values!"<<endl;
 		WARN_LOG("OBSRA/OBSDEC keywords not found in header, setting them to fake values!");
 	}
 	else{
@@ -214,7 +208,6 @@ bool FITSReader::ReadHeader(TFITSHDU* hdu,FITSFileInfo& fits_info){
 	// Get epoch information
 	double Epoch= 2000;
 	if(hdu->GetKeywordValue("EPOCH")==""){
-		//cerr<<"FITSReader::ReadHeader(): WARNING: EPOCH keyword not found in header, setting it to 2000!"<<endl;
 		WARN_LOG("EPOCH keyword not found in header, setting it to 2000!");
 	}
 	else{
@@ -288,7 +281,6 @@ int FITSReader::Read(std::string filename,Caesar::Img& image,Caesar::FITSFileInf
 	//## Read file
 	TFITSHDU* hdu= ReadFile(filename,fits_info,checkFile);
 	if(!hdu){
-		//cerr<<"FITSReader::Read(): ERROR: Failed to read file "<<filename<<"!"<<endl;
 		ERROR_LOG("Failed to read file "<<filename<<"!");
 		return -1;
 	}
@@ -305,16 +297,35 @@ int FITSReader::Read(std::string filename,Caesar::Img& image,Caesar::FITSFileInf
 	image.SetMetaData(metadata);
 
 	//## Fill image
-	for(int j=0;j<Ny;j++){
-		TVectorD* thisPixelRow= hdu->GetArrayRow(j);
-		for(int i=0;i<Nx;i++){
-			double pixValue= ((*thisPixelRow))(i);
-			if(TMath::IsNaN(pixValue) || fabs(pixValue)==TMath::Infinity()) continue;
-			image.FillPixel(i,j,pixValue);
-		}//end loop columns
-		if(thisPixelRow) thisPixelRow->Delete();
-	}//end loop row
-	
+	#ifdef OPENMP_ENABLED
+		#pragma omp parallel
+		{
+			INFO_LOG("Starting image filling in thread "<<omp_get_thread_num()<<" (nthreads="<<SysUtils::GetOMPThreads()<<") ...");
+			
+			#pragma omp for
+			for(int j=0;j<Ny;j++){
+				TVectorD* thisPixelRow= hdu->GetArrayRow(j);
+				for(int i=0;i<Nx;i++){
+					double pixValue= ((*thisPixelRow))(i);
+					if(TMath::IsNaN(pixValue) || fabs(pixValue)==TMath::Infinity()) continue;
+					image.FillPixel(i,j,pixValue);
+				}//end loop columns
+				if(thisPixelRow) thisPixelRow->Delete();
+			}//end loop row
+
+		}//close parallel section
+	#else
+		for(int j=0;j<Ny;j++){
+			TVectorD* thisPixelRow= hdu->GetArrayRow(j);
+			for(int i=0;i<Nx;i++){
+				double pixValue= ((*thisPixelRow))(i);
+				if(TMath::IsNaN(pixValue) || fabs(pixValue)==TMath::Infinity()) continue;
+				image.FillPixel(i,j,pixValue);
+			}//end loop columns
+			if(thisPixelRow) thisPixelRow->Delete();
+		}//end loop row
+	#endif
+
 	return 0;
 	
 }//close FITSReader::Read()
