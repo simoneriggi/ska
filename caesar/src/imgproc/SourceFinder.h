@@ -246,6 +246,8 @@ class SourceFinder : public TObject {
 		double m_SaliencyNNFactor;
 		double m_SaliencySpatialRegFactor;
 		double m_SaliencyMultiResoCombThrFactor;
+		double m_SaliencyDissExpFalloffPar;
+		double m_SaliencySpatialDistRegPar;
 
 		//Extended sources
 		bool m_SearchExtendedSources;

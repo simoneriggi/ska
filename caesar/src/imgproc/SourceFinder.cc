@@ -253,7 +253,9 @@ int SourceFinder::Configure(){
 	GET_OPTION_VALUE(saliencyNNFactor,m_SaliencyNNFactor);
 	GET_OPTION_VALUE(saliencySpatialRegFactor,m_SaliencySpatialRegFactor);
 	GET_OPTION_VALUE(saliencyMultiResoCombThrFactor,m_SaliencyMultiResoCombThrFactor);
-
+	GET_OPTION_VALUE(saliencyDissExpFalloffPar,m_SaliencyDissExpFalloffPar);
+	GET_OPTION_VALUE(saliencySpatialDistRegPar,m_SaliencySpatialDistRegPar);
+		
 	//Get extended source options
 	GET_OPTION_VALUE(searchExtendedSources,m_SearchExtendedSources);
 	GET_OPTION_VALUE(extendedSearchMethod,m_ExtendedSearchMethod);
@@ -290,7 +292,6 @@ int SourceFinder::Run(){
 		return -1;
 	}
 	
-
 	//## Read input image
 	INFO_LOG("Reading input image...");
 	if(ReadImage()<0){
@@ -521,12 +522,12 @@ int SourceFinder::FindExtendedSources(){
 		status= FindExtendedSources_WT(inputImg);
 	}
 	else{
-		cerr<<"FindSaliency(): ERROR: Invalid extended source method selected (method="<<m_ExtendedSearchMethod<<")!"<<endl;
+		cerr<<"FindExtendedSources(): ERROR: Invalid extended source method selected (method="<<m_ExtendedSearchMethod<<")!"<<endl;
 		return -1;
 	}
 	
 	if(status<0){
-		cerr<<"FindSaliency(): ERROR: Failed to run the segmentation algorithm!"<<endl;
+		cerr<<"FindExtendedSources(): ERROR: Failed to run the segmentation algorithm!"<<endl;
 		return -1;
 	}
 
@@ -537,10 +538,10 @@ int SourceFinder::FindExtendedSources(){
 int SourceFinder::FindExtendedSources_HClust(Img*){
 
 	//## Compute saliency
-	m_SaliencyImg= m_ResidualImg->GetSaliencyMap(
+	m_SaliencyImg= m_ResidualImg->GetMultiResoSaliencyMap(
 		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
-		m_spBeta,m_spMinArea,m_SaliencyNNFactor,
-		m_SaliencySpatialRegFactor,m_SaliencyUseRobustPars,m_SaliencyUseCurvInDiss,m_SaliencyMultiResoCombThrFactor,
+		m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
+		m_SaliencyMultiResoCombThrFactor,
 		m_SaliencyUseBkgMap,m_SaliencyUseNoiseMap,m_ResidualBkgData,
 		m_SaliencyThrFactor,m_SaliencyImgThrFactor
 	);
@@ -855,11 +856,10 @@ BkgData* SourceFinder::ComputeStatsAndBkg(Img* img){
 	bool computeRobustStats= true;
 	bool skipNegativePix= false;
 	bool forceRecomputing= false;
-	if(!img->ComputeStats(computeRobustStats,skipNegativePix,forceRecomputing)<0){
+	if(img->ComputeStats(computeRobustStats,skipNegativePix,forceRecomputing)<0){
 		ERROR_LOG("Stats computing failed!");
 		return 0;
 	}
-	//img->PrintStats();
 	img->LogStats("INFO");
 
 	//## Set local bkg grid/box

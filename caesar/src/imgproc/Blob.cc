@@ -54,6 +54,7 @@
 #include <time.h>
 #include <ctime>
 #include <queue>
+#include <climits>
 
 using namespace std;
 
@@ -282,10 +283,10 @@ void Blob::ResetMoments(){
 	m_Ymin= std::numeric_limits<double>::infinity();
 	m_Ymax= -std::numeric_limits<double>::infinity();
 
-	m_Ix_min= std::numeric_limits<double>::infinity();
-	m_Ix_max= -std::numeric_limits<double>::infinity();
-	m_Iy_min= std::numeric_limits<double>::infinity();
-	m_Iy_max= -std::numeric_limits<double>::infinity();
+	m_Ix_min= LONG_MAX;
+	m_Ix_max= LONG_MIN;
+	m_Iy_min= LONG_MAX;
+	m_Iy_max= LONG_MIN;
 	
 	m_HasStats= false;
 
@@ -388,21 +389,33 @@ int Blob::ComputeStats(bool computeRobustStats,bool forceRecomputing){
 	//## Compute region stats & shape parameters
 	if(NPix<=0) return -1;
 
+	//## If stats was already computed before return (unless forced)
+	//## NB: Without this is stats are computed again the X0, Y0 etc are scaled again by Npix ==> WRONG!!!!
+	//##     This was a bug in old version
+	//if(m_HasStats && !forceRecomputing) {
+	//	ERROR_LOG("Blob has already stats computed (you need to force recomputation)!");
+	//	return -1;
+	//}
+
 	//## Recomputing moments?
 	if(forceRecomputing){
 		ResetMoments();//reset moments
 		for(unsigned int k=0;k<m_Pixels.size();k++) UpdateMoments(m_Pixels[k]);//update moments
 	}
 		
-	//## Compute standard stats
-	X0/= (double)(NPix);
-	Y0/= (double)(NPix);
-	m_Sx/= m_S;
-	m_Sy/= m_S;
-	m_Sxx/= m_S;
-	m_Syy/= m_S;
-	m_Sxy/= m_S;
-	
+	//## NB: Compute stats parameters only if not already done or if forced
+	//##     This was a bug in older version affecting saliency calculation (the spatial component in region distance) and eventually the extended source extraction!!!
+	//##     Need to introduce a rescaling of spatial vs color distance (a factor 100 more or less?) 
+	if(!m_HasStats || forceRecomputing){
+		X0/= (double)(NPix);
+		Y0/= (double)(NPix);
+		m_Sx/= m_S;
+		m_Sy/= m_S;
+		m_Sxx/= m_S;
+		m_Syy/= m_S;
+		m_Sxy/= m_S;
+	}
+
 	Mean= m_M1;
 	Mean_curv= m_M1_curv;
 	RMS= 0;
