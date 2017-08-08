@@ -81,9 +81,18 @@ include(SearchInstalledSoftware)
 #-----------------------------------------------------------------------------------------------
 
 
-#-----------------------------------------------------------------------------------------------
-#---  SET INCLUDES & LIBS
-#-----------------------------------------------------------------------------------------------
+#===================================================
+#==   INCLUDE OPENMP FLAGS?
+#===================================================
+if(BUILD_WITH_OPENMP AND OPENMP_FOUND)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
+
+#==============================================================================================
+#===          SET INCLUDES & LIBS
+#==============================================================================================
 set(INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
 set(LINKED_LIBS "")
 
@@ -132,9 +141,11 @@ list (APPEND INCLUDE_DIRS ${LOG4CXX_INCLUDE_DIRS})
 list (APPEND INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
 list (APPEND INCLUDE_DIRS ${CFITSIO_INCLUDE_DIR})
 list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
-	
-
 list (APPEND INCLUDE_DIRS ${LINTERP_DOWNLOAD_DIR})
+if (ENABLE_TEST)
+	list (APPEND INCLUDE_DIRS ${GTEST_INCLUDE_DIRS})
+endif()
+
 
 ##if(ENABLE_SERVER)
 ##	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
@@ -166,6 +177,10 @@ list (APPEND LINKED_LIBS ${LOG4CXX_LIBRARIES})
 list (APPEND LINKED_LIBS ${JSONCPP_LIBRARIES})
 list (APPEND LINKED_LIBS ${CFITSIO_LIBRARIES})
 list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
+if (ENABLE_TEST)
+  list (APPEND LINKED_LIBS ${GTEST_BOTH_LIBRARIES})
+endif()
+
 ##if(ENABLE_SERVER)
 ##	list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
 ##	list (APPEND LINKED_LIBS ${MSGPACK_LIBRARIES})
@@ -178,9 +193,9 @@ list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
 message (STATUS "LINKED_LIBS: ${LINKED_LIBS}")
 
 
-#-----------------------------------------------------------------------------------------------
-#---  BUILD EXTERNALS
-#-----------------------------------------------------------------------------------------------
+#==============================================================================================
+#===          BUILD EXTERNALS
+#==============================================================================================
 message (STATUS "CMAKE_CURRENT_BINARY_DIR: ${CMAKE_CURRENT_BINARY_DIR}")
 
 include(ExternalProject)
@@ -207,9 +222,9 @@ message (STATUS "LINTERP_BUILD_DIR: ${LINTERP_BUILD_DIR}")
 message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
 
 
-#-----------------------------------------------------------------------------------------------
-#---  GENERATE PROTOBUF SOURCES
-#-----------------------------------------------------------------------------------------------
+#==============================================================================================
+#===             GENERATE PROTOBUF SOURCES
+#==============================================================================================
 #if(ENABLE_SERVER)
 	MESSAGE(STATUS PROTO_FILES: ${PROTO_FILES})
 	MESSAGE(STATUS PROTO_SRCS: ${PROTO_SRCS})
@@ -298,9 +313,9 @@ message(STATUS "ADDITIONAL_CLEAN_TARGETS: ${ADDITIONAL_CLEAN_TARGETS}")
 set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_CLEAN_TARGETS}") ## do not forget to put "" in final vars otherwise you'll get a parsing error
 
 
-#-----------------------------------------------------------------------------------------------
-#---  BUILD PROJECT SHARED LIB
-#-----------------------------------------------------------------------------------------------
+#===============================================================================================
+#===                    BUILD PROJECT SHARED LIB
+#===============================================================================================
 #--- Generate classes dictionary
 message (STATUS "DICT_HEADERS: ${DICT_HEADERS}, $DICT_SRCS: ${DICT_SRCS}")
 ##ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} MODULE Caesar LINKDEF LinkDef.h)
@@ -313,11 +328,12 @@ add_dependencies(Caesar LINTERP WCSTools ProtobufSchema)
 #add_library(Caesar SHARED ${PROTO_GEN_SRCS} ${SRCS} CaesarDict.cxx)
 #add_dependencies(Caesar LINTERP WCSTools)
 target_link_libraries(Caesar PUBLIC ${LINKED_LIBS})
-#-----------------------------------------------------------------------------------------------
+#===============================================================================================
 
-#-----------------------------------------------------------------------------------------------
-#---  BUILD PROJECT TASKS EXEs
-#-----------------------------------------------------------------------------------------------
+
+#===============================================================================================
+#===                     BUILD PROJECT TASKS EXEs
+#===============================================================================================
 if(BUILD_APPS)
 	add_executable(FindSource ${Task_FindSource_SRCS})
 	target_link_libraries(FindSource Caesar ${LINKED_LIBS})
@@ -349,11 +365,12 @@ if(BUILD_APPS)
 	endif()
 
 endif()
-#-----------------------------------------------------------------------------------------------
+#==============================================================================================
 
-#-----------------------------------------------------------------------------------------------
-#---  BUILD PROJECT SERVERs
-#-----------------------------------------------------------------------------------------------
+
+#===============================================================================================
+#===                      BUILD PROJECT SERVERs
+#===============================================================================================
 ## SFINDER SERVER 
 if(ENABLE_SERVER)
 	## Worker
@@ -376,10 +393,47 @@ if(ENABLE_SERVER)
 endif()
 
 
-#-----------------------------------------------------------------------------------------------
-#---  INSTALL STUFF
-#-----------------------------------------------------------------------------------------------
-#-- INstall targets
+#==============================================================================================
+#===                    TESTING
+#==============================================================================================
+if (ENABLE_TEST)
+	# Append subdirs (headers & sources files are appended in subdirs)
+	set(TEST_INCLUDE_DIRS ${GTEST_INCLUDE_DIRS})
+	add_subdirectory(test)
+
+	enable_testing()
+
+  # Include test & Google Test headers
+  include_directories(${TEST_INCLUDE_DIRS})
+
+	# Append external libs found 
+	list (APPEND LINKED_LIBS ${GTEST_BOTH_LIBRARIES})
+	message (STATUS "LINKED_LIBS: ${LINKED_LIBS}")
+	
+  ##############
+  # Unit Tests
+  ##############	
+	add_executable(runUnitTests ${UNIT_TEST_MAIN} ${UNIT_TEST_SRCS})
+	add_dependencies(runUnitTests Caesar)
+
+  # Standard linking to gtest stuff.
+	target_link_libraries(runUnitTests PUBLIC ${LINKED_LIBS} Caesar)
+
+  # This is so you can do 'make test' to see all your tests run, instead of
+  # manually running the executable runUnitTests to see those specific tests.
+	add_test(UnitTests ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/runUnitTests --gtest_output="xml:UnitTestResults.xml")
+
+  # You can also omit NAME and COMMAND. The second argument could be some other
+  # test executable.
+	# add_test(that-other-test-I-made runUnitTests)
+endif()
+#==================================================================================================
+
+
+#==============================================================================================
+#===              INSTALL STUFF
+#==============================================================================================
+#-- Install targets
 #install(TARGETS FindSource FindBkg DESTINATION ${BINARY_INSTALL_DIR} COMPONENT binaries)
 
 # -- Install library dict map
@@ -388,14 +442,18 @@ install(FILES ${PROJECT_BINARY_DIR}/CaesarDict_rdict.pcm DESTINATION ${CMAKE_LIB
 #-- Install project headers
 #file(COPY ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-#-----------------------------------------------------------------------------------------------
+
+#-- Install test executable
+if (ENABLE_TEST)
+	install(TARGETS runUnitTests DESTINATION ${BINARY_INSTALL_DIR})
+endif()
+#==================================================================================================
 
 
 
-###############################################################################
-## packaging ##################################################################
-###############################################################################
-
+#==============================================================================================
+#==           PACKAGING 
+#==============================================================================================
 # all install commands get the same destination. this allows us to use paths
 # relative to the executable.
 #install(TARGETS example DESTINATION example_destination)

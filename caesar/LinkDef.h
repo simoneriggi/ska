@@ -69,6 +69,17 @@
 #pragma link C++ function Caesar::StatsUtils::GetBiWeightEstimators<double>;
 #pragma link C++ function Caesar::StatsUtils::GetBiWeightEstimators<int>;
 #pragma link C++ function Caesar::StatsUtils::GetBiWeightEstimators<long int>;
+
+#pragma link C++ class Caesar::ClippedStats+;
+#pragma link C++ class Caesar::ClippedStats*+;
+#pragma link C++ class Caesar::ClippedStats<int>+;
+#pragma link C++ class Caesar::ClippedStats<long int>+;
+#pragma link C++ class Caesar::ClippedStats<float>+;
+#pragma link C++ class Caesar::ClippedStats<double>+;
+#pragma link C++ function Caesar::StatsUtils::GetClippedEstimators<int>;
+#pragma link C++ function Caesar::StatsUtils::GetClippedEstimators<long int>;
+#pragma link C++ function Caesar::StatsUtils::GetClippedEstimators<float>;
+#pragma link C++ function Caesar::StatsUtils::GetClippedEstimators<double>;
 //==============
 
 //== LOGGER ==
@@ -78,7 +89,7 @@
 #pragma link C++ class Caesar::ConsoleLogger+;
 #pragma link C++ class Caesar::LoggerManager+;
 
-//== CNFIG PARSER ==
+//== CONFIG PARSER ==
 #pragma link C++ class Caesar::OptionBase+;
 #pragma link C++ class Caesar::OptionBase*+;
 #pragma link C++ class std::map<std::string,Caesar::OptionBase*>+;
