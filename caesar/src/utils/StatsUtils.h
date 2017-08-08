@@ -29,6 +29,8 @@
 #ifndef StatsUtils_h
 #define StatsUtils_h 1
 
+#include <Logger.h>
+
 #include <TObject.h>
 #include <TMatrixD.h>
 #include <TMath.h>
@@ -48,12 +50,40 @@
 #include <string>
 #include <time.h>
 #include <ctime>
-
 #include <complex>
+
+//OpenMP headers
+#ifdef OPENMP_ENABLED
+  #include <omp.h>
+	#include <parallel/partition.h>//C++ stdlib parallel algorithms
+#endif
+
+
 
 using namespace std;
 
 namespace Caesar {
+
+template <typename T>  
+class ClippedStats {
+
+	public:
+		T median;
+		T mean;
+		T stddev;
+
+	public:
+		ClippedStats(T _median,T _mean,T _stddev)
+			: median(_median), mean(_mean), stddev(_stddev)
+		{}
+
+		ClippedStats(){
+			median= T(0);
+			mean= T(0);
+			stddev= T(0);
+		}
+
+};//close ClippedStats class
 
 
 class StatsUtils : public TObject {
@@ -71,60 +101,211 @@ class StatsUtils : public TObject {
 
 		
 	public:
-
-		//Median Fast (should run in O(n))
+	
+		/**
+		* \brief Compute median using nth_element (should run in O(n))
+		*/
 		template < typename T >
-			static T GetMedianFast( std::vector<T>&vec){
-				size_t n = vec.size()/2;
-				if(n<=0) return -999;
+		static T GetMedianFast(std::vector<T>&vec, bool useParallelVersion=false){
+			std::size_t n = vec.size()/2;
+  		
+			if(n<=0) return -999;
+			#ifdef OPENMP_ENABLED
+				if(useParallelVersion) __gnu_parallel::__parallel_nth_element(vec.begin(),vec.begin()+n, vec.end(), std::less<T>());
+				else nth_element(vec.begin(),vec.begin()+n, vec.end());
+			#else 
 				nth_element(vec.begin(),vec.begin()+n, vec.end());
-  			return vec[n];
-			}//close GetMedianFast()
+			#endif
+			
+			double median= vec[n];//Odd number of elements
+    	if(vec.size()%2==0){//Even numbers
+				double a= *std::max_element(vec.begin(),vec.begin()+n);
+				double median_even= (median+a)/2.;
+				median= median_even;
+			}
 
-		//Get median (should run in O(nlog n))
-		template < typename T >
-			static T GetMedian( std::vector<T>&vec, bool isSorted=false){//this should run in O(nlog(n))
-				size_t n = vec.size();
-				if(n<=0) return -999;
-  			if(!isSorted) std::sort(vec.begin(), vec.end());
-				double median= 0;		
-  			if(n%2==0) median = (vec[n/2-1] + vec[n/2])/2;	
-				else median = vec[n/2];
-  			return median;
-			}//close GetMedian()
+  		return median;
+		}//close GetMedianFast()
 
-		//MAD
+		/**
+		* \brief Compute MAD using nth_element (should run in O(n))
+		*/
 		template < typename T >
-			static T GetMAD( std::vector<T>const &vec, T median){
-				size_t n = vec.size();
-				if(n<=0) return -999;
-				std::vector<double> MADs;
-  			for(int j=0;j<n;j++){
-					double diff= fabs(vec[j]-median);
-					MADs.push_back(diff);
+		static T GetMADFast( std::vector<T>const &vec, T median,bool useParallelVersion=false){
+			size_t n = vec.size();
+			if(n<=0) return -999;
+			std::vector<double> MADs;
+
+			#ifdef OPENMP_ENABLED
+				#pragma omp declare reduction (merge : std::vector<T> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+				#pragma omp parallel for reduction(merge: MADs)
+				for(size_t j=0;j<n;j++) MADs.push_back( fabs(vec[j]-median) );
+			#else
+  			for(size_t j=0;j<n;j++) MADs.push_back( fabs(vec[j]-median) );
+			#endif
+
+			double MAD= StatsUtils::GetMedianFast(MADs,useParallelVersion);
+  		return MAD;
+		}//close GetMADFast()
+
+
+		/**
+		* \brief Compute median using vector sorting (should run in O(nlog n))
+		*/
+		template < typename T >
+		static T GetMedian( std::vector<T>&vec, bool isSorted=false){//this should run in O(nlog(n))
+			size_t n = vec.size();
+			if(n<=0) return -999;
+  		if(!isSorted) std::sort(vec.begin(), vec.end());
+			double median= 0;		
+  		if(n%2==0) median = (vec[n/2-1] + vec[n/2])/2;	
+			else median = vec[n/2];
+  		return median;
+		}//close GetMedian()
+
+		/**
+		* \brief Compute MAD using vector sorting (should run in O(nlog n))
+		*/
+		template < typename T >
+		static T GetMAD( std::vector<T>const &vec, T median){
+			size_t n = vec.size();
+			if(n<=0) return -999;
+			std::vector<double> MADs;
+  		for(int j=0;j<n;j++){
+				double diff= fabs(vec[j]-median);
+				MADs.push_back(diff);
+			}
+			std::sort(MADs.begin(),MADs.end());
+			double MAD= StatsUtils::GetMedian(MADs,true);
+  		return MAD;
+		}//close GetMAD()
+
+		
+		/**
+		* \brief Compute mean & std dev
+		*/
+		template <typename T>
+		static void ComputeMeanAndRMS(T& mean,T& stddev,std::vector<T>const &vec){
+			mean= stddev= -999;
+			if(vec.empty()) return;
+			size_t n= vec.size();
+
+			#ifdef OPENMP_ENABLED
+				T sum= T(0);
+				T s2= T(0);
+				#pragma omp parallel for reduction(+: sum)
+				for(size_t i=0;i<vec.size();i++) sum+= vec[i];
+				mean= sum/n;
+
+				#pragma omp parallel for reduction(+: s2)
+				for(size_t i=0;i<vec.size();i++) s2 += (vec[i] - mean) * (vec[i] - mean);
+    		stddev= sqrt(s2/(n-1));
+
+			#else 
+				mean= std::accumulate(vec.begin(), vec.end(), T(0))/n;
+				T s2 = T(0);
+    		for(auto x : vec) s2 += (x - mean) * (x - mean);
+    		stddev= sqrt(s2/(n-1));
+			#endif
+
+		}//close ComputeMeanAndRMS()
+
+		/**
+		* \brief Compute clipped estimators
+		*/
+		template <typename T>
+		static int UpdateClippedStats(ClippedStats<T>& stats_clipped,std::vector<T>& vec_clipped, std::vector<T>const& vec, ClippedStats<T>& stats, double clipsig=3, bool useParallelVersion=false){
+			
+			//Check if empty
+			if(vec.empty()) return -1;
+			
+			//Compute mean & standard deviation
+			//T mean= stats.mean;
+			T stddev= stats.stddev;
+			T median= stats.median;
+
+			//Fill vector of truncated items	
+			//std::vector<T> vec_clipped;	
+			vec_clipped.clear();	
+			#ifdef OPENMP_ENABLED
+				#pragma omp declare reduction (merge : std::vector<T> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+				#pragma omp parallel for reduction(merge: vec_clipped)
+				for(size_t i=0;i<vec.size();i++) {
+					T diff= fabs(vec[i]-median);
+					if(diff<clipsig*stddev) vec_clipped.push_back(diff);
 				}
-				std::sort(MADs.begin(),MADs.end());
-				double MAD= StatsUtils::GetMedian(MADs,true);
-  			return MAD;
-			}//close GetMAD()
-
-		template < typename T >
-			static T GetMADFast( std::vector<T>const &vec, T median){
-				size_t n = vec.size();
-				if(n<=0) return -999;
-				std::vector<double> MADs;
-  			for(int j=0;j<n;j++){
-					double diff= fabs(vec[j]-median);
-					MADs.push_back(diff);
+				
+			#else
+				for(auto x : vec) {
+					T diff= fabs(x-median);
+					if(diff<clipsig*stddev) vec_clipped.push_back(diff);
 				}
-				double MAD= StatsUtils::GetMedianFast(MADs);
-  			return MAD;
-			}//close GetMAD()
+			#endif
 
-		//Clipped estimators
+			//Compute mean/stddev of clipped data
+			T mean_clipped= T(0);
+			T stddev_clipped= T(0);
+			ComputeMeanAndRMS(mean_clipped,stddev_clipped,vec_clipped);
+			
+			//Compute median of clipped data
+			T median_clipped= GetMedianFast(vec_clipped,useParallelVersion);	
+			
+			//Set stats				
+			stats_clipped.median= median_clipped;
+			stats_clipped.mean= mean_clipped;
+			stats_clipped.stddev= stddev_clipped;
+			
+			return 0;
+
+		}//close UpdateClippedStats()
+
+		/**
+		* \brief Compute clipped stat estimators
+		*/
+		template <typename T>
+		static int GetClippedEstimators(ClippedStats<T>& stats, std::vector<T>const &vec, T median, T mean, T stddev, double clipsig=3, int maxiter=5, double tol=0.1, bool useParallelVersion=false){
+
+			//Check if empty			
+			if(vec.empty()) return -1;
+
+			//Init stats & vector
+			ClippedStats<T> stats_pre(median,mean,stddev);	
+			std::vector<T> data_pre= vec;
+
+			//Start iteration
+			int iter = 0; 
+			double eps= 1.e+99;
+			
+
+			while ( eps>tol && (iter < maxiter) ){
+
+				//Update clipped stats
+				std::vector<T> data;
+				if(UpdateClippedStats(stats,data,data_pre,stats_pre,clipsig,useParallelVersion)<0){
+					DEBUG_LOG("Stop clipping iteration as clipped vector has no more data!");
+					stats= stats_pre;	
+					data= data_pre;				
+					break;
+				}
+
+				//Update tolerance
+				eps= fabs(stats.stddev-stats_pre.stddev)/stats_pre.stddev;
+
+				//Update stats pre and iter
+				stats_pre= stats;
+				data_pre= data;
+				iter++;
+
+			}//end iter loop	
+
+			return 0;
+
+		}//close GetClippedEstimators()
+
+		/*
 		template < typename T >
 			static std::pair<T,T> GetClippedEstimators( std::vector<T>const &vec, double clipsig=3, int maxiter=5, double tol=0.1, bool isSorted=false){
-				int n= (int)vec.size();
+				size_t n= vec.size();
 				if(n<=0) {
 					return std::make_pair(-999,-999);
 				}
@@ -140,8 +321,9 @@ class StatsUtils : public TObject {
 				double eps= 1.e+99;
   			
 				while ( eps>tol && (iter < maxiter) ){
-  				n = (int)data.size();
-					median= GetMedian(data,true);	
+  				n = data.size();
+					median= GetMedian(data,true);
+					//median= GetMedianFast(data,false);	
 					//rms= 1.4826*Utils::GetMAD(data,median);
 					double sum = std::accumulate(data.begin(), data.end(), 0.0);
 					double mean = sum/(double)n;		
@@ -159,7 +341,7 @@ class StatsUtils : public TObject {
 					}
 
 					//Check data sizes
-					n= (int)data_tmp.size();
+					n= data_tmp.size();
 					if(n<=0) {	
 						median= lastmedian;
 						rms= lastrms;
@@ -178,7 +360,7 @@ class StatsUtils : public TObject {
 				std::pair<T,T> res= std::make_pair (median,rms);	
 				return res;
 			}//close GetClippedEstimators()
-
+			*/
 
 		//BiWeight estimators
 		template < typename T >

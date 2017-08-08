@@ -84,7 +84,7 @@ struct OptionHelper  {
 	}//close CheckRange()
 
 	static int SetValueFromStream(std::stringstream& sstream,T& value,T& minValue,T& maxValue) {
-		T tmpValue;	
+		T tmpValue= T(0);	
 		sstream>>tmpValue;	
 		if(!CheckRange(tmpValue,minValue,maxValue)) return -1;
 		value= tmpValue;

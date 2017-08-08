@@ -281,7 +281,7 @@ class CodeUtils : public TObject {
   			// sorted
   			std::vector<T> copy = unordered;
   			ordered.resize(index_map.size());
-  			for(int i = 0; i<index_map.size();i++)
+  			for(unsigned int i = 0; i<index_map.size();i++)
 					ordered[i] = copy[index_map[i]];
 			}
 

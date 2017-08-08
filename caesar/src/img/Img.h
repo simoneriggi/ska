@@ -590,9 +590,15 @@ class Img : public TH2F {
 		*/
 		Img* GetSmoothedImage(int size_x=3,int size_y=3,double sigma_x=1,double sigma_y=1);
 		/**
-		* \brief Smooth image
+		* \brief Get single-reso saliency map
 		*/
-		Img* GetSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=0.2,double spatialRegFactor=6,bool useRobust=true,bool addCurvDist=true,double salientMultiplicityThrFactor=0.7,bool addBkgMap=true,bool addNoiseMap=true,BkgData* bkgData=0,double saliencyThrFactor=2,double imgThrFactor=1);
+		Img* GetSaliencyMap(int reso=20,double regFactor=1,int minRegionSize=10,double knnFactor=1,bool useRobust=false,double expFalloffPar=100,double distanceRegPar=1);
+
+		/**
+		* \brief Get multi-reso saliency map
+		*/
+		Img* GetMultiResoSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=0.2,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,double salientMultiplicityThrFactor=0.7,bool addBkgMap=true,bool addNoiseMap=true,BkgData* bkgData=0,double saliencyThrFactor=2,double imgThrFactor=1);
+
 
 		//== Convert/Scale util methods
 		/**
@@ -665,10 +671,15 @@ class Img : public TH2F {
 			m_Stats= 0;
 			m_HasStats= false;
 		}
+		
 		/**
 		* \brief Update moments
 		*/
-		void UpdateMoments(int ix,int iy,double w);
+		void UpdateMoments(double w);	
+		/**
+		* \brief Update moments (multithreaded version)
+		*/
+		void ComputeMoments(bool skipNegativePixels=false);
 		/**
 		* \brief Compute image stats parameters from moments 
 		*/
@@ -695,7 +706,7 @@ class Img : public TH2F {
 		bool m_HasStats;
 		ImgStats* m_Stats;
 		
-		int m_Npix;//npixels	
+		long long int m_Npix;//npixels	
 		double m_M1;//1st moments
 		double m_M2;//2nd moment
 		double m_M3;//3rd moment

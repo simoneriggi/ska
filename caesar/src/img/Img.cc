@@ -38,7 +38,7 @@
 #include <StatsUtils.h>
 #include <GraphicsUtils.h>
 #include <CodeUtils.h>
-
+#include <SysUtils.h>
 
 //== Img processing headers
 #include <BkgFinder.h>
@@ -92,6 +92,7 @@
 #include <time.h>
 #include <ctime>
 #include <queue>
+#include <chrono>
 
 using namespace std;
 
@@ -236,7 +237,7 @@ int Img::FillPixel(double x,double y,double w,bool useNegativePixInStats){
 			return -1;
 		}//close if
 		else{
-			UpdateMoments(ix,iy,w);
+			UpdateMoments(w);
 		}
 	}//close if
 	
@@ -292,7 +293,68 @@ void Img::ResetImgStats(bool resetMoments,bool clearStats){
 
 }//close Img::ResetImgStats()
 
-void Img::UpdateMoments(int ix,int iy,double w){
+
+void Img::ComputeMoments(bool skipNegativePixels){
+
+	#ifdef OPENMP_ENABLED
+		
+		//Define variables for reduction (OMP does not allow class members in reduction operation)
+		long long int nPix= m_Npix;
+		double pixelMin= m_PixelMin; 
+		double pixelMax= m_PixelMax;
+		double M1= m_M1;
+		double M2= m_M2;
+		double M3= m_M3;
+		double M4= m_M4;
+
+		#pragma omp parallel
+		{
+			INFO_LOG("Starting image moment computing in thread "<<omp_get_thread_num()<<" (nthreads="<<SysUtils::GetOMPThreads()<<") ...");
+			
+			#pragma omp for reduction(max: pixelMax), reduction(min: pixelMin), reduction(+: nPix,M1,M2,M3,M4)
+		
+			for(int i=0;i<this->GetNbinsX();i++){
+				for(int j=0;j<this->GetNbinsY();j++){
+					double w= this->GetBinContent(i+1,j+1);
+					if( w==0 || (skipNegativePixels && w<0) ) continue; 
+					if(w<pixelMin) pixelMin= w;
+					if(w>pixelMax) pixelMax= w;
+					nPix++;
+  				double delta = w - M1;
+  				double delta_n = delta/nPix;
+  				double delta_n2 = delta_n * delta_n;
+  				double f = delta * delta_n * (nPix-1);
+  				M1+= delta_n;
+  				M4+= f * delta_n2 * (nPix*nPix - 3*nPix + 3) + 6 * delta_n2 * M2 - 4 * delta_n * M3;
+  				M3+= f * delta_n * (nPix - 2) - 3 * delta_n * M2;
+  				M2+= f;
+				}
+			}
+		}//close parallel section
+
+		//Set reduced vars to global class var
+		m_Npix = nPix;
+		m_PixelMin= pixelMin;
+		m_PixelMax= pixelMax;
+		m_M1= M1;
+		m_M2= M2;
+		m_M3= M3;
+		m_M4= M4;
+
+	#else
+		for(int i=0;i<this->GetNbinsX();i++){
+			for(int j=0;j<this->GetNbinsY();j++){
+				double w= this->GetBinContent(i+1,j+1);
+				if( w==0 || (skipNegativePixels && w<0) ) continue; 
+				UpdateMoments(w);
+			}
+		}
+	#endif
+
+}//close ComputeMoments()
+
+
+void Img::UpdateMoments(double w){
 
 	//Update full image moments
 	if(w<m_PixelMin) m_PixelMin= w;
@@ -345,34 +407,23 @@ void Img::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	if(!computeRobustStats) return;
 	
 	//## Compute robust stats (median, MAD, ...)	
-	std::vector<double> Pixels;
-	Pixels.clear();
-	Pixels.resize(0);
+	std::vector<double> pixels;
+	pixels.clear();
+	pixels.resize(0);
 	for(int i=0;i<this->GetNbinsX();i++){
 		for(int j=0;j<this->GetNbinsY();j++){
 			double pixelValue= this->GetBinContent(i+1,j+1);
 			if( pixelValue==0 || (skipNegativePixels && pixelValue<0) ) continue;
-			Pixels.push_back(pixelValue);
+			pixels.push_back(pixelValue);
 		}
 	}
 	
 	//Sort and compute median for all image	
-	//std::sort(Pixels.begin(),Pixels.end());
-	//double median= Caesar::StatsUtils::GetMedian<double>(Pixels,true);	
-	double median= Caesar::StatsUtils::GetMedianFast<double>(Pixels);
+	double median= Caesar::StatsUtils::GetMedianFast<double>(pixels);
 	m_Stats->median= median;
 
 	//Compute MAD = median(|x_i-median|)
-	/*
-	std::vector<double> MADs;
-	for(unsigned j=0;j<Pixels.size();j++){
-		double mad= fabs(Pixels[j]-median);
-		MADs.push_back(mad);
-	}
-	std::sort(MADs.begin(),MADs.end());
-	double medianMAD= Caesar::StatsUtils::GetMedian<double>(MADs,true);
-	*/
-	double medianMAD= Caesar::StatsUtils::GetMADFast(Pixels,median);
+	double medianMAD= Caesar::StatsUtils::GetMADFast(pixels,median);
 	double medianRMS= medianMAD*1.4826;//0.6744888;
 	m_Stats->medianRMS= medianRMS;
 
@@ -380,7 +431,7 @@ void Img::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	double C= 6.;
 	double tol= 0.0001;
 	double nmaxIter= 10;
-	std::pair<double,double> biweightEstimators= Caesar::StatsUtils::GetBiWeightEstimators<double>(Pixels,median,medianRMS,C,tol,nmaxIter);
+	std::pair<double,double> biweightEstimators= Caesar::StatsUtils::GetBiWeightEstimators<double>(pixels,median,medianRMS,C,tol,nmaxIter);
 	m_Stats->bwLocation= biweightEstimators.first;
 	m_Stats->bwScale= biweightEstimators.second;
 
@@ -388,10 +439,16 @@ void Img::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	double clipSigma= 3;
 	int clipMaxIter= 100;
 	double clipTolerance= 0.1;
-	//std::pair<double,double> clippedEstimators= Caesar::StatsUtils::GetClippedEstimators<double>(Pixels,clipSigma,clipMaxIter,clipTolerance, true);
-	std::pair<double,double> clippedEstimators= Caesar::StatsUtils::GetClippedEstimators<double>(Pixels,clipSigma,clipMaxIter,clipTolerance, false);
-	m_Stats->clippedMedian= clippedEstimators.first;
-	m_Stats->clippedRMS= clippedEstimators.second;
+	bool useParallelVersion= false;
+	//std::pair<double,double> clippedEstimators= Caesar::StatsUtils::GetClippedEstimators<double>(pixels,clipSigma,clipMaxIter,clipTolerance, false);
+	//m_Stats->clippedMedian= clippedEstimators.first;
+	//m_Stats->clippedRMS= clippedEstimators.second;
+	
+	ClippedStats<double> clipped_stats;
+	Caesar::StatsUtils::GetClippedEstimators(clipped_stats,pixels,median,m_Stats->mean,m_Stats->rms,clipSigma,clipMaxIter,clipTolerance,useParallelVersion);
+	m_Stats->clippedMedian= clipped_stats.median;
+	m_Stats->clippedRMS= clipped_stats.stddev;
+	
 	
 }//close Img::ComputeStatsParams()
 
@@ -399,44 +456,46 @@ void Img::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 
 int Img::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool forceRecomputing){
 
+	//## Start timer
+	auto start = chrono::steady_clock::now();
+
 	//## Check if image has already stats computed
 	if(!HasStats()){
 		m_Stats= new Caesar::ImgStats;
 	}
 	else{		
-		WARN_LOG("Image has already stats computed...");
+		WARN_LOG("Image has stats already computed...");
 	}
 
 	//## If recomputing is not requested (i.e. some pixels has been reset by the user, just set the stats params!
 	if(!forceRecomputing){
 		ComputeStatsParams(computeRobustStats,skipNegativePixels);
 		m_HasStats= true;
+		
+		auto stop = chrono::steady_clock::now();
+		double elapsed_time= chrono::duration <double, milli> (stop-start).count();
+		INFO_LOG("Image stats computed in "<<elapsed_time<<" ms");
 		return 0;
 	}
 
 	//## Recompute the moments and stats params
-	INFO_LOG("Recomputing image stats...");
+	DEBUG_LOG("Recomputing image stats...");
 
 	//--> Reset stats
 	ResetImgStats(true);
 
 	//--> Recompute moments
-	std::vector<double> pixels;
-	pixels.clear();
-	pixels.resize(0);
-	for(int i=0;i<this->GetNbinsX();i++){
-		for(int j=0;j<this->GetNbinsY();j++){
-			double pixelValue= this->GetBinContent(i+1,j+1);
-			if( pixelValue==0 || (skipNegativePixels && pixelValue<0) ) continue; 
-			pixels.push_back(pixelValue);
-			UpdateMoments(i,j,pixelValue);
-		}
-	}
+	ComputeMoments(skipNegativePixels);
 
 	//--> Recompute stats params
 	ComputeStatsParams(true,skipNegativePixels);
 
 	m_HasStats= true;
+
+	//Stop timer
+	auto end = chrono::steady_clock::now();
+	double dt= chrono::duration <double, milli> (end-start).count();
+	INFO_LOG("Image stats recomputed in "<<dt<<" ms");
 
 	return 0;
 
@@ -856,17 +915,26 @@ int Img::ReadImageFile(std::string filename){
 }//close Img::ReadFile()
 
 int Img::ReadFITS(std::string filename,int ix_min,int ix_max,int iy_min,int iy_max){
-		
+
+	//Start timer		
+	auto start = chrono::steady_clock::now();
+
+	//Read image or tile
 	int status= 0;
 	Caesar::FITSFileInfo fits_info;
 	if(ix_min==-1 && ix_max==-1 && iy_min==-1 && iy_max==-1) {
 		status= FITSReader::Read(filename,*this,fits_info);
 	}
 	else{
-		//status= FITSReader::ReadTile(filename,*this,fits_info,ix_min,ix_max,iy_min,iy_max);
 		status= FITSReader::ReadTileFast(filename,*this,fits_info,ix_min,ix_max,iy_min,iy_max);
 	}
 	
+	//Stop timer and print
+	auto end = chrono::steady_clock::now();
+	double dt= chrono::duration <double, milli> (end-start).count();
+	INFO_LOG("Read FITS image "<<filename<<" in "<<dt<<" ms");	
+
+	//Check error status
 	if(status<0){
 		ERROR_LOG("Failed to fill image from FITS file!");
 		return -1;
@@ -1506,11 +1574,12 @@ Img* Img::GetSmoothedImage(int size_x,int size_y,double sigma_x,double sigma_y){
 
 }//close GetSmoothedImage()
 
-Img* Img::GetSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,double spatialRegFactor,bool useRobust,bool addCurvDist,double salientMultiplicityThrFactor,bool addBkgMap,bool addNoiseMap,BkgData* bkgData,double saliencyThrFactor,double imgThrFactor){
 
-	//## Compute multi-reso saliency map
+Img* Img::GetSaliencyMap(int reso,double regFactor,int minRegionSize,double knnFactor,bool useRobust,double expFalloffPar,double distanceRegPar){
+
+	//## Compute single-reso saliency map
 	Img* saliencyMap= 0;
-	saliencyMap= SaliencyFilter::ComputeMultiResoSaliencyMap(this,resoMin,resoMax,resoStep,beta,minRegionSize,knnFactor,spatialRegFactor,useRobust,addCurvDist, salientMultiplicityThrFactor,addBkgMap,addNoiseMap,bkgData,saliencyThrFactor,imgThrFactor);
+	saliencyMap= SaliencyFilter::ComputeSaliencyMap(this,reso,regFactor,minRegionSize,knnFactor,useRobust,expFalloffPar,distanceRegPar);
 	if(!saliencyMap){
 		ERROR_LOG("Saliency map estimation failed!");
 		return 0;
@@ -1519,6 +1588,22 @@ Img* Img::GetSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int mi
 	return saliencyMap;
 
 }//close GetSaliencyMap()
+
+
+Img* Img::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,bool useRobustPars,double expFalloffPar,double distanceRegPar,double salientMultiplicityThrFactor,bool addBkgMap,bool addNoiseMap,BkgData* bkgData,double saliencyThrFactor,double imgThrFactor){
+
+	//## Compute multi-reso saliency map
+	Img* saliencyMap= 0;
+	saliencyMap= SaliencyFilter::ComputeMultiResoSaliencyMap(this,resoMin,resoMax,resoStep,beta,minRegionSize,knnFactor,useRobustPars,expFalloffPar,distanceRegPar, salientMultiplicityThrFactor,addBkgMap,addNoiseMap,bkgData,saliencyThrFactor,imgThrFactor);
+	if(!saliencyMap){
+		ERROR_LOG("Multi-resolution saliency map estimation failed!");
+		return 0;
+	}
+
+	return saliencyMap;
+
+}//close GetSaliencyMap()
+
 
 
 

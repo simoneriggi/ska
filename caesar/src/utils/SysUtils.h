@@ -118,9 +118,14 @@ class SysUtils : public TObject {
 		
 	public:
 
-		
+		/**
+		* \brief Check if a file exists in filesystem
+		*/
 		static bool CheckFile(std::string path,FileInfo& info,bool match_extension=false,std::string extension="");
-
+	
+		/**
+		* \brief Compute the difference between two timestamps
+		*/
 		static timespec TimeDiff(timespec start, timespec end) {
 			timespec temp;
 			if ((end.tv_nsec-start.tv_nsec)<0) {
@@ -134,6 +139,9 @@ class SysUtils : public TObject {
 			return temp;
 		}
 
+		/**
+		* \brief Compute the sum of two timestamps
+		*/
 		static timespec TimeSum (timespec time1, timespec time2) {
 			timespec  result ;
 			result.tv_sec = time1.tv_sec + time2.tv_sec ;
@@ -144,16 +152,43 @@ class SysUtils : public TObject {
     	return (result) ;
 		}
 		
+		/**
+		* \brief Convert a timestamp to seconds
+		*/
 		static double TimeToSec (timespec time){
     	return ((double)time.tv_sec + (time.tv_nsec/1.e+09)) ;
 		}
 
+		/**
+		* \brief Convert a timestamp to nanoseconds
+		*/
 		static double TimeToNSec (timespec time){
 			return (time.tv_sec*1.e+09 + (double)time.tv_nsec) ;
 		}
 
+		/**
+		* \brief Get the size of a FITS image
+		*/
 		static int GetFITSImageSize(const std::string& filename,long int& Nx,long int& Ny);
 		
+		/**
+		* \brief Get the number of cores in system
+		*/
+		static int GetNCores();
+	
+		/**
+		* \brief Set the number of threads to be used by OpenMP (if enabled at build)
+		*/
+		static void SetOMPThreads(int nthreads);
+		/**
+		* \brief Get the number of threads currently used by OpenMP (return 0 if OMP is disabled at build)
+		*/
+		static int GetOMPThreads();
+		/**
+		* \brief Get the number of cores currently used by OpenMP (return 0 if OMP is disabled at build)
+		*/
+		static int GetOMPCores();
+
 	private:
 	
 		ClassDef(SysUtils,1)

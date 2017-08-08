@@ -280,6 +280,9 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(saliencyNNFactor,double,0.2,0,1);
 		REGISTER_OPTION(saliencySpatialRegFactor,double,6,0,100);
 		REGISTER_OPTION(saliencyMultiResoCombThrFactor,double,0.7,0,1);
+		REGISTER_OPTION(saliencyDissExpFalloffPar,double,100,1.e-6,1.e+6);
+		REGISTER_OPTION(saliencySpatialDistRegPar,double,1,0,1.e+6);
+
 		
 		//==============================================
 		//==  Superpixel Generation/Merging options   ==

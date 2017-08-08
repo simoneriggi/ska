@@ -30,13 +30,21 @@
 #include <CodeUtils.h>
 #include <Logger.h>
 
-
+//CFITSIO headers
 #include <fitsio.h>
 
+//Boost headers
 #include <boost/filesystem.hpp>
 
+//ROOT headers
 #include <TObject.h>
 
+//OpenMP headers
+#ifdef OPENMP_ENABLED
+  #include <omp.h>
+#endif
+
+//C++ headers
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -47,6 +55,7 @@
 #include <math.h>
 #include <time.h>
 #include <ctime>
+#include <thread>
 
 using namespace std;
 
@@ -163,6 +172,44 @@ int SysUtils::GetFITSImageSize(const std::string& filename,long int& Nx,long int
 	return 0;
 
 }//close GetFITSImageSize()
+
+
+int SysUtils::GetNCores(){
+
+	return std::thread::hardware_concurrency();
+
+}//close GetNCores()
+
+void SysUtils::SetOMPThreads(int nthreads){
+
+	#ifdef OPENMP_ENABLED
+		omp_set_dynamic(false);
+  	omp_set_num_threads(nthreads);
+	#endif
+
+}//close SetOMPThreads()
+
+int SysUtils::GetOMPThreads(){
+
+	#ifdef OPENMP_ENABLED
+		//return omp_get_thread_num();//WRONG (this is the thread id)
+		return omp_get_num_threads();
+	#endif
+
+	return 0;
+
+}//close GetOMPThreads()
+
+int SysUtils::GetOMPCores(){
+
+	#ifdef OPENMP_ENABLED
+		return omp_get_num_procs();
+	#endif
+
+	return 0;
+
+}//close GetOMPCores()
+
 
 }//close namespace
 
