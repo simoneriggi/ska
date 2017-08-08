@@ -194,6 +194,7 @@ int main(int argc, char **argv){
 	}
 
 	//## Check given input file and get info
+	cout<<"INFO: Check input file name "<<inputFileName<<" ..."<<endl;
 	Caesar::FileInfo info;
 	if(!Caesar::SysUtils::CheckFile(inputFileName,info,true,".fits")){
 		cerr<<"ERROR: Invalid input file ("<<inputFileName<<") specified!"<<endl;

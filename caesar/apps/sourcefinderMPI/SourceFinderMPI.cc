@@ -332,6 +332,8 @@ int SourceFinderMPI::Configure(){
 	GET_OPTION_VALUE(saliencyNNFactor,m_SaliencyNNFactor);
 	GET_OPTION_VALUE(saliencySpatialRegFactor,m_SaliencySpatialRegFactor);
 	GET_OPTION_VALUE(saliencyMultiResoCombThrFactor,m_SaliencyMultiResoCombThrFactor);
+	GET_OPTION_VALUE(saliencyDissExpFalloffPar,m_SaliencyDissExpFalloffPar);
+	GET_OPTION_VALUE(saliencySpatialDistRegPar,m_SaliencySpatialDistRegPar);
 
 	//Get extended source options
 	GET_OPTION_VALUE(searchExtendedSources,m_SearchExtendedSources);
@@ -1457,10 +1459,10 @@ int SourceFinderMPI::FindExtendedSources(){
 int SourceFinderMPI::FindExtendedSources_HClust(Img*){
 
 	//## Compute saliency
-	m_SaliencyImg= m_ResidualImg->GetSaliencyMap(
+	m_SaliencyImg= m_ResidualImg->GetMultiResoSaliencyMap(
 		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
-		m_spBeta,m_spMinArea,m_SaliencyNNFactor,
-		m_SaliencySpatialRegFactor,m_SaliencyUseRobustPars,m_SaliencyUseCurvInDiss,m_SaliencyMultiResoCombThrFactor,
+		m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
+		m_SaliencyMultiResoCombThrFactor,
 		m_SaliencyUseBkgMap,m_SaliencyUseNoiseMap,m_ResidualBkgData,
 		m_SaliencyThrFactor,m_SaliencyImgThrFactor
 	);

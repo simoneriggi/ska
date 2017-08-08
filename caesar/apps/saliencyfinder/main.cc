@@ -248,6 +248,8 @@ int FindSaliency(){
 	double saliencySpatialRegFactor;
 	bool saliencyUseRobustPars;
 	double saliencyMultiResoCombThrFactor;
+	double saliencyDissExpFalloffPar;
+	double saliencySpatialDistRegPar;
 	if(GET_OPTION_VALUE(saliencyNNFactor,saliencyNNFactor)<0){
 		cerr<<"FindSaliency(): ERROR: Failed to get saliencyNNFactor option!"<<endl;
 		return -1;
@@ -262,6 +264,14 @@ int FindSaliency(){
 	}
 	if(GET_OPTION_VALUE(saliencySpatialRegFactor,saliencySpatialRegFactor)<0){
 		cerr<<"FindSaliency(): ERROR: Failed to get saliencySpatialRegFactor option!"<<endl;
+		return -1;
+	}
+	if(GET_OPTION_VALUE(saliencyDissExpFalloffPar,saliencyDissExpFalloffPar)<0){
+		cerr<<"FindSaliency(): ERROR: Failed to get saliencyDissExpFalloffPar option!"<<endl;
+		return -1;
+	}
+	if(GET_OPTION_VALUE(saliencySpatialDistRegPar,saliencySpatialDistRegPar)<0){
+		cerr<<"FindSaliency(): ERROR: Failed to get saliencySpatialDistRegPar option!"<<endl;
 		return -1;
 	}
 
@@ -294,7 +304,14 @@ int FindSaliency(){
 	cout<<"INFO: saliencyReso("<<saliencyResoMin<<","<<saliencyResoMax<<","<<saliencyResoStep<<") spBeta="<<spBeta<<". spMinArea="<<spMinArea<<", saliencyUseRobustPars="<<saliencyUseRobustPars<<", saliencyUseCurvInDiss="<<saliencyUseCurvInDiss<<" saliencyMultiResoCombThrFactor="<<saliencyMultiResoCombThrFactor<<" saliencyUseBkgMap="<<saliencyUseBkgMap<<" saliencyUseNoiseMap="<<saliencyUseNoiseMap<<" saliencyThrFactor="<<saliencyThrFactor<<", saliencyImgThrFactor="<<saliencyImgThrFactor<<endl;
 
 	//## Compute saliency
-	saliencyImg= inputImg->GetSaliencyMap(saliencyResoMin,saliencyResoMax,saliencyResoStep,spBeta,spMinArea,saliencyNNFactor,saliencySpatialRegFactor,saliencyUseRobustPars,saliencyUseCurvInDiss,saliencyMultiResoCombThrFactor,saliencyUseBkgMap,saliencyUseNoiseMap,bkgData,saliencyThrFactor,saliencyImgThrFactor);
+	saliencyImg= inputImg->GetMultiResoSaliencyMap(
+		saliencyResoMin,saliencyResoMax,saliencyResoStep,
+		spBeta,spMinArea,saliencyNNFactor,saliencyUseRobustPars,saliencyDissExpFalloffPar,saliencySpatialDistRegPar, 
+		saliencyMultiResoCombThrFactor,
+  	saliencyUseBkgMap,saliencyUseNoiseMap,bkgData,
+		saliencyThrFactor,saliencyImgThrFactor
+	);
+
 	if(!saliencyImg){
 		cerr<<"FindSaliency(): ERROR: Failed to compute saliency map!"<<endl;
 		return -1;
@@ -469,7 +486,7 @@ int ReadImage(){
 
 	// Compute stats
 	cout<<"INFO: Computing input image stats..."<<endl;
-	if(!inputImg->ComputeStats(true,false,false)<0){
+	if(inputImg->ComputeStats(true,false,false)<0){
 		cerr<<"ReadImage(): ERROR: Stats computing failed!"<<endl;
 		inputImg->Delete();
 		return -1;

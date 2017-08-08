@@ -628,7 +628,7 @@ int ReadImage(){
 
 	// Compute stats
 	cout<<"INFO: Computing input image stats..."<<endl;
-	if(!inputImg->ComputeStats(true,false,false)<0){
+	if(inputImg->ComputeStats(true,false,false)<0){
 		cerr<<"ReadImage(): ERROR: Stats computing failed!"<<endl;
 		inputImg->Delete();
 		return -1;
