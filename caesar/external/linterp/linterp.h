@@ -35,6 +35,9 @@ For a description of the algorithms, see:
 #include <array>
 #include <functional>
 
+#include <boost/serialization/array_wrapper.hpp>//added to fix build error: ‘make_array’ is not a member of ‘boost::serialization’
+
+
 #include <boost/multi_array.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/matrix_proxy.hpp>
