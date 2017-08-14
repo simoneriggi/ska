@@ -34,6 +34,10 @@
 #pragma link C++ class vector<Caesar::Img>+;
 #pragma link C++ class vector<Caesar::Img*>+;
 //#pragma link C++ enum Caesar::WCSType+;
+
+#pragma link C++ class Caesar::Image+;
+#pragma link C++ class vector<Caesar::Image>+;
+#pragma link C++ class vector<Caesar::Image*>+;
 //================
 
 //== UTILS CLASSES ==
@@ -190,6 +194,7 @@
 #pragma link C++ class Caesar::BkgSampleData+;
 #pragma link C++ class vector<Caesar::BkgSampleData>+;
 #pragma link C++ class Caesar::BkgData+;
+#pragma link C++ class Caesar::ImgBkgData+;
 #pragma link C++ class Caesar::BkgFinder+;
 #pragma link C++ function Caesar::BlobFinder::FindBlob<Blob>(Caesar::Img*,std::vector<Blob*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
 #pragma link C++ function Caesar::BlobFinder::FindBlob<Source>(Caesar::Img*,std::vector<Source*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
