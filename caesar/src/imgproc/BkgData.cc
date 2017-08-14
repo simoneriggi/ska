@@ -27,6 +27,7 @@
 
 #include <BkgData.h>
 #include <Img.h>
+#include <Image.h>
 
 #include <TObject.h>
 #include <TString.h>
@@ -44,8 +45,53 @@ using namespace std;
 
 ClassImp(Caesar::BkgSampleData)
 ClassImp(Caesar::BkgData)
+ClassImp(Caesar::ImgBkgData)
 
 namespace Caesar {
+
+//=====================================
+//==   NEW BKG DATA
+//=====================================
+
+ImgBkgData::ImgBkgData() {
+	BkgSamplings.clear();
+	BkgMap= 0;
+	NoiseMap= 0;
+	gBkg= 0;
+	gNoise= 0;
+}//close costructor
+
+ImgBkgData::~ImgBkgData() {
+	Clear();
+}//close destructor
+
+void ImgBkgData::CopyBkgMap(Caesar::Image* aMap){
+	if(!aMap) return;
+	TString mapName= "bkgMap";
+	if(BkgMap) {
+		mapName= BkgMap->GetName();
+		delete BkgMap;
+		BkgMap= 0;
+	}
+	BkgMap= aMap->GetCloned(std::string(mapName),true,true);
+}//close CopyBkgMap()
+		
+void ImgBkgData::CopyNoiseMap(Caesar::Image* aMap){
+	if(!aMap) return;
+	TString mapName= "noiseMap";
+	if(NoiseMap) {
+		mapName= NoiseMap->GetName();	
+		delete NoiseMap;
+		NoiseMap= 0;
+	}
+	NoiseMap= aMap->GetCloned(std::string(mapName),true,true);
+
+}//close CopyNoiseMap()
+		
+
+//=====================================
+//==   OLD BKG DATA
+//=====================================
 
 BkgData::BkgData() {
 	BkgSamplings.clear();

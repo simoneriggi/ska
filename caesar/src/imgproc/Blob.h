@@ -30,6 +30,7 @@
 
 #include <Pixel.h>
 #include <Img.h>
+#include <Consts.h>
 
 
 #include <TObject.h>
@@ -238,7 +239,8 @@ class Blob : public TObject {
 		/**
 		* \brief Get image
 		*/
-		Img* GetImage(Img::ImgType mode);
+		//Img* GetImage(Img::ImgType mode);
+		Img* GetImage(ImgType mode);
 		/**
 		* \brief Return contours
 		*/

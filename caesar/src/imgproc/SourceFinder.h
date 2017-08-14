@@ -58,11 +58,13 @@ class Img;
 class Source;
 class BkgData;
 
+/*
 enum SegmAlgo {
-	eWT= 1,
+	eWaveletTranform= 1,
 	eHClust= 2,
 	eChanVese= 3,
 };
+*/
 
 class SourceFinder : public TObject {
 

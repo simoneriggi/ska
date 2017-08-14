@@ -1,3 +1,4 @@
+
 // ***********************************************************************
 // * License and Disclaimer                                              *
 // *                                                                     *
@@ -15,77 +16,90 @@
 // * have received a copy of the GNU General Public License along with   * 
 // * Caesar. If not, see http://www.gnu.org/licenses/.                   *
 // ***********************************************************************
+
 /**
-* @file AstroUtils.h
-* @class AstroUtils
-* @brief Utility functions for astronomical tasks
+* @file ImgStats.h
+* @class ImgStats
+* @brief ImgStats
 *
-* Utility functions for astronomical tasks
+* Image stats class
 * @author S. Riggi
-* @date 15/01/2016
+* @date 20/01/2015
 */
 
-
-#ifndef AstroUtils_h
-#define AstroUtils_h 1
-
-#include <wcs.h>
+#ifndef _IMG_STATS_h
+#define _IMG_STATS_h 1
 
 #include <TObject.h>
-
-#include <cstdlib>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
-#include <fstream>
-#include <stdio.h>
 #include <string>
-#include <stdexcept>
-
-#include <vector>
-#include <algorithm>
-#include <map>
-#include <time.h>
-#include <ctime>
-
-using namespace std;
-
 
 namespace Caesar {
 
-class Img;
-class ImgMetaData;
-class ImgStatsData;
 
-class AstroUtils : public TObject {
+class ImgStats : public TObject {
 
-  public:
-		
-		/** 
-		\brief Class constructor: initialize structures.
- 		*/
-    AstroUtils();
-		/**
-		* \brief Class destructor: free allocated memory
-		*/
-   	virtual ~AstroUtils();
-
-		
 	public:
 
-		static int PixelToWCSCoords(Caesar::Img* image,WorldCoor* wcs,double ix,double iy,double& xpos, double& ypos);
-		static int PixelToWCSCoords(Caesar::Img* image,double ix,double iy,double& xpos, double& ypos,int coordSystem=-1);
-		
-	private:
+		/**
+		* \brief Constructor
+		*/
+		ImgStats();
+		/**
+		* \brief Destructor
+		*/
+		virtual ~ImgStats();
+
+	public:
+		/**
+		* \brief Reset stats params
+		*/
+		void Reset();
+
+		/**
+		* \brief Log stats
+		*/
+		void Log(std::string level="INFO");
+
+		/**
+		* \brief Print stats to stdout
+		*/
+		void Print();
+
+		/**
+		* \brief Get a printable string
+		*/
+		std::string GetPrintable();
+
+	public:		
 	
-		ClassDef(AstroUtils,1)
-};
+		int n;
+		double min;
+		double max;
+		double mean;
+		double meanErr;
+		double rms;
+		double rmsErr;
+  	double skewness;	
+		double skewnessErr;			
+		double kurtosis;	
+		double kurtosisErr;	
+		double median;
+		double medianRMS;
+		double bwLocation;
+		double bwScale;
+		double bwLocationIter;
+		double bwScaleIter;
+		double clippedMedian;
+		double clippedRMS;
+		
+	ClassDef(ImgStats,2)
+
+};//close class
 
 #ifdef __MAKECINT__
-#pragma link C++ class AstroUtils+;
-#endif	
+#pragma link C++ class ImgStats+;
+#endif
 
 }//close namespace
 
-
-#endif 
+#endif

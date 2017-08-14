@@ -29,6 +29,8 @@
 
 #include <Img.h>
 
+//== Img headers
+#include <ImgStats.h>
 
 //== IO headers
 #include <FITSReader.h>
@@ -97,8 +99,8 @@
 using namespace std;
 
 
-ClassImp(Caesar::ImgMetaData)
-ClassImp(Caesar::ImgStats)
+//ClassImp(Caesar::ImgMetaData)
+//ClassImp(Caesar::ImgStats)
 ClassImp(Caesar::Img)
 
 namespace Caesar {
@@ -129,6 +131,7 @@ Img::Img(const Img &img) : TH2F() {
 	DEBUG_LOG("Copy constuctor called...");
   ((Img&)img).Copy(*this);
 }//close constructor
+
 
 
 void Img::Copy(TObject& obj) const
@@ -162,9 +165,6 @@ void Img::Copy(TObject& obj) const
 	}
 	//cout<<"done!"<<endl;
 	
-
-	
-  
 }//close Copy()
 
 
@@ -190,6 +190,7 @@ Img& Img::operator=(const Img &img) {
   if (this != &img)  ((Img&)img).Copy(*this);
   return *this;
 }
+
 
 
 void Img::Init(){
@@ -296,41 +297,149 @@ void Img::ResetImgStats(bool resetMoments,bool clearStats){
 
 void Img::ComputeMoments(bool skipNegativePixels){
 
+
 	#ifdef OPENMP_ENABLED
 		
 		//Define variables for reduction (OMP does not allow class members in reduction operation)
-		long long int nPix= m_Npix;
-		double pixelMin= m_PixelMin; 
-		double pixelMax= m_PixelMax;
-		double M1= m_M1;
-		double M2= m_M2;
-		double M3= m_M3;
-		double M4= m_M4;
+		long long int nPix= 0;
+		double pixelMin= +1.e+99; 
+		double pixelMax= -1.e+99;
+		double M1= 0;
+		double M2= 0;
+		double M3= 0;
+		double M4= 0;
+		double S= 0;
 
-		#pragma omp parallel
+		long long int nPix_t= 0;
+		double M1_t= 0;
+		double M2_t= 0;
+		double M3_t= 0;
+		double M4_t= 0;
+		double S_t= 0;
+
+		std::vector<long long int> nPix_list;
+		std::vector<double> M1_list;
+		std::vector<double> M2_list;
+		std::vector<double> M3_list;
+		std::vector<double> M4_list;
+
+		#pragma omp parallel private(nPix_t,M1_t,M2_t,M3_t,M4_t,S_t) reduction(max: pixelMax), reduction(min: pixelMin), reduction(+: nPix, S)
 		{
-			INFO_LOG("Starting image moment computing in thread "<<omp_get_thread_num()<<" (nthreads="<<SysUtils::GetOMPThreads()<<") ...");
+
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+			INFO_LOG("Starting image moment computing in thread "<<thread_id<<" (nthreads="<<nthreads<<") ...");
 			
-			#pragma omp for reduction(max: pixelMax), reduction(min: pixelMin), reduction(+: nPix,M1,M2,M3,M4)
-		
+			//Init moments
+			nPix_t= 0;
+			M1_t= 0;
+			M2_t= 0;
+			M3_t= 0;
+			M4_t= 0;
+			S_t= 0;
+
+			#pragma omp single
+   		{
+     		nPix_list.assign(nthreads,0);
+				M1_list.assign(nthreads,0);
+				M2_list.assign(nthreads,0);	
+				M3_list.assign(nthreads,0);
+				M4_list.assign(nthreads,0);
+   		}
+
+			#pragma omp for
 			for(int i=0;i<this->GetNbinsX();i++){
 				for(int j=0;j<this->GetNbinsY();j++){
 					double w= this->GetBinContent(i+1,j+1);
 					if( w==0 || (skipNegativePixels && w<0) ) continue; 
 					if(w<pixelMin) pixelMin= w;
 					if(w>pixelMax) pixelMax= w;
-					nPix++;
-  				double delta = w - M1;
-  				double delta_n = delta/nPix;
+					nPix_t++;
+					S_t+= w;
+  				double delta = w - M1_t;
+  				double delta_n = delta/nPix_t;
   				double delta_n2 = delta_n * delta_n;
-  				double f = delta * delta_n * (nPix-1);
-  				M1+= delta_n;
-  				M4+= f * delta_n2 * (nPix*nPix - 3*nPix + 3) + 6 * delta_n2 * M2 - 4 * delta_n * M3;
-  				M3+= f * delta_n * (nPix - 2) - 3 * delta_n * M2;
-  				M2+= f;
-				}
-			}
+  				double f = delta * delta_n * (nPix_t-1);
+  				M1_t+= delta_n;
+  				M4_t+= f * delta_n2 * (nPix_t*nPix_t - 3*nPix_t + 3) + 6 * delta_n2 * M2_t - 4 * delta_n * M3_t;
+  				M3_t+= f * delta_n * (nPix_t - 2) - 3 * delta_n * M2_t;
+  				M2_t+= f;
+				}//end bins y
+			}//end bins x
+
+			INFO_LOG("Thread id="<<omp_get_thread_num()<<": nPix_t="<<nPix_t<<", M1="<<M1_t<<", M2="<<M2_t<<", M3="<<M3_t<<", M4="<<M4_t);
+
+			nPix+= nPix_t;
+			S+= S_t;
+
+			//Fill list
+			nPix_list[thread_id]= nPix_t; 
+			M1_list[thread_id]= M1_t; 
+			M2_list[thread_id]= M2_t; 
+			M3_list[thread_id]= M3_t; 
+			M4_list[thread_id]= M4_t; 
+	
 		}//close parallel section
+
+		
+		//Compute moments
+		if(M3_list.size()==1){
+			M1= M1_list[0];
+			M2= M2_list[0];
+			M3= M3_list[0];
+			M4= M4_list[0];
+		}
+		else{
+			//Compute mean
+			M1= S/(double)(nPix);
+		
+			//Compute second moment: sum (M2_j + n_j*(mean-mean_j)^2 
+			M2= 0;
+			double mean= M1;
+			for(size_t j=0;j<M2_list.size();j++){
+				double M2_j= M2_list[j];
+				double mean_j= M1_list[j];
+				double N_j= nPix_list[j];
+				M2+= M2_j + N_j*(mean-mean_j)*(mean-mean_j);	
+			}
+	
+			//Compute 3rd & 4th moments	
+			double M1_A= M1_list[0];
+			double M2_A= M2_list[0];
+			double M3_A= M3_list[0];
+			double M4_A= M4_list[0];
+			double N_A= nPix_list[0];
+			double M1_AB= 0;
+			double M2_AB= 0;
+			double M3_AB= 0;
+			double M4_AB= 0;
+			double N_AB= 0;
+			for(size_t j=1;j<M3_list.size();j++){
+				double M1_B= M1_list[j];
+				double M2_B= M2_list[j];
+				double M3_B= M3_list[j];
+				double M4_B= M4_list[j];
+				double N_B= nPix_list[j];
+				double delta= M1_B-M1_A;
+				N_AB= N_A+N_B;
+				M1_AB= (N_A*M1_A+N_B*M1_B)/N_AB;
+				//M2_AB= M2_A + M2_B + delta*delta*N_A*N_B/N_AB;
+				M2_AB= M2_A + M2_B + N_A*(M1_AB-M1_A)*(M1_AB-M1_A) + N_B*(M1_AB-M1_B)*(M1_AB-M1_B);			
+				M3_AB= M3_A + M3_B + pow(delta,3)*N_A*N_B*(N_A-N_B)/(N_AB*N_AB) + 3*delta*(N_A*M2_B-N_B*M2_A)/N_AB;
+				M4_AB= M4_A + M4_B + pow(delta,4)*N_A*N_B*(N_A*N_A-N_A*N_B+N_B*N_B)/pow(N_AB,3) + 6*delta*delta*(N_A*N_A*M2_B+N_B*N_B*M2_A)/(N_AB*N_AB) + 4*delta*(N_A*M3_B-N_B*M3_A)/N_AB;
+
+				//Update A partition to A+B
+				N_A= N_AB;
+				M1_A= M1_AB;
+				M2_A= M2_AB;
+				M3_A= M3_AB;
+				M4_A= M4_AB;
+			}//end loop partitions
+		
+			M3= M3_AB;
+			M4= M4_AB;
+		}//close else
+
 
 		//Set reduced vars to global class var
 		m_Npix = nPix;
@@ -350,6 +459,7 @@ void Img::ComputeMoments(bool skipNegativePixels){
 			}
 		}
 	#endif
+
 
 }//close ComputeMoments()
 

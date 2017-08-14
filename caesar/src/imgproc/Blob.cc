@@ -638,7 +638,8 @@ int Blob::ComputeMorphologyParams(){
 
 }//close ComputeMorphologyParams()
 
-Img* Blob::GetImage(Img::ImgType mode){
+//Img* Blob::GetImage(Img::ImgType mode){
+Img* Blob::GetImage(ImgType mode){
 
 	//Bounding box in (x,y) coordinates
 	double xRange[2]= {m_Xmin,m_Xmax};
@@ -657,7 +658,8 @@ Img* Blob::GetImage(Img::ImgType mode){
 	TString imgName= Form("SourceImg_%s_mode%d",Name.c_str(),mode);
 	Img* blobImg= new Img(imgName,imgName,nBoxX,boundingBoxX[0]-0.5,boundingBoxX[1]+0.5,nBoxY,boundingBoxY[0]-0.5,boundingBoxY[1]+0.5);
 	
-	if(mode==Img::eBinaryMap){
+	//if(mode==Img::eBinaryMap){
+	if(mode==eBinaryMap){
 		for(unsigned int k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
@@ -665,7 +667,8 @@ Img* Blob::GetImage(Img::ImgType mode){
 			blobImg->FillPixel(thisX,thisY,1);
 		}//end loop pixels
 	}//close if
-	else if(mode==Img::eFluxMap){
+	//else if(mode==Img::eFluxMap){
+	else if(mode==eFluxMap){
 		for(unsigned int k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
@@ -674,7 +677,8 @@ Img* Blob::GetImage(Img::ImgType mode){
 			blobImg->FillPixel(thisX,thisY,thisS);
 		}//end loop pixels
 	}//close else
-	else if(mode==Img::eSignificanceMap){
+	//else if(mode==Img::eSignificanceMap){
+	else if(mode==eSignificanceMap){
 		for(unsigned int k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
@@ -687,7 +691,8 @@ Img* Blob::GetImage(Img::ImgType mode){
 			blobImg->FillPixel(thisX,thisY,thisZ);
 		}//end loop pixels
 	}//close else
-	else if(mode==Img::ePullMap){
+	//else if(mode==Img::ePullMap){
+	else if(mode==ePullMap){
 		for(unsigned int k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
@@ -697,7 +702,8 @@ Img* Blob::GetImage(Img::ImgType mode){
 			blobImg->FillPixel(thisX,thisY,thisPull);
 		}//end loop pixels
 	}//close else if
-	else if(mode==Img::eCurvatureMap){
+	//else if(mode==Img::eCurvatureMap){
+	else if(mode==eCurvatureMap){
 		for(unsigned int k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
@@ -707,7 +713,8 @@ Img* Blob::GetImage(Img::ImgType mode){
 		}//end loop pixels
 	}//close else if
 	
-	else if(mode==Img::eMeanFluxMap){
+	//else if(mode==Img::eMeanFluxMap){
+	else if(mode==eMeanFluxMap){
 		for(unsigned int k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;

@@ -34,6 +34,7 @@
 #include <BkgData.h>
 #include <CodeUtils.h>
 #include <Logger.h>
+#include <Consts.h>
 
 #include <SLIC.h>
 #include <SLICUtils.h>
@@ -518,7 +519,7 @@ int SourceFinder::FindExtendedSources(){
 	else if(m_ExtendedSearchMethod==eChanVese){
 		status= FindExtendedSources_ChanVese(inputImg);
 	}
-	else if(m_ExtendedSearchMethod==eWT){
+	else if(m_ExtendedSearchMethod==eWaveletTransform){
 		status= FindExtendedSources_WT(inputImg);
 	}
 	else{

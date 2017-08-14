@@ -28,13 +28,16 @@
 #ifndef BkgFinder_h
 #define BkgFinder_h 1
 
+#include <Consts.h>
 #include <TObject.h>
 
 namespace Caesar {
 
 class Img;
+class Image;
 class BkgSampleData;
 class BkgData;
+class ImgBkgData;
 
 class BkgFinder : public TObject {
 
@@ -50,19 +53,70 @@ class BkgFinder : public TObject {
 		*/
     virtual ~BkgFinder();
 
-		enum BkgEstimator {eMeanBkg=1,eMedianBkg=2,eBiWeightBkg=3,eMedianClippedBkg= 4};
-		enum BkgMethod {eGridBkg=1,eSuperpixelBkg=2};
+		//enum BkgEstimator {eMeanBkg=1,eMedianBkg=2,eBiWeightBkg=3,eMedianClippedBkg= 4};
+		//enum BkgMethod {eGridBkg=1,eSuperpixelBkg=2};
 
 	public:
 	
+		//=========================================
+		//==  NEW IMAGE METHODS 
+		//=========================================
+		/**
+		* \brief Find image background
+		*/
+		static ImgBkgData* FindBkg(Image* img,int estimator=eMedianBkg,bool computeLocalBkg=true,int boxSizeX=100,int boxSizeY=100, double gridStepSizeX=10, double gridStepSizeY=10, bool use2ndPass=true,bool skipOutliers=false,double seedThr=5,double mergeThr=2.6,int minPixels=10);
+	
+		
+		//=========================================
+		//==  OLD IMAGE METHODS 
+		//=========================================
+		/**
+		* \brief Find image background
+		*/
 		static BkgData* FindBkg(Img* img,int estimator=eMedianBkg,bool computeLocalBkg=true,int boxSizeX=100,int boxSizeY=100, double gridStepSizeX=10, double gridStepSizeY=10, bool use2ndPass=true,bool skipOutliers=false,double seedThr=5,double mergeThr=2.6,int minPixels=10);
 		
 		
 	private:
-		static int FindLocalGridBkg(BkgData* bkgData,Img* img,int estimator,int boxSizeX, int boxSizeY, double gridStepSizeX,double gridStepSizeY,bool use2ndPass);
-		static int ComputeLocalGridBkg(BkgData* bkgData,Img* img,int estimator,int boxSizeX,int boxSizeY,double gridStepSizeX,double gridStepSizeY);
+
+		//=========================================
+		//==  NEW IMAGE METHODS 
+		//=========================================
+		/**
+		* \brief Compute global background
+		*/
+		static int ComputeGlobalBkg(ImgBkgData* bkgData,Image* img,int estimator);
+		/**
+		* \brief Compute background of sample/tile image
+		*/
+		static int ComputeSampleBkg(BkgSampleData& bkgSampleData,Image* img,int estimator,long int ix_min=-1,long int ix_max=-1,long int iy_min=-1,long int iy_max=-1);
+		/**
+		* \brief Find local grid background
+		*/
+		static int FindLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,long int boxSizeX,long int boxSizeY,double gridStepSizeX,double gridStepSizeY,bool use2ndPass);
+		/**
+		* \brief Compute local grid background
+		*/
+		static int ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,long int boxSizeX,long int boxSizeY,double gridStepSizeX,double gridStepSizeY);
+		
+		//=========================================
+		//==  OLD IMAGE METHODS 
+		//=========================================
+		/**
+		* \brief Compute global background
+		*/
 		static int ComputeGlobalBkg(BkgData* bkgData,Img* img,int estimator);
+		/**
+		* \brief Compute background of sample/tile image
+		*/
 		static int ComputeSampleBkg(BkgSampleData& bkgSampleData,Img* img,int estimator);
+		/**
+		* \brief Find local grid background
+		*/
+		static int FindLocalGridBkg(BkgData* bkgData,Img* img,int estimator,int boxSizeX, int boxSizeY, double gridStepSizeX,double gridStepSizeY,bool use2ndPass);
+		/**
+		* \brief Compute local grid background
+		*/
+		static int ComputeLocalGridBkg(BkgData* bkgData,Img* img,int estimator,int boxSizeX,int boxSizeY,double gridStepSizeX,double gridStepSizeY);
 		
 	private:
 

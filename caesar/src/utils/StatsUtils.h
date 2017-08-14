@@ -134,7 +134,7 @@ class StatsUtils : public TObject {
 		static T GetMADFast( std::vector<T>const &vec, T median,bool useParallelVersion=false){
 			size_t n = vec.size();
 			if(n<=0) return -999;
-			std::vector<double> MADs;
+			std::vector<T> MADs;
 
 			#ifdef OPENMP_ENABLED
 				#pragma omp declare reduction (merge : std::vector<T> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
@@ -144,7 +144,7 @@ class StatsUtils : public TObject {
   			for(size_t j=0;j<n;j++) MADs.push_back( fabs(vec[j]-median) );
 			#endif
 
-			double MAD= StatsUtils::GetMedianFast(MADs,useParallelVersion);
+			T MAD= StatsUtils::GetMedianFast(MADs,useParallelVersion);
   		return MAD;
 		}//close GetMADFast()
 

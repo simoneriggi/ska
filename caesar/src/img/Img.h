@@ -29,6 +29,10 @@
 #ifndef Img_h
 #define Img_h 1
 
+#include <Consts.h>
+#include <ImgStats.h>
+#include <ImgMetaData.h>
+
 #include <FITSReader.h>
 #include <AstroUtils.h>
 #include <BkgFinder.h>
@@ -74,7 +78,7 @@ namespace Caesar{
 
 class Source;
 
-
+/*
 enum WCSType {
 	eJ2000= 0,
 	eB1950= 1,
@@ -90,7 +94,9 @@ enum ImgFilters {
 	eWaveletFilter= 3,
 	eLoGFilter= 4
 };
+*/
 
+/*
 class ImgMetaData : public TObject {
 
 	public:
@@ -108,9 +114,7 @@ class ImgMetaData : public TObject {
 		virtual ~ImgMetaData(){};
 
 	public: 
-		/**
-		* \brief Set cards from FITS file
-		*/
+		
 		void SetFITSCards(Caesar::FITSFileInfo fits_info){
 			Nx= (fits_info.header).Nx;
 			Ny= (fits_info.header).Ny;
@@ -131,14 +135,10 @@ class ImgMetaData : public TObject {
 			Epoch= (fits_info.header).Epoch;
 		}//close SetFITSCards()
 
-		/**
-		* \brief Get current WCS type
-		*/
+		
 		std::string GetWCSType(){return m_wcsType;}
 		
-		/**
-		* \brief Get world coordinate system 
-		*/
+		
 		WorldCoor* GetWorldCoord(int coordSystem=-1){
 
 			//Compute the wcs from vars
@@ -168,25 +168,19 @@ class ImgMetaData : public TObject {
 			return wcs;
 		}//close GetWorldCoord()
 
-		/**
-		* \brief Get size of synthetic beam
-		*/
+		
 		double GetBeamSize(){
 			double beamSize= sqrt(fabs(Bmaj*Bmin));
 			return beamSize;	
 		}
-		/**
-		* \brief Get pixel scale
-		*/
+		
 		int GetBeamSizeInPixel(){
 			double beamSize= GetBeamSize();
 			double pixScale= sqrt(fabs(dX*dY));
 			int npixInBeam= int(ceil(beamSize/pixScale));
 			return npixInBeam;
 		}
-		/**
-		* \brief Get flux correction from beam
-		*/
+		
 		double GetBeamFluxIntegral(){
 			double fx= Bmaj;
 			double fy= Bmin;
@@ -241,8 +235,9 @@ class ImgMetaData : public TObject {
 #pragma link C++ class ImgMetaData+;
 //#pragma link C++ enum WCSType+;
 #endif
+*/
 
-
+/*
 class ImgStats : public TObject {
 
 	public:
@@ -262,6 +257,8 @@ class ImgStats : public TObject {
 			rmsErr= 0;
 			skewness= 0;
 			skewnessErr= 0;
+			kurtosis= 0;
+			kurtosisErr= 0;
 			median= 0;
 			medianRMS= 0;
 			bwLocation= 0;
@@ -280,6 +277,7 @@ class ImgStats : public TObject {
 			cout<<"Mean: "<<mean<<" +- "<<meanErr<<endl;
 			cout<<"RMS: "<<rms<<" +- "<<rmsErr<<endl;
 			cout<<"Skewness: "<<skewness<<" +- "<<skewnessErr<<endl;
+			cout<<"Kurtosis: "<<kurtosis<<" +- "<<kurtosisErr<<endl;
       cout<<"Median: "<<median<<", MAD: "<<medianRMS<<endl;
 			cout<<"BiWeight Location: "<<bwLocation<<", Scale: "<<bwScale<<endl;		
 			cout<<"Clipped Median: "<<clippedMedian<<" MAD: "<<clippedRMS<<endl;
@@ -308,6 +306,8 @@ class ImgStats : public TObject {
 		double rmsErr;
   	double skewness;	
 		double skewnessErr;			
+		double kurtosis;	
+		double kurtosisErr;	
 		double median;
 		double medianRMS;
 		double bwLocation;
@@ -324,7 +324,7 @@ class ImgStats : public TObject {
 #ifdef __MAKECINT__
 #pragma link C++ class ImgStats+;
 #endif
-
+*/
 
 class Img : public TH2F {
 
@@ -345,6 +345,7 @@ class Img : public TH2F {
 		*/
     virtual ~Img();
 
+		/*
 		enum ImgType {
 			eUnknown=0,
 			eFluxMap=1,
@@ -366,6 +367,7 @@ class Img : public TH2F {
 			eLoG=6,	
 			eNormLoG=7
 		};
+		*/
 
 	public:
 				
@@ -502,7 +504,7 @@ class Img : public TH2F {
 		/**
 		* \brief Compute local bkg
 		*/
-		BkgData* ComputeBkg(int estimator=BkgFinder::eMedianBkg,bool computeLocalBkg=true,int boxSizeX=100,int boxSizeY=100, double gridStepSizeX=10, double gridStepSizeY=10, bool use2ndPass=true,bool skipOutliers=false,double seedThr=5,double mergeThr=2.6,int minPixels=10);
+		BkgData* ComputeBkg(int estimator=eMedianBkg,bool computeLocalBkg=true,int boxSizeX=100,int boxSizeY=100, double gridStepSizeX=10, double gridStepSizeY=10, bool use2ndPass=true,bool skipOutliers=false,double seedThr=5,double mergeThr=2.6,int minPixels=10);
 		/**
 		* \brief Compute significance map
 		*/
@@ -653,6 +655,9 @@ class Img : public TH2F {
 		*/
 		void SetDrawRange(double zmin,double zmax);
 
+
+		
+
 	private:
 		/**
 		* \brief Init data
@@ -695,6 +700,7 @@ class Img : public TH2F {
 		}
 
 		
+	
 
 	private:
 
@@ -720,9 +726,9 @@ class Img : public TH2F {
 };
 
 #ifdef __MAKECINT__
-#pragma link C++ enum Img::ImgType+;
-#pragma link C++ class StatsData+;
-#pragma link C++ class MetaData+;
+//#pragma link C++ enum Img::ImgType+;
+//#pragma link C++ class StatsData+;
+//#pragma link C++ class MetaData+;
 #pragma link C++ class Img+;
 #pragma link C++ class vector<Img>+;
 #pragma link C++ class vector<Img*>+;

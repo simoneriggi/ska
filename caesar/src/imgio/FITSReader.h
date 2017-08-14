@@ -34,6 +34,10 @@
 #include <TFITS.h>
 #include <TMath.h>
 
+
+//CFITSIO headers
+#include <fitsio.h>
+
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -55,6 +59,7 @@ namespace Caesar {
 
 class Img;
 class ImgMetaData;
+class Image;
 
 class FITSHeader : public TObject {
 
@@ -154,11 +159,34 @@ class FITSReader : public TObject {
 		static int Read(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info,bool checkFile=true);
 		static int ReadTile(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info,int xMin,int xMax,int yMin,int yMax,bool checkFile=true);	
 		static int ReadTileFast(std::string filename,Caesar::Img& image,Caesar::FITSFileInfo& fits_info,int ix_min,int ix_max,int iy_min,int iy_max,bool checkFile=true);
+
+		/**
+		* \brief Read a FITS image & header and store it in Caesar img format (based on CFITSIO)
+		*/
+		static int Read(Caesar::Image& img,Caesar::FITSFileInfo& info,std::string filename,int hdu_id=1,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1,bool checkFile=true);
+	
 	private:
 
 		static bool ReadHeader(TFITSHDU* hdu,Caesar::FITSFileInfo& fits_info);
-		static TFITSHDU* ReadFile(std::string filename,Caesar::FITSFileInfo& fits_info,bool checkFile=true);
 		
+		static TFITSHDU* ReadFile(std::string filename,Caesar::FITSFileInfo& fits_info,bool checkFile=true);
+
+		/**
+		* \brief Read header of currently open HDU (based on CFITSIO)
+		*/		
+		static int ReadHeader(Caesar::FITSFileInfo& fits_info,fitsfile* fp);
+		/**
+		* \brief Read header of currently open HDU (based on CFITSIO)
+		*/		
+		static int ReadImage(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile* fp,std::string filename,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1);
+		//static int ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,std::string filename,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1);
+
+		static int ReadAndFillImageData(Image& img,long int Nx,long int Ny,fitsfile* fp,int& read_data_status);
+		/**
+		* \brief Internal method to handle errors occurred while processing cfitsio data structures
+		*/
+		static void HandleError(int& status,fitsfile* fp);
+
 	private:
 
 		ClassDef(FITSReader,1)
