@@ -98,6 +98,7 @@ class BkgFinder : public TObject {
 		*/
 		static int ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,long int boxSizeX,long int boxSizeY,double gridStepSizeX,double gridStepSizeY);
 		
+
 		//=========================================
 		//==  OLD IMAGE METHODS 
 		//=========================================

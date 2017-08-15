@@ -29,6 +29,7 @@
 #define FITSReader_h 1
 
 #include <SysUtils.h>
+#include <StatsUtils.h>
 
 #include <TObject.h>
 #include <TFITS.h>
@@ -179,9 +180,20 @@ class FITSReader : public TObject {
 		* \brief Read header of currently open HDU (based on CFITSIO)
 		*/		
 		static int ReadImage(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile* fp,std::string filename,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1);
-		//static int ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,std::string filename,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1);
+		
+		#ifdef OPENMP_ENABLED
+		static int ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile* fp,std::string filename,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1);
+		#endif
 
+		/**
+		* \brief Read image data
+		*/	
 		static int ReadAndFillImageData(Image& img,long int Nx,long int Ny,fitsfile* fp,int& read_data_status);
+		
+		#ifdef OPENMP_ENABLED
+		static int ReadAndFillImageDataMT(Image& img,long int Nx,long int Ny,fitsfile* fp,int& read_data_status,std::vector<Caesar::StatMoments<double>>& moments);
+		#endif
+
 		/**
 		* \brief Internal method to handle errors occurred while processing cfitsio data structures
 		*/

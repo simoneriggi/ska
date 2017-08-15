@@ -89,6 +89,7 @@ class Image : public TObject {
     Image(const Image& img);		
 		Image(long int nbinsx,long int nbinsy,float xlow=-1,float ylow=-1,std::string name="");	
 		Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,float xlow=-1,float ylow=-1,std::string name="");
+		Image(long int nbinsx,long int nbinsy,float w,float xlow=-1,float ylow=-1,std::string name="");
 		Image& operator=(const Image &img);
 		virtual void Copy(TObject &hnew) const;
 
@@ -122,6 +123,20 @@ class Image : public TObject {
 		* \brief Return pixel list
 		*/
 		const std::vector<float>& GetPixels() const {return m_pixels;}
+
+		/**
+		* \brief Get pixel vector size
+		*/
+		long int GetPixelDataSize(){
+			return (long int)(m_pixels.size());
+		}
+		/**
+		* \brief Has pixel data
+		*/
+		bool HasPixelData() {
+			long int n= GetPixelDataSize();
+			return (n>0 && n==GetNPixels());
+		}
 
 		/**
 		* \brief Set image size (NB: this cleares pixel vector and allocated space!!!)
@@ -190,13 +205,17 @@ class Image : public TObject {
 			return ((gbin-binx)/m_Nx)%m_Ny;
 		}	
 
-		float GetBinContent(long int ix,long int iy){
-			long int gbin= GetBin(ix,iy);	
+		float GetPixelValue(long int gbin){
 			if(gbin<0 || gbin>=(long int)(m_pixels.size())) {
 				WARN_LOG("Invalid pixel bin ("<<gbin<<") requested to be accessed (hint: check if image size is not initialized or given bin exceed size), returning nan");
 				return std::numeric_limits<float>::quiet_NaN();
-			}	
+			}
 			return m_pixels[gbin];
+		}
+
+		float GetBinContent(long int ix,long int iy){
+			long int gbin= GetBin(ix,iy);	
+			return GetPixelValue(gbin);
 		}
 	
 		/**
@@ -222,6 +241,10 @@ class Image : public TObject {
 			this->ResetImgStats(true,true);
 		}
 		
+		/**
+		* \brief Add an image to this (this= this + img*c)
+		*/
+		int Add(Image* img,double c=1,bool computeStats=false);
 
 		/**
 		* \brief Get pixel world coordinate
@@ -274,12 +297,22 @@ class Image : public TObject {
 		//==       Fill methods
 		//================================
 		/**
-		* \brief Fill pixels (to be used to compute stats at fill time)
+		* \brief Check filled pixel
+		*/
+		int CheckFillPixel(long int gbin,double w);
+
+		/**
+		* \brief Fill pixels (to be used to compute stats at fill time). NB: use only in single-thread otherwise computed moments are not correct (+ race conditions)!!!
 		*/
 		int FillPixel(long int ix,long int iy,double w,bool useNegativePixInStats=true);
 		int FillPixel(long int gbin,double w,bool useNegativePixInStats=true);
-
-		
+		/**
+		* \brief Fill pixel (multithreaded version). This updated the moments per thread. To get the cumulative moments use the StatsUtils
+		*/
+		#ifdef OPENMP_ENABLED
+		int FillPixelMT(Caesar::StatMoments<double>& moments,long int ix,long int iy,double w,bool useNegativePixInStats=true);
+		int FillPixelMT(Caesar::StatMoments<double>& moments,long int gbin,double w,bool useNegativePixInStats=true);
+		#endif		
 
 		/**
 		* \brief Fill pixels (to be used to compute stats at fill time)
@@ -369,6 +402,14 @@ class Image : public TObject {
 			if(!HasStats()) return;
 			m_Stats->Log(level);
 		}//close LogStats()
+
+		/**
+		* \brief Set moments
+		*/
+		void SetMoments(Caesar::StatMoments<double>& moments){
+			m_StatMoments= moments;
+			this->ResetImgStats(false,true);
+		}
 
 		/**
 		* \brief Get tile mean stats
@@ -565,7 +606,7 @@ class Image : public TObject {
 		/**
 		* \brief Update moments
 		*/
-		void UpdateMoments(double w);	
+		//void UpdateMoments(double w);	
 		/**
 		* \brief Update moments (multithreaded version)
 		*/
@@ -612,7 +653,9 @@ class Image : public TObject {
 		//Stats data
 		bool m_HasStats;
 		ImgStats* m_Stats;
-		
+		StatMoments<double> m_StatMoments;//stat moments & min/max
+
+		/*
 		long long int m_Npix;//npixels	
 		double m_M1;//1st moments
 		double m_M2;//2nd moment
@@ -620,7 +663,7 @@ class Image : public TObject {
 		double m_M4;//4th moment
 		double m_PixelMin;
 		double m_PixelMax;
-		
+		*/
 
 		ClassDef(Image,1)
 

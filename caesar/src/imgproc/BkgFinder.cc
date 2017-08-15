@@ -118,7 +118,7 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		INFO_LOG("Improving bkg estimate by skipping outliers ...");
 
 		//Get significance map
-		Img* significanceMap= img->GetSignificanceMap(bkgData,computeLocalBkg);
+		Image* significanceMap= img->GetSignificanceMap(bkgData,computeLocalBkg);
 		if(!significanceMap){
 			ERROR_LOG("Failed to compute the significance map (needed to exclude blobs)!");
 			delete bkgData;
@@ -216,13 +216,13 @@ int BkgFinder::FindLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,lon
 		return -1;
 	}
 
-	/*
+	
 	//## Improve rms by recomputing stuff from residual map 
 	if(use2ndPass){
 		INFO_LOG("Improving rms estimation with a 2nd pass...");
 
-		TString residualMapName= Form("%s_residual",img->GetName());
-		Img* residualMap= img->GetCloned(std::string(residualMapName),true,true);
+		TString residualMapName= Form("%s_residual",img->GetName().c_str());
+		Image* residualMap= img->GetCloned(std::string(residualMapName),true,true);
 		residualMap->Add(bkgData->BkgMap,-1);//subtract the bkg level model
 
 		//Compute bkg for residual map
@@ -253,7 +253,7 @@ int BkgFinder::FindLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,lon
 		bkgData_residual= 0;
 		DEBUG_LOG("End local bkg computation");
 	}//close if
-	*/
+	
 
 	return 0;
 
@@ -429,55 +429,145 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
 	
 	//## Perform the 2D interpolation
 	INFO_LOG("Start bkg 2d interpolation...");
-	try {		
+	std::vector<double> interp_gridX;
+	std::vector<double> interp_gridY;
+	
+	//Construct the interpolation grid
+	try{
+		interp_gridX = CodeUtils::linspace(xlim[0],xlim[1], Nx);
+		interp_gridY = CodeUtils::linspace(ylim[0],ylim[1], Ny);
+	}
+	catch( std::exception& e ) {
+		ERROR_LOG("C++ exception while creating the interpolation grid (err="<<e.what()<<")");
+		return -1;
+  } 
 		
-		// Construct the grid in each dimension (note that we will pass in a sequence of iterators pointing to the beginning of each grid)
-		DEBUG_LOG("Build 2D grid for interpolation (nTilesX="<<nTilesX<<", nTilesY="<<nTilesY<<")...");
 
-		
-		std::vector<double> interp_gridX = CodeUtils::linspace(xlim[0],xlim[1], Nx);
-		std::vector<double> interp_gridY = CodeUtils::linspace(ylim[0],ylim[1], Ny);
-		std::vector<double> interpolatedBkg;
-  	std::vector<double> interpolatedRMS;
+	//If OPENMP if defined split the bkg noise interpolation in two separate concurrent thread	
+	std::vector<double> interpolatedBkg;
+	std::vector<double> interpolatedRMS;
+	bool splitWork= false;
+	int errflag= 0;
+	#ifdef OPENMP_ENABLED
+		splitWork= true;
+	#endif
 
-		/*
-  	for (int i=0; i<nTilesX; i++) {
-    	for (int j=0; j<nTilesY; j++) {
-				long int gBin= i*nTilesY + j;
-				fbkg_values[gBin] = (*sampledBkgLevel)(i,j);
-				frms_values[gBin] = (*sampledRMS)(i,j);
+	#ifdef OPENMP_ENABLED
+	#pragma omp parallel num_threads(2) reduction(+: errflag)
+	#endif
+	{
+		int thread_id= omp_get_thread_num();
+
+		//Perform the bkg map interpolation	
+		if( !splitWork || (splitWork && thread_id==0) ){
+			DEBUG_LOG("Interpolating bkg map ...");
+			
+			try{
+				int status= MathUtils::BiLinearInterpolation(sampledGridX,sampledGridY,fbkg_values,interp_gridX,interp_gridY,interpolatedBkg);
+				if(status<0){
+					ERROR_LOG("Failed to interpolate the bkg map!");
+					errflag++;
+				}
 			}
-  	}
-		*/
+			catch( std::exception& e ) {
+				ERROR_LOG("C++ exception while interpolating the bkg map (err="<<e.what()<<")");
+				errflag++;
+  		}
+			catch(...) { 
+				ERROR_LOG("Unknown exception caught while interpolating the bkg map!");
+				errflag++;
+  		}
+		}//close if thread 0
+			
+		//Perform the noise map interpolation	
+		if( !splitWork || (splitWork && thread_id==1) ){
+						
+			DEBUG_LOG("Interpolating noise map ...");
+			try{
+				int status= MathUtils::BiLinearInterpolation(sampledGridX,sampledGridY,frms_values,interp_gridX,interp_gridY,interpolatedRMS);
+				if(status<0){
+					ERROR_LOG("Failed to interpolate noise!");
+					errflag++;
+				}
+			}
+			catch( std::exception& e ) {
+				ERROR_LOG("C++ exception while interpolating the noise map (err="<<e.what()<<")");
+				errflag++;
+  		}
+			catch(...) { 
+				ERROR_LOG("Unknown exception caught while interpolating the noise map!");
+				errflag++;
+  		}
+		}//close if thread 1
 
-		DEBUG_LOG("Interpolating bkg map ...");
-		int status= MathUtils::BiLinearInterpolation(sampledGridX,sampledGridY,fbkg_values,interp_gridX,interp_gridY,interpolatedBkg);
-		if(status<0){
-			ERROR_LOG("Failed to interpolate bkg!");
-			throw std::runtime_error("Failed to interpolate bkg!");
-		}
+	}//close parallel section
+	
+	//Check errors in interpolation
+	if(errflag>0){
+		ERROR_LOG("One or more failures occurred in bkg/noise map interpolation...");
+		return -1;
+	}
+	
+	
+	//## Fill images
+	DEBUG_LOG("Init bkg image...");
+	TString bkgImgName= Form("%s_bkg",img->GetName().c_str());
+	(bkgData->BkgMap)= img->GetCloned(std::string(bkgImgName),true,true);
+	(bkgData->BkgMap)->Reset();
+		
+	DEBUG_LOG("Init noise image...");
+	TString noiseImgName= Form("%s_noise",img->GetName().c_str());
+	(bkgData->NoiseMap)= img->GetCloned(std::string(noiseImgName),true,true);
+	(bkgData->NoiseMap)->Reset();
+		
+	INFO_LOG("Filling bkg/noise images after interpolation ...");
+	#ifdef OPENMP_ENABLED
+		Caesar::StatMoments<double> bkg_moments_t;		
+		Caesar::StatMoments<double> rms_moments_t;	
+		std::vector<Caesar::StatMoments<double>> bkg_parallel_moments;
+		std::vector<Caesar::StatMoments<double>> rms_parallel_moments;
+	
+		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+		#pragma omp parallel private(bkg_moments_t,rms_moments_t) reduction(merge: bkg_parallel_moments,rms_parallel_moments)
+		{
+			#pragma omp for collapse(2) 
+			for (size_t i=0; i<interp_gridX.size(); i++) {
+   			for (size_t j=0; j<interp_gridY.size(); j++) {
+					long int gBin= i*interp_gridY.size() + j;
+					double thisBkgValue= interpolatedBkg[gBin];
+	  			double thisRMSValue= interpolatedRMS[gBin];
+					if(thisBkgValue==0 || thisRMSValue<=0 ){
+						WARN_LOG("Interpolated value is zero (bkg="<<thisBkgValue<<", rms="<<thisRMSValue<<")");
+					}
+	
+					(bkgData->BkgMap)->FillPixelMT(bkg_moments_t,i,j,thisBkgValue);
+					(bkgData->NoiseMap)->FillPixelMT(rms_moments_t,i,j,thisRMSValue);
+				}//end loop bins Y
+  		}//end loop bins X
+		
+			//Fill parallel moments per thread
+			bkg_parallel_moments.push_back(bkg_moments_t);
+			rms_parallel_moments.push_back(rms_moments_t);
+		}//close parallel section
 
-		DEBUG_LOG("Interpolating noise map ...");
-		status= MathUtils::BiLinearInterpolation(sampledGridX,sampledGridY,frms_values,interp_gridX,interp_gridY,interpolatedRMS);
-		if(status<0){
-			ERROR_LOG("Failed to interpolate noise!");
-			throw std::runtime_error("Failed to interpolate noise!");
+		//Update moments from parallel estimates
+		Caesar::StatMoments<double> bkg_moments;
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(bkg_moments,bkg_parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative bkg map moments from parallel estimates (NB: image will have wrong moments!)");
+			return -1;
 		}
-		
-		//## Fill images
-		DEBUG_LOG("Init bkg image...");
-		TString bkgImgName= Form("%s_bkg",img->GetName().c_str());
-		(bkgData->BkgMap)= img->GetCloned(std::string(bkgImgName),true,true);
-		(bkgData->BkgMap)->Reset();
-		
-		DEBUG_LOG("Init noise image...");
-		TString noiseImgName= Form("%s_noise",img->GetName().c_str());
-		(bkgData->NoiseMap)= img->GetCloned(std::string(noiseImgName),true,true);
-		(bkgData->NoiseMap)->Reset();
-		
-		INFO_LOG("Filling bkg/noise images after interpolation ...");
+		(bkgData->BkgMap)->SetMoments(bkg_moments);
+
+		Caesar::StatMoments<double> rms_moments;
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(rms_moments,rms_parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative rms map moments from parallel estimates (NB: image will have wrong moments!)");
+			return -1;
+		}
+		(bkgData->NoiseMap)->SetMoments(rms_moments);
+
+	#else
 		for (size_t i=0; i<interp_gridX.size(); i++) {
-    	for (size_t j=0; j<interp_gridY.size(); j++) {
+   		for (size_t j=0; j<interp_gridY.size(); j++) {
 				long int gBin= i*interp_gridY.size() + j;
 				double thisBkgValue= interpolatedBkg[gBin];
 	  		double thisRMSValue= interpolatedRMS[gBin];
@@ -489,20 +579,8 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
 				(bkgData->NoiseMap)->FillPixel(i,j,thisRMSValue);
 			}//end loop bins Y
   	}//end loop bins X
+	#endif
 	
-		//Delete stuff?
-		//...
-
-	}//close try block
-	catch( std::exception &ex ) {
-		ERROR_LOG("Exception detected in interpolation (err="<<ex.what()<<")");
-		return -1;
-  } 
-	catch(...) { 
-		ERROR_LOG("Unknown exception caught in interpolation!");
-		return -1;
-  }		
-
 	DEBUG_LOG("End local bkg computation");
 
 	return 0;

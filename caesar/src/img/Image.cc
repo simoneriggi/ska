@@ -165,6 +165,34 @@ Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,flo
 
 }//close constructor
 
+Image::Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::string name)
+{
+	//Check mismatch between pixels size and dimx/dimy
+	if(nbinsx<=0 || nbinsy<=0){
+		std::stringstream ss;
+		ss<<"Invalid image size (<=0) or pixel size given (should be equal to Nx*Ny)!";
+		ERROR_LOG(ss.str());
+		throw std::out_of_range(ss.str().c_str());
+	}
+	long int npixels= nbinsx*nbinsy;
+
+	//Init pars
+  Init();
+
+	//Set image name
+	m_name= name;
+
+	//Set image size
+	SetSize(nbinsx,nbinsy,xlow,ylow);
+
+	//Fill pixels	
+	bool useNegativePixInStats= true;
+	for(long int i=0;i<npixels;i++){
+		if(FillPixel(i,w,useNegativePixInStats)<0) continue;
+	}
+
+}//close constructor
+		
 
 Image::Image(const Image &img)
 {
@@ -191,6 +219,8 @@ void Image::Copy(TObject& obj) const
 	DEBUG_LOG("Copying stats vars...");
 	((Image&)obj).m_HasMetaData= m_HasMetaData;
 	((Image&)obj).m_HasStats= m_HasStats;
+	((Image&)obj).m_StatMoments= m_StatMoments;
+	/*
 	((Image&)obj).m_Npix= m_Npix;
 	((Image&)obj).m_M1= m_M1;
 	((Image&)obj).m_M2= m_M2;
@@ -198,7 +228,8 @@ void Image::Copy(TObject& obj) const
 	((Image&)obj).m_M4= m_M4;
 	((Image&)obj).m_PixelMin= m_PixelMin;
 	((Image&)obj).m_PixelMax= m_PixelMax;
-	
+	*/
+
 	DEBUG_LOG("Copying meta data...");
 	if(m_MetaData){
 		((Image&)obj).m_MetaData= new ImgMetaData;
@@ -255,6 +286,7 @@ void Image::Init(){
 	//Stats
 	m_HasStats= false;
 	m_Stats= 0;
+	m_StatMoments.Reset();
 	ResetImgStats(true);//Reset stats & moments
 
 }//close Init()
@@ -360,7 +392,7 @@ Image* Image::GetTile(long int ix_min,long int ix_max,long int iy_min,long int i
 //================================================================
 //===    FILLING METHODS
 //================================================================
-int Image::FillPixel(long int gbin,double w,bool useNegativePixInStats){
+int Image::CheckFillPixel(long int gbin,double w){
 
 	//Check bin & value
 	if(gbin<0 || gbin>=(long int)(m_pixels.size())) {
@@ -382,12 +414,27 @@ int Image::FillPixel(long int gbin,double w,bool useNegativePixInStats){
 		WARN_LOG("Pixel "<<gbin<<" ("<<binx<<","<<biny<<") has been already filled (w="<<w_old<<"), skipping...");
 		return -1;
 	}
+	
+	return 0;
+
+}//close CheckFillPixel()
+
+int Image::FillPixel(long int gbin,double w,bool useNegativePixInStats){
+
+	//Check bin & value
+	if(CheckFillPixel(gbin,w)<0) {
+		WARN_LOG("Invalid bin given or pixel already filled!");
+		return -1;
+	}
 
 	//Set pixel value
 	m_pixels[gbin]= w;
 
 	//Update moments
-	if(w>=0 || (w<0 && useNegativePixInStats)) UpdateMoments(w);
+	if(w>=0 || (w<0 && useNegativePixInStats)) {
+		Caesar::StatsUtils::UpdateMoments(m_StatMoments,w);
+		//UpdateMoments(w);
+	}
 
 	return 0;
 
@@ -404,6 +451,120 @@ int Image::FillPixel(long int ix,long int iy,double w,bool useNegativePixInStats
 
 }//close FillPixel()
 
+#ifdef OPENMP_ENABLED
+int Image::FillPixelMT(Caesar::StatMoments<double>& moments,long int gbin,double w,bool useNegativePixInStats){
+
+	//Check bin & value
+	if(CheckFillPixel(gbin,w)<0) {
+		WARN_LOG("Invalid bin given or pixel already filled!");
+		return -1;
+	}
+
+	//Set pixel value
+	m_pixels[gbin]= w;
+
+	//Update moments
+	if(w>=0 || (w<0 && useNegativePixInStats)) {
+		Caesar::StatsUtils::UpdateMoments(moments,w);
+	}
+
+	return 0;
+
+}//close FillPixelMT()
+#endif
+
+#ifdef OPENMP_ENABLED
+int Image::FillPixelMT(Caesar::StatMoments<double>& moments,long int ix,long int iy,double w,bool useNegativePixInStats){
+
+	//Compute global bin
+	long int gbin= GetBin(ix,iy);
+	
+	//Fill pixel
+	return FillPixelMT(moments,gbin,w,useNegativePixInStats);
+
+}//close FillPixelMT()
+#endif
+
+int Image::Add(Image* img,double c,bool computeStats)
+{
+
+	//Check input image
+	if(!img){
+		ERROR_LOG("Null ptr to given input image!");
+		return -1;
+	}
+	long int Nx= img->GetNx();
+	long int Ny= img->GetNy();
+	long int PixDataSize= img->GetPixelDataSize();
+	if(m_Nx!=Nx || m_Ny!=Ny){
+		ERROR_LOG("Image to be added has different size ("<<Nx<<","<<Ny<<") wrt to this image ("<<m_Nx<<","<<m_Ny<<")!");
+		return -1;
+	}
+	if(PixDataSize!=this->GetPixelDataSize()){
+		ERROR_LOG("Image to be added has different pixel vector size ("<<PixDataSize<<") wrt to this image ("<<m_pixels.size()<<")!");
+		return -1;
+	}
+
+	//Reset stats
+	ResetImgStats(true,true);
+	
+	//Loop to sum vectors
+	bool useNegativePixInStats= true;
+	
+	#ifdef OPENMP_ENABLED		
+		Caesar::StatMoments<double> moments_t;	
+		std::vector<Caesar::StatMoments<double>> parallel_moments;
+	
+		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+		#pragma omp parallel private(moments_t) reduction(merge: parallel_moments)
+		{
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+			INFO_LOG("Starting multithread image add (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
+
+			#pragma omp for 
+			for(size_t i=0;i<m_pixels.size();i++){
+				double w1= m_pixels[i];			
+				double w2= img->GetPixelValue(i);	
+				double w= w1 + c*w2;
+				m_pixels[i]= 0;
+				if(FillPixelMT(moments_t,i,w,useNegativePixInStats)<0) continue;
+			}
+			
+			parallel_moments.push_back(moments_t);
+		}//close parallel section
+		
+		//Update moments from parallel estimates
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(m_StatMoments,parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative moments from parallel estimates (NB: image will have wrong moments!)");
+			return -1;
+		}
+
+	#else 
+		for(size_t i=0;i<m_pixels.size();i++){
+			double w1= m_pixels[i];			
+			double w2= img->GetPixelValue(i);	
+			double w= w1 + c*w2;
+			m_pixels[i]= 0;
+			if(FillPixel(i,w,useNegativePixInStats)<0) continue;
+		}
+	#endif
+	
+
+	if(computeStats){
+		bool computeRobustStats= true;
+		bool skipNegativePixels= false;
+		bool forceRecomputing= false;
+		if(ComputeStats(computeRobustStats,skipNegativePixels,forceRecomputing)<0){
+			WARN_LOG("Failed to compute stats after adding the two images!");
+			return -1;
+		}	
+	}//close if computeStats
+
+	return 0;
+
+}//close Add()
+
 
 //================================================================
 //===    STATS METHODS
@@ -415,6 +576,8 @@ void Image::ResetImgStats(bool resetMoments,bool clearStats){
 
 	//Reset moments
 	if(resetMoments){
+		m_StatMoments.Reset();
+		/*
 		m_PixelMin= +1.e+99;
 		m_PixelMax= -1.e+99;
 		m_Npix= 0;//npixels	
@@ -422,6 +585,7 @@ void Image::ResetImgStats(bool resetMoments,bool clearStats){
   	m_M2= 0;//2nd moment
 		m_M3= 0;//3rd moment
 		m_M4= 0;//4th moment
+		*/
 	}
 
 	//Delete current stats data
@@ -433,7 +597,14 @@ void Image::ResetImgStats(bool resetMoments,bool clearStats){
 
 void Image::ComputeMoments(bool skipNegativePixels){
 
-	
+	//## Recompute stat moments
+	//## NB: If OMP is enabled this is done in parallel and moments are aggregated to return the correct cumulative estimate 
+	int status= Caesar::StatsUtils::ComputeStatsMoments(m_StatMoments,m_pixels,skipNegativePixels);
+	if(status<0){
+		ERROR_LOG("Failed to compute stat moments!");
+	}
+
+	/*
 	#ifdef OPENMP_ENABLED
 		
 		//Define variables for reduction (OMP does not allow class members in reduction operation)
@@ -593,12 +764,15 @@ void Image::ComputeMoments(bool skipNegativePixels){
 			double w= m_pixels[i];
 			if( w==0 || (skipNegativePixels && w<0) ) continue; 
 			UpdateMoments(w);
+			Caesar::StatsUtils::UpdateMoments(m_StatMoments,w);
 		}//end loop pixels
 	#endif
+	*/
+
 
 }//close ComputeMoments()
 
-
+/*
 void Image::UpdateMoments(double w){
 
 	//Update full image moments
@@ -616,18 +790,20 @@ void Image::UpdateMoments(double w){
   m_M2+= f;
 	
 }//close UpdateMoments()
+*/
 
 void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 
 	//## Reset previous stats params (Reset only Stats not moments!)
 	ResetImgStats(false);
 
-
 	//-- DEBUG
-	DEBUG_LOG("Npix="<<m_Npix<<", M1="<<m_M1<<", m_M2="<<m_M2<<", m_M3="<<m_M3<<", m_M4="<<m_M4<<", pixel sizes="<<m_pixels.size());
+	//DEBUG_LOG("Npix="<<m_Npix<<", M1="<<m_M1<<", m_M2="<<m_M2<<", m_M3="<<m_M3<<", m_M4="<<m_M4<<", pixel sizes="<<m_pixels.size());
+	DEBUG_LOG("Npix="<<m_StatMoments.N<<", M1="<<m_StatMoments.M1<<", M2="<<m_StatMoments.M2<<", M3="<<m_StatMoments.M3<<", M4="<<m_StatMoments.M4<<", pixel sizes="<<m_pixels.size());
 	//----
 	
 	//## Compute Stats params
+	/*
 	m_Stats->n= m_Npix;
 	m_Stats->min= m_PixelMin;
 	m_Stats->max= m_PixelMax;
@@ -640,9 +816,23 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
   	m_Stats->skewness= sqrt(m_Npix)*m_M3/pow(m_M2,1.5);//need to adjust for finite population?
 		m_Stats->kurtosis= m_Npix*m_M4/(m_M2*m_M2)-3;
 	}
-	
+	*/
+	m_Stats->n= m_StatMoments.N;
+	m_Stats->min= m_StatMoments.minVal;
+	m_Stats->max= m_StatMoments.maxVal;
+	m_Stats->mean= m_StatMoments.M1;
+	m_Stats->rms= 0;
+	if(m_StatMoments.N>2) m_Stats->rms= sqrt(m_StatMoments.M2/(m_StatMoments.N-1));
+	m_Stats->skewness= 0;
+	m_Stats->kurtosis= 0;
+	if(m_StatMoments.M2!=0) {
+  	m_Stats->skewness= sqrt(m_StatMoments.N)*m_StatMoments.M3/pow(m_StatMoments.M2,1.5);//need to adjust for finite population?
+		m_Stats->kurtosis= m_StatMoments.N*m_StatMoments.M4/(m_StatMoments.M2*m_StatMoments.M2)-3;
+	}
+
 
 	//## Compute stats param errors
+	/*
 	m_Stats->meanErr= 0;
 	if(m_Npix>0) m_Stats->meanErr= (m_Stats->rms)/sqrt(m_Npix);
 	double varianceErr= 0;
@@ -655,7 +845,20 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	m_Stats->skewnessErr= 0;
 	m_Stats->kurtosisErr= 0;
 	if(m_Npix>2) m_Stats->skewnessErr= sqrt(6.*m_Npix*(m_Npix-1)/((m_Npix-2)*(m_Npix+1)*(m_Npix+3)));//approximate for normal distribution
+	*/
+	m_Stats->meanErr= 0;
+	if(m_StatMoments.N>0) m_Stats->meanErr= (m_Stats->rms)/sqrt(m_StatMoments.N);
+	double varianceErr= 0;
+	m_Stats->rmsErr= 0;
+	if(m_StatMoments.N>1) {
+		varianceErr= (m_StatMoments.M4-(m_StatMoments.N-3)/(m_StatMoments.N-1)*pow(m_Stats->rms,4))/m_StatMoments.N;
+		m_Stats->rmsErr= varianceErr/(2*m_Stats->rms);
+	}	 
+	m_Stats->skewnessErr= 0;
+	m_Stats->kurtosisErr= 0;
+	if(m_StatMoments.N>2) m_Stats->skewnessErr= sqrt(6.*m_StatMoments.N*(m_StatMoments.N-1)/((m_StatMoments.N-2)*(m_StatMoments.N+1)*(m_StatMoments.N+3)));//approximate for normal distribution
 	
+
   
 	//## End if no robust stats are to be computed
 	if(!computeRobustStats) return;
@@ -968,43 +1171,102 @@ Image* Image::GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg){
 	Image* significanceMap= this->GetCloned(std::string(imgName),true,true);
 	significanceMap->Reset();
 
-	if(useLocalBkg){
-		#ifdef OPENMP_ENABLED
-		#pragma omp parallel for collapse(2)
-		#endif
-		for(long int i=0;i<Nx;i++){		
-			for(long int j=0;j<Ny;j++){	
-				long int gBin= GetBin(i,j);
-				double w= m_pixels[gBin];											
-				double bkgLevel= (bkgData->BkgMap)->GetBinContent(i,j);
-				double bkgRMS= (bkgData->NoiseMap)->GetBinContent(i,j);
-				if( w==0 || bkgRMS<=0) {
-					DEBUG_LOG("Empty pixel or invalid bkg  ("<<i<<","<<j<<") skip it!");
-					continue;
-				}
-				double Z= (w-bkgLevel)/bkgRMS;
-				significanceMap->FillPixel(i,j,Z);
-			}//end loop
-		}//end loop 
-	}//close if useLocalBkg
-	else{
-		double bkgLevel= bkgData->gBkg;
-		double bkgRMS= bkgData->gNoise;
+	
+	#ifdef OPENMP_ENABLED
+		Caesar::StatMoments<double> moments_t;	
+		std::vector<Caesar::StatMoments<double>> parallel_moments;
+	
+		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+		#pragma omp parallel private(moments_t) reduction(merge: parallel_moments)
+		{
+			if(useLocalBkg){
+				#pragma omp for collapse(2)
+				for(long int i=0;i<Nx;i++){		
+					for(long int j=0;j<Ny;j++){	
+						long int gBin= GetBin(i,j);
+						double w= m_pixels[gBin];											
+						double bkgLevel= (bkgData->BkgMap)->GetBinContent(i,j);
+						double bkgRMS= (bkgData->NoiseMap)->GetBinContent(i,j);
+						if( w==0 || bkgRMS<=0) {
+							DEBUG_LOG("Empty pixel or invalid bkg  ("<<i<<","<<j<<") skip it!");
+							continue;
+						}
+						double Z= (w-bkgLevel)/bkgRMS;
+						significanceMap->FillPixelMT(moments_t,i,j,Z);
+					}//end loop
+				}//end loop 
+
+				parallel_moments.push_back(moments_t);
+
+			}//close if local bkg
+
+			else{//global bkg
+				double bkgLevel= bkgData->gBkg;
+				double bkgRMS= bkgData->gNoise;
+						
+				#pragma omp for collapse(2)
+				for(long int i=0;i<Nx;i++){		
+					for(long int j=0;j<Ny;j++){	
+						long int gBin= GetBin(i,j);
+						double w= m_pixels[gBin];										
+						if( w==0 || bkgRMS<=0) continue;
 				
-		#ifdef OPENMP_ENABLED
-		#pragma omp parallel for collapse(2)
-		#endif
-		for(long int i=0;i<Nx;i++){		
-			for(long int j=0;j<Ny;j++){	
-				long int gBin= GetBin(i,j);
-				double w= m_pixels[gBin];										
-				if( w==0 || bkgRMS<=0) continue;
+						double Z= (w-bkgLevel)/bkgRMS;
+						significanceMap->FillPixelMT(moments_t,i,j,Z);
+					}//end loop
+				}//end loop
+
+				parallel_moments.push_back(moments_t);
+
+			}//close else 
+			
+		}//close parallel section
+
+		//Update moments from parallel estimates
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(m_StatMoments,parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative moments from parallel estimates (NB: image will have wrong moments!)");
+			if(significanceMap){
+				delete significanceMap;
+				significanceMap= 0;
+			}
+			return nullptr;
+		}
+
+	#else
+			
+		if(useLocalBkg){
+			for(long int i=0;i<Nx;i++){		
+				for(long int j=0;j<Ny;j++){	
+					long int gBin= GetBin(i,j);
+					double w= m_pixels[gBin];											
+					double bkgLevel= (bkgData->BkgMap)->GetBinContent(i,j);
+					double bkgRMS= (bkgData->NoiseMap)->GetBinContent(i,j);
+					if( w==0 || bkgRMS<=0) {
+						DEBUG_LOG("Empty pixel or invalid bkg  ("<<i<<","<<j<<") skip it!");
+						continue;
+					}
+					double Z= (w-bkgLevel)/bkgRMS;
+					significanceMap->FillPixel(i,j,Z);
+				}//end loop
+			}//end loop 
+		}//close if useLocalBkg
+	
+		else{
+			double bkgLevel= bkgData->gBkg;
+			double bkgRMS= bkgData->gNoise;
+			for(long int i=0;i<Nx;i++){		
+				for(long int j=0;j<Ny;j++){	
+					long int gBin= GetBin(i,j);
+					double w= m_pixels[gBin];										
+					if( w==0 || bkgRMS<=0) continue;
 				
-				double Z= (w-bkgLevel)/bkgRMS;
-				significanceMap->FillPixel(i,j,Z);
+					double Z= (w-bkgLevel)/bkgRMS;
+					significanceMap->FillPixel(i,j,Z);
+				}//end loop
 			}//end loop
-		}//end loop
-	}//close else
+		}//close else
+
+	#endif
 
 	return significanceMap;
 
