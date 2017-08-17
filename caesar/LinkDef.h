@@ -231,6 +231,7 @@
 //blob/source finder
 #pragma link C++ class Caesar::BlobFinder+;
 //#pragma link C++ class Caesar::SourceFinder+;
+#pragma link C++ class Caesar::SFinder+;
 //======================
 
 //ChanVese segmenter
