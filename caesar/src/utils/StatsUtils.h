@@ -29,6 +29,7 @@
 #ifndef StatsUtils_h
 #define StatsUtils_h 1
 
+#include <SysUtils.h>
 #include <Logger.h>
 
 #include <TObject.h>
@@ -84,6 +85,42 @@ class ClippedStats {
 		}
 
 };//close ClippedStats class
+
+template <typename T>  
+class StatMoments {
+
+	public:
+		T N;
+		T M1;
+		T M2;
+		T M3;
+		T M4;
+		T minVal;
+		T maxVal;
+
+	public:
+		/** 
+		\brief Constructor
+ 		*/
+		StatMoments(){
+			Reset();
+		}
+
+	public:
+		/** 
+		\brief Reset moments
+ 		*/
+		void Reset(){
+			N= T(0);
+			M1= T(0);
+			M2= T(0);
+			M3= T(0);
+			M4= T(0);
+			minVal= std::numeric_limits<T>::max();
+			maxVal= -std::numeric_limits<T>::max();
+		}
+
+};//close StatMoments()
 
 
 class StatsUtils : public TObject {
@@ -421,6 +458,232 @@ class StatsUtils : public TObject {
 				std::pair<T,T> res= std::make_pair (Tb,S);	
 				return res;
 			}//close GetBiWeightEstimators()
+
+		template<typename T>
+		static void UpdateMoments(StatMoments<T>& moments,T w){
+
+			//Update moments
+			if(w<moments.minVal) moments.minVal= w;
+			if(w>moments.maxVal) moments.maxVal= w;
+
+			moments.N++;
+  		T delta = w - moments.M1;
+  		T delta_n = delta/moments.N;
+  		T delta_n2 = delta_n * delta_n;
+  		T f = delta * delta_n * (moments.N-1);
+  		moments.M1+= delta_n;
+  		moments.M4+= f * delta_n2 * (moments.N*moments.N - 3*moments.N + 3) + 6 * delta_n2 * moments.M2 - 4 * delta_n * moments.M3;
+  		moments.M3+= f * delta_n * (moments.N - 2) - 3 * delta_n * moments.M2;
+  		moments.M2+= f;
+	
+		}//close UpdateMoments()
+
+
+		template<typename T>
+		static int ComputeMomentsFromParallel(StatMoments<T>& moments,std::vector<StatMoments<T>>const& parallel_moments)
+		{
+			//Check size	
+			if(parallel_moments.empty()) return -1;
+
+			//Compute moments
+			if(parallel_moments.size()==1){
+				moments.N= parallel_moments[0].N;
+				moments.M1= parallel_moments[0].M1;
+				moments.M2= parallel_moments[0].M2;
+				moments.M3= parallel_moments[0].M3;
+				moments.M4= parallel_moments[0].M4;
+				return 0;
+			}
+		
+			//Compute mean
+			T N= T(0);
+			T M1= T(0);
+			T minVal= parallel_moments[0].minVal;
+			T maxVal= parallel_moments[0].maxVal;
+			for(size_t j=0;j<parallel_moments.size();j++){
+				T minVal_j= parallel_moments[j].minVal;
+				T maxVal_j= parallel_moments[j].maxVal;
+				if(minVal_j<minVal) minVal= minVal_j;
+				if(maxVal_j>maxVal) maxVal= maxVal_j;			
+				T N_j= parallel_moments[j].N;
+				T M1_j= parallel_moments[j].M1;
+				N+= N_j;
+				M1+= N_j*M1_j;
+			}//end loop
+			M1/= N;
+		
+			//Compute second moment: sum (M2_j + n_j*(mean-mean_j)^2 
+			T M2= T(0);
+			T mean= M1;
+			for(size_t j=0;j<parallel_moments.size();j++){
+				T N_j= parallel_moments[j].N;
+				T mean_j= parallel_moments[j].M1;
+				T M2_j= parallel_moments[j].M2;
+				M2+= M2_j + N_j*(mean-mean_j)*(mean-mean_j);	
+			}
+	
+			//Compute 3rd & 4th moments	
+			T M1_A= parallel_moments[0].M1;
+			T M2_A= parallel_moments[0].M2;
+			T M3_A= parallel_moments[0].M3;
+			T M4_A= parallel_moments[0].M4;
+			T N_A= parallel_moments[0].N;
+			T M1_AB= 0;
+			T M2_AB= 0;
+			T M3_AB= 0;
+			T M4_AB= 0;
+			T N_AB= 0;
+			T M3= T(0);
+			T M4= T(0);
+			for(size_t j=1;j<parallel_moments.size();j++){
+				T M1_B= parallel_moments[j].M1;
+				T M2_B= parallel_moments[j].M2;
+				T M3_B= parallel_moments[j].M3;
+				T M4_B= parallel_moments[j].M4;
+				T N_B= parallel_moments[j].N;
+				T delta= M1_B-M1_A;
+				N_AB= N_A+N_B;
+				M1_AB= (N_A*M1_A+N_B*M1_B)/N_AB;
+				//M2_AB= M2_A + M2_B + delta*delta*N_A*N_B/N_AB;
+				M2_AB= M2_A + M2_B + N_A*(M1_AB-M1_A)*(M1_AB-M1_A) + N_B*(M1_AB-M1_B)*(M1_AB-M1_B);			
+				M3_AB= M3_A + M3_B + pow(delta,3)*N_A*N_B*(N_A-N_B)/(N_AB*N_AB) + 3*delta*(N_A*M2_B-N_B*M2_A)/N_AB;
+				M4_AB= M4_A + M4_B + pow(delta,4)*N_A*N_B*(N_A*N_A-N_A*N_B+N_B*N_B)/pow(N_AB,3) + 6*delta*delta*(N_A*N_A*M2_B+N_B*N_B*M2_A)/(N_AB*N_AB) + 4*delta*(N_A*M3_B-N_B*M3_A)/N_AB;
+
+				//Update A partition to A+B
+				N_A= N_AB;
+				M1_A= M1_AB;
+				M2_A= M2_AB;
+				M3_A= M3_AB;
+				M4_A= M4_AB;
+			}//end loop partitions
+		
+			M3= M3_AB;
+			M4= M4_AB;
+					
+			moments.N= N;
+			moments.M1= M1;
+			moments.M2= M2;
+			moments.M3= M3;
+			moments.M4= M4;
+			moments.minVal= minVal;
+			moments.maxVal= maxVal;
+			
+			return 0;
+
+		}//close ComputeMomentsFromParallel()
+
+
+		template<typename T,typename K> 
+		static int ComputeStatsMoments(StatMoments<T>& moments,std::vector<K>const& data,bool skipNegativeValues=false)
+		{
+			if(data.empty()) return 0;
+		
+			#ifdef OPENMP_ENABLED
+				std::vector<StatMoments<T>> moments_parallel;
+				T N_t= T(0);
+				T M1_t= T(0);
+				T M2_t= T(0);
+				T M3_t= T(0);
+				T M4_t= T(0);
+				T minVal_t= std::numeric_limits<T>::max();
+				T maxVal_t= -std::numeric_limits<T>::max();
+
+				#pragma omp parallel private(N_t,M1_t,M2_t,M3_t,M4_t,minVal_t,maxVal_t)
+				{
+
+					int thread_id= omp_get_thread_num();
+					int nthreads= SysUtils::GetOMPThreads();
+					INFO_LOG("Starting image moment computing in thread "<<thread_id<<" (nthreads="<<nthreads<<") ...");
+			
+					//Init moments
+					minVal_t= std::numeric_limits<T>::max();
+					maxVal_t= -std::numeric_limits<T>::max();
+					N_t= T(0);
+					M1_t= T(0);
+					M2_t= T(0);
+					M3_t= T(0);
+					M4_t= T(0);
+
+					#pragma omp single
+   				{						
+						moments_parallel.assign(nthreads,StatMoments<T>());
+   				}
+
+					#pragma omp for
+					for(size_t i=0;i<data.size();i++){			
+						T w= static_cast<T>(data[i]);
+						if( w==0 || (skipNegativeValues && w<0) ) continue; 
+						if(w<minVal_t) minVal_t= w;
+						if(w>maxVal_t) maxVal_t= w;
+						N_t++;
+  					T delta = w - M1_t;
+  					T delta_n = delta/N_t;
+  					T delta_n2 = delta_n * delta_n;
+  					T f = delta * delta_n * (N_t-1);
+  					M1_t+= delta_n;
+  					M4_t+= f * delta_n2 * (N_t*N_t - 3*N_t + 3) + 6 * delta_n2 * M2_t - 4 * delta_n * M3_t;
+  					M3_t+= f * delta_n * (N_t - 2) - 3 * delta_n * M2_t;
+  					M2_t+= f;
+					}//end loop vector
+
+					INFO_LOG("Thread id="<<omp_get_thread_num()<<": N="<<N_t<<", M1="<<M1_t<<", M2="<<M2_t<<", M3="<<M3_t<<", M4="<<M4_t);
+
+					//Fill moments for this thread
+					moments_parallel[thread_id].N= N_t;
+					moments_parallel[thread_id].M1= M1_t;
+					moments_parallel[thread_id].M2= M2_t;
+					moments_parallel[thread_id].M3= M3_t;
+					moments_parallel[thread_id].M4= M4_t;
+					moments_parallel[thread_id].minVal= minVal_t;
+					moments_parallel[thread_id].maxVal= maxVal_t;
+					
+				}//close parallel section
+			
+				//Compute aggregated moments
+				if(ComputeMomentsFromParallel(moments,moments_parallel)<0){
+					ERROR_LOG("Failed to aggregate moments from parallel estimates!");
+					return -1;
+				}
+
+			#else
+				T N= T(0);
+				T M1= T(0);
+				T M2= T(0);
+				T M3= T(0);
+				T M4= T(0);
+				T minVal= std::numeric_limits<T>::max();
+				T maxVal= -std::numeric_limits<T>::max();
+
+				for(size_t i=0;i<data.size();i++){			
+					T w= static_cast<T>(data[i]);
+					if( w==0 || (skipNegativeValues && w<0) ) continue; 
+					if(w<minVal) minVal= w;
+					if(w>maxVal) maxVal= w;
+
+					N++;
+  				T delta = w - M1;
+  				T delta_n = delta/N;
+  				T delta_n2 = delta_n * delta_n;
+  				T f = delta * delta_n * (N-1);
+  				M1+= delta_n;
+  				M4+= f * delta_n2 * (N*N - 3*N + 3) + 6 * delta_n2 * M2 - 4 * delta_n * M3;
+  				M3+= f * delta_n * (N - 2) - 3 * delta_n * M2;
+  				M2+= f;
+				}//end loop pixels
+
+				moments.N= N;
+				moments.M1= M1;
+				moments.M2= M2;
+				moments.M3= M3;
+				moments.M4= M4;
+				moments.minVal= minVal;
+				moments.maxVal= maxVal;
+			#endif
+
+			return 0;
+
+		}//close ComputeStatsMoments()
+
 
   	//Mahalanobis distance
 		static double GetMahalanobisDistance(TMatrixD x, TMatrixD mean, TMatrixD Sigma,bool isInverted=false);

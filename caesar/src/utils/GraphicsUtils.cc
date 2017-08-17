@@ -29,6 +29,7 @@
 #include <GraphicsUtils.h>
 #include <AstroUtils.h>
 #include <Img.h>
+#include <Image.h>
 
 #include <TObject.h>
 #include <TStyle.h>
@@ -65,16 +66,190 @@ GraphicsUtils::~GraphicsUtils(){
 
 }
 
+void GraphicsUtils::SetPalette(int paletteStyle,int ncolors)
+{
 
-int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::vector<TPolyLine>& gridy,int coordSystem){
+	switch(paletteStyle){
+		case eRAINBOW :
+			gStyle->SetPalette(55);
+			break;
+		case eBLACKWHITE :	
+			SetBWPalette(ncolors);
+			break;
+		case eBLACKBODY :
+			gStyle->SetPalette(53);
+			break;
+		case eHOT2COLD :
+			SetHotColdPalette(ncolors);
+			break;
+		case eCOLD2HOT :
+			SetColdHotPalette(ncolors);
+			break;
+		case eTHERMAL :
+			SetThermalPalette(ncolors);
+			break;
+		default: 
+			gStyle->SetPalette(55);
+			break;
+	}//close switch
+
+
+}//close SetPalette()
+
+
+//=========================================
+//==  NEW IMAGE METHODS 
+//=========================================
+/*
+int GraphicsUtils::DrawImage(Image* img,std::vector<Source*>const& sources,bool useCurrentCanvas,bool drawFull,int paletteStyle,bool drawColorPalette,bool putWCSAxis,int coordSystem,std::string units){
+	
+	//## Check input image
+	if(!img){
+		ERROR_LOG("Null ptr to input image given!");
+		return -1;
+	}
+
+	//## Get histogram 2D from image
+	TH2D* histo= img->GetHisto2D();
+
+	//## Set palette
+	int ncolors= 999;
+	gStyle->SetNumberContours(ncolors);
+
+	DEBUG_LOG("paletteStyle="<<paletteStyle);
+
+	switch(paletteStyle){
+		case eRAINBOW :
+			gStyle->SetPalette(55);
+			break;
+		case eBLACKWHITE :	
+			Caesar::GraphicsUtils::SetBWPalette(ncolors);
+			break;
+		case eBLACKBODY :
+			gStyle->SetPalette(53);
+			break;
+		case eHOT2COLD :
+			Caesar::GraphicsUtils::SetHotColdPalette(ncolors);
+			break;
+		case eCOLD2HOT :
+			Caesar::GraphicsUtils::SetColdHotPalette(ncolors);
+			break;
+		case eTHERMAL :
+			Caesar::GraphicsUtils::SetThermalPalette(ncolors);
+			break;
+		default: 
+			gStyle->SetPalette(55);
+			break;
+	}//close switch
+
+
+	//## Set canvas
+	TString canvasName= Form("%s_Plot",std::string(histo->GetName()).c_str());	
+	TCanvas* canvas= 0;
+	if(useCurrentCanvas && gPad) {
+		canvas= gPad->GetCanvas();
+		canvas->SetName(canvasName);
+		canvas->SetTitle(canvasName);
+	}
+	else{
+		canvas= new TCanvas(canvasName,canvasName,720,700);
+	}
+
+	if(!canvas){
+		ERROR_LOG("Failed to retrieve or set canvas!");
+		return -1;
+	}
+
+	//Draw full image (without borders)
+	canvas->cd();
+	histo->SetStats(0);
+	
+	if(drawFull){
+		canvas->ToggleEventStatus();
+  	canvas->SetRightMargin(0.0);
+  	canvas->SetLeftMargin(0.0);
+  	canvas->SetTopMargin(0.0);
+  	canvas->SetBottomMargin(0.0);
+		histo->Draw("COLA");
+	}
+	else{
+		gStyle->SetPadTopMargin(0.1);
+  	gStyle->SetPadBottomMargin(0.1);
+  	gStyle->SetPadLeftMargin(0.15);
+  	//gStyle->SetPadRightMargin(0.19);
+		gStyle->SetPadRightMargin(0.15);
+
+		
+		gPad->SetTopMargin(0.1);
+		gPad->SetBottomMargin(0.1);
+		gPad->SetLeftMargin(0.15);
+		//gPad->SetRightMargin(0.19);
+  	gPad->SetRightMargin(0.15);
+  		
+		if(drawColorPalette) {
+			//Set palette axis title	
+			histo->GetZaxis()->SetTitle(units.c_str());
+			histo->GetZaxis()->SetTitleSize(0.05);
+			histo->GetZaxis()->SetTitleOffset(0.9);
+			histo->Draw();
+			gPad->Update();
+			if(putWCSAxis) histo->Draw("COLAZ");
+			else histo->Draw("COLZ");
+			gPad->Update();
+		}//close if
+		else {
+			if(putWCSAxis) histo->Draw("COLA");
+			else histo->Draw("COL");
+		}
+	}
+
+
+	//## Draw WCS axis?
+	if(putWCSAxis){
+		gPad->Update();
+		TGaxis* xaxis_wcs= new TGaxis;
+		TGaxis* yaxis_wcs= new TGaxis;
+		int status= GraphicsUtils::SetWCSAxis(this,*xaxis_wcs,*yaxis_wcs,coordSystem);
+		if(status>=0){
+			TExec* ex = new TExec("ex","GraphicsUtils::PadUpdater()");
+   		histo->GetListOfFunctions()->Add(ex);
+
+			xaxis_wcs->Draw("same");
+			yaxis_wcs->Draw("same");
+		}
+		else{
+			WARN_LOG("Failed to set gAxis!");
+		}
+	}//close if
+
+	//## Draw sources
+	for(unsigned int k=0;k<sources.size();k++){	
+		int type= sources[k]->Type;
+		int lineColor= kBlack;
+		if(type==Source::eCompact)
+			lineColor= kBlack;	
+		else if(type==Source::ePointLike)
+			lineColor= kRed;
+		else if(type==Source::eExtended)
+			lineColor= kGreen+1;	
+		sources[k]->Draw(false,false,true,lineColor);
+	}//end loop sources
+	
+	
+	return 0;
+
+}//close DrawImage()
+
+
+int GraphicsUtils::SetWCSProjGrid(Image* img,std::vector<TPolyLine>& gridx,std::vector<TPolyLine>& gridy,int coordSystem){
 	
 	if(!img) {
-		cerr<<"GraphicsUtils::SetWCSAxis(): ERROR: Null ptr to image given!"<<endl;
+		ERROR_LOG("Null ptr to image given!");
 		return -1;
 	}
 	
 	if(!gPad){
-		cerr<<"GraphicsUtils::SetWCSAxis(): ERROR: No pad available!"<<endl;
+		ERROR_LOG("No pad available!");
 		return -1;
 	}
 
@@ -86,14 +261,13 @@ int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::ve
 
 	//Get image WCS
 	if(!img->HasMetaData()){
-		cerr<<"GraphicsUtils::CreateWCSAxis(): WARN: No meta-data present!"<<endl;
+		WARN_LOG("No meta-data present!");
 		return -1;
 	}
 	ImgMetaData* metadata= img->GetMetaData();
 	WorldCoor* wcs= metadata->GetWorldCoord(coordSystem);
-	//WorldCoor* wcs= metadata->GetWorldCoord();
 	if(!wcs){
-		cerr<<"GraphicsUtils::CreateWCSAxis(): WARN: Cannot get WCS from image!"<<endl;
+		WARN_LOG("Cannot get WCS from image!");
 		return -1;
 	}		
 
@@ -110,7 +284,168 @@ int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::ve
 	xmax_wcs= max(max(xBR_wcs,xBL_wcs),max(xTR_wcs,xTL_wcs));
 	ymin_wcs= min(min(yBR_wcs,yBL_wcs),min(yTR_wcs,yTL_wcs));
 	ymax_wcs= max(max(yBR_wcs,yBL_wcs),max(yTR_wcs,yTL_wcs));
-	cout<<"xmin="<<xmin<<" xmax="<<xmax<<" xmin_wcs="<<xmin_wcs<<" xmax_wcs="<<xmax_wcs<<" ymin="<<ymin<<" ymax="<<ymax<<" ymin_wcs="<<ymin_wcs<<" ymax_wcs="<<ymax_wcs<<endl;
+	DEBUG_LOG("xmin="<<xmin<<" xmax="<<xmax<<" xmin_wcs="<<xmin_wcs<<" xmax_wcs="<<xmax_wcs<<" ymin="<<ymin<<" ymax="<<ymax<<" ymin_wcs="<<ymin_wcs<<" ymax_wcs="<<ymax_wcs);
+
+	std::vector<double> x_list;
+	std::vector<double> y_list;
+	//double thisx= xmin_wcs;
+	//double stepx= 0.1*fabs(xmax_wcs-xmin_wcs);
+	//double thisy= ymin_wcs;
+	//double stepy= 0.1*fabs(ymax_wcs-ymin_wcs);
+	double thisx= xmin;
+	double stepx= 0.1*fabs(xmax-xmin);
+	double thisy= ymin;
+	double stepy= 0.1*fabs(ymax-ymin);
+	//while(thisx<xmax_wcs){
+	while(thisx<xmax){
+		x_list.push_back(thisx);
+		cout<<"x="<<thisx<<endl;
+		thisx+= stepx;
+	}
+	//while(thisy<ymax_wcs){
+	while(thisy<ymax){
+		y_list.push_back(thisy);
+		cout<<"y="<<thisy<<endl;
+		thisy+= stepy;
+	}
+
+	//Convert wcs to desired type
+	char* flag = (char*)("");
+	std::string wcsType= metadata->GetWCSType();
+	if(coordSystem==eGALACTIC)
+		flag = (char*)("GALACTIC");	
+	else if(coordSystem==eJ2000)
+		flag = (char*)("FK5");
+	else if(coordSystem==eB1950)
+		flag = (char*)("FK4");
+	else if(coordSystem==-1 && wcsType!="")
+		flag = (char*)(wcsType.c_str());
+			
+	if(strcmp(flag,"")!=0) {
+		wcsininit (wcs,flag);			
+	}
+	
+	
+	//## Generate grid
+	double stepx_wcs= 0.05*fabs(xmax_wcs-xmin_wcs);
+	double stepy_wcs= 0.05*fabs(ymax_wcs-ymin_wcs);
+	DEBUG_LOG("stepx_wcs="<<stepx_wcs<<" stepy_wcs="<<stepy_wcs);
+
+	for(unsigned int i=0;i<x_list.size();i++){
+		double xstart= x_list[i];
+		double ystart= ymin;
+		double xstart_wcs, ystart_wcs;
+		//wcsoutinit (wcs,flag);
+		pix2wcs (wcs,xstart,ystart,&xstart_wcs,&ystart_wcs); 
+		DEBUG_LOG("Grid no. "<<i<<" (xstart,ystart)=("<<xstart<<","<<ystart<<") ==> ("<<xstart_wcs<<","<<ystart_wcs<<")");
+	
+		//Move along wcs proj
+		int nPts= 0;
+		double x= xstart;
+		double y= ystart;
+		double x_wcs= xstart_wcs;
+		double y_wcs= ystart_wcs;
+		int offset;
+		TPolyLine thisPolyLine;
+
+		while(img->HasBin(x,y)){	
+			DEBUG_LOG("wcs("<<x_wcs<<","<<y_wcs<<") ==> ("<<x<<","<<y<<") offset="<<offset);
+			thisPolyLine.SetPoint(nPts,x,y);	
+			nPts++;
+			
+			x_wcs+= stepx_wcs;
+			//wcsininit (wcs,flag);
+			wcs2pix(wcs, x_wcs, y_wcs,&x,&y,&offset);
+		}//end loop points
+		gridx.push_back(thisPolyLine);
+
+	}//end loop x
+	
+
+	for(unsigned int i=0;i<y_list.size();i++){
+		double xstart= xmin;
+		double ystart= y_list[i];
+		double xstart_wcs, ystart_wcs;
+		//wcsoutinit (wcs,flag);
+		pix2wcs (wcs,xstart,ystart,&xstart_wcs,&ystart_wcs); 
+		DEBUG_LOG("Grid no. "<<i<<" (xstart,ystart)=("<<xstart<<","<<ystart<<") ==> ("<<xstart_wcs<<","<<ystart_wcs<<")");
+	
+		//Move along wcs proj
+		int nPts= 0;
+		double x= xstart;
+		double y= ystart;
+		double x_wcs= xstart_wcs;
+		double y_wcs= ystart_wcs;
+		int offset;
+		TPolyLine thisPolyLine;
+
+		while(img->HasBin(x,y)){	
+			DEBUG_LOG("wcs("<<x_wcs<<","<<y_wcs<<") ==> ("<<x<<","<<y<<") offset="<<offset);
+			thisPolyLine.SetPoint(nPts,x,y);	
+			nPts++;
+			
+			y_wcs+= stepy_wcs;
+			//wcsininit (wcs,flag);
+			wcs2pix(wcs, x_wcs, y_wcs,&x,&y,&offset);
+		}//end loop points
+		gridy.push_back(thisPolyLine);
+
+	}//end loop x
+	
+	
+	return 0;
+
+}//close SetWCSProjGrid()
+*/
+
+//=========================================
+//==  OLD IMAGE METHODS 
+//=========================================
+int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::vector<TPolyLine>& gridy,int coordSystem){
+	
+	if(!img) {
+		ERROR_LOG("Null ptr to image given!");
+		return -1;
+	}
+	
+	if(!gPad){
+		ERROR_LOG("No pad available!");
+		return -1;
+	}
+
+	//Get image ranges
+	double xmin= gPad->GetUxmin();
+	double xmax= gPad->GetUxmax();
+	double ymin= gPad->GetUymin();
+	double ymax= gPad->GetUymax();
+
+	//Get image WCS
+	if(!img->HasMetaData()){
+		WARN_LOG("No meta-data present!");
+		return -1;
+	}
+	ImgMetaData* metadata= img->GetMetaData();
+	WorldCoor* wcs= metadata->GetWorldCoord(coordSystem);
+	//WorldCoor* wcs= metadata->GetWorldCoord();
+	if(!wcs){
+		WARN_LOG("Cannot get WCS from image!");
+		return -1;
+	}		
+
+	//Get range coord in WCS
+	double xBR_wcs, xBL_wcs, xTR_wcs, xTL_wcs;
+	double yBR_wcs, yBL_wcs, yTR_wcs, yTL_wcs;
+	pix2wcs (wcs,xmin,ymin,&xBL_wcs,&yBL_wcs);//Bottom-Left corner
+	pix2wcs (wcs,xmax,ymin,&xBR_wcs,&yBR_wcs);//Bottom-Right corner
+	pix2wcs (wcs,xmin,ymax,&xTL_wcs,&yTL_wcs);//Top-Left corner
+	pix2wcs (wcs,xmax,ymax,&xTR_wcs,&yTR_wcs);//Top-Right corner
+	
+	double xmin_wcs, xmax_wcs, ymin_wcs, ymax_wcs;	
+	xmin_wcs= min(min(xBR_wcs,xBL_wcs),min(xTR_wcs,xTL_wcs));
+	xmax_wcs= max(max(xBR_wcs,xBL_wcs),max(xTR_wcs,xTL_wcs));
+	ymin_wcs= min(min(yBR_wcs,yBL_wcs),min(yTR_wcs,yTL_wcs));
+	ymax_wcs= max(max(yBR_wcs,yBL_wcs),max(yTR_wcs,yTL_wcs));
+	DEBUG_LOG("xmin="<<xmin<<" xmax="<<xmax<<" xmin_wcs="<<xmin_wcs<<" xmax_wcs="<<xmax_wcs<<" ymin="<<ymin<<" ymax="<<ymax<<" ymin_wcs="<<ymin_wcs<<" ymax_wcs="<<ymax_wcs);
 
 	std::vector<double> x_list;
 	std::vector<double> y_list;
@@ -157,7 +492,7 @@ int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::ve
 	//## Generate grid
 	double stepx_wcs= 0.05*fabs(xmax_wcs-xmin_wcs);
 	double stepy_wcs= 0.05*fabs(ymax_wcs-ymin_wcs);
-	cout<<"stepx_wcs="<<stepx_wcs<<" stepy_wcs="<<stepy_wcs<<endl;
+	DEBUG_LOG("stepx_wcs="<<stepx_wcs<<" stepy_wcs="<<stepy_wcs);
 
 	for(unsigned int i=0;i<x_list.size();i++){
 		double xstart= x_list[i];
@@ -165,7 +500,7 @@ int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::ve
 		double xstart_wcs, ystart_wcs;
 		//wcsoutinit (wcs,flag);
 		pix2wcs (wcs,xstart,ystart,&xstart_wcs,&ystart_wcs); 
-		cout<<"Grid no. "<<i<<" (xstart,ystart)=("<<xstart<<","<<ystart<<") ==> ("<<xstart_wcs<<","<<ystart_wcs<<")"<<endl;
+		DEBUG_LOG("Grid no. "<<i<<" (xstart,ystart)=("<<xstart<<","<<ystart<<") ==> ("<<xstart_wcs<<","<<ystart_wcs<<")");
 	
 		//Move along wcs proj
 		int nPts= 0;
@@ -177,7 +512,7 @@ int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::ve
 		TPolyLine thisPolyLine;
 
 		while(img->HasBin(x,y)){	
-			cout<<"wcs("<<x_wcs<<","<<y_wcs<<") ==> ("<<x<<","<<y<<") offset="<<offset<<endl;
+			DEBUG_LOG("wcs("<<x_wcs<<","<<y_wcs<<") ==> ("<<x<<","<<y<<") offset="<<offset);
 			thisPolyLine.SetPoint(nPts,x,y);	
 			nPts++;
 			
@@ -196,7 +531,7 @@ int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::ve
 		double xstart_wcs, ystart_wcs;
 		//wcsoutinit (wcs,flag);
 		pix2wcs (wcs,xstart,ystart,&xstart_wcs,&ystart_wcs); 
-		cout<<"Grid no. "<<i<<" (xstart,ystart)=("<<xstart<<","<<ystart<<") ==> ("<<xstart_wcs<<","<<ystart_wcs<<")"<<endl;
+		DEBUG_LOG("Grid no. "<<i<<" (xstart,ystart)=("<<xstart<<","<<ystart<<") ==> ("<<xstart_wcs<<","<<ystart_wcs<<")");
 	
 		//Move along wcs proj
 		int nPts= 0;
@@ -208,7 +543,7 @@ int GraphicsUtils::SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::ve
 		TPolyLine thisPolyLine;
 
 		while(img->HasBin(x,y)){	
-			cout<<"wcs("<<x_wcs<<","<<y_wcs<<") ==> ("<<x<<","<<y<<") offset="<<offset<<endl;
+			DEBUG_LOG("wcs("<<x_wcs<<","<<y_wcs<<") ==> ("<<x<<","<<y<<") offset="<<offset);
 			thisPolyLine.SetPoint(nPts,x,y);	
 			nPts++;
 			

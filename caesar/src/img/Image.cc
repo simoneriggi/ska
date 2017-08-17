@@ -485,85 +485,31 @@ int Image::FillPixelMT(Caesar::StatMoments<double>& moments,long int ix,long int
 }//close FillPixelMT()
 #endif
 
-int Image::Add(Image* img,double c,bool computeStats)
-{
 
-	//Check input image
-	if(!img){
-		ERROR_LOG("Null ptr to given input image!");
-		return -1;
-	}
-	long int Nx= img->GetNx();
-	long int Ny= img->GetNy();
-	long int PixDataSize= img->GetPixelDataSize();
-	if(m_Nx!=Nx || m_Ny!=Ny){
-		ERROR_LOG("Image to be added has different size ("<<Nx<<","<<Ny<<") wrt to this image ("<<m_Nx<<","<<m_Ny<<")!");
-		return -1;
-	}
-	if(PixDataSize!=this->GetPixelDataSize()){
-		ERROR_LOG("Image to be added has different pixel vector size ("<<PixDataSize<<") wrt to this image ("<<m_pixels.size()<<")!");
-		return -1;
-	}
+void Image::FillFromMat(cv::Mat& mat,bool useNegativePixInStats){
 
-	//Reset stats
-	ResetImgStats(true,true);
-	
-	//Loop to sum vectors
-	bool useNegativePixInStats= true;
-	
-	#ifdef OPENMP_ENABLED		
-		Caesar::StatMoments<double> moments_t;	
-		std::vector<Caesar::StatMoments<double>> parallel_moments;
-	
-		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
-		#pragma omp parallel private(moments_t) reduction(merge: parallel_moments)
-		{
-			int thread_id= omp_get_thread_num();
-			int nthreads= SysUtils::GetOMPThreads();
-			INFO_LOG("Starting multithread image add (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
+	//Get image size
+	long int nRows = mat.rows;
+  long int nCols = mat.cols;
+	long int Ny= this->GetNy();
 
-			#pragma omp for 
-			for(size_t i=0;i<m_pixels.size();i++){
-				double w1= m_pixels[i];			
-				double w2= img->GetPixelValue(i);	
-				double w= w1 + c*w2;
-				m_pixels[i]= 0;
-				if(FillPixelMT(moments_t,i,w,useNegativePixInStats)<0) continue;
-			}
-			
-			parallel_moments.push_back(moments_t);
-		}//close parallel section
+	//Reset this image
+	Reset();
 		
-		//Update moments from parallel estimates
-		if(Caesar::StatsUtils::ComputeMomentsFromParallel(m_StatMoments,parallel_moments)<0){
-			ERROR_LOG("Failed to compute cumulative moments from parallel estimates (NB: image will have wrong moments!)");
-			return -1;
-		}
-
-	#else 
-		for(size_t i=0;i<m_pixels.size();i++){
-			double w1= m_pixels[i];			
-			double w2= img->GetPixelValue(i);	
-			double w= w1 + c*w2;
-			m_pixels[i]= 0;
-			if(FillPixel(i,w,useNegativePixInStats)<0) continue;
-		}
-	#endif
+	#pragma omp parallel for
+	for(long int i=0;i<nRows;++i) {
+		long int rowId= i;
+		long int iy= Ny-1-rowId;
+		double* p = mat.ptr<double>(i);
+    for (long int j=0;j<nCols;++j){
+			long int colId= j;
+			long int ix= colId;
+			double w= p[j];
+			this->FillPixel(ix,iy,w,useNegativePixInStats);
+    }//end loop cols
+  }//end loop rows
 	
-
-	if(computeStats){
-		bool computeRobustStats= true;
-		bool skipNegativePixels= false;
-		bool forceRecomputing= false;
-		if(ComputeStats(computeRobustStats,skipNegativePixels,forceRecomputing)<0){
-			WARN_LOG("Failed to compute stats after adding the two images!");
-			return -1;
-		}	
-	}//close if computeStats
-
-	return 0;
-
-}//close Add()
+}//close FillFromMat()
 
 
 //================================================================
@@ -595,7 +541,7 @@ void Image::ResetImgStats(bool resetMoments,bool clearStats){
 
 }//close ResetImgStats()
 
-void Image::ComputeMoments(bool skipNegativePixels){
+int Image::ComputeMoments(bool skipNegativePixels){
 
 	//## Recompute stat moments
 	//## NB: If OMP is enabled this is done in parallel and moments are aggregated to return the correct cumulative estimate 
@@ -769,6 +715,7 @@ void Image::ComputeMoments(bool skipNegativePixels){
 	#endif
 	*/
 
+	return status;
 
 }//close ComputeMoments()
 
@@ -1167,7 +1114,7 @@ Image* Image::GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg){
 	}//close if
 		
 	//Clone this image and reset content
-	TString imgName= Form("%s_significance",this->GetName().c_str());
+	TString imgName= Form("%s_significance",m_name.c_str());
 	Image* significanceMap= this->GetCloned(std::string(imgName),true,true);
 	significanceMap->Reset();
 
@@ -1272,6 +1219,637 @@ Image* Image::GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg){
 
 }//close GetSignificanceMap()
 
+//=======================================================
+//==          SOURCE EXTRACTION
+//=======================================================
+int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,bool findNestedSources,double nestedBlobThreshold)
+{
+
+	//Find sources
+	int status= BlobFinder::FindBlobs(this,sources,floodImg,bkgData,seedThr,mergeThr,minPixels,findNegativeExcess,mergeBelowSeed);
+	if(status<0){
+		ERROR_LOG("Blob finder failed!");
+		for(unsigned int k=0;k<sources.size();k++){
+			if(sources[k]){
+				delete sources[k];
+				sources[k]= 0;
+			}	
+		}//end loop sources
+		sources.clear();
+		return -1;
+	}
+
+	//Find nested sources?
+	if(findNestedSources && sources.size()>0){
+		int status= FindNestedSource(sources,bkgData,minPixels,nestedBlobThreshold);
+		if(status<0){
+			WARN_LOG("Nested source search failed!");
+		}
+	}//close if
+
+	return 0;
+
+}//close FindCompactSource()
+
+
+int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,int minPixels,double nestedBlobThreshold){
+
+	//Check if given mother source list is empty
+	int nSources= static_cast<int>(sources.size());
+	if(nSources<=0){
+		WARN_LOG("Empty source list given!");
+		return 0;
+	}
+
+	//Find image mask of found sources
+	Image* sourceMask= this->GetSourceMask(sources,false);
+	if(!sourceMask){
+		ERROR_LOG("Null ptr to computed source mask!");
+		return -1;
+	}
+
+	Image* curvMap= this->GetLaplacianImage(true);
+	if(!curvMap){
+		ERROR_LOG("Null ptr to computed curvature mask!");
+		if(sourceMask) {
+			delete sourceMask;
+			sourceMask= 0;
+		}
+		return -1;
+	}
+	curvMap->ComputeStats(true,false,false);
+	double curvMapRMS= curvMap->GetPixelStats()->medianRMS;
+	double curvMapThr= curvMapRMS*nestedBlobThreshold;
+	Image* blobMask= curvMap->GetBinarizedImage(curvMapThr);
+	if(!blobMask){
+		ERROR_LOG("Failed to compute blob mask!");
+		if(sourceMask) {
+			delete sourceMask;
+			sourceMask= 0;
+		}
+		if(curvMap) {
+			delete curvMap;
+			curvMap= 0;
+		}
+		return -1;
+	}
+
+	//Find blob+source mask
+	Image* sourcePlusBlobMask= sourceMask->GetMask(blobMask,true);
+	if(!sourcePlusBlobMask){
+		ERROR_LOG("Failed to compute (source+blob) mask!");
+		if(sourceMask) {
+			delete sourceMask;
+			sourceMask= 0;
+		}
+		if(curvMap) {
+			delete curvMap;
+			curvMap= 0;
+		}
+		if(blobMask) {
+			delete blobMask;
+			blobMask= 0;
+		}
+		return -1;
+	}
+
+	//Find nested blobs 
+	std::vector<Source*> NestedSources;
+	double fgValue= 1;
+	int status= BlobFinder::FindBlobs(this,NestedSources,sourcePlusBlobMask,bkgData,fgValue,fgValue,minPixels,false,false);
+	if(status<0){
+		ERROR_LOG("Nested blob finder failed!");
+		if(sourceMask) {
+			delete sourceMask;
+			sourceMask= 0;
+		}
+		if(curvMap) {
+			delete curvMap;
+			curvMap= 0;
+		}
+		if(blobMask) {
+			delete blobMask;
+			blobMask= 0;
+		}
+		if(sourcePlusBlobMask) {
+			delete sourcePlusBlobMask;
+			sourcePlusBlobMask= 0;
+		}
+		for(unsigned int k=0;k<NestedSources.size();k++){
+			if(NestedSources[k]){
+				delete NestedSources[k];
+				NestedSources[k]= 0;
+			}	
+		}//end loop sources
+		NestedSources.clear();
+		return -1;
+	}//close if
+
+	//Add nested sources to mother source
+	int nNestedSources= (int)NestedSources.size();
+	if(nNestedSources>=0){
+		INFO_LOG("#"<<nNestedSources<<" nested sources found!");
+
+		//## Find matching between mother and nested sources
+		for(int j=0;j<nNestedSources;j++){
+			bool isMotherFound= false;
+			DEBUG_LOG("Finding matching for nested source no. "<<j);
+			
+			for(int i=0;i<nSources;i++){
+				int sourceId= sources[i]->Id;
+				bool isInside= NestedSources[j]->IsInsideSource(sources[i]);
+				if(isInside){
+					DEBUG_LOG("Nested source no. "<<j<<" added to source id="<<sourceId<<" ...");
+					NestedSources[j]->ComputeStats();
+					NestedSources[j]->ComputeMorphologyParams();
+					sources[i]->AddNestedSource(NestedSources[j]);
+					isMotherFound= true;
+					break;
+				}
+			}//end loop mother sources
+			if(!isMotherFound){
+				WARN_LOG("Cannot find mother source for nested source no. "<<j<<"!");
+				NestedSources[j]->Print();
+			}			
+		}//end loop nested sources							
+	}//close nNestedBlobs>0
+
+	//Clear
+	if(sourceMask) {
+		delete sourceMask;
+		sourceMask= 0;
+	}
+	if(curvMap) {
+		delete curvMap;
+		curvMap= 0;
+	}
+	if(blobMask) {
+		delete blobMask;
+		blobMask= 0;
+	}
+	if(sourcePlusBlobMask) {
+		delete sourcePlusBlobMask;
+		sourcePlusBlobMask= 0;
+	}
+
+	return 0;
+
+}//close FindNestedSources()
+
+//==================================================
+//==       FILTERING METHODS
+//==================================================
+
+Image* Image::GetMask(Image* mask,bool isBinary)
+{
+
+	//## Check input mask
+	if(!mask) {
+		ERROR_LOG("Null ptr to given image mask!");
+		return 0;
+	}
+		
+	//## Check mask bins
+	long int Nx= mask->GetNx();
+	long int Ny= mask->GetNy();
+	if(Nx!=this->GetNx() || Ny!=this->GetNy()){
+		ERROR_LOG("Mask binning is different than current image!");
+		return 0;
+	}	
+
+	//## Clone map
+	TString imgName= Form("%s_Mask",m_name.c_str());	
+	Image* maskedImage= this->GetCloned(std::string(imgName),true,true);
+	maskedImage->Reset();
+
+	//## Loop over mask	
+	if(isBinary){
+		#ifdef OPENMP_ENABLED
+		#pragma omp parallel for collapse(2)
+		#endif
+		for(long int i=0;i<Nx;i++){	
+			for(long int j=0;j<Ny;j++){
+				double binContent= this->GetPixelValue(i,j);
+				if(binContent==0) continue;
+				double maskContent= mask->GetPixelValue(i,j);
+				if(maskContent!=0) maskedImage->SetPixelValue(i,j,1);
+			}//end loop bins Y
+		}//end loop bins X
+	}//close if
+	else{
+		#ifdef OPENMP_ENABLED
+		#pragma omp parallel for collapse(2)
+		#endif
+		for(int i=0;i<Nx;i++){
+			for(int j=0;j<Ny;j++){
+				double binContent= this->GetPixelValue(i,j);	
+				if(binContent==0) continue;
+				double maskContent= mask->GetPixelValue(i,j);
+				if(maskContent!=0) maskedImage->SetPixelValue(i,j,binContent);
+			}//end loop bins Y
+		}//end loop bins X
+	}//close else
+
+	//Force re-computation of stats (in parallel computation moments are wrong)
+	maskedImage->ComputeStats(true,false,true);
+
+	return maskedImage;
+
+}//close GetMask()
+
+Image* Image::GetSourceMask(std::vector<Source*>const& sources,bool isBinary,bool invert){
+
+	//## Clone map
+	long int Nx= this->GetNx();
+	long int Ny= this->GetNy();
+	bool copyMetaData= true;
+	bool resetStats= true;
+	TString imgName= Form("%s_SourceMask",m_name.c_str());	
+	Image* maskedImage= this->GetCloned(std::string(imgName),copyMetaData,resetStats);
+	
+	//## Check source list
+	int nSources= static_cast<int>(sources.size());
+	if(nSources<=0) {
+		WARN_LOG("Source list is empty, returning same image!");
+		return maskedImage;	
+	}
+
+	if(invert){
+		if(isBinary){
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif
+			for(int k=0;k<nSources;k++){
+				for(int l=0;l<sources[k]->GetNPixels();l++){
+					long int id= (sources[k]->GetPixel(l))->id;
+					maskedImage->SetPixelValue(id,0);
+				}//end loop pixels
+			}//end loop sources	
+
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif
+			for(long int i=0;i<Nx;i++){
+				for(long int j=0;j<Ny;j++){
+					double w= maskedImage->GetPixelValue(i,j);		
+					if(w==0) continue;
+					maskedImage->SetPixelValue(i,j,1);				
+				}
+			}
+		}//close if
+		else{
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif
+			for(int k=0;k<nSources;k++){
+				for(int l=0;l<sources[k]->GetNPixels();l++){
+					long int id= (sources[k]->GetPixel(l))->id;
+					maskedImage->SetPixelValue(id,0);
+				}//end loop pixels
+			}//end loop sources		
+		}//close else
+
+		//Force re-computation of stats
+		maskedImage->ComputeStats(true,false,true);
+
+	}//close if invert
+	else{
+		//Reset map and loop over sources
+		maskedImage->Reset();
+
+		if(isBinary){	
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif		
+			for(int k=0;k<nSources;k++){
+				for(int l=0;l<sources[k]->GetNPixels();l++){
+					long int id= (sources[k]->GetPixel(l))->id;
+					//maskedImage->FillPixel(id,1);
+					maskedImage->SetPixelValue(id,1);
+				}//end loop pixels
+			}//end loop sources		
+		}//close if
+		else{
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif
+			for(int k=0;k<nSources;k++){
+				for(int l=0;l<sources[k]->GetNPixels();l++){
+					long int id= (sources[k]->GetPixel(l))->id;
+					double w= this->GetPixelValue(id);
+					//maskedImage->FillPixel(id,w);
+					maskedImage->SetPixelValue(id,w);
+				}//end loop pixels
+			}//end loop sources		
+		}//close else
+
+		//Force re-computation of stats
+		maskedImage->ComputeStats(true,false,true);
+
+	}//close else
+
+	return maskedImage;
+
+}//close GetSourceMask()
+
+Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
+
+	//Clone input image	
+	TString imgName= Form("%s_Residual",m_name.c_str());	
+	Image* residualImg= this->GetCloned(std::string(imgName),true,true);
+	if(!residualImg){
+		ERROR_LOG("Failed to clone input image, returning nullptr!");
+		return nullptr;
+	}
+
+	//Dilate source pixels
+	int status= 0;
+	//int status= MorphFilter::DilateAroundSources(residualImg,sources,KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
+
+	if(status<0){
+		ERROR_LOG("Failed to dilate sources!");
+		if(residualImg) {
+			delete residualImg;
+			residualImg= 0;
+		}
+		return 0;		
+	}
+
+	//Re-Compute stats
+	residualImg->ComputeStats(true,false,true);
+
+	return residualImg;
+
+}//close GetSourceResidual()
+
+Image* Image::GetNormalizedImage(std::string normScale,int normmin,int normmax,bool skipEmptyBins){
+
+	long int Nx= this->GetNx();
+	long int Ny= this->GetNy();
+	double wmin= (this->m_StatMoments).minVal;
+	double wmax= (this->m_StatMoments).maxVal;
+	
+	TString imgName= Form("%s_Normalized",m_name.c_str());	
+	Image* norm_img= this->GetCloned(std::string(imgName),true,true);
+	norm_img->Reset();
+	
+	if(normScale=="LINEAR"){
+
+		#ifdef OPENMP_ENABLED
+		#pragma omp parallel for
+		#endif
+		for(size_t i=0;i<m_pixels.size();i++){
+			double w= m_pixels[i];
+			if(skipEmptyBins && w==0) continue;
+			double w_norm= normmin + (normmax-normmin)*(w-wmin)/(wmax-wmin);
+			norm_img->SetPixelValue(i,w_norm);
+		}
+	}//close if
+
+	else if(normScale=="LOG"){
+		double safemin= 1;
+		double safemax= 256;
+
+		#ifdef OPENMP_ENABLED
+		#pragma omp parallel for
+		#endif
+		for(size_t i=0;i<m_pixels.size();i++){
+			double w= m_pixels[i];
+			if(skipEmptyBins && w==0) continue;
+			double w_norm= safemin + (safemax-safemin)*(w-wmin)/(wmax-wmin);
+			double w_log= normmin + log10(w_norm/safemin)/log10(safemax/safemin) * (normmax-normmin);
+			norm_img->SetPixelValue(i,w_log);
+		}
+
+	}//close else if
+	else{
+		WARN_LOG("Invalid norm scale option selected ("<<normScale<<") no transform applied to original image!");
+		return norm_img;
+	}
+
+	//Force recomputation of stats if present, otherwise recompute only moments
+	bool skipNegativePixels= false;
+	bool computeRobustStats= true;	
+	bool forceRecomputing= true;
+	int status= 0;
+	if(this->HasStats()) status= norm_img->ComputeStats(computeRobustStats,skipNegativePixels,forceRecomputing);
+	else status= norm_img->ComputeMoments(skipNegativePixels);
+	if(status<0){
+		WARN_LOG("Failed to re-compute moments/stats for normalized image!");
+	}
+	
+	return norm_img;
+
+}//close GetNormalizedImage()
+
+
+Image* Image::GetLaplacianImage(bool invert)
+{
+
+	//Compute laplacian filter
+	Image* laplImg= GradientFilter::GetLaplaceFilter(this);
+	if(invert) laplImg->Scale(-1);
+	
+	return laplImg;
+
+}//close GetLaplacianImage()
+
+
+Image* Image::GetGuidedFilterImage(int radius,double eps)
+{
+
+	//Normalize img
+	Image* img_norm= this->GetNormalizedImage("LINEAR",1,256);
+	img_norm->SetName("tmpImg");
+	if(!img_norm) {
+		ERROR_LOG("Failed to get normalized image!");
+		return 0;
+	}
+
+	//## Convert image to OpenCV mat
+	cv::Mat I= img_norm->GetOpenCVMat("64");
+	cv::Mat p= I;
+	eps *= 255*255;   // Because the intensity range of our images is [0, 255]
+
+	//## Run guided filter
+	cv::Mat dst = Caesar::guidedFilter(I, p, radius, eps);
+
+	//## Fill filtered image
+	TString imgName= Form("%s_GuidedFilter",m_name.c_str());
+	Image* FilterImg= this->GetCloned(std::string(imgName),true,true);
+	FilterImg->Reset();
+	FilterImg->FillFromMat(dst);
+
+	//## Clear allocated data
+	if(img_norm) {
+		delete img_norm;
+		img_norm= 0;
+	}
+
+	return FilterImg;
+
+}//close GetGuidedFilterImage()
+
+Image* Image::GetSmoothedImage(int size_x,int size_y,double sigma_x,double sigma_y)
+{
+
+	//## Get OpenCV mat
+	cv::Mat mat= this->GetOpenCVMat("64");
+	
+	//## Smooth matrix
+	cv::Size smooth_size(size_x,size_y);
+	cv::Mat smoothed_mat;
+	cv::GaussianBlur(mat,smoothed_mat, smooth_size, sigma_x, sigma_y, cv::BORDER_DEFAULT);
+
+	//## Fill smoothed image
+	TString imgName= Form("%s_Smoothed",m_name.c_str());
+	Image* SmoothedImg= this->GetCloned(std::string(imgName),true,true);
+	SmoothedImg->Reset();
+	SmoothedImg->FillFromMat(smoothed_mat);
+	
+	return SmoothedImg;
+
+}//close GetSmoothedImage()
+
+
+int Image::Add(Image* img,double c,bool computeStats)
+{
+
+	//Check input image
+	if(!img){
+		ERROR_LOG("Null ptr to given input image!");
+		return -1;
+	}
+	long int Nx= img->GetNx();
+	long int Ny= img->GetNy();
+	long int PixDataSize= img->GetPixelDataSize();
+	if(m_Nx!=Nx || m_Ny!=Ny){
+		ERROR_LOG("Image to be added has different size ("<<Nx<<","<<Ny<<") wrt to this image ("<<m_Nx<<","<<m_Ny<<")!");
+		return -1;
+	}
+	if(PixDataSize!=this->GetPixelDataSize()){
+		ERROR_LOG("Image to be added has different pixel vector size ("<<PixDataSize<<") wrt to this image ("<<m_pixels.size()<<")!");
+		return -1;
+	}
+
+	//Reset stats
+	ResetImgStats(true,true);
+	
+	//Loop to sum vectors
+	bool useNegativePixInStats= true;
+	
+	#ifdef OPENMP_ENABLED		
+		Caesar::StatMoments<double> moments_t;	
+		std::vector<Caesar::StatMoments<double>> parallel_moments;
+	
+		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+		#pragma omp parallel private(moments_t) reduction(merge: parallel_moments)
+		{
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+			INFO_LOG("Starting multithread image add (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
+
+			#pragma omp for 
+			for(size_t i=0;i<m_pixels.size();i++){
+				double w1= m_pixels[i];			
+				double w2= img->GetPixelValue(i);	
+				double w= w1 + c*w2;
+				m_pixels[i]= 0;
+				if(FillPixelMT(moments_t,i,w,useNegativePixInStats)<0) continue;
+			}
+			
+			parallel_moments.push_back(moments_t);
+		}//close parallel section
+		
+		//Update moments from parallel estimates
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(m_StatMoments,parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative moments from parallel estimates (NB: image will have wrong moments!)");
+			return -1;
+		}
+
+	#else 
+		for(size_t i=0;i<m_pixels.size();i++){
+			double w1= m_pixels[i];			
+			double w2= img->GetPixelValue(i);	
+			double w= w1 + c*w2;
+			m_pixels[i]= 0;
+			if(FillPixel(i,w,useNegativePixInStats)<0) continue;
+		}
+	#endif
+	
+
+	if(computeStats){
+		bool computeRobustStats= true;
+		bool skipNegativePixels= false;
+		bool forceRecomputing= false;
+		if(ComputeStats(computeRobustStats,skipNegativePixels,forceRecomputing)<0){
+			WARN_LOG("Failed to compute stats after adding the two images!");
+			return -1;
+		}	
+	}//close if computeStats
+
+	return 0;
+
+}//close Add()
+
+int Image::Scale(double c)
+{
+	//Multiply pixel values by a factor c
+	#ifdef OPENMP_ENABLED
+	#pragma omp parallel for
+	#endif
+	for(size_t i=0;i<m_pixels.size();i++){
+		double w_old= m_pixels[i];
+		double w= w_old*c;
+		m_pixels[i]= w;
+	}
+
+	//Force recomputation of stats if present, otherwise recompute only moments
+	bool skipNegativePixels= false;
+	bool computeRobustStats= true;	
+	bool forceRecomputing= true;
+	int status= 0;
+	if(this->HasStats()) status= this->ComputeStats(computeRobustStats,skipNegativePixels,forceRecomputing);
+	else status= this->ComputeMoments(skipNegativePixels);
+		
+	return status;
+
+}//close Scale()
+
+//================================
+//==    THRESHOLDING METHODS
+//================================
+Image* Image::GetBinarizedImage(double threshold,double fgValue,bool isLowerThreshold){
+
+	TString imgName= Form("%s_Binarized",m_name.c_str());	
+	Image* BinarizedImg= this->GetCloned(std::string(imgName),true,true);
+	BinarizedImg->Reset();
+
+	#ifdef OPENMP_ENABLED
+	#pragma omp parallel for
+	#endif
+	for(size_t i=0;i<m_pixels.size();i++){
+		double w= m_pixels[i];
+		if(w==0) continue;
+		if(w>=threshold && !isLowerThreshold) {
+			BinarizedImg->SetPixelValue(i,fgValue);
+		}
+		else if(w<threshold && isLowerThreshold) {
+			BinarizedImg->SetPixelValue(i,fgValue);
+		}
+	}//end loop pixels
+	
+	//Force recomputation of stats if present, otherwise recompute only moments
+	bool skipNegativePixels= false;
+	if(BinarizedImg->ComputeMoments(skipNegativePixels)<0){
+		ERROR_LOG("Failed to re-compute moments of binarized image!");
+		return nullptr;
+	}	
+	
+	return BinarizedImg;
+
+}//close GetBinarizedImage()
+
 //================================================================
 //===    CONVERSION METHODS
 //================================================================
@@ -1307,6 +1885,144 @@ TH2D* Image::GetHisto2D(std::string histoname){
 
 }//close GetHisto2D()
 
+cv::Mat Image::GetOpenCVMat(std::string encoding){
+
+	long int Nx= this->GetNx();
+	long int Ny= this->GetNy();
+
+	//## Fill OpenCV mat
+	cv::Mat mat;
+	if(encoding=="64") mat= cv::Mat::zeros(Ny,Nx,CV_64FC1);
+	else if(encoding=="32") mat= cv::Mat::zeros(Ny,Nx,CV_32FC1);
+	else{
+		WARN_LOG("Invalid encoding selected, using default 64bit encoding");
+		mat= cv::Mat::zeros(Ny,Nx,CV_64FC1);
+	}
+
+	//The fast way
+	long int nRows = mat.rows;
+  long int nCols = mat.cols;
+	
+	#ifdef OPENMP_ENABLED
+	#pragma omp parallel for
+	#endif
+	for(long int i=0;i<nRows;++i) {
+		long int rowId= i;
+		long int iy= Ny-1-rowId;
+  	double* p = mat.ptr<double>(i);
+    for (long int j=0;j<nCols;++j){
+			int colId= j;
+			int ix= colId;
+			double w= this->GetPixelValue(ix,iy);
+    	p[j] = w;
+    }
+  }
+
+	return mat;
+
+}//close ImgToMat()
+
+//================================================================
+//===    DRAW  METHODS
+//================================================================
+int Image::Draw(int palette,bool drawFull,bool useCurrentCanvas,std::string units)
+{
+	//Set palette
+	Caesar::GraphicsUtils::SetPalette(palette);
+
+	//Get temp histogram
+	TH2D* htemp= GetHisto2D("htemp");
+	if(!htemp){
+		ERROR_LOG("Failed to get histo from this image!");
+		return -1;
+	}
+	
+	//Set canvas
+	int canvas_width= 720;
+	int canvas_height= 700;
+	TString canvasName= Form("%s_Plot",m_name.c_str());	
+	TCanvas* canvas= 0;
+	if(useCurrentCanvas && gPad) {
+		canvas= gPad->GetCanvas();
+		canvas->SetName(canvasName);
+		canvas->SetTitle(canvasName);
+	}
+	else{
+		canvas= new TCanvas(canvasName,canvasName,canvas_width,canvas_height);
+	}
+
+	if(!canvas){
+		ERROR_LOG("Failed to retrieve or set canvas!");
+		return -1;
+	}
+
+	//Draw full image (without borders)
+	canvas->cd();
+	htemp->SetStats(0);
+	
+	if(drawFull){
+		canvas->ToggleEventStatus();
+  	canvas->SetRightMargin(0.0);
+  	canvas->SetLeftMargin(0.0);
+  	canvas->SetTopMargin(0.0);
+  	canvas->SetBottomMargin(0.0);
+		htemp->Draw("COLA");
+	}
+	else{
+		gStyle->SetPadTopMargin(0.1);
+  	gStyle->SetPadBottomMargin(0.1);
+  	gStyle->SetPadLeftMargin(0.15);
+  	gStyle->SetPadRightMargin(0.15);
+
+		gPad->SetTopMargin(0.1);
+		gPad->SetBottomMargin(0.1);
+		gPad->SetLeftMargin(0.15);
+  	gPad->SetRightMargin(0.15);
+
+		//Set palette axis title	
+		htemp->GetZaxis()->SetTitle(units.c_str());
+		htemp->GetZaxis()->SetTitleSize(0.05);
+		htemp->GetZaxis()->SetTitleOffset(0.9);
+		htemp->Draw();
+		gPad->Update();
+		htemp->Draw("COLZ");
+		gPad->Update();
+  }
+
+	return 0;
+
+}//close Draw()
+
+
+int Image::Draw(std::vector<Source*>const& sources,int palette,bool drawFull,bool useCurrentCanvas,std::string units)
+{
+	
+	//Draw image first
+	Draw(palette,drawFull,useCurrentCanvas,units);
+
+	//Retrieve canvas and draw sources	
+	TCanvas* canvas= gPad->GetCanvas();
+	if(!canvas){
+		WARN_LOG("Failed to get access to current canvas!");
+		return -1;
+	}
+
+	//Draw sources in current canvas
+	for(unsigned int k=0;k<sources.size();k++){	
+		int type= sources[k]->Type;
+		int lineColor= kBlack;
+		if(type==Source::eCompact)
+			lineColor= kBlack;	
+		else if(type==Source::ePointLike)
+			lineColor= kRed;
+		else if(type==Source::eExtended)
+			lineColor= kGreen+1;	
+		sources[k]->Draw(false,false,true,lineColor);
+	}//end loop sources
+
+	return 0;
+
+}//close Draw()
 
 
 }//close namespace

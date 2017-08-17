@@ -205,6 +205,9 @@ class Image : public TObject {
 			return ((gbin-binx)/m_Nx)%m_Ny;
 		}	
 
+		/**
+		* \brief Get pixel value
+		*/
 		float GetPixelValue(long int gbin){
 			if(gbin<0 || gbin>=(long int)(m_pixels.size())) {
 				WARN_LOG("Invalid pixel bin ("<<gbin<<") requested to be accessed (hint: check if image size is not initialized or given bin exceed size), returning nan");
@@ -213,13 +216,64 @@ class Image : public TObject {
 			return m_pixels[gbin];
 		}
 
+		/**
+		* \brief Get pixel value
+		*/
+		float GetPixelValue(long int ix,long int iy){
+			long int gbin= GetBin(ix,iy);	
+			return GetPixelValue(gbin);
+		}
+
+		/**
+		* \brief Set pixel value
+		*/
+		int SetPixelValue(long int gbin,double w){
+			if(gbin<0 || gbin>=(long int)(m_pixels.size())) {
+				WARN_LOG("Invalid pixel bin ("<<gbin<<") requested to be accessed (hint: check if image size is not initialized or given bin exceed size), will not set value!");
+				return -1;
+			}
+			m_pixels[gbin]= w;
+			return 0;
+		}
+			
+		/**
+		* \brief Set pixel value
+		*/
+		int SetPixelValue(long int ix,long int iy,double w){
+			long int gbin= GetBin(ix,iy);	
+			return SetPixelValue(gbin,w);
+		}
+
+		/**
+		* \brief Get bin content (equivalent to GetPixelValue)
+		*/
 		float GetBinContent(long int ix,long int iy){
 			long int gbin= GetBin(ix,iy);	
 			return GetPixelValue(gbin);
 		}
+		/**
+		* \brief Get bin content (equivalent to GetPixelValue)
+		*/
+		float GetBinContent(long int gbin){
+			return GetPixelValue(gbin);
+		}
 	
 		/**
-		* \brief Get pixel world coordinate
+		* \brief Set bin content (equivalent to SetPixelValue)
+		*/
+		int SetBinContent(long int ix,long int iy,double w){
+			long int gbin= GetBin(ix,iy);	
+			return SetPixelValue(gbin,w);
+		}
+		/**
+		* \brief Set bin content (equivalent to SetPixelValue)
+		*/
+		int SetBinContent(long int gbin,double w){
+			return SetPixelValue(gbin,w);
+		}
+
+		/**
+		* \brief Clone image (return a new image)
 		*/
 		Image* GetCloned(std::string name,bool copyMetaData=true,bool resetStats=true){
 			Image* clone= new Image;
@@ -241,10 +295,7 @@ class Image : public TObject {
 			this->ResetImgStats(true,true);
 		}
 		
-		/**
-		* \brief Add an image to this (this= this + img*c)
-		*/
-		int Add(Image* img,double c=1,bool computeStats=false);
+		
 
 		/**
 		* \brief Get pixel world coordinate
@@ -258,14 +309,14 @@ class Image : public TObject {
 		/**
 		* \brief Check if given bin id is within image range
 		*/
-		/*
-		bool HasBin(int binId){
-			return (!this->IsBinOverflow(binId) && !this->IsBinUnderflow(binId) );
+		bool HasBin(long int gbin){
+			return ( gbin>=0 && gbin<(long int)(m_pixels.size()) );
 		}
-		bool HasBin(int binIdX,int binIdY){
-			int binId= this->GetBin(binIdX,binIdY);
+		bool HasBin(long int binIdX,long int binIdY){
+			long int binId= GetBin(binIdX,binIdY);
 			return HasBin(binId);
 		}
+		/*
 		bool HasBin(double x,double y){
 			int binId= this->FindBin(x,y);
 			return HasBin(binId);
@@ -286,12 +337,31 @@ class Image : public TObject {
 			int binIdY= this->GetYaxis()->FindBin(y);
 			return HasBinY(binIdY);
 		}
-		bool IsBinContentInRange(int binIdX,int binIdY,double minThr,double maxThr){	
+		*/
+
+		/**
+		* \brief Check if bin content is within given value range
+		*/
+		bool IsBinContentInRange(long int binIdX,long int binIdY,double minThr,double maxThr){	
 			if(!HasBin(binIdX,binIdY)) return false;
 			double w= this->GetBinContent(binIdX,binIdY);
 			return (w>=minThr && w<=maxThr);
 		}
+
+		/**
+		* \brief Check if bin is at edge
 		*/
+		bool IsEdgeBin(long int binIdX,long int binIdY){
+			return ( binIdX==0 || binIdX==(m_Nx-1) || binIdY==0 || binIdY==(m_Ny-1) );
+		}
+		/**
+		* \brief Check if bin is at edge
+		*/
+		bool IsEdgeBin(long int gbin){
+			long int binIdX= GetBinX(gbin);
+			long int binIdY= GetBinY(gbin);
+			return IsEdgeBin(binIdX,binIdY);
+		}
 
 		//================================
 		//==       Fill methods
@@ -317,7 +387,7 @@ class Image : public TObject {
 		/**
 		* \brief Fill pixels (to be used to compute stats at fill time)
 		*/
-		//void FillFromMat(cv::Mat,bool useNegativePixInStats=true);
+		void FillFromMat(cv::Mat&,bool useNegativePixInStats=true);
 
 		
 
@@ -432,7 +502,7 @@ class Image : public TObject {
 		int GetTileBiWeightStats(float& bwLocation,float& bwScale,long int& npix,double C,long int ix_min,long int ix_max,long int iy_min,long int iy_max,bool skipNegativePixels=false); 
 		
 		//================================
-		//==       BKG methods
+		//==       BKG METHODS
 		//================================
 		/**
 		* \brief Compute local bkg
@@ -443,7 +513,9 @@ class Image : public TObject {
 		*/
 		Image* GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg=false);
 
-
+		//================================
+		//==    THRESHOLDING METHODS
+		//================================
 		//== Thresholding methods ==
 		/**
 		* \brief Compute pixel histo
@@ -468,18 +540,20 @@ class Image : public TObject {
 		/**
 		* \brief Get binarized image
 		*/
-		//Img* GetBinarizedImage(double threshold,double fgValue=1,bool isLowerThreshold=false);
+		Image* GetBinarizedImage(double threshold,double fgValue=1,bool isLowerThreshold=false);
 
 
-		//== Source finding methods ==
+		//=========================================
+		//==    SOURCE FINDING METHODS           ==
+		//=========================================
 		/**
 		* \brief Find compact sources
 		*/
-		//int FindCompactSource(std::vector<Source*>&,Img* floodImg=0,BkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,bool findNestedSources=false,double nestedBlobThrFactor=1);
+		int FindCompactSource(std::vector<Source*>&,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,bool findNestedSources=false,double nestedBlobThrFactor=1);
 		/**
 		* \brief Find nested sources
 		*/
-		//int	FindNestedSource(std::vector<Source*>& sources,BkgData* bkgData=0,int minPixels=5,double nestedBlobThreshold=1);
+		int	FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData=0,int minPixels=5,double nestedBlobThreshold=1);
 
 		/**
 		* \brief Find extended sources with ChanVese method
@@ -491,12 +565,55 @@ class Image : public TObject {
 		*/
 		//int FindExtendedSource_HClust(std::vector<Source*>&,Img* saliencyImg,Img* edgeImg);
 
+		
+		//=========================================
+		//==     FILTER METHODS                  ==
+		//=========================================
+		/**
+		* \brief Get masked image
+		*/
+		Image* GetMask(Image* mask,bool isBinary=false);
+		
+		/**
+		* \brief Get source masked image
+		*/
+		Image* GetSourceMask(std::vector<Source*>const& sources,bool isBinary=false,bool invert=false);
 
-		//== Filter methods ==
+		/**
+		* \brief Returns a residual image obtained by dilating given sources with a random background
+		*/
+		Image* GetSourceResidual(std::vector<Source*>const& sources,int KernSize=5,int dilateModel=MorphFilter::eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,BkgData* bkgData=0,bool useLocalBkg=false,bool randomize=false,double zThr=20);
+
+
+		/**
+		* \brief Scale image by a factor 'c'
+		*/
+		int Scale(double c);
+
+		/**
+		* \brief Add an image to this (this= this + img*c)
+		*/
+		int Add(Image* img,double c=1,bool computeStats=false);
+
+		/**
+		* \brief Get normalized image
+		*/
+		Image* GetNormalizedImage(std::string normScale="LINEAR",int normmin=1,int normmax=256, bool skipEmptyBins=true);
+
+		/**
+		* \brief Get image laplacian
+		*/
+		Image* GetLaplacianImage(bool invert=false);
+
 		/**
 		* \brief Get guided filter image
 		*/
-		//Img* GetGuidedFilterImage(int radius=12,double eps=0.04);
+		Image* GetGuidedFilterImage(int radius=12,double eps=0.04);
+		/**
+		* \brief Smooth image
+		*/
+		Image* GetSmoothedImage(int size_x=3,int size_y=3,double sigma_x=1,double sigma_y=1);
+
 		/**
 		* \brief Get image wavelength decomposition
 		*/
@@ -509,10 +626,7 @@ class Image : public TObject {
 		* \brief Get image gradient
 		*/
 		//Img* GetGradientImage(bool invert=false);
-		/**
-		* \brief Get image laplacian
-		*/
-		//Img* GetLaplacianImage(bool invert=false);
+		
 		/**
 		* \brief Get laplacian of gaussian image
 		*/
@@ -521,10 +635,7 @@ class Image : public TObject {
 		* \brief Get scale-normalized laplacian of gaussian image
 		*/
 		//Img* GetNormLoGImage(int size=3,double scale=1,bool invert=false);
-		/**
-		* \brief Smooth image
-		*/
-		//Img* GetSmoothedImage(int size_x=3,int size_y=3,double sigma_x=1,double sigma_y=1);
+		
 		/**
 		* \brief Get single-reso saliency map
 		*/
@@ -535,43 +646,44 @@ class Image : public TObject {
 		*/
 		//Img* GetMultiResoSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=0.2,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,double salientMultiplicityThrFactor=0.7,bool addBkgMap=true,bool addNoiseMap=true,BkgData* bkgData=0,double saliencyThrFactor=2,double imgThrFactor=1);
 
-
-		//== Convert/Scale util methods
+		//=========================================
+		//==   CONVERT METHODS
+		//=========================================
 		/**
 		* \brief Export to ROOT TH2
 		*/
 		TH2D* GetHisto2D(std::string histoname="");
 
 		/**
+		* \brief Convert image to OpenCV mat float image
+		*/
+		cv::Mat GetOpenCVMat(std::string encoding="64");	
+		
+
+		/**
 		* \brief Get matrix from image
 		*/
 		//TMatrixD* GetMatrix();
-		/**
-		* \brief Convert image to OpenCV mat float image
-		*/
-		//cv::Mat ImgToMat(std::string encoding="64");	
-		/**
-		* \brief Get normalized image
-		*/
-		//Img* GetNormalizedImage(std::string normScale="LINEAR",int normmin=1,int normmax=256, bool skipEmptyBins=true);
+		
+		
 		/**
 		* \brief Clone image
 		*/
 		
+		
+		
+		//==================================
+		//==    DRAW METHODS             ===
+		//==================================
 		/**
-		* \brief Get masked image
+		* \brief Draw image (plain image, no WCS, no sources)
 		*/
-		//Img* GetMask(Img* mask,bool isBinary=false);
+		int Draw(int palette=Caesar::eRAINBOW,bool drawFull=false,bool useCurrentCanvas=false,std::string units="");
 		/**
-		* \brief Get source masked image
+		* \brief Draw image and sources (no WCS axis)
 		*/
-		//Img* GetSourceMask(std::vector<Source*>const& sources,bool isBinary=false,bool invert=false);
-		/**
-		* \brief Returns a residual image obtained by dilating given sources with a random background
-		*/
-		//Img* GetSourceResidual(std::vector<Source*>const& sources,int KernSize=5,int dilateModel=MorphFilter::eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,BkgData* bkgData=0,bool useLocalBkg=false,bool randomize=false,double zThr=20);
+		int Draw(std::vector<Source*>const& sources,int palette=Caesar::eRAINBOW,bool drawFull=false,bool useCurrentCanvas=false,std::string units="");
 
-		//== Drawing methods
 		/**
 		* \brief Draw image
 		*/
@@ -610,7 +722,7 @@ class Image : public TObject {
 		/**
 		* \brief Update moments (multithreaded version)
 		*/
-		void ComputeMoments(bool skipNegativePixels=false);
+		int ComputeMoments(bool skipNegativePixels=false);
 		/**
 		* \brief Compute image stats parameters from moments 
 		*/

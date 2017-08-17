@@ -36,8 +36,9 @@
 namespace Caesar {
 
 class Img;
+class Image;
 
-
+/*
 enum ColorPaletteStyle {
 	eRAINBOW= 0,
 	eBLACKWHITE= 1,
@@ -46,6 +47,7 @@ enum ColorPaletteStyle {
 	eCOLD2HOT= 4,
 	eTHERMAL= 5
 };
+*/
 
 class GraphicsUtils : public TObject {
 
@@ -62,15 +64,62 @@ class GraphicsUtils : public TObject {
 
 		
 	public:
+
+		/**
+		* \brief Get palette code
+		*/
+		static void SetPalette(int paletteStyle,int ncolors=999);
+
+		/**
+		* \brief Set thermal palette
+		*/
 		static int SetThermalPalette(int ncolors=999);
+		/**
+		* \brief Set hot-to-cold palette
+		*/
 		static int SetHotColdPalette(int ncolors=999);
+		/**
+		* \brief Set cold-to-hot palette
+		*/
 		static int SetColdHotPalette(int ncolors=999);
+		/**
+		* \brief Setblack & white palette
+		*/
 		static int SetBWPalette(int ncolors=999);
-		static int UpdateGAxis();
+
+
+		
+		//=========================================
+		//==  OLD IMAGE METHODS 
+		//=========================================
+		/**
+		* \brief Set WCS axis
+		*/
 		static int SetWCSAxis(Img* img,TGaxis& xaxis,TGaxis& yaxis,int coordSystem=-1);
+
+		/**
+		* \brief Set WCS proj grid
+		*/
 		static int SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::vector<TPolyLine>& gridy,int coordSystem);
+		/**
+		* \brief Retrieve image from pad
+		*/
 		static Img* FindImageFromPad();
+		/**
+		* \brief Update pad
+		*/
 		static int PadUpdater();
+		/**
+		* \brief Update ROOT canvas gaxis
+		*/
+		static int UpdateGAxis();
+
+
+
+		//=========================================
+		//==  NEW IMAGE METHODS 
+		//=========================================
+		
 
 	private:
 	
@@ -79,7 +128,6 @@ class GraphicsUtils : public TObject {
 
 #ifdef __MAKECINT__
 #pragma link C++ class GraphicsUtils+;
-//#pragma link C++ enum ColorPaletteStyle+;
 #endif	
 
 }//close namespace

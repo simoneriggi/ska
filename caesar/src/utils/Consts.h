@@ -91,6 +91,20 @@ enum BkgMethod {
 	eSuperpixelBkg=2
 };
 
+enum ColorPaletteStyle {
+	eRAINBOW= 0,
+	eBLACKWHITE= 1,
+	eBLACKBODY= 2,
+	eHOT2COLD= 3,
+	eCOLD2HOT= 4,
+	eTHERMAL= 5
+};
+
+enum FileType{
+	eROOT= 0,
+	eFITS= 1
+};
+
 #ifdef __MAKECINT__
 #pragma link C++ enum WCSType+;
 #pragma link C++ enum ImgFilters+;
@@ -99,6 +113,8 @@ enum BkgMethod {
 #pragma link C++ enum SegmAlgo+;
 #pragma link C++ enum BkgEstimator+;
 #pragma link C++ enum BkgMethod+;
+#pragma link C++ enum ColorPaletteStyle+;
+#pragma link C++ enum FileType+;
 #endif
 
 //====================================
