@@ -1123,9 +1123,17 @@ Image* Image::GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg){
 		Caesar::StatMoments<double> moments_t;	
 		std::vector<Caesar::StatMoments<double>> parallel_moments;
 	
-		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
-		#pragma omp parallel private(moments_t) reduction(merge: parallel_moments)
+		//#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+		#pragma omp parallel private(moments_t) //reduction(merge: parallel_moments)
 		{
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+
+			#pragma omp single
+   		{
+     		parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+   		}
+
 			if(useLocalBkg){
 				#pragma omp for collapse(2)
 				for(long int i=0;i<Nx;i++){		
@@ -1143,8 +1151,8 @@ Image* Image::GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg){
 					}//end loop
 				}//end loop 
 
-				parallel_moments.push_back(moments_t);
-
+				//parallel_moments.push_back(moments_t);
+				parallel_moments[thread_id]= moments_t;
 			}//close if local bkg
 
 			else{//global bkg
@@ -1163,7 +1171,8 @@ Image* Image::GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg){
 					}//end loop
 				}//end loop
 
-				parallel_moments.push_back(moments_t);
+				//parallel_moments.push_back(moments_t);
+				parallel_moments[thread_id]= moments_t;
 
 			}//close else 
 			
@@ -1742,12 +1751,17 @@ int Image::Add(Image* img,double c,bool computeStats)
 		Caesar::StatMoments<double> moments_t;	
 		std::vector<Caesar::StatMoments<double>> parallel_moments;
 	
-		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
-		#pragma omp parallel private(moments_t) reduction(merge: parallel_moments)
+		//#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+		#pragma omp parallel private(moments_t) //reduction(merge: parallel_moments)
 		{
 			int thread_id= omp_get_thread_num();
 			int nthreads= SysUtils::GetOMPThreads();
 			INFO_LOG("Starting multithread image add (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
+
+			#pragma omp single
+   		{
+     		parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+   		}
 
 			#pragma omp for 
 			for(size_t i=0;i<m_pixels.size();i++){
@@ -1758,7 +1772,8 @@ int Image::Add(Image* img,double c,bool computeStats)
 				if(FillPixelMT(moments_t,i,w,useNegativePixInStats)<0) continue;
 			}
 			
-			parallel_moments.push_back(moments_t);
+			//parallel_moments.push_back(moments_t);
+			parallel_moments[thread_id]= moments_t;
 		}//close parallel section
 		
 		//Update moments from parallel estimates

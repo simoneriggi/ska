@@ -530,9 +530,19 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
 		std::vector<Caesar::StatMoments<double>> bkg_parallel_moments;
 		std::vector<Caesar::StatMoments<double>> rms_parallel_moments;
 	
-		#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
-		#pragma omp parallel private(bkg_moments_t,rms_moments_t) reduction(merge: bkg_parallel_moments,rms_parallel_moments)
+		//#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+		#pragma omp parallel private(bkg_moments_t,rms_moments_t) //reduction(merge: bkg_parallel_moments,rms_parallel_moments)
 		{
+
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+
+			#pragma omp single
+   		{
+     		bkg_parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+				rms_parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+   		}
+
 			#pragma omp for collapse(2) 
 			for (size_t i=0; i<interp_gridX.size(); i++) {
    			for (size_t j=0; j<interp_gridY.size(); j++) {
@@ -549,8 +559,11 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
   		}//end loop bins X
 		
 			//Fill parallel moments per thread
-			bkg_parallel_moments.push_back(bkg_moments_t);
-			rms_parallel_moments.push_back(rms_moments_t);
+			//bkg_parallel_moments.push_back(bkg_moments_t);
+			//rms_parallel_moments.push_back(rms_moments_t);
+			bkg_parallel_moments[thread_id]= bkg_moments_t;
+			rms_parallel_moments[thread_id]= bkg_moments_t;
+			
 		}//close parallel section
 
 		//Update moments from parallel estimates

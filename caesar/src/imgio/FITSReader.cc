@@ -416,8 +416,8 @@ int FITSReader::ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile*
 	Caesar::StatMoments<double> moments_t;	
 	std::vector<Caesar::StatMoments<double>> parallel_moments;
 	
-	#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
-	#pragma omp parallel private(fp_safe,moments_t) reduction(+: errflag)	reduction(merge: parallel_moments)
+	//#pragma omp declare reduction (merge : std::vector<Caesar::StatMoments<double>> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+	#pragma omp parallel private(fp_safe,moments_t) reduction(+: errflag)	// reduction(merge: parallel_moments)
 	{
 		int thread_id= omp_get_thread_num();
 		int nthreads= SysUtils::GetOMPThreads();
@@ -434,6 +434,11 @@ int FITSReader::ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile*
 			ERROR_LOG("Failed to open FITS file "<<filename_wfilter<<" in thread "<<omp_get_thread_num()<<"!");
 			errflag++;
 		}
+
+		#pragma omp single
+   	{
+     	parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+   	}
 
 		//Read image data in parallel (each thread with its own file pointer)
 		DEBUG_LOG("Reading image data (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
@@ -602,6 +607,7 @@ int FITSReader::ReadAndFillImageDataMT(Image& img,long int Nx,long int Ny,fitsfi
 	//Define parallel stat moments list	
 	Caesar::StatMoments<double> moments_t;	
 	int nthreads= SysUtils::GetOMPThreads();
+	int thread_id= omp_get_thread_num();
 	
 	#pragma omp for private(moments_t) reduction(+: err_flag)	
 	for(long int j=0;j<Ny;j++){
@@ -631,7 +637,8 @@ int FITSReader::ReadAndFillImageDataMT(Image& img,long int Nx,long int Ny,fitsfi
 		}//end loop columns (bufsize)
 
 		//Fill moment list 
-		parallel_moments.push_back(moments_t);
+		//parallel_moments.push_back(moments_t);
+		parallel_moments[thread_id]= moments_t;
 
 		//Clear allocated buffer
 		if(buffer) delete [] buffer;

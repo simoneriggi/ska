@@ -172,7 +172,13 @@ class StatsUtils : public TObject {
 			size_t n = vec.size();
 			if(n<=0) return -999;
 			std::vector<T> MADs;
-
+			MADs.resize(n);
+			
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif
+			for(size_t j=0;j<n;j++) MADs[j]= fabs(vec[j]-median);
+			/*
 			#ifdef OPENMP_ENABLED
 				#pragma omp declare reduction (merge : std::vector<T> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
 				#pragma omp parallel for reduction(merge: MADs)
@@ -180,6 +186,7 @@ class StatsUtils : public TObject {
 			#else
   			for(size_t j=0;j<n;j++) MADs.push_back( fabs(vec[j]-median) );
 			#endif
+			*/
 
 			T MAD= StatsUtils::GetMedianFast(MADs,useParallelVersion);
   		return MAD;
@@ -262,8 +269,13 @@ class StatsUtils : public TObject {
 			T median= stats.median;
 
 			//Fill vector of truncated items	
-			//std::vector<T> vec_clipped;	
 			vec_clipped.clear();	
+			for(auto x : vec) {
+				T diff= fabs(x-median);
+				if(diff<clipsig*stddev) vec_clipped.push_back(diff);
+			}
+
+			/*
 			#ifdef OPENMP_ENABLED
 				#pragma omp declare reduction (merge : std::vector<T> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
 				#pragma omp parallel for reduction(merge: vec_clipped)
@@ -278,6 +290,7 @@ class StatsUtils : public TObject {
 					if(diff<clipsig*stddev) vec_clipped.push_back(diff);
 				}
 			#endif
+			*/
 
 			//Compute mean/stddev of clipped data
 			T mean_clipped= T(0);
