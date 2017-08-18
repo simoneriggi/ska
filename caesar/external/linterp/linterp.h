@@ -35,7 +35,11 @@ For a description of the algorithms, see:
 #include <array>
 #include <functional>
 
+#include <boost/version.hpp>
+
+#if BOOST_VERSION >= 106000
 #include <boost/serialization/array_wrapper.hpp>//added to fix build error: ‘make_array’ is not a member of ‘boost::serialization’
+#endif
 
 
 #include <boost/multi_array.hpp>
