@@ -189,6 +189,44 @@ TEST_F(StatsUtilsTest, TestClippedEstimators)
 }//close TestClippedEstimators()
 
 
+TEST_F(StatsUtilsTest, TestMoments)
+{
+
+	//Expected value (computed with python scipy.stats.moment(...))
+	double M1_exp= 0.865864176934;
+	double M2_exp= 2166.6380378;
+	double M3_exp= 11987.8113948;
+	double M4_exp= 207693.943081;
+
+	//Compute moments
+	Caesar::StatMoments<double> moments;
+	bool skipNegativeValues= false;
+	int status= Caesar::StatsUtils::ComputeStatsMoments(moments,m_data,skipNegativeValues);
+	ASSERT_EQ(status,0);
+
+	double M1= moments.M1;
+	double M2= moments.M2;
+	double M3= moments.M3;
+	double M4= moments.M4;
+	double diff_M1= fabs(M1-M1_exp);
+	double diff_M2= fabs(M2-M2_exp);
+	double diff_M3= fabs(M3-M3_exp);
+	double diff_M4= fabs(M4-M4_exp);
+
+	//Print text
+	std::stringstream ss;
+	ss<<"StatsUtilsTest::TestMoments(): INFO: M1_exp="<<M1_exp<<", M1="<<M1<<" (diff="<<diff_M1<<"), M2_exp="<<M2_exp<<", M2="<<M2<<" (diff="<<diff_M2<<"), M3_exp="<<M3_exp<<", M3="<<M3<<" (diff="<<diff_M3<<"), M4_exp="<<M4_exp<<", M4="<<M4<<" (diff="<<diff_M4<<")";
+	std::cerr<<ss.str()<<std::endl;
+
+	//Check if computation is correct within numerical limits
+	ASSERT_LT(diff_M1,m_numeric_tol);
+	ASSERT_LT(diff_M2,m_numeric_tol);
+	ASSERT_LT(diff_M3,m_numeric_tol);
+	ASSERT_LT(diff_M4,m_numeric_tol);
+
+}//close TestMoments
+
+
 }//close namespace
 
 

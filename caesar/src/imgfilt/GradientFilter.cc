@@ -28,6 +28,7 @@
 
 #include <GradientFilter.h>
 #include <Img.h>
+#include <Image.h>
 #include <MathUtils.h>
 
 #include <TObject.h>
@@ -101,6 +102,9 @@ cv::Mat GradientFilter::BuildLaplaceKernel(){
 }//close BuildLaplaceKernel()
 
 
+//===================================
+//==        OLD IMAGE METHODS
+//===================================
 Img* GradientFilter::GetGradientFilter(Img* image){
 
 	//## Check image
@@ -181,6 +185,42 @@ Img* GradientFilter::GetLaplaceFilter(Img* image){
 
 }//close GetLaplaceFilter()
 
+//===================================
+//==        NEW IMAGE METHODS
+//===================================
+Image* GradientFilter::GetLaplaceFilter(Image* image)
+{
+	
+	//## Check image
+	if(!image){
+		ERROR_LOG("Null prt to given image!");
+		return nullptr;
+	}
+
+	//## Init kernels
+	cv::Mat kernel= BuildLaplaceKernel();
+	
+	//## Convert input image to OpenCV mat
+	cv::Mat I= image->GetOpenCVMat("64");
+	
+	//## Compute convolution
+	cv::Mat filteredMat= Caesar::MathUtils::GetConvolution(I,kernel);	
+
+	//## Convert OpenCV mat list to Img
+	TString imgName= Form("%s_Lapl",image->GetName().c_str());
+	Image* filteredImg= image->GetCloned(std::string(imgName),true,true);
+	if(!filteredImg){
+		ERROR_LOG("Failed to clone image!");
+		return nullptr;
+	}
+
+	//## Fill filtered image with laplacian Mat
+	filteredImg->Reset();
+	filteredImg->FillFromMat(filteredMat);
+
+	return filteredImg;
+
+}//close GetLaplaceFilter()
 
 }//close namespace 
 

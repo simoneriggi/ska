@@ -28,6 +28,7 @@
 
 #include <BlobFinder.h>
 #include <Img.h>
+#include <Image.h>
 #include <BkgData.h>
 #include <Blob.h>
 #include <Source.h>
@@ -65,7 +66,279 @@ BlobFinder::~BlobFinder(){
 
 }//close destructor
 
+//=========================================
+//==  NEW IMAGE METHODS 
+//=========================================
+template <class T>
+int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed){
 
+	//## Check input img
+	if(!inputImg){
+		ERROR_LOG("Null ptr to given input image!");
+		return -1;
+	}
+
+	//## Check if the flood map is provided otherwise set to the input map
+	//## NB: In source search it should be the significance map
+	//## NB2: It could be used to fill blobs in the input map, conditional to another map (i.e. a binary mask)
+	if(!floodImg) floodImg= inputImg;
+
+	//## Check if bkg data are provided and if local bkg is available
+	//## If local bkg is available use it, otherwise use global bkg
+	bool hasBkgData= false;
+	bool hasLocalBkg= false;
+	if(bkgData){
+		hasBkgData= true;
+		hasLocalBkg= bkgData->HasLocalBkg();
+	}
+
+	//## Set flood threshold
+	//Example: merge=4, seed=5  [4,5] o [4,+inf]
+	// merge=-4 seed=-5         [-5,-4] o [-inf,-4]            [-inf,4]
+	double floodMinThr= mergeThr;
+	double floodMaxThr= std::numeric_limits<double>::infinity();
+	double floodMinThr_inv= -std::numeric_limits<double>::infinity();
+	double floodMaxThr_inv= -mergeThr;
+	if(mergeBelowSeed) {
+		floodMaxThr= seedThr;
+		floodMinThr_inv= seedThr;
+	}
+
+	DEBUG_LOG("Flood thr("<<floodMinThr<<","<<floodMaxThr<<") Flood inv thr("<<floodMinThr_inv<<","<<floodMaxThr_inv<<")");
+	
+	//## Find seed pixels (above seed threshold)	
+	std::vector<long int> pixelSeeds;	
+	std::vector<bool> isNegativeExcessSeed;
+	long int Nx= inputImg->GetNx();
+	long int Ny= inputImg->GetNy();
+	long int Ntot= Nx*Ny;
+	
+	for(int i=0;i<Nx;i++){
+		for(int j=0;j<Ny;j++){	
+			int gBin= inputImg->GetBin(i+1,j+1);	
+			double Z= floodImg->GetBinContent(i+1,j+1);
+			bool isNegative= false;
+			if(fabs(Z)>=seedThr) {
+				if(Z<0) isNegative= true;
+				pixelSeeds.push_back(gBin);	
+				isNegativeExcessSeed.push_back(isNegative);
+			}
+		}//end loop y
+	}//end loop x
+	
+	DEBUG_LOG("#"<<pixelSeeds.size()<<" seeds found ...");
+
+	//## Perform cluster finding starting from detected seeds
+	int nBlobs= 0;
+	T* aBlob= 0;
+	Pixel* aPixel= 0;
+	std::vector<bool> isAddedInCluster(Ntot,false);
+	
+	for(unsigned int k=0;k<pixelSeeds.size();k++){
+		long int seedPixelId= pixelSeeds[k];	
+		long int binX= inputImg->GetBinX(seedPixelId);
+		long int binY= inputImg->GetBinY(seedPixelId);
+		
+		//Check if this seed bin has been already assigned to a cluster
+		if(isAddedInCluster[seedPixelId]) continue;
+		
+		//Skip negative excess seed if not requested
+		if(!findNegativeExcess && isNegativeExcessSeed[k]) continue;
+		
+		//Compute flooded pixels
+		std::vector<long int> clusterPixelIds;
+		int status= 0;
+		if(isNegativeExcessSeed[k]){
+			status= FloodFill(floodImg,clusterPixelIds,seedPixelId,floodMinThr_inv,floodMaxThr_inv);
+		}
+		else {
+			status= FloodFill(floodImg,clusterPixelIds,seedPixelId,floodMinThr,floodMaxThr);
+		}
+		if(status<0) {
+			WARN_LOG("Flood fill failed, skip seed!");
+			continue;
+		}
+
+		//Append cluster pixels to a blob object
+		size_t nClusterPixels= clusterPixelIds.size();
+		if(nClusterPixels==0 || (int)nClusterPixels<minPixels) {//skip small blobs
+			DEBUG_LOG("Blob pixels found @ (x,y)=("<<binX<<","<<binY<<") (N="<<nClusterPixels<<") below npix threshold (thr="<<minPixels<<"), skip blob!");
+			continue;
+		}
+		DEBUG_LOG("Blob found @ (x,y)=("<<binX<<","<<binY<<") (N="<<nClusterPixels<<")");
+		
+		nBlobs++;	
+		
+		DEBUG_LOG("Adding new blob (# "<<nBlobs<<") to list...");
+		TString blobName= Form("%s_blobId%d",inputImg->GetName().c_str(),nBlobs);
+		aBlob= new T;
+		aBlob->SetId(nBlobs);	
+		aBlob->SetName(std::string(blobName));
+		
+		for(size_t l=0;l<nClusterPixels;l++){
+			long int clusterPixelId= clusterPixelIds[l];	
+			if(isAddedInCluster[clusterPixelId]) continue;
+			isAddedInCluster[clusterPixelId]= true;//do not forget to add to list of taken pixels!
+
+			long int clusterPixelIdX= inputImg->GetBinX(clusterPixelId);
+			long int clusterPixelIdY= inputImg->GetBinY(clusterPixelId);
+			double S= inputImg->GetBinContent(clusterPixelId);			
+			double Z= floodImg->GetBinContent(clusterPixelId);
+
+			double x= inputImg->GetX(clusterPixelIdX);
+			double y= inputImg->GetY(clusterPixelIdY);
+			long int ix= clusterPixelIdX;
+			long int iy= clusterPixelIdY;
+			
+			aPixel= new Pixel;
+			aPixel->S= S;
+			if(fabs(Z)>=seedThr) aPixel->type= Pixel::eSeed;
+			else aPixel->type= Pixel::eNormal;
+			aPixel->id= clusterPixelId;
+			aPixel->SetPhysCoords(x,y);
+			aPixel->SetCoords(ix,iy);
+			
+			if( inputImg->IsEdgeBin(clusterPixelIdX,clusterPixelIdY) ) {
+				aBlob->SetEdgeFlag(true);
+			}
+
+			//Set bkg data if available
+			if(hasBkgData){
+				double bkgLevel= bkgData->gBkg;
+				double noiseLevel= bkgData->gNoise;
+				if(hasLocalBkg){
+					bkgLevel= (bkgData->BkgMap)->GetBinContent(clusterPixelId);
+					noiseLevel= (bkgData->NoiseMap)->GetBinContent(clusterPixelId);
+				}
+				aPixel->SetBkg(bkgLevel,noiseLevel);
+			}//close if
+	
+			aBlob->AddPixel(aPixel);
+		}//end loop cluster pixels
+
+		//## Check if blobs has pixels
+		if(!aBlob->HasPixels()){//no pixel...delete blob!
+			delete aBlob;
+			aBlob= 0;
+			continue;
+		}
+
+		//## Compute stats
+		DEBUG_LOG("Computing blob stats...");
+		aBlob->ComputeStats();
+		
+		//## Compute morphology parameters
+		DEBUG_LOG("Computing blob morphology params...");
+		aBlob->ComputeMorphologyParams();
+
+		//## Add blob to list
+		blobs.push_back(aBlob);
+		
+	}//end loop seeds
+
+	INFO_LOG("#"<<blobs.size()<<" blobs found!");
+
+	return 0;
+
+}//close BlobFinder::FindBlobs()
+template int BlobFinder::FindBlobs<Blob>(Image* img,std::vector<Blob*>& blobs,Image*,ImgBkgData*,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed);
+template int BlobFinder::FindBlobs<Source>(Image* img,std::vector<Source*>& blobs,Image*,ImgBkgData*,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed);
+
+
+int BlobFinder::FloodFill(Image* img,std::vector<long int>& clusterPixelIds,long int seedPixelId,double floodMinThr,double floodMaxThr){
+	
+	//Init
+	clusterPixelIds.clear();
+
+	//Check image and given seed id
+	if(!img){
+		ERROR_LOG("Null ptr to image given!");
+		return -1;
+	}
+	if(!img->HasBin(seedPixelId)){//check if given seed actually exists
+		ERROR_LOG("Given seed id is outside image range!");
+		return -1;
+	}
+
+	//Check given flood range
+	double seedSignal= img->GetPixelValue(seedPixelId);
+	if(seedSignal<floodMinThr || seedSignal>floodMaxThr){
+		WARN_LOG("Given flood threshold range does not contain seed, no blobs detected!");
+		return -1;
+	}
+	
+	//Add seed to queue and loop over queue
+	std::queue<long int> pixelQueue;
+	pixelQueue.push(seedPixelId);
+	
+	int Ntot= img->GetNPixels();
+	std::vector<bool> isAddedInQueue(Ntot,false);	
+	std::vector<bool> isAddedInCluster(Ntot,false);
+
+	while(!pixelQueue.empty()){
+
+		//Take first pixel in queue, process it and then remove from the queue
+		long int gBinId= pixelQueue.front();
+		long int binIdX= img->GetBinX(gBinId);
+		long int binIdY= img->GetBinY(gBinId);
+		pixelQueue.pop();
+
+		//Loop on row pixels above threshold
+		while (img->IsBinContentInRange(binIdX-1,binIdY,floodMinThr,floodMaxThr)){
+    	binIdX--;
+    }//close while loop
+    
+		bool spanUp = false;
+    bool spanDown = false;
+		 
+		while (img->IsBinContentInRange(binIdX,binIdY,floodMinThr,floodMaxThr)) {
+   		long int gBinId_cluster= img->GetBin(binIdX,binIdY);
+			if(!isAddedInCluster[gBinId_cluster]) {
+				clusterPixelIds.push_back(gBinId_cluster);
+				isAddedInCluster[gBinId_cluster]= true;
+			}
+			
+			//Search up pixels
+			long int gBinId_up= img->GetBin(binIdX,binIdY+1);
+
+			if (!spanUp && img->IsBinContentInRange(binIdX,binIdY+1,floodMinThr,floodMaxThr)) {
+      	if(!isAddedInQueue[gBinId_up]) {
+					pixelQueue.push(gBinId_up);
+					isAddedInQueue[gBinId_up]= true;
+					spanUp = true;
+				} 
+			}//close if
+			else if (spanUp && !img->IsBinContentInRange(binIdX,binIdY+1,floodMinThr,floodMaxThr)){
+				spanUp = false;
+      }
+
+			//Search down pixel
+			long int gBinId_down= img->GetBin(binIdX,binIdY-1);
+
+			if (!spanDown && img->IsBinContentInRange(binIdX,binIdY-1,floodMinThr,floodMaxThr)) {
+     		if(!isAddedInQueue[gBinId_down]) {
+					pixelQueue.push(gBinId_down);
+					isAddedInQueue[gBinId_down]= true;
+					spanDown = true;
+				} 
+      }//close if 
+			else if (spanDown && !img->IsBinContentInRange(binIdX,binIdY-1,floodMinThr,floodMaxThr)) {
+				spanDown = false;
+      }
+      binIdX++;
+		}//end while loop
+	}//end queue loop
+	
+	//Append cluster pixels to a source object
+	DEBUG_LOG("#"<<clusterPixelIds.size()<<" cluster pixels found around given seed "<<seedPixelId);
+	
+	return 0;
+
+}//close BlobFinder::FloodFill()
+
+//=========================================
+//==  OLD IMAGE METHODS 
+//=========================================
 int BlobFinder::FloodFill(Img* img,std::vector<int>& clusterPixelIds,int seedPixelId,double floodMinThr,double floodMaxThr){
 	
 	//Init

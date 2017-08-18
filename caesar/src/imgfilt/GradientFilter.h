@@ -56,6 +56,7 @@ namespace cv {
 namespace Caesar{
 
 class Img;
+class Image;
 
 class GradientFilter : public TObject {
 
@@ -72,8 +73,31 @@ class GradientFilter : public TObject {
     virtual ~GradientFilter();
 
 	public:
+
+		//===================================
+		//==        NEW IMAGE METHODS
+		//===================================
+		/**
+		* \brief Apply a gradient filter to image and return filtered image
+		*/	
+		//static Image* GetGradientFilter(Image* image);
 	
+		/**
+		* \brief Apply a laplacian filter to image and return filtered image
+		*/
+		static Image* GetLaplaceFilter(Image* image);
+
+		//===================================
+		//==        OLD IMAGE METHODS
+		//===================================
+		/**
+		* \brief Apply a gradient filter to image and return filtered image
+		*/	
 		static Img* GetGradientFilter(Img* image);
+	
+		/**
+		* \brief Apply a laplacian filter to image and return filtered image
+		*/
 		static Img* GetLaplaceFilter(Img* image);
 
 	private:

@@ -177,6 +177,17 @@ if (ENABLE_TEST)
 	MESSAGE(STATUS "GTEST_LIBRARIES: ${GTEST_BOTH_LIBRARIES}")
 endif()
 
+#==================================
+#==   Check for Doxygen         ===
+#==================================
+MESSAGE(STATUS "Looking for Doxygen")
+find_package(Doxygen)
+if (NOT DOXYGEN_FOUND)
+	MESSAGE(STATUS "Doxygen not found, cannot generate project documentation!")
+endif()
+option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation (requires Doxygen)" ${DOXYGEN_FOUND})
+
+
 #===========================================
 #==   Check for Tango Framework          ===
 #===========================================

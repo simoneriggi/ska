@@ -478,7 +478,6 @@ int SourceFinder::FindResidualMap(){
 		return -1;
 	}
 
-
 	return 0;
 
 }//close FindResidualMap()

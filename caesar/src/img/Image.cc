@@ -1552,7 +1552,7 @@ Image* Image::GetSourceMask(std::vector<Source*>const& sources,bool isBinary,boo
 
 }//close GetSourceMask()
 
-Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
+Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
 
 	//Clone input image	
 	TString imgName= Form("%s_Residual",m_name.c_str());	

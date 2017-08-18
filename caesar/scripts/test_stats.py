@@ -19,14 +19,24 @@ y += (np.random.normal(0., 0.2, x.shape) + c*np.random.normal(3.0, 5.0, x.shape)
 print(y)
 
 ## Compute stats
+n= np.size(x)
 mean= np.mean(y)
 stddev= np.std(y,ddof=1)
 median= np.median(y)
 mad= mad_std(y)
+M1= stats.moment(y,1)
+M2= stats.moment(y,2)*n
+M3= stats.moment(y,3)*n
+M4= stats.moment(y,4)*n
 print 'mean=',mean
 print 'stddev=',stddev
 print 'median=',median
 print 'mad=',mad
+print 'M1=',M1
+print 'M2=',M2
+print 'M3=',M3
+print 'M4=',M4
+
 
 ## Compute robust stats
 niter= 1

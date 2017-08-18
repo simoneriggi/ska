@@ -53,7 +53,9 @@ namespace Caesar {
 
 
 class Img;
+class Image;
 class BkgData;
+class ImgBkgData;
 class Blob;
 class Source;
 
@@ -71,11 +73,38 @@ class BlobFinder : public TObject {
 		virtual ~BlobFinder();
 
 	public:
+
+		//=========================================
+		//==  NEW IMAGE METHODS 
+		//=========================================
+		/**
+		* \brief Find blobs
+		*/
+		template <class T>
+		static int FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false);
+		/**
+		* \brief Flood fill algorithm
+		*/
+		static int FloodFill(Image* img,std::vector<long int>& clusterPixelIds,long int seedPixelId,double floodMinThr,double floodMaxThr);
+		
+
+		//=========================================
+		//==  OLD IMAGE METHODS 
+		//=========================================
+		/**
+		* \brief Flood fill algorithm
+		*/
 		static int FloodFill(Img* img,std::vector<int>& clusterPixelIds,int seedPixelId,double floodMinThr,double floodMaxThr);
 		
+		/**
+		* \brief Find blobs
+		*/
 		template <class T>
-			static int FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg=0,BkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false);
+		static int FindBlobs(Img* inputImg,std::vector<T*>& blobs,Img* floodImg=0,BkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false);
 
+		/**
+		* \brief Get multiscale blob mask
+		*/
 		static Img* GetMultiScaleBlobMask(Img* img,int kernelFactor,double sigmaMin,double sigmaMax,double sigmaStep,int thrModel=2,double thrFactor=1);
 
 	public:
@@ -90,6 +119,9 @@ class BlobFinder : public TObject {
 #pragma link C++ class BlobFinder+;
 #pragma link C++ function FindBlob<Blob>(Caesar::Img*,std::vector<Blob*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
 #pragma link C++ function FindBlob<Source>(Caesar::Img*,std::vector<Source*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
+
+#pragma link C++ function FindBlob<Blob>(Caesar::Image*,std::vector<Blob*>&,Caesar::Image*,Caesar::ImgBkgData*,double,double,int,bool,bool);
+#pragma link C++ function FindBlob<Source>(Caesar::Image*,std::vector<Source*>&,Caesar::Image*,Caesar::ImgBkgData*,double,double,int,bool,bool);
 #endif
 
 }//close namespace

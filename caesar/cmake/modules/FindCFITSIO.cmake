@@ -27,8 +27,8 @@ find_path(CFITSIO_INCLUDE_DIR fitsio.h
 
 find_library(CFITSIO_LIBRARY NAMES cfitsio
   PATHS
-  $ENV{CFITSIO}
   $ENV{CFITSIO_DIR}/lib
+	$ENV{CFITSIO}
   ${GNUWIN32_DIR}/lib
 )
 if(CFITSIO_LIBRARY)

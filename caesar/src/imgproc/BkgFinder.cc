@@ -110,7 +110,7 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		INFO_LOG("Local bkg computation completed!");
 	}//close if computeLocalBkg
 
-	/*
+	
 	//## Skip outliers?
 	//## Search and exclude significant blobs (both positive & negative excesses) 
 	//## using the first estimate bkg/noise
@@ -137,18 +137,20 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 			ERROR_LOG("Failed to find significant blobs!");
 			delete bkgData;
 			bkgData= 0;
-			significanceMap->Delete();
+			delete significanceMap;
+			significanceMap= 0;
 			return 0;
 		}
 
 		//Find image without outliers (set to zero)
 		DEBUG_LOG("Computing image without outliers (set to zero)...");
-		Img* img_wOutliers= img->GetSourceMask(blobs,false,true);//invert mask
+		Image* img_wOutliers= img->GetSourceMask(blobs,false,true);//invert mask
 		if(!img_wOutliers){
 			ERROR_LOG("Failed to compute image with blob outliers subtracted!");
 			delete bkgData;
 			bkgData= 0;
-			significanceMap->Delete();
+			delete significanceMap;
+			significanceMap= 0;
 			for(unsigned int i=0;i<blobs.size();i++){
 				if(blobs[i]){
 					delete blobs[i];
@@ -162,12 +164,13 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		//Recompute bkg on residual map (using this function recursively)
 		//Do not skip outliers this time!
 		DEBUG_LOG("Recomputing bkg on residual map...");
-		BkgData* robustBkgData= FindBkg(img_wOutliers,estimator,computeLocalBkg,boxSizeX,boxSizeY,gridStepSizeX,gridStepSizeY,use2ndPass,false);
+		ImgBkgData* robustBkgData= FindBkg(img_wOutliers,estimator,computeLocalBkg,boxSizeX,boxSizeY,gridStepSizeX,gridStepSizeY,use2ndPass,false);
 		if(!robustBkgData){
 			ERROR_LOG("Failed to compute bkg over image with blob outliers subtracted!");
 			delete bkgData;
 			bkgData= 0;
-			significanceMap->Delete();
+			delete significanceMap;
+			significanceMap= 0;
 			for(unsigned int i=0;i<blobs.size();i++){
 				if(blobs[i]){
 					delete blobs[i];
@@ -188,7 +191,8 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		bkgData->gNoise= robustBkgData->gNoise;
 				
 		//Delete stuff
-		significanceMap->Delete();
+		delete significanceMap;
+		significanceMap= 0;
 		for(unsigned int i=0;i<blobs.size();i++){
 			if(blobs[i]){
 				delete blobs[i];
@@ -200,7 +204,6 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		robustBkgData= 0;
 
 	}//close if skip outliers
-	*/
 
 	return bkgData;
 

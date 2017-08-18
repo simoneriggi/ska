@@ -25,12 +25,11 @@
 * @date 20/01/2015
 */
 
-#ifndef MorphFilter_h
-#define MorphFilter_h 1
+#ifndef _MORPH_FILTER_h
+#define _MORPH_FILTER_h 1
 
 //ROOT
 #include <TObject.h>
-
 
 #include <cstdlib>
 #include <iomanip>
@@ -56,7 +55,9 @@ namespace Caesar{
 
 class Source;
 class BkgData;
+class ImgBkgData;
 class Img;
+class Image;
 
 class MorphFilter : public TObject {
 
@@ -76,13 +77,59 @@ class MorphFilter : public TObject {
 
 	public:
 	
+		//================================================
+		//==      NEW IMAGE METHODS
+		//================================================
+		/**
+		* \brief Dilate image with specified kernel
+		*/
+		//static Image* Dilate(Image* img,int KernSize,bool returnPeakImg=false);
+		/**
+		* \brief Dilate image around specified sources position
+		*/
+		static int DilateAroundSources(Image* img,std::vector<Source*>const& sources,int KernSize=5,int dilateModel=eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,ImgBkgData* bkgData=0,bool useLocalBkg=false,bool randomize=false,double zThr=1.e+6);
+	
+		//================================================
+		//==      OLD IMAGE METHODS
+		//================================================
+		/**
+		* \brief Dilate image with specified kernel
+		*/
 		static Img* Dilate(Img* img,int KernSize,bool returnPeakImg=false);
+		/**
+		* \brief Dilate image around specified source position
+		*/
 		static int DilateAroundSources(Img* img,std::vector<Source*>const& sources,int KernSize=5,int dilateModel=eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,BkgData* bkgData=0,bool useLocalBkg=false,bool randomize=false,double zThr=1.e+6);
 
 	private:
+
+		//================================================
+		//==      NEW IMAGE METHODS
+		//================================================
+		/**
+		* \brief Dilate image around a specified source position
+		*/
+		static int DilateAroundSource(Image* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr);
+		/**
+		* \brief Find pixels to be dilated
+		*/
+		static int FindDilatedSourcePixels(Image* img,Source* source,int KernSize,std::vector<long int>& pixelsToBeDilated);
+		
+
+		//================================================
+		//==      OLD IMAGE METHODS
+		//================================================
+		/**
+		* \brief Dilate image around a specified source position
+		*/
 		static int DilateAroundSource(Img* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr);
+		/**
+		* \brief Find pixels to be dilated
+		*/
 		static int FindDilatedSourcePixels(Img* img,Source* source,int KernSize,std::vector<int>& pixelsToBeDilated);
 		
+		
+
 	private:
 
 	ClassDef(MorphFilter,1)

@@ -19,7 +19,8 @@ set(
 	Blob.h
 	BlobFinder.h
 	Source.h
-	SourceFinder.h	
+	SourceFinder.h
+	SFinder.h	
 	Contour.h
 	ChanVeseSegmenter.h
 	SLICSegmenter.h
@@ -38,6 +39,7 @@ set(
 	${SRC_DIR}/Source.cc
 	${SRC_DIR}/BlobFinder.cc
 	#${SRC_DIR}/SourceFinder.cc
+	${SRC_DIR}/SFinder.cc
 	${SRC_DIR}/Contour.cc
 	${SRC_DIR}/ChanVeseSegmenter.cc
 	${SRC_DIR}/SLICSegmenter.cc

@@ -27,17 +27,21 @@ project(Caesar)
 #set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
+##set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
+##set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
 set(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
+#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
 set(BINARY_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/bin)
-
-
+set(SHARE_SRC_DIR ${CMAKE_SOURCE_DIR}/share)
+set(SHARE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/share)
+set(CONFIG_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/config)
+set(SCRIPT_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/scripts)
+set(DATA_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/data)
 
 message (STATUS "CMAKE_LIBRARY_OUTPUT_DIRECTORY: ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 message (STATUS "PROJECT_BINARY_DIR: ${PROJECT_BINARY_DIR}")
+message (STATUS "BINARY_INSTALL_DIR: ${BINARY_INSTALL_DIR}")
 
 set(SFINDER ${CMAKE_BINARY_DIR})
 set(HEADER_OUTPUT_PATH ${CMAKE_BINARY_DIR}/include)
@@ -97,11 +101,15 @@ set(INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
 set(LINKED_LIBS "")
 
 # Append subdirs (headers & sources files are appended in subdirs)
+add_subdirectory(external)
 add_subdirectory(proto)
 add_subdirectory(src)
 if(BUILD_APPS)
 	add_subdirectory(apps)
 endif()
+add_subdirectory(config)
+add_subdirectory(scripts)
+add_subdirectory(data)
 
 ##if(ENABLE_SERVER)
 	##add_subdirectory(server)
@@ -119,7 +127,8 @@ set(WCSTOOL_HEADERS ${WCSTOOL_BUILD_DIR}/libwcs/wcs.h)
 list(APPEND WCSTOOL_HEADERS ${WCSTOOL_BUILD_DIR}/libwcs/wcslib.h)
 list(APPEND WCSTOOL_HEADERS ${WCSTOOL_BUILD_DIR}/libwcs/fitshead.h)
 set(WCSTOOL_INCLUDE_DIRS ${CMAKE_INSTALL_INCLUDEDIR})
-set(WCSTOOL_LIBRARIES ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${WCSTOOL_LIB})
+##set(WCSTOOL_LIBRARIES ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${WCSTOOL_LIB})
+set(WCSTOOL_LIBRARIES ${CMAKE_INSTALL_LIBDIR}/${WCSTOOL_LIB})
 
 #-- linterp
 set(LINTERP_DOWNLOAD_DIR ${CMAKE_SOURCE_DIR}/external/linterp)
@@ -205,7 +214,9 @@ ExternalProject_Add(WCSTools
 	BUILD_IN_SOURCE 0
 	CONFIGURE_COMMAND ""
 	BUILD_COMMAND make
-	INSTALL_COMMAND mkdir --parents ${CMAKE_INSTALL_INCLUDEDIR} COMMAND cp ${WCSTOOL_BUILD_DIR}/libwcs/${WCSTOOL_LIB} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} COMMAND cp ${WCSTOOL_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
+	#INSTALL_COMMAND ""
+	#INSTALL_COMMAND mkdir --parents ${CMAKE_INSTALL_INCLUDEDIR} COMMAND cp ${WCSTOOL_BUILD_DIR}/libwcs/${WCSTOOL_LIB} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} COMMAND cp ${WCSTOOL_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
+	INSTALL_COMMAND mkdir --parents ${CMAKE_INSTALL_INCLUDEDIR} COMMAND mkdir --parents ${CMAKE_INSTALL_LIBDIR} COMMAND cp ${WCSTOOL_BUILD_DIR}/libwcs/${WCSTOOL_LIB} ${CMAKE_INSTALL_LIBDIR} COMMAND cp ${WCSTOOL_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 ExternalProject_Add(LINTERP
@@ -214,7 +225,8 @@ ExternalProject_Add(LINTERP
   BUILD_IN_SOURCE 0
   CONFIGURE_COMMAND ""
 	BUILD_COMMAND ""
-	INSTALL_COMMAND cp ${LINTERP_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
+	##INSTALL_COMMAND ""
+	INSTALL_COMMAND mkdir --parents ${CMAKE_INSTALL_INCLUDEDIR} COMMAND cp ${LINTERP_HEADERS} ${CMAKE_INSTALL_INCLUDEDIR}
 )
 message (STATUS "LINTERP_DOWNLOAD_DIR: ${LINTERP_DOWNLOAD_DIR}")
 message (STATUS "LINTERP_DOWNLOAD_DEST_DIR: ${LINTERP_DOWNLOAD_DEST_DIR}")
@@ -263,8 +275,8 @@ message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
 	add_custom_command(
   	OUTPUT proto_generation
     COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
-    DEPENDS always_rebuild  ### Decomment this to always generate protobuf files
-		##DEPENDS ${PROTO_FILES}
+    ##DEPENDS always_rebuild  ### Decomment this to always generate protobuf files
+		DEPENDS ${PROTO_FILES}
   )
 
 	add_custom_target(ProtobufSchema ALL 
@@ -293,31 +305,13 @@ message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
 
 #-----------------------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------------------------
-#---  CLEAN STUFF
-#-----------------------------------------------------------------------------------------------
-#--- Set external WCTOOLS lib to be removed by clean command
-#--- Set copied headers to be removed by clean command
-set(ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${WCSTOOL_LIB})
-
-set(CLEANED_HEADERS "")
-foreach (_headerFile ${HEADERS_WPATH})
-	set(_cleanedHeader ${CMAKE_INSTALL_INCLUDEDIR}/${_headerFile})
-	list(APPEND CLEANED_HEADERS ${_cleanedHeader})
-endforeach()
-list(REMOVE_DUPLICATES CLEANED_HEADERS)
-list(APPEND ADDITIONAL_CLEAN_TARGETS ${CLEANED_HEADERS})
-list(APPEND ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/CaesarDict_rdict.pcm)
-
-message(STATUS "ADDITIONAL_CLEAN_TARGETS: ${ADDITIONAL_CLEAN_TARGETS}")
-set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_CLEAN_TARGETS}") ## do not forget to put "" in final vars otherwise you'll get a parsing error
 
 
 #===============================================================================================
 #===                    BUILD PROJECT SHARED LIB
 #===============================================================================================
 #--- Generate classes dictionary
-message (STATUS "DICT_HEADERS: ${DICT_HEADERS}, $DICT_SRCS: ${DICT_SRCS}")
+MESSAGE (STATUS "DICT_HEADERS: ${DICT_HEADERS}, $DICT_SRCS: ${DICT_SRCS}")
 ##ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} MODULE Caesar LINKDEF LinkDef.h)
 ROOT_GENERATE_DICTIONARY(CaesarDict ${DICT_HEADERS} LINKDEF LinkDef.h OPTIONS -DBOOST_LOG_USE_NATIVE_SYSLOG -DBOOST_LOG_DYN_LINK )
 
@@ -335,34 +329,41 @@ target_link_libraries(Caesar PUBLIC ${LINKED_LIBS})
 #===                     BUILD PROJECT TASKS EXEs
 #===============================================================================================
 if(BUILD_APPS)
-	add_executable(FindSource ${Task_FindSource_SRCS})
-	target_link_libraries(FindSource Caesar ${LINKED_LIBS})
+	add_executable(FindSourceExe ${Task_FindSource_SRCS})
+	target_link_libraries(FindSourceExe Caesar ${LINKED_LIBS})
+	set_target_properties(FindSourceExe PROPERTIES OUTPUT_NAME FindSource)
 
-	add_executable(FindSourceResidual ${Task_FindSourceResidual_SRCS})
-	target_link_libraries(FindSourceResidual Caesar ${LINKED_LIBS})
+	add_executable(FindSourceResidualExe ${Task_FindSourceResidual_SRCS})
+	target_link_libraries(FindSourceResidualExe Caesar ${LINKED_LIBS})
+	set_target_properties(FindSourceResidualExe PROPERTIES OUTPUT_NAME FindSourceResidual)
 
-	add_executable(FindSaliency ${Task_FindSaliency_SRCS})
-	target_link_libraries(FindSaliency Caesar ${LINKED_LIBS})
+	add_executable(FindSaliencyExe ${Task_FindSaliency_SRCS})
+	target_link_libraries(FindSaliencyExe Caesar ${LINKED_LIBS})
+	set_target_properties(FindSaliencyExe PROPERTIES OUTPUT_NAME FindSaliency)
 
-	add_executable(FindBkg ${Task_FindBkg_SRCS})
-	target_link_libraries(FindBkg Caesar ${LINKED_LIBS})
+	add_executable(FindBkgExe ${Task_FindBkg_SRCS})
+	target_link_libraries(FindBkgExe Caesar ${LINKED_LIBS})
+	set_target_properties(FindBkgExe PROPERTIES OUTPUT_NAME FindBkg)
 
-	add_executable(FITS2ROOT ${Task_FITS2ROOT_SRCS})
-	target_link_libraries(FITS2ROOT Caesar ${LINKED_LIBS})
+	add_executable(FITS2ROOTExe ${Task_FITS2ROOT_SRCS})
+	target_link_libraries(FITS2ROOTExe Caesar ${LINKED_LIBS})
+	set_target_properties(FITS2ROOTExe PROPERTIES OUTPUT_NAME FITS2ROOT)
 
-	add_executable(ROOT2FITS ${Task_ROOT2FITS_SRCS})
-	target_link_libraries(ROOT2FITS Caesar ${LINKED_LIBS})
+	add_executable(ROOT2FITSExe ${Task_ROOT2FITS_SRCS})
+	target_link_libraries(ROOT2FITSExe Caesar ${LINKED_LIBS})
+	set_target_properties(ROOT2FITSExe PROPERTIES OUTPUT_NAME ROOT2FITS)
 
 	
 	include_directories(${MPI_CXX_INCLUDE_PATH})
-	add_executable(FindSourceMPI ${Task_FindSourceMPI_SRCS})
-	target_link_libraries(FindSourceMPI Caesar ${LINKED_LIBS} ${MPI_CXX_LIBRARIES})
+	add_executable(FindSourceMPIExe ${Task_FindSourceMPI_SRCS})
+	target_link_libraries(FindSourceMPIExe Caesar ${LINKED_LIBS} ${MPI_CXX_LIBRARIES})
 	if(MPI_COMPILE_FLAGS)
-  	set_target_properties(FindSourceMPI PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+  	set_target_properties(FindSourceMPIExe PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
 	endif()
 	if(MPI_LINK_FLAGS)
-  	set_target_properties(FindSourceMPI PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
+  	set_target_properties(FindSourceMPIExe PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
 	endif()
+	set_target_properties(FindSourceMPIExe PROPERTIES OUTPUT_NAME FindSourceMPI)
 
 endif()
 #==============================================================================================
@@ -421,7 +422,8 @@ if (ENABLE_TEST)
 
   # This is so you can do 'make test' to see all your tests run, instead of
   # manually running the executable runUnitTests to see those specific tests.
-	add_test(UnitTests ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/runUnitTests --gtest_output="xml:UnitTestResults.xml")
+	##add_test(UnitTests ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/runUnitTests --gtest_output="xml:UnitTestResults.xml")
+	add_test(UnitTests ${BINARY_INSTALL_DIR}/runUnitTests --gtest_output="xml:UnitTestResults.xml")
 
   # You can also omit NAME and COMMAND. The second argument could be some other
   # test executable.
@@ -429,15 +431,66 @@ if (ENABLE_TEST)
 endif()
 #==================================================================================================
 
+#==============================================================================================
+#===                    DOCUMENTATION
+#==============================================================================================
+if(BUILD_DOCUMENTATION)
+	if(NOT DOXYGEN_FOUND)
+  	message(FATAL_ERROR "Doxygen is needed to build the documentation.")
+  endif()
+
+	# -- Generate doxygen doc files
+  set(doxyfile_in ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen/Doxyfile.in)
+  set(doxyfile ${CMAKE_CURRENT_BINARY_DIR}/doc/doxygen/Doxyfile)
+  configure_file(${doxyfile_in} ${doxyfile} @ONLY)
+
+  add_custom_target(doc POST_BUILD
+    COMMAND ${DOXYGEN_EXECUTABLE} ${doxyfile}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Generating API documentation with Doxygen"
+		VERBATIM
+	)
+
+  # -- Install doc files
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc DESTINATION ${SHARE_INSTALL_DIR})
+
+endif()
+
 
 #==============================================================================================
 #===              INSTALL STUFF
 #==============================================================================================
 #-- Install targets
-#install(TARGETS FindSource FindBkg DESTINATION ${BINARY_INSTALL_DIR} COMPONENT binaries)
+set(EXE_FILES "")
+if(BUILD_APPS)
+	list(APPEND EXE_FILES 
+		FindSource
+		FindSourceResidual
+		FindSaliency
+		FindBkg
+		FITS2ROOT
+		ROOT2FITS
+		FindSourceMPI
+	)
+	foreach (_exeFile ${EXE_FILES})
+		install(TARGETS ${_exeFile}Exe DESTINATION ${BINARY_INSTALL_DIR})
+	endforeach()
+	
+	#install(TARGETS FindSourceExe DESTINATION ${BINARY_INSTALL_DIR})
+	#install(TARGETS FindSourceResidualExe DESTINATION ${BINARY_INSTALL_DIR})
+	#install(TARGETS FindSaliencyExe DESTINATION ${BINARY_INSTALL_DIR})
+	#install(TARGETS FindBkgExe DESTINATION ${BINARY_INSTALL_DIR})
+	#install(TARGETS FITS2ROOTExe DESTINATION ${BINARY_INSTALL_DIR})
+	#install(TARGETS ROOT2FITSExe DESTINATION ${BINARY_INSTALL_DIR})
+	#install(TARGETS FindSourceMPIExe DESTINATION ${BINARY_INSTALL_DIR})
+endif()
 
 # -- Install library dict map
-install(FILES ${PROJECT_BINARY_DIR}/CaesarDict_rdict.pcm DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+##install(FILES ${PROJECT_BINARY_DIR}/CaesarDict_rdict.pcm DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+install(FILES ${PROJECT_BINARY_DIR}/CaesarDict_rdict.pcm DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+# -- Install libraries
+install(TARGETS Caesar DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 #-- Install project headers
 #file(COPY ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
@@ -447,8 +500,94 @@ install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 if (ENABLE_TEST)
 	install(TARGETS runUnitTests DESTINATION ${BINARY_INSTALL_DIR})
 endif()
+
+#-- Install external headers
+## WCS
+install(FILES ${WCSTOOL_BUILD_DIR}/libwcs/${WCSTOOL_LIB} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${WCSTOOL_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+## LINTERP
+install(FILES ${LINTERP_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# -- Install share files
+file(GLOB_RECURSE SHARE_FILES ${SHARE_SRC_DIR}/*)
+MESSAGE(STATUS SHARE_FILES: ${SHARE_FILES})
+install(FILES ${SHARE_FILES} DESTINATION ${SHARE_INSTALL_DIR})
+
+# -- Install config files
+MESSAGE(STATUS CONFIG_FILES: ${CONFIG_FILES})
+install(FILES ${CONFIG_FILES} DESTINATION ${CONFIG_INSTALL_DIR})
+
+# -- Install script files
+MESSAGE(STATUS SCRIPT_FILES: ${SCRIPT_FILES})
+install(FILES ${SCRIPT_FILES} DESTINATION ${SCRIPT_INSTALL_DIR})
+
+# -- Install data files
+MESSAGE(STATUS DATA_FILES: ${DATA_FILES})
+install(FILES ${DATA_FILES} DESTINATION ${DATA_INSTALL_DIR})
+
+# -- Install documentation files
+if(BUILD_DOCUMENTATION)
+	install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc DESTINATION ${SHARE_INSTALL_DIR})
+endif()
+
 #==================================================================================================
 
+#===============================================================================================
+#==               CLEAN STUFF
+#===============================================================================================
+set(CLEANED_HEADERS "")
+set(CLEANED_LIBS "")
+set(CLEANED_EXE "")
+
+#--- Set external WCTOOLS lib & headers to be removed by clean command
+##set(ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${WCSTOOL_LIB})
+list(APPEND CLEANED_LIBS ${WCSTOOL_LIBRARIES})
+foreach (_headerFile ${WCSTOOL_HEADERS})
+	get_filename_component(_basefilename ${_headerFile} NAME)
+	set(_cleanedHeader ${CMAKE_INSTALL_INCLUDEDIR}/${_basefilename})
+	list(APPEND CLEANED_HEADERS ${_cleanedHeader})
+endforeach()
+
+#-- Set linterp headers to be removed by clean command
+foreach (_headerFile ${LINTERP_HEADERS})
+	get_filename_component(_basefilename ${_headerFile} NAME)
+	set(_cleanedHeader ${CMAKE_INSTALL_INCLUDEDIR}/${_basefilename})
+	list(APPEND CLEANED_HEADERS ${_cleanedHeader})
+endforeach()
+
+#--- Set CAESAR headers & libs & exe to be removed by clean command
+list(APPEND CLEANED_LIBS ${CMAKE_INSTALL_LIBDIR}/CaesarDict_rdict.pcm)
+list(APPEND CLEANED_LIBS ${CMAKE_INSTALL_LIBDIR}/libCaesar.so)
+##list(APPEND ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/CaesarDict_rdict.pcm)
+##list(APPEND ADDITIONAL_CLEAN_TARGETS ${CMAKE_INSTALL_LIBDIR}/CaesarDict_rdict.pcm)
+
+foreach (_headerFile ${HEADERS_WPATH})
+	set(_cleanedHeader ${CMAKE_INSTALL_INCLUDEDIR}/${_headerFile})
+	list(APPEND CLEANED_HEADERS ${_cleanedHeader})
+endforeach()
+
+if(BUILD_APPS)
+	foreach (_exeFile ${EXE_FILES})
+		set(_cleanedExe ${BINARY_INSTALL_DIR}/${_exeFile})
+		list(APPEND CLEANED_EXE ${_cleanedExe})
+	endforeach()
+endif()
+
+if (ENABLE_TEST)	
+	list(APPEND CLEANED_EXE ${BINARY_INSTALL_DIR}/runUnitTests)
+endif()
+
+# Remove duplicated and add to additional clean targets
+list(REMOVE_DUPLICATES CLEANED_HEADERS)
+list(REMOVE_DUPLICATES CLEANED_LIBS)
+list(REMOVE_DUPLICATES CLEANED_EXE)
+list(APPEND ADDITIONAL_CLEAN_TARGETS ${CLEANED_HEADERS})
+list(APPEND ADDITIONAL_CLEAN_TARGETS ${CLEANED_LIBS})
+list(APPEND ADDITIONAL_CLEAN_TARGETS ${CLEANED_EXE})
+MESSAGE(STATUS "ADDITIONAL_CLEAN_TARGETS: ${ADDITIONAL_CLEAN_TARGETS}")
+set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${ADDITIONAL_CLEAN_TARGETS}") ## do not forget to put "" in final vars otherwise you'll get a parsing error
+#=================================================================================================
 
 
 #==============================================================================================
