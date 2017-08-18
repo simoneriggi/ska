@@ -62,11 +62,13 @@ class Source;
 class BkgData;
 class TaskData;
 
+/*
 enum SegmAlgo {
-	eWT= 1,
+	eWaveletTransform= 1,
 	eHClust= 2,
 	eChanVese= 3,
 };
+*/
 
 class SourceFinderMPI : public TObject {
 

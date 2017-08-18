@@ -156,18 +156,18 @@ int main(int argc, char *argv[]){
  
 	
 	//Set bkg estimator
-	Caesar::BkgFinder::BkgEstimator estimator= Caesar::BkgFinder::eMedianBkg;
-	if(bkgEstimator==Caesar::BkgFinder::eMedianBkg){
-		estimator= Caesar::BkgFinder::eMedianBkg;
+	Caesar::BkgEstimator estimator= Caesar::eMedianBkg;
+	if(bkgEstimator==Caesar::eMedianBkg){
+		estimator= Caesar::eMedianBkg;
 	}
-	else if(bkgEstimator==Caesar::BkgFinder::eMeanBkg){
-		estimator= Caesar::BkgFinder::eMeanBkg;
+	else if(bkgEstimator==Caesar::eMeanBkg){
+		estimator= Caesar::eMeanBkg;
 	}
-	else if(bkgEstimator==Caesar::BkgFinder::eBiWeightBkg){
-		estimator= Caesar::BkgFinder::eBiWeightBkg;
+	else if(bkgEstimator==Caesar::eBiWeightBkg){
+		estimator= Caesar::eBiWeightBkg;
 	}	
-	else if(bkgEstimator==Caesar::BkgFinder::eMedianClippedBkg){
-		estimator= Caesar::BkgFinder::eMedianClippedBkg;
+	else if(bkgEstimator==Caesar::eMedianClippedBkg){
+		estimator= Caesar::eMedianClippedBkg;
 	}
 	else{
 		cerr<<"ERROR: Invalid bkg estimator specified!"<<endl;

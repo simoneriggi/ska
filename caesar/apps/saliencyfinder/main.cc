@@ -21,6 +21,7 @@
 #include <BkgData.h>
 #include <BkgFinder.h>
 #include <ConfigParser.h>
+#include <Consts.h>
 
 #include <RInside.h>
 
@@ -352,10 +353,12 @@ int ApplySmoothing(){
 
 	//## Apply a smoothing stage?
 	Img* smoothedImg= 0;
-	if(smoothFilter==Img::eGaus){
+	//if(smoothFilter==Img::eGaus){
+	if(smoothFilter==eGaus){
 		smoothedImg= inputImg->GetSmoothedImage(gausFilterKernSize,gausFilterKernSize,gausFilterSigma,gausFilterSigma);
 	}
-	else if(smoothFilter==Img::eGuided){
+	//else if(smoothFilter==Img::eGuided){	
+	else if(smoothFilter==eGuided){
 		smoothedImg= inputImg->GetGuidedFilterImage(guidedFilterRadius,guidedFilterColorEps);
 	}
 	else{
@@ -370,7 +373,7 @@ int ApplySmoothing(){
 
 	// Compute stats
 	cout<<"INFO: Computing input image stats..."<<endl;
-	if(!smoothedImg->ComputeStats(true,false,false)<0){
+	if(smoothedImg->ComputeStats(true,false,false)<0){
 		cerr<<"ReadImage(): ERROR: Stats computing failed!"<<endl;
 		smoothedImg->Delete();
 		return -1;

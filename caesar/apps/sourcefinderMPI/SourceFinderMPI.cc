@@ -41,6 +41,7 @@
 #include <SLIC.h>
 #include <SLICUtils.h>
 #include <SLICSegmenter.h>
+#include <Consts.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -1439,7 +1440,7 @@ int SourceFinderMPI::FindExtendedSources(){
 	else if(m_ExtendedSearchMethod==eChanVese){
 		status= FindExtendedSources_ChanVese(inputImg);
 	}
-	else if(m_ExtendedSearchMethod==eWT){
+	else if(m_ExtendedSearchMethod==eWaveletTransform){
 		status= FindExtendedSources_WT(inputImg);
 	}
 	else{
