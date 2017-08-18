@@ -609,7 +609,7 @@ int FITSReader::ReadAndFillImageDataMT(Image& img,long int Nx,long int Ny,fitsfi
 	int nthreads= SysUtils::GetOMPThreads();
 	int thread_id= omp_get_thread_num();
 	
-	#pragma omp for private(moments_t) reduction(+: err_flag)	
+	#pragma omp for private(moments_t) // reduction(+: err_flag)	
 	for(long int j=0;j<Ny;j++){
 		
 		//Init buffer
@@ -626,7 +626,10 @@ int FITSReader::ReadAndFillImageDataMT(Image& img,long int Nx,long int Ny,fitsfi
 		fits_read_pix(fp,TFLOAT,fpixel,bufsize,(void*)&nullval,(void*)buffer,&anynull, &read_status);
 		if(read_status){
 			ERROR_LOG("Failed to read FITS image data row "<<j<<", skip...");
-			err_flag++;
+			#pragma omp critical
+			{
+				err_flag++;
+			}
 			continue;
 		}
 		
