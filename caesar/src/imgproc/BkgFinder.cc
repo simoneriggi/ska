@@ -118,6 +118,7 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		INFO_LOG("Improving bkg estimate by skipping outliers ...");
 
 		//Get significance map
+		INFO_LOG("Computing the significance map ...");
 		Image* significanceMap= img->GetSignificanceMap(bkgData,computeLocalBkg);
 		if(!significanceMap){
 			ERROR_LOG("Failed to compute the significance map (needed to exclude blobs)!");
@@ -127,7 +128,7 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		}	
 
 		//Find blobs
-		DEBUG_LOG("Finding compact blobs to be tagged as outliers...");
+		INFO_LOG("Finding compact blobs to be tagged as outliers...");
 		std::vector<Source*> blobs;
 		bool findNegativeExcess= true;
 		bool mergeBelowSeed= false;
@@ -143,7 +144,7 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		}
 
 		//Find image without outliers (set to zero)
-		DEBUG_LOG("Computing image without outliers (set to zero)...");
+		INFO_LOG("Computing image without outliers (set to zero)...");
 		Image* img_wOutliers= img->GetSourceMask(blobs,false,true);//invert mask
 		if(!img_wOutliers){
 			ERROR_LOG("Failed to compute image with blob outliers subtracted!");
@@ -163,7 +164,7 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 
 		//Recompute bkg on residual map (using this function recursively)
 		//Do not skip outliers this time!
-		DEBUG_LOG("Recomputing bkg on residual map...");
+		INFO_LOG("Recomputing bkg on residual map...");
 		ImgBkgData* robustBkgData= FindBkg(img_wOutliers,estimator,computeLocalBkg,boxSizeX,boxSizeY,gridStepSizeX,gridStepSizeY,use2ndPass,false);
 		if(!robustBkgData){
 			ERROR_LOG("Failed to compute bkg over image with blob outliers subtracted!");

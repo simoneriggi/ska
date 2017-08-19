@@ -30,6 +30,7 @@
 
 #include <Region.h>
 #include <Contour.h>
+#include <Consts.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -55,10 +56,10 @@
 
 namespace Caesar {
 
-enum SLICEdgeModel {eKirschEdge,eChanVeseEdge};
+//enum SLICEdgeModel {eKirschEdge,eChanVeseEdge};
 
 class Img;
-
+class Image;
 
 class SLICData : public TObject {
 
@@ -72,9 +73,18 @@ class SLICData : public TObject {
 		*/
 		virtual ~SLICData();
 
-	public:
+	public:	
+		/**
+		* \brief Clear data
+		*/
 		void Clear();
+		/**
+		* \brief Clear images
+		*/
 		void ClearImages();
+		/**
+		* \brief Clear regions
+		*/
 		void ClearRegions();
 
 		/**
@@ -124,6 +134,11 @@ class SLICData : public TObject {
 		
 		
 	public:
+
+		Image* inputImage;//the image passed to SLIC generator (normalized)
+		Image* edgeImage;//the image borders passed to SLIC generator
+		Image* laplImage;//the image laplacian
+
 		Img* inputImg;//the image passed to SLIC generator (normalized)
 		Img* edgeImg;//the image borders passed to SLIC generator
 		Img* laplImg;//the image laplacian

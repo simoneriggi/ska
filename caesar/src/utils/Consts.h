@@ -105,6 +105,11 @@ enum FileType{
 	eFITS= 1
 };
 
+enum SLICEdgeModel {
+	eKirschEdge= 0,
+	eChanVeseEdge= 1
+};
+
 #ifdef __MAKECINT__
 #pragma link C++ enum WCSType+;
 #pragma link C++ enum ImgFilters+;
@@ -115,6 +120,7 @@ enum FileType{
 #pragma link C++ enum BkgMethod+;
 #pragma link C++ enum ColorPaletteStyle+;
 #pragma link C++ enum FileType+;
+#pragma link C++ enum SLICEdgeModel+;
 #endif
 
 //====================================

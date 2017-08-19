@@ -49,6 +49,16 @@ using namespace std;
 
 ClassImp(Caesar::StatsUtils)
 
+ClassImp(Caesar::ClippedStats<int>)
+ClassImp(Caesar::ClippedStats<long int>)
+ClassImp(Caesar::ClippedStats<double>)
+ClassImp(Caesar::ClippedStats<float>)
+
+ClassImp(Caesar::StatMoments<int>)
+ClassImp(Caesar::StatMoments<long int>)
+ClassImp(Caesar::StatMoments<double>)
+ClassImp(Caesar::StatMoments<float>)
+
 namespace Caesar {
 
 StatsUtils::StatsUtils(){

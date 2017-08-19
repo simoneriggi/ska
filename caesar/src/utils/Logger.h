@@ -113,6 +113,8 @@ class Logger : public TObject {
 			}	
 		#endif
 
+		
+
 	public:
 		virtual int Init() = 0;
 

@@ -78,7 +78,8 @@ namespace cv {
 namespace Caesar{
 
 
-class Image : public TObject {
+//class Image : public TObject {
+class Image : public TNamed {
 
   public:
 		
@@ -108,11 +109,13 @@ class Image : public TObject {
 		/**
 		* \brief Set image name
 		*/
-		void SetName(std::string name){m_name= name;}
+		//void SetName(std::string name){m_name= name;}
+		void SetName(std::string name){TNamed::SetName(name.c_str());}
 		/**
 		* \brief Get image name
 		*/
-		std::string GetName(){return m_name;}
+		//std::string GetName(){return m_name;}
+		std::string GetName(){return std::string(TNamed::GetName());}
 
 		/**
 		* \brief Get npixels
@@ -295,7 +298,19 @@ class Image : public TObject {
 			this->ResetImgStats(true,true);
 		}
 		
-		
+		/**
+		* \brief Get pixel minimum
+		*/
+		float GetMinimum(){
+			return m_StatMoments.minVal;
+		}
+
+		/**
+		* \brief Get pixel maximum
+		*/
+		float GetMaximum(){
+			return m_StatMoments.maxVal;
+		}
 
 		/**
 		* \brief Get pixel world coordinate
@@ -401,7 +416,7 @@ class Image : public TObject {
 		/**
 		* \brief Write image to FITS file
 		*/
-		//int WriteFITS(std::string outfilename);
+		int WriteFITS(std::string outfilename);
 		/**
 		* \brief Get image subregion or tile
 		*/
@@ -446,6 +461,10 @@ class Image : public TObject {
 		//================================
 		//==       STATS methods
 		//================================
+		/**
+		* \brief Update moments (multithreaded version)
+		*/
+		int ComputeMoments(bool skipNegativePixels=false);
 		/**
 		* \brief Get stats information
 		*/
@@ -520,15 +539,15 @@ class Image : public TObject {
 		/**
 		* \brief Compute pixel histo
 		*/
-		//TH1D* GetPixelHisto(int nbins=100,bool normalize=false);
+		TH1D* GetPixelHisto(int nbins=100,bool normalize=false);
 		/**
 		* \brief Find Otsu threshold
 		*/
-		//double FindOtsuThreshold(int nbins=100);
+		double FindOtsuThreshold(int nbins=100);
 		/**
 		* \brief Find valley threshold
 		*/
-		//double FindValleyThreshold(int nbins=100,bool smooth=true);
+		double FindValleyThreshold(int nbins=100,bool smooth=true);
 		/**
 		* \brief Find median global threshold
 		*/
@@ -719,10 +738,7 @@ class Image : public TObject {
 		* \brief Update moments
 		*/
 		//void UpdateMoments(double w);	
-		/**
-		* \brief Update moments (multithreaded version)
-		*/
-		int ComputeMoments(bool skipNegativePixels=false);
+		
 		/**
 		* \brief Compute image stats parameters from moments 
 		*/

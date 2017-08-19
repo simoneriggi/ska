@@ -106,14 +106,16 @@ ClassImp(Caesar::Image)
 namespace Caesar {
 
 //Default constructor
-Image::Image() 
+Image::Image()
+	: TNamed()
 {
 	//Do not allocate memory in default constructor otherwise you will have a memory leak 
 	//(see https://root.cern.ch/root/html534/guides/users-guide/AddingaClass.html#the-default-constructor)
   Init();
 }//close costructor
 
-Image::Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string name)
+Image::Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string name) 
+	: TNamed(name.c_str(),name.c_str())
 {
 
 	//Check mismatch between pixels size and dimx/dimy
@@ -137,6 +139,7 @@ Image::Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string n
 
 
 Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,float xlow,float ylow,std::string name)
+	: TNamed(name.c_str(),name.c_str())
 {
 	//Check mismatch between pixels size and dimx/dimy
 	long int npixels= (long int)(pixels.size());
@@ -166,6 +169,7 @@ Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,flo
 }//close constructor
 
 Image::Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::string name)
+	: TNamed(name.c_str(),name.c_str())
 {
 	//Check mismatch between pixels size and dimx/dimy
 	if(nbinsx<=0 || nbinsy<=0){
@@ -205,7 +209,9 @@ Image::Image(const Image &img)
 
 void Image::Copy(TObject& obj) const
 {
-	
+	DEBUG_LOG("Copying parent TNamed...");
+	TNamed::Copy((Image&)obj);
+
 	DEBUG_LOG("Copying main vars...");
 	((Image&)obj).m_name= m_name;
 	((Image&)obj).m_Nx= m_Nx;
@@ -336,7 +342,7 @@ int Image::SetSize(long int Nx,long int Ny,float xlow,float ylow){
 }//close SetSize()
 
 //================================================================
-//===    READ METHODS
+//===    READ/WRITE METHODS
 //================================================================
 int Image::ReadFITS(std::string filename,int hdu_id,int ix_min,int ix_max,int iy_min,int iy_max){
 
@@ -362,6 +368,19 @@ int Image::ReadFITS(std::string filename,int hdu_id,int ix_min,int ix_max,int iy
 	return 0;
 
 }//close ReadFITS()
+
+
+int Image::WriteFITS(std::string outfilename){
+		
+	//## Write fits to file
+	if(FITSWriter::WriteFITS(this,outfilename)<0){
+		ERROR_LOG("Failed to write image to FITS file!");
+		return -1;
+	}
+	
+	return 0;
+
+}//close WriteFITS()
 
 
 Image* Image::GetTile(long int ix_min,long int ix_max,long int iy_min,long int iy_max,std::string imgname){
@@ -1572,8 +1591,7 @@ Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,
 	}
 
 	//Dilate source pixels
-	int status= 0;
-	//int status= MorphFilter::DilateAroundSources(residualImg,sources,KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
+	int status= MorphFilter::DilateAroundSources(residualImg,sources,KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
 
 	if(status<0){
 		ERROR_LOG("Failed to dilate sources!");
@@ -1834,6 +1852,188 @@ int Image::Scale(double c)
 //================================
 //==    THRESHOLDING METHODS
 //================================
+TH1D* Image::GetPixelHisto(int nbins,bool normalize){
+
+	//Check if image has stats computed
+	if(!HasStats()){
+		WARN_LOG("No stats computed, returning nullptr!");
+		return nullptr;
+	}
+
+	double Smin= m_Stats->min;
+	double Smax= m_Stats->max;
+	double Srange= Smax-Smin;
+	double tol= 0.0;
+	double Smin_tol= Smin-tol*fabs(Srange);
+	double Smax_tol= Smax+tol*fabs(Srange);
+
+	TString histoName= Form("%s_histo",m_name.c_str());
+	TH1D* histo= new TH1D(histoName,histoName,nbins,Smin_tol,Smax_tol);
+		
+	for(size_t i=0;i<m_pixels.size();i++){
+		double w= m_pixels[i];
+		if(w==0) continue;
+		histo->Fill(w);
+	}
+
+	if(normalize) histo->Scale(1./histo->Integral());
+	return histo;
+
+}//close GetPixelHisto()
+
+
+double Image::FindOtsuThreshold(int nbins){
+	
+	//## Get histo and normalize
+	TH1D* hist= this->GetPixelHisto(nbins,true);
+	if(!hist) {
+		ERROR_LOG("Failed to compute pixel histo, return thr=0!");
+		return 0;
+	}
+
+	int Nx= hist->GetNbinsX();
+	double sum = 0;
+	double Wxs[Nx];
+	for (int t=0;t<Nx;t++) {
+		double w= hist->GetBinContent(t+1);
+		double x= hist->GetBinCenter(t+1);
+		Wxs[t]= w*x;
+		sum+= w*x;
+	}
+
+	double sumB = 0;
+	double wB = 0;
+	double wF = 0;
+
+	double varMax = 0;
+	double threshold = 0;
+	
+	for (int t=0;t<Nx;t++) {
+		double binX= hist->GetBinCenter(t+1);
+		double binContent= hist->GetBinContent(t+1);	
+		double Wx= Wxs[t];
+  	wB += binContent;               // Weight Background
+   	if (wB == 0) continue;
+
+   	wF = 1. - wB;                 // Weight Foreground
+   	if (wF == 0) break;
+
+		sumB+= Wx;
+		double mB = sumB/wB;            // Mean Background
+   	double mF = (sum - sumB)/wF;    // Mean Foreground
+
+   	// Calculate Between Class Variance
+   	double varBetween = wB*wF * (mB - mF) * (mB - mF);
+		
+   	// Check if new maximum found
+   	if (varBetween > varMax) {
+   		varMax = varBetween;
+      threshold = binX;
+   	}
+	}//end loop bins
+
+	if(hist) {
+		hist->Delete();
+		hist= 0;
+	}
+
+	return threshold;
+
+}//close FindOtsuThreshold()
+
+
+double Image::FindValleyThreshold(int nbins,bool smooth){
+
+	//## Init dilate kernel size and histos
+	const int nKernels= 3;
+	int kernelSizes[]= {3,5,7};//{5,7,9}
+	int maxStep= floor(kernelSizes[nKernels-1]/2.);
+
+	//## Get pixel histo (invert to find peaks corresponding to valley in original histo)
+	TH1D* histo= this->GetPixelHisto(nbins);
+	if(smooth) histo->Smooth(1);
+	histo->Scale(-1);
+	double sMin= histo->GetMinimum();
+	const double SMALL_NUMBER= 1.e-6;	
+	for(int i=0;i<histo->GetNbinsX();i++){
+		double w= histo->GetBinContent(i+1);
+		double wnew= w-sMin+SMALL_NUMBER;
+		histo->SetBinContent(i+1,wnew);
+	}//end loop bins
+
+	//## Get dilated histos
+	TH1D* dilatedHisto= 0;
+	std::vector<TH1D*> dilatedHistoList;
+
+	for(int k=0;k<nKernels;k++){//loop over kernels
+		TString histoName= Form("hdilate_%d",k+1);
+		dilatedHisto= (TH1D*)histo->Clone(histoName);
+		dilatedHisto->Reset();
+		dilatedHistoList.push_back(dilatedHisto);
+		
+		int step= floor(kernelSizes[k]/2.);		
+
+		for(int i=0;i<histo->GetNbinsX();i++){//loop over bins	
+			double wmax= -1.e+99;
+			for(int j=-step;j<step;j++){//Loop over kernel range
+				int s= i+j;
+				int binId= s+1;
+				if(histo->IsBinUnderflow(binId) || histo->IsBinOverflow(binId)) continue;
+				double w= histo->GetBinContent(binId);
+				if(w>wmax) wmax= w;
+			}//end loop kernel
+
+			dilatedHistoList[k]->SetBinContent(i+1,wmax);
+		}//end loop bins
+	}//end loop kernels
+
+	//## Find valleys
+	TGraph* peaks= new TGraph;
+	int npeaks= 0;
+	double valleyThr= 0;
+	for(int i=0;i<histo->GetNbinsX();i++){
+		int binId= i+1;
+		if(binId<maxStep+1) continue;
+		double x= histo->GetXaxis()->GetBinCenter(i+1);
+		double w= histo->GetBinContent(i+1);
+		bool isPeak= true;
+		for(int k=0;k<nKernels;k++) {	
+			double wdilate= dilatedHistoList[k]->GetBinContent(binId); 
+			if(wdilate!=w){
+				isPeak= false;	
+				break;
+			}
+		}//end loop kernels
+
+		if(isPeak){
+			peaks->SetPoint(npeaks,x,w);
+			if(npeaks==0){
+				valleyThr= x;
+			}
+			npeaks++;			
+		}
+	}//end loop bins
+
+	DEBUG_LOG("#"<<npeaks<<" valleys detected!");
+	
+	//## Clear stuff
+	if(histo){
+		histo->Delete();
+		histo= 0;
+	}
+	if(peaks) peaks->Delete();
+	for(int k=0;k<nKernels;k++) {
+		if(dilatedHistoList[k]) {
+			dilatedHistoList[k]->Delete();
+			dilatedHistoList[k]= 0;
+		}
+	}//end loop kernels
+	dilatedHistoList.clear();
+
+	return valleyThr;
+
+}//close FindValleyThreshold()
+
 Image* Image::GetBinarizedImage(double threshold,double fgValue,bool isLowerThreshold){
 
 	TString imgName= Form("%s_Binarized",m_name.c_str());	

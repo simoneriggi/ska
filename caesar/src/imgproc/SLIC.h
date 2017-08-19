@@ -52,6 +52,7 @@
 namespace Caesar {
 
 class Img;
+class Image;
 
 class SLIC : public TObject {
 
@@ -68,12 +69,30 @@ class SLIC : public TObject {
 
 
 	public:
+
+
+		//===================================================
+		//==        NEW IMAGE METHODS
+		//===================================================
+		static SLICData* SPGenerator(Image* img,int regionSize=10,double regParam=1,int minRegionSize=10,bool useLogScaleMapping=false,Image* edgeImg=0);
+
+		//===================================================
+		//==        OLD IMAGE METHODS
+		//===================================================
 		/**
 		* \brief Generate Superpixel partition
 		*/
 		static SLICData* SPGenerator(Img* img,int regionSize=10,double regParam=1,int minRegionSize=10,bool useLogScaleMapping=false,Img* edgeImg=0);	
 
 	private:
+		//===================================================
+		//==        NEW IMAGE METHODS
+		//===================================================
+		static int Init(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edgeImg);
+
+		//===================================================
+		//==        OLD IMAGE METHODS
+		//===================================================
 		/**
 		* \brief Initialize and fill SLIC image data
 		*/

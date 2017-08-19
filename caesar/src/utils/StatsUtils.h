@@ -66,28 +66,41 @@ using namespace std;
 namespace Caesar {
 
 template <typename T>  
-class ClippedStats {
+class ClippedStats : public TObject {
 
 	public:
 		T median;
 		T mean;
 		T stddev;
 
-	public:
+	public:	
+		/** 
+		\brief Constructor
+ 		*/
 		ClippedStats(T _median,T _mean,T _stddev)
 			: median(_median), mean(_mean), stddev(_stddev)
 		{}
 
+		/** 
+		\brief Constructor
+ 		*/
 		ClippedStats(){
 			median= T(0);
 			mean= T(0);
 			stddev= T(0);
 		}
 
+		/** 
+		\brief Destructor
+ 		*/
+		virtual ~ClippedStats(){}
+
+	ClassDef(ClippedStats,1)
+
 };//close ClippedStats class
 
 template <typename T>  
-class StatMoments {
+class StatMoments : public TObject {
 
 	public:
 		T N;
@@ -105,6 +118,10 @@ class StatMoments {
 		StatMoments(){
 			Reset();
 		}
+		/** 
+		\brief Destructor
+ 		*/
+		virtual ~StatMoments(){}
 
 	public:
 		/** 
@@ -119,6 +136,8 @@ class StatMoments {
 			minVal= std::numeric_limits<T>::max();
 			maxVal= -std::numeric_limits<T>::max();
 		}
+
+	ClassDef(StatMoments,1)
 
 };//close StatMoments()
 
@@ -711,6 +730,16 @@ class StatsUtils : public TObject {
 
 #ifdef __MAKECINT__
 #pragma link C++ class StatsUtils+;
+
+#pragma link C++ class Caesar::ClippedStats<int>+;
+#pragma link C++ class Caesar::ClippedStats<long int>+;
+#pragma link C++ class Caesar::ClippedStats<float>+;
+#pragma link C++ class Caesar::ClippedStats<double>+;
+
+#pragma link C++ class Caesar::StatMoments<int>+;
+#pragma link C++ class Caesar::StatMoments<long int>+;
+#pragma link C++ class Caesar::StatMoments<float>+;
+#pragma link C++ class Caesar::StatMoments<double>+;
 
 #pragma link C++ function StatsUtils::GetMedianFast<float>;
 #pragma link C++ function StatsUtils::GetMedianFast<double>;

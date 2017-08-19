@@ -217,7 +217,7 @@ int MorphFilter::FindDilatedSourcePixels(Image* img,Source* source,int KernSize,
 }//close FindDilatedSourcePixels()
 
 
-int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
+int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
 
 	//## Check input source
 	if(!source) {
@@ -308,14 +308,21 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 		double BkgRealization= sourceMedian;
 		double BkgRMS= sourceMedianRMS;
 		if(randomize){
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif
 			for(size_t l=0;l<pixelsToBeDilated.size();l++){
 				long int id= pixelsToBeDilated[l];			
 				double r= fR.Eval(randomGenCmd.c_str());
-				BkgRealization+= r*BkgRMS;
-				img->SetPixelValue(id,BkgRealization);
+				double bkg= BkgRealization + r*BkgRMS;
+				//BkgRealization+= r*BkgRMS;
+				img->SetPixelValue(id,bkg);
 			}//end loop pixels 	
 		}
 		else{
+			#ifdef OPENMP_ENABLED
+			#pragma omp parallel for
+			#endif
 			for(size_t l=0;l<pixelsToBeDilated.size();l++){
 				long int id= pixelsToBeDilated[l];			
 				img->SetPixelValue(id,BkgRealization);
@@ -325,19 +332,26 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
   else if(dilateModel==eDilateWithBkg){
 		if(useLocalBkg){
 			if(randomize){
+				#ifdef OPENMP_ENABLED
+				#pragma omp parallel for
+				#endif
 				for(size_t l=0;l<pixelsToBeDilated.size();l++){
 					long int id= pixelsToBeDilated[l];			
-					double BkgRealization= (bkgData->BkgMap)->GetBinContent(id);
-					double BkgRMS= (bkgData->NoiseMap)->GetBinContent(id);
+					double BkgRealization= (bkgData->BkgMap)->GetPixelValue(id);
+					double BkgRMS= (bkgData->NoiseMap)->GetPixelValue(id);
 					double r= fR.Eval(randomGenCmd.c_str());
-					BkgRealization+= r*BkgRMS;
-					img->SetPixelValue(id,BkgRealization);
+					//BkgRealization+= r*BkgRMS;
+					double bkg= BkgRealization + r*BkgRMS;
+					img->SetPixelValue(id,bkg);
 				}//end loop pixels
 			}
 			else{
+				#ifdef OPENMP_ENABLED
+				#pragma omp parallel for
+				#endif
 				for(size_t l=0;l<pixelsToBeDilated.size();l++){
 					long int id= pixelsToBeDilated[l];			
-					double BkgRealization= (bkgData->BkgMap)->GetBinContent(id);
+					double BkgRealization= (bkgData->BkgMap)->GetPixelValue(id);
 					img->SetPixelValue(id,BkgRealization);
 				}//end loop pixels
 			}
@@ -346,14 +360,21 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 			double BkgRealization= bkgData->gBkg;
 			double BkgRMS= bkgData->gNoise;	
 			if(randomize){
+				#ifdef OPENMP_ENABLED
+				#pragma omp parallel for
+				#endif
 				for(size_t l=0;l<pixelsToBeDilated.size();l++){
 					long int id= pixelsToBeDilated[l];			
 					double r= fR.Eval(randomGenCmd.c_str());
-					BkgRealization+= r*BkgRMS;
-					img->SetPixelValue(id,BkgRealization);
+					double bkg= BkgRealization + r*BkgRMS;
+					//BkgRealization+= r*BkgRMS;
+					img->SetPixelValue(id,bkg);
 				}//end loop pixels
 			}
 			else{
+				#ifdef OPENMP_ENABLED
+				#pragma omp parallel for
+				#endif
 				for(size_t l=0;l<pixelsToBeDilated.size();l++){
 					long int id= pixelsToBeDilated[l];			
 					img->SetPixelValue(id,BkgRealization);
@@ -362,9 +383,64 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 		}//close else
 	}//close else if
 
+	//Force recomputation of stats if present, otherwise recompute only moments
+	bool skipNegativePixels= false;
+	bool computeRobustStats= true;	
+	bool forceRecomputing= true;
+	int status= 0;
+	if(img->HasStats()) status= img->ComputeStats(computeRobustStats,skipNegativePixels,forceRecomputing);
+	else status= img->ComputeMoments(skipNegativePixels);
+		
+	if(status<0){
+		WARN_LOG("Failed to recompute moments/stats after source dilation!");
+		return -1;
+	}
+
 	return 0;
 
 }//close DilateAroundSource()
+
+
+int MorphFilter::DilateAroundSources(Image* img,std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
+	
+	//## Check input image
+	if(!img){
+		ERROR_LOG("Null ptr to given image!");
+		return -1;
+	}
+	
+	//## Check bkg data
+	if(dilateModel==eDilateWithBkg){
+	 	if(!bkgData){
+			ERROR_LOG("Selected to use bkg dilation but null ptr to bkg data!");
+			return -1;
+		}
+		if(useLocalBkg && !bkgData->HasLocalBkg()){
+			ERROR_LOG("Selected to use local bkg but no local bkg data are available!");
+			return -1;
+		}
+	}//close if
+
+	//## Check source list
+	if(sources.size()<=0){
+		WARN_LOG("Source list empty, nothing to be dilated!");
+		return 0;
+	}
+
+	//## Start dilating sources
+	for(unsigned int k=0;k<sources.size();k++){	
+		int status= DilateAroundSource(img,sources[k],KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
+		if(status<0){
+			WARN_LOG("Source dilation failed for source no. "<<k<<" ...");
+		}
+	}//end loop sources
+
+	return 0;
+
+}//close DilateAroundSources()
+
+
+
 
 //================================================
 //==      OLD IMAGE METHODS

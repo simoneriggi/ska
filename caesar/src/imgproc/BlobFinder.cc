@@ -113,10 +113,10 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 	long int Ny= inputImg->GetNy();
 	long int Ntot= Nx*Ny;
 	
-	for(int i=0;i<Nx;i++){
-		for(int j=0;j<Ny;j++){	
-			int gBin= inputImg->GetBin(i+1,j+1);	
-			double Z= floodImg->GetBinContent(i+1,j+1);
+	for(long int i=0;i<Nx;i++){
+		for(long int j=0;j<Ny;j++){	
+			long int gBin= inputImg->GetBin(i,j);	
+			double Z= floodImg->GetPixelValue(i,j);
 			bool isNegative= false;
 			if(fabs(Z)>=seedThr) {
 				if(Z<0) isNegative= true;

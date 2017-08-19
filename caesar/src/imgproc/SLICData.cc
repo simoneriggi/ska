@@ -28,6 +28,7 @@
 #include <SLICData.h>
 #include <Region.h>
 #include <Img.h>
+#include <Image.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -58,6 +59,11 @@ SLICData::SLICData() {
 	inputImg= 0;
 	edgeImg= 0;
 	laplImg= 0;
+
+	inputImage= 0;
+	edgeImage= 0;
+	laplImage= 0;
+
 	regions.clear();
 	labels.clear();
 }//close costructor
@@ -77,7 +83,10 @@ void SLICData::Clear(){
 void SLICData::ClearImages(){
 	if(inputImg) inputImg->Delete();
 	if(edgeImg) edgeImg->Delete();
-	if(laplImg) laplImg->Delete();
+	if(laplImg) laplImg->Delete();	
+	if(inputImage) inputImage->Delete();
+	if(edgeImage) edgeImage->Delete();
+	if(laplImage) laplImage->Delete();
 }//close ClearImages()
 
 void SLICData::ClearRegions(){

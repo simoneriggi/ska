@@ -50,6 +50,7 @@ using namespace std;
 namespace Caesar {
 
 class Img;
+class Image;
 class ImgMetaData;
 
 class FITSWriter : public TObject {
@@ -69,6 +70,7 @@ class FITSWriter : public TObject {
 
 	public:
 		static int WriteFITS(Img* img,std::string outfilename);
+		static int WriteFITS(Image* img,std::string outfilename);
 		
 	private:
 		static int Init();

@@ -109,7 +109,7 @@ class MorphFilter : public TObject {
 		/**
 		* \brief Dilate image around a specified source position
 		*/
-		static int DilateAroundSource(Image* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,BkgData* bkgData,bool useLocalBkg,bool randomize,double zThr);
+		static int DilateAroundSource(Image* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr);
 		/**
 		* \brief Find pixels to be dilated
 		*/
