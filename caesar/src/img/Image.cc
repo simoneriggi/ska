@@ -419,7 +419,7 @@ int Image::CheckFillPixel(long int gbin,double w){
 		return -1;
 	}
 	if(TMath::IsNaN(w) || fabs(w)==TMath::Infinity()) {
-		WARN_LOG("Given value is NaN or inf, skipping!");
+		WARN_LOG("Given value (w="<<w<<") for bin "<<gbin<<" is NaN or inf, skipping!");
 		return -1;
 	}
 
@@ -442,7 +442,7 @@ int Image::FillPixel(long int gbin,double w,bool useNegativePixInStats){
 
 	//Check bin & value
 	if(CheckFillPixel(gbin,w)<0) {
-		WARN_LOG("Invalid bin given or pixel already filled!");
+		WARN_LOG("Invalid bin given (gbin="<<gbin<<") or nan/inf value given (w="<<w<<") or pixel already filled!");
 		return -1;
 	}
 
@@ -475,7 +475,7 @@ int Image::FillPixelMT(Caesar::StatMoments<double>& moments,long int gbin,double
 
 	//Check bin & value
 	if(CheckFillPixel(gbin,w)<0) {
-		WARN_LOG("Invalid bin given or pixel already filled!");
+		WARN_LOG("Invalid bin given (gbin="<<gbin<<") or nan/inf value given (w="<<w<<") or pixel already filled!");
 		return -1;
 	}
 
@@ -1424,6 +1424,66 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 
 }//close FindNestedSources()
 
+int Image::FindExtendedSource_CV(std::vector<Source*>& sources,ImgBkgData* bkgData,int minPixels,bool findNegativeExcess,double dt,double h,double lambda1,double lambda2,double mu,double nu,double p){
+
+	//## Compute segmented image
+	Image* segmentedImg= ChanVeseSegmenter::FindSegmentation(this,false,dt,h,lambda1,lambda2,mu,nu,p);
+	if(!segmentedImg){
+		ERROR_LOG("Failed to compute ChanVese image segmentation!");
+		return -1;
+	}
+	
+	//## Finding blobs in masked image
+	double fgValue= 1;	
+	int status= this->FindCompactSource(sources,segmentedImg,bkgData,fgValue,fgValue,minPixels,false,false,false);
+	if(status<0){
+		ERROR_LOG("Finding sources in Chan-Vese segmented mask failed!");
+		return -1;
+	}
+	
+	//## Clear segmented image
+	if(segmentedImg){
+		delete segmentedImg;
+		segmentedImg= 0;
+	}
+
+	//## Remove sources of negative excess 
+	if(!findNegativeExcess){
+
+		//Compute image stats if not already present
+		if(!this->HasStats()){
+			this->ComputeStats(true,false,false);
+		}	
+		if(!m_Stats){
+			ERROR_LOG("Failed to compute image stats, clearing all detected sources and returning empty list!");
+			for(size_t k=0;k<sources.size();k++){
+				if(sources[k]){
+					delete sources[k];
+					sources[k]= 0;
+				}	
+			}//end loop sources
+			sources.clear();
+			return -1;
+		}//close if
+
+		//Find and remove sources with flux below the input image median (THIS COULD BE IMPROVED!)
+		std::vector<int> sourcesToBeRemoved;		
+		int imgMedian= m_Stats->median;
+		for(size_t k=0;k<sources.size();k++){
+			//Tag sources as extended
+			sources[k]->SetType(Source::eExtended);
+
+			//Check if source is a "negative excess"
+			double Smedian= sources[k]->Median;
+			if(Smedian<imgMedian) sourcesToBeRemoved.push_back(k);
+		}
+		CodeUtils::DeleteItems(sources, sourcesToBeRemoved);
+	}//close if
+
+	return 0;
+	
+}//close FindExtendedSources_CV()
+
 //==================================================
 //==       FILTERING METHODS
 //==================================================
@@ -1611,15 +1671,16 @@ Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,
 
 Image* Image::GetNormalizedImage(std::string normScale,int normmin,int normmax,bool skipEmptyBins){
 
-	long int Nx= this->GetNx();
-	long int Ny= this->GetNy();
+	//Get image content min/max
 	double wmin= (this->m_StatMoments).minVal;
 	double wmax= (this->m_StatMoments).maxVal;
 	
+	//Create normalized image
 	TString imgName= Form("%s_Normalized",m_name.c_str());	
 	Image* norm_img= this->GetCloned(std::string(imgName),true,true);
 	norm_img->Reset();
 	
+	//Fill norm image
 	if(normScale=="LINEAR"){
 
 		#ifdef OPENMP_ENABLED
@@ -1669,11 +1730,50 @@ Image* Image::GetNormalizedImage(std::string normScale,int normmin,int normmax,b
 
 }//close GetNormalizedImage()
 
+Image* Image::GetGradientImage(bool invert)
+{
+	//Compute gradient filtered image
+	Image* gradImg= GradientFilter::GetGradientFilter(this);
+	if(invert) gradImg->Scale(-1);
+
+	return gradImg;
+
+}//close GetGradientImage()
+
+Image* Image::GetKirschImage()
+{
+	
+	//Compute Kirsh filtered image
+	Image* kirschImg= KirschFilter::GetKirschFilter(this);
+
+	return kirschImg;
+
+}//close GetKirschImage()
+
+Image* Image::GetLoGImage(bool invert)
+{
+	//Compute LoG filtered image
+	Image* LoGImg= LoGFilter::GetLoGFilter(this);
+	if(LoGImg && invert) LoGImg->Scale(-1);
+	
+	return LoGImg;
+
+}//close GetLoGImage()
+
+Image* Image::GetNormLoGImage(int size,double scale,bool invert)
+{
+	//Compute normalized LoG filtered image
+	Image* normLoGImg= LoGFilter::GetNormLoGFilter(this,size,scale);
+	if(normLoGImg && invert) normLoGImg->Scale(-1);
+
+	return normLoGImg;
+
+}//close GetNormLoGImage()
 
 Image* Image::GetLaplacianImage(bool invert)
 {
 
-	//Compute laplacian filter
+	//Compute laplacian filtered image
 	Image* laplImg= GradientFilter::GetLaplaceFilter(this);
 	if(invert) laplImg->Scale(-1);
 	
@@ -1738,6 +1838,46 @@ Image* Image::GetSmoothedImage(int size_x,int size_y,double sigma_x,double sigma
 
 }//close GetSmoothedImage()
 
+std::vector<Image*> Image::GetWaveletDecomposition(int nScales){
+
+	DEBUG_LOG("Computing wavelet decomposition up to scale J="<<nScales<<" ...");
+	std::vector<Image*> img_decomposition;
+	img_decomposition= WTFilter::GetDecomposition(this,nScales);
+	
+	return img_decomposition;
+
+}//close GetWaveletDecomposition()
+
+
+Image* Image::GetSaliencyMap(int reso,double regFactor,int minRegionSize,double knnFactor,bool useRobust,double expFalloffPar,double distanceRegPar){
+
+	//## Compute single-reso saliency map
+	Image* saliencyMap= 0;
+	saliencyMap= SaliencyFilter::ComputeSaliencyMap(this,reso,regFactor,minRegionSize,knnFactor,useRobust,expFalloffPar,distanceRegPar);
+	if(!saliencyMap){
+		ERROR_LOG("Saliency map estimation failed!");
+		return nullptr;
+	}
+
+	return saliencyMap;
+
+}//close GetSaliencyMap()
+
+
+Image* Image::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,bool useRobustPars,double expFalloffPar,double distanceRegPar,double salientMultiplicityThrFactor,bool addBkgMap,bool addNoiseMap,ImgBkgData* bkgData,double saliencyThrFactor,double imgThrFactor){
+
+	//## Compute multi-reso saliency map
+	Image* saliencyMap= 0;
+	saliencyMap= SaliencyFilter::ComputeMultiResoSaliencyMap(this,resoMin,resoMax,resoStep,beta,minRegionSize,knnFactor,useRobustPars,expFalloffPar,distanceRegPar, salientMultiplicityThrFactor,addBkgMap,addNoiseMap,bkgData,saliencyThrFactor,imgThrFactor);
+	if(!saliencyMap){
+		ERROR_LOG("Multi-resolution saliency map estimation failed!");
+		return nullptr;
+	}
+
+	return saliencyMap;
+
+}//close GetMultiResoSaliencyMap()
+
 
 int Image::Add(Image* img,double c,bool computeStats)
 {
@@ -1774,7 +1914,7 @@ int Image::Add(Image* img,double c,bool computeStats)
 		{
 			int thread_id= omp_get_thread_num();
 			int nthreads= SysUtils::GetOMPThreads();
-			INFO_LOG("Starting multithread image add (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
+			DEBUG_LOG("Starting multithread image add (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
 
 			#pragma omp single
    		{
@@ -2099,6 +2239,29 @@ TH2D* Image::GetHisto2D(std::string histoname){
 	return histo;
 
 }//close GetHisto2D()
+
+TMatrixD* Image::GetMatrix(){
+
+	//Allocate matrix
+	TMatrixD* M= new TMatrixD(m_Ny,m_Nx);
+	M->Zero();
+
+	//Fill matrix
+	#ifdef OPENMP_ENABLED
+	#pragma omp parallel for collapse(2)
+	#endif
+	for(long int i=0;i<m_Nx;i++){//rows
+		for(long int j=0;j<m_Ny;j++){//columns
+			double w= this->GetPixelValue(i,j);
+			long int rowId= j;
+			long int colId= i;
+			(*M)(rowId,colId)= w;
+		}//end loop cols
+	}//end loop rows
+
+	return M;
+
+}//close Img::GetMatrix()
 
 cv::Mat Image::GetOpenCVMat(std::string encoding){
 

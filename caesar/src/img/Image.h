@@ -577,7 +577,7 @@ class Image : public TNamed {
 		/**
 		* \brief Find extended sources with ChanVese method
 		*/
-		//int FindExtendedSource_CV(std::vector<Source*>&,BkgData* bkgData=0,int minPixels=10,bool findNegativeExcess=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1);
+		int FindExtendedSource_CV(std::vector<Source*>&,ImgBkgData* bkgData=0,int minPixels=10,bool findNegativeExcess=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1);
 
 		/**
 		* \brief Find extended sources with Hierarchical Clustering method
@@ -634,36 +634,41 @@ class Image : public TNamed {
 		Image* GetSmoothedImage(int size_x=3,int size_y=3,double sigma_x=1,double sigma_y=1);
 
 		/**
-		* \brief Get image wavelength decomposition
-		*/
-		//std::vector<Img*> GetWaveletDecomposition(int nScales);
-		/**
-		* \brief Get kirsch image
-		*/
-		//Img* GetKirschImage();
-		/**
-		* \brief Get image gradient
-		*/
-		//Img* GetGradientImage(bool invert=false);
-		
-		/**
-		* \brief Get laplacian of gaussian image
-		*/
-		//Img* GetLoGImage(bool invert=false);	
-		/**
-		* \brief Get scale-normalized laplacian of gaussian image
-		*/
-		//Img* GetNormLoGImage(int size=3,double scale=1,bool invert=false);
-		
-		/**
 		* \brief Get single-reso saliency map
 		*/
-		//Img* GetSaliencyMap(int reso=20,double regFactor=1,int minRegionSize=10,double knnFactor=1,bool useRobust=false,double expFalloffPar=100,double distanceRegPar=1);
+		Image* GetSaliencyMap(int reso=20,double regFactor=1,int minRegionSize=10,double knnFactor=1,bool useRobust=false,double expFalloffPar=100,double distanceRegPar=1);
 
 		/**
 		* \brief Get multi-reso saliency map
 		*/
-		//Img* GetMultiResoSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=0.2,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,double salientMultiplicityThrFactor=0.7,bool addBkgMap=true,bool addNoiseMap=true,BkgData* bkgData=0,double saliencyThrFactor=2,double imgThrFactor=1);
+		Image* GetMultiResoSaliencyMap(int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=0.2,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,double salientMultiplicityThrFactor=0.7,bool addBkgMap=true,bool addNoiseMap=true,ImgBkgData* bkgData=0,double saliencyThrFactor=2,double imgThrFactor=1);
+
+		/**
+		* \brief Get image wavelength decomposition
+		*/
+		std::vector<Image*> GetWaveletDecomposition(int nScales);
+		
+		/**
+		* \brief Get image gradient
+		*/
+		Image* GetGradientImage(bool invert=false);
+
+		/**
+		* \brief Get kirsch image
+		*/
+		Image* GetKirschImage();
+				
+		/**
+		* \brief Get laplacian of gaussian image
+		*/
+		Image* GetLoGImage(bool invert=false);	
+		
+		/**
+		* \brief Get scale-normalized laplacian of gaussian image
+		*/
+		Image* GetNormLoGImage(int size=3,double scale=1,bool invert=false);
+		
+		
 
 		//=========================================
 		//==   CONVERT METHODS
@@ -678,18 +683,12 @@ class Image : public TNamed {
 		*/
 		cv::Mat GetOpenCVMat(std::string encoding="64");	
 		
+		/**
+		* \brief Get ROOT matrix from image
+		*/
+		TMatrixD* GetMatrix();
+		
 
-		/**
-		* \brief Get matrix from image
-		*/
-		//TMatrixD* GetMatrix();
-		
-		
-		/**
-		* \brief Clone image
-		*/
-		
-		
 		
 		//==================================
 		//==    DRAW METHODS             ===
