@@ -16,6 +16,7 @@
 // * Caesar. If not, see http://www.gnu.org/licenses/.                   *
 // ***********************************************************************
 #include <Img.h>
+#include <Image.h>
 #include <SysUtils.h>
 #include <FITSReader.h>
 #include <BkgData.h>
@@ -23,6 +24,7 @@
 #include <ConfigParser.h>
 #include <Contour.h>
 #include <Source.h>
+#include <Logger.h>
 
 #include <RInside.h>
 
@@ -34,7 +36,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
-
+#include <chrono>
 using namespace std;
 using namespace Caesar;
 
@@ -54,26 +56,19 @@ static const struct option options_tab[] = {
   {(char*)0, (int)0, (int*)0, (int)0}
 };
 
-int ReadImage();
-int ComputeBkg();
-int OpenOutputFile();
-int FindSources();
-int SelectSources();
-bool IsGoodSource(Source* aSource);
-bool IsPointLikeSource(Source* aSource);
-int ComputeSourceResidual();
-int Clear();
-int Save();
+
 
 //Options
 //--> Main options
-Img* inputImg= 0;
+//Img* inputImg= 0;
+Image* inputImg= 0;
 TFile* inputFile= 0;
 std::string inputFileName= "";
 std::string imageName= "";
 TFile* outputFile= 0;	
 std::string outputFileName;
-Img* residualImg= 0;
+//Img* residualImg= 0;
+Image* residualImg= 0;
 std::vector<Source*> sources;	
 bool saveToFile;
 bool saveConfig;
@@ -98,8 +93,10 @@ double sourceMinBoundingBox;
 double psCircRatioThr, psElongThr, psEllipseAreaRatioMinThr, psEllipseAreaRatioMaxThr, psMaxNPix;
 
 //--> bkg options
-BkgData* bkgData= 0;
-Img* significanceMap= 0;
+//BkgData* bkgData= 0;
+ImgBkgData* bkgData= 0;
+//Img* significanceMap= 0;
+Image* significanceMap= 0;
 double boxSizeX, boxSizeY;
 double gridSizeX, gridSizeY;
 int bkgEstimator;
@@ -107,18 +104,175 @@ bool useLocalBkg;
 bool use2ndPassInLocalBkg;
 bool skipOutliersInLocalBkg;
 
+//Functions
+int ParseOptions(int argc, char *argv[]);
+int ReadImage();
+int ComputeStats();
+int ComputeBkg();
+int OpenOutputFile();
+int FindSources();
+int SelectSources();
+bool IsGoodSource(Source* aSource);
+bool IsPointLikeSource(Source* aSource);
+int ComputeSourceResidual();
+int Clear();
+int Save();
+
 int main(int argc, char *argv[]){
 
+	auto t0 = chrono::steady_clock::now();
+	
+	//================================
+	//== Parse command line options
+	//================================
+	auto t0_parse = chrono::steady_clock::now();
+	if(ParseOptions(argc,argv)<0){
+		ERROR_LOG("Failed to parse command line options!");
+		Clear();
+		return -1;
+	}
+	auto t1_parse = chrono::steady_clock::now();
+	double dt_parse= chrono::duration <double, milli> (t1_parse-t0_parse).count();
+
+	//=======================
+	//== Open out file
+	//=======================
+	auto t0_outfile = chrono::steady_clock::now();
+	if(OpenOutputFile()<0){
+		ERROR_LOG("Failed to open output file!");
+		Clear();
+		return -1;	
+	}
+	auto t1_outfile = chrono::steady_clock::now();
+	double dt_outfile= chrono::duration <double, milli> (t1_outfile-t0_outfile).count();
+
+	
+	//=======================
+	//== Read image
+	//=======================
+	auto t0_read = chrono::steady_clock::now();
+	if(ReadImage()<0){
+		ERROR_LOG("Failed to read image from file!");		
+		Clear();
+		return -1;
+	}
+	auto t1_read = chrono::steady_clock::now();
+	double dt_read= chrono::duration <double, milli> (t1_read-t0_read).count();
+	
+	//=======================
+	//== Compute stats
+	//=======================
+	auto t0_stats = chrono::steady_clock::now();
+	if(ComputeStats()<0){
+		ERROR_LOG("Failed to read image from file!");		
+		Clear();
+		return -1;
+	}
+	auto t1_stats = chrono::steady_clock::now();
+	double dt_stats= chrono::duration <double, milli> (t1_stats-t0_stats).count();
+
+	//=======================
+	//== Background finder
+	//=======================
+	auto t0_bkg = chrono::steady_clock::now();	
+	if(ComputeBkg()<0){
+		ERROR_LOG("Failed to compute stats & bkg!");		
+		Clear();
+		return -1;
+	}
+	auto t1_bkg = chrono::steady_clock::now();
+	double dt_bkg= chrono::duration <double, milli> (t1_bkg-t0_bkg).count();
+
+	
+	//=======================
+	//== Source finding
+	//=======================
+	auto t0_sfinder = chrono::steady_clock::now();	
+	if(FindSources()<0){
+		ERROR_LOG("Failed to find sources!");
+		Clear();
+		return -1;
+	}		
+	auto t1_sfinder = chrono::steady_clock::now();
+	double dt_sfinder= chrono::duration <double, milli> (t1_sfinder-t0_sfinder).count();
+
+	//=======================
+	//== Source selection
+	//=======================
+	auto t0_ssel = chrono::steady_clock::now();	
+	if(SelectSources()<0){
+		ERROR_LOG("Failed to select sources!");	
+		Clear();
+		return -1;
+	}
+	auto t1_ssel = chrono::steady_clock::now();
+	double dt_ssel= chrono::duration <double, milli> (t1_ssel-t0_ssel).count();
+
+	//=======================
+	//== Source residuals
+	//=======================		
+	auto t0_res = chrono::steady_clock::now();
+	if(ComputeSourceResidual()<0){
+		ERROR_LOG("Failed to compute source residual map!");
+		Clear();
+		return -1;
+	}
+	auto t1_res = chrono::steady_clock::now();
+	double dt_res= chrono::duration <double, milli> (t1_res-t0_res).count();
+
+	//=======================
+	//== Save to file
+	//=======================
+	auto t0_save = chrono::steady_clock::now();	
+	Save();
+	auto t1_save = chrono::steady_clock::now();
+	double dt_save= chrono::duration <double, milli> (t1_save-t0_save).count();
+
+	//=======================
+	//== Clear data
+	//=======================
+	Clear();
+
+	//=======================
+	//== Print perf stats
+	//=======================
+	auto t1 = chrono::steady_clock::now();
+	double dt= chrono::duration <double, milli> (t1-t0).count();
+
+	INFO_LOG("===========================");
+	INFO_LOG("===   PERFORMANCE INFO  ===");
+	INFO_LOG("===========================");
+	INFO_LOG("dt(ms)= "<<dt);
+	INFO_LOG("dt_read(ms)= "<<dt_read<<" ["<<dt_read/dt*100.<<"%]");
+	INFO_LOG("dt_stats(ms)= "<<dt_stats<<" ["<<dt_stats/dt*100.<<"%]");
+	INFO_LOG("dt_bkg(ms)= "<<dt_bkg<<" ["<<dt_bkg/dt*100.<<"%]");
+	INFO_LOG("dt_sfinder(ms)= "<<dt_sfinder<<" ["<<dt_sfinder/dt*100.<<"%]");
+	INFO_LOG("dt_ssel(ms)= "<<dt_ssel<<" ["<<dt_ssel/dt*100.<<"%]");
+	INFO_LOG("dt_res(ms)= "<<dt_res<<" ["<<dt_res/dt*100.<<"%]");
+	INFO_LOG("dt_save(ms)= "<<dt_save<<" ["<<dt_save/dt*100.<<"%]");
+	INFO_LOG("===========================");
+	
+	
+	cout<<"INFO: End compact source finder"<<endl;
+	
+	return 0;
+
+}//close main
+
+int ParseOptions(int argc, char *argv[])
+{
+	
+	//## Check args
 	if(argc<2){
 		cerr<<"ERROR: Invalid number of arguments...see macro usage!"<<endl;
 		Usage(argv[0]);
 		exit(1);
 	}
+
+	//## Parse options
+	std::string configFileName= "";
 	int c = 0;
   int option_index = 0;
-	
-	//Parse options
-	std::string configFileName= "";
 
 	while((c = getopt_long(argc, argv, "hc:",options_tab, &option_index)) != -1) {
     
@@ -145,95 +299,80 @@ int main(int argc, char *argv[]){
     }//close switch
 	}//close while
  
-	//=======================
-	//== Read config options 
-	//=======================
+	//## Read config options 
 	if(ConfigParser::Instance().Parse(configFileName)<0){
 		cerr<<"ERROR: Failed to parse config options!"<<endl;
 		return -1;
 	}
 	PRINT_OPTIONS();
 
-
-	cout<<"Create Rinstance..."<<endl;
+	//=======================
+	//== Init R 
+	//=======================
+	cout<<"INFO: Create Rinstance..."<<endl;
 	RInside::instancePtr();
 	
 	//=======================
-	//== Open out file
+	//== Init Logger 
 	//=======================
-	if(OpenOutputFile()<0){
-		cerr<<"ERROR: Failed to open output file!"<<endl;
-		return -1;	
-	}
-	
-	//=======================
-	//== Read image
-	//=======================
-	if(ReadImage()<0){
-		cerr<<"ERROR: Failed to read image from file!"<<endl;
+	//Get main logger options
+	int loggerTarget= 0;
+	if(GET_OPTION_VALUE(loggerTarget,loggerTarget)<0){
+		cerr<<"ERROR: Failed to get loggerTarget option!"<<endl;
 		return -1;
 	}
-	
-	//=======================
-	//== Background finder
-	//=======================
-	cout<<"INFO: Starting background finder ..."<<endl;
-	if(ComputeBkg()<0){
-		cerr<<"ERROR: Failed to compute bkg!"<<endl;	
-		Clear();
+	std::string loggerTag= "";
+	std::string logLevel= "";
+	if(GET_OPTION_VALUE(loggerTag,loggerTag)<0){
+		cerr<<"ERROR: Failed to get loggerTag option!"<<endl;
 		return -1;
 	}
-	significanceMap= inputImg->GetSignificanceMap(bkgData,useLocalBkg);
-	if(!significanceMap){
-		cerr<<"ERROR: Failed to compute significance map!"<<endl;	
-		Clear();
+	if(GET_OPTION_VALUE(logLevel,logLevel)<0){
+		cerr<<"ERROR: Failed to get logLevel option!"<<endl;
 		return -1;
 	}
 
-	
-	//=======================
-	//== Source finding
-	//=======================
-	if(FindSources()<0){
-		cerr<<"ERROR: Failed to find sources!"<<endl;	
-		Clear();
-		return -1;
-	}		
-
-	//=======================
-	//== Source selection
-	//=======================
-	if(SelectSources()<0){
-		cerr<<"ERROR: Failed to select sources!"<<endl;	
-		Clear();
-		return -1;
+	//Init logger
+	if(loggerTarget==eCONSOLE_TARGET){
+		std::string consoleTarget= "";
+		GET_OPTION_VALUE(consoleTarget,consoleTarget);
+		LoggerManager::Instance().CreateConsoleLogger(logLevel,loggerTag,consoleTarget);
 	}
-	
-	//=======================
-	//== Source residuals
-	//=======================
-	if(ComputeSourceResidual()<0){
-		cerr<<"ERROR: Failed to compute source residual map!"<<endl;	
-		Clear();
+	else if(loggerTarget==eFILE_TARGET){
+		std::string logFile= "";
+		std::string maxLogFileSize= "";
+		bool appendToLogFile= false;
+		int maxBackupLogFiles= 1;
+		GET_OPTION_VALUE(logFile,logFile);
+		GET_OPTION_VALUE(appendToLogFile,appendToLogFile);
+		GET_OPTION_VALUE(maxLogFileSize,maxLogFileSize);
+		GET_OPTION_VALUE(maxBackupLogFiles,maxBackupLogFiles);
+		LoggerManager::Instance().CreateFileLogger(logLevel,loggerTag,logFile,appendToLogFile,maxLogFileSize,maxBackupLogFiles);
+	}
+	else if(loggerTarget==eSYSLOG_TARGET){
+		std::string syslogFacility= "";
+		GET_OPTION_VALUE(syslogFacility,syslogFacility);
+		LoggerManager::Instance().CreateSysLogger(logLevel,loggerTag,syslogFacility);
+	}
+	else{
+		cerr<<"ERROR: Failed to initialize logger!"<<endl;
 		return -1;
 	}
 
 	//=======================
-	//== Save results 
+	//== Init thread numbers 
 	//=======================
-	Save();
-	
+	int nThreads;
+	if(GET_OPTION_VALUE(nThreads,nThreads)<0){
+		ERROR_LOG("Failed to get nThreads option!");
+		return -1;
+	}
+	if(nThreads>0) SysUtils::SetOMPThreads(nThreads);
 
-	//=======================
-	//== Clear
-	//=======================
-	Clear();
-	
-	cout<<"INFO: End compact source finder"<<endl;
-	
 	return 0;
 
-}//close main
+}//close ParseOptions()
+
 
 int ComputeSourceResidual(){
 
@@ -243,26 +382,26 @@ int ComputeSourceResidual(){
 	int dilatedSourceType;
 	int dilateSourceModel;
 	if(GET_OPTION_VALUE(dilateNestedSources,dilateNestedSources)<0){
-		cerr<<"ComputeSourceResidual(): ERROR: Failed to get dilateNestedSources option!"<<endl;
+		ERROR_LOG("Failed to get dilateNestedSources option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(dilateKernelSize,dilateKernelSize)<0){
-		cerr<<"ComputeSourceResidual(): ERROR: Failed to get dilateKernelSize option!"<<endl;
+		ERROR_LOG("Failed to get dilateKernelSize option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(dilatedSourceType,dilatedSourceType)<0){
-		cerr<<"ComputeSourceResidual(): ERROR: Failed to get dilatedSourceType option!"<<endl;
+		ERROR_LOG("Failed to get dilatedSourceType option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(dilateSourceModel,dilateSourceModel)<0){
-		cerr<<"ComputeSourceResidual(): ERROR: Failed to get dilateSourceModel option!"<<endl;
+		ERROR_LOG("Failed to get dilateSourceModel option!");
 		return -1;
 	}
 
 	//Compute residual
 	residualImg= inputImg->GetSourceResidual(sources,dilateKernelSize,dilateSourceModel,dilatedSourceType,dilateNestedSources,bkgData,useLocalBkg);
 	if(!residualImg){
-		cerr<<"ComputeSourceResidual(): ERROR: Failed to compute residual map!"<<endl;
+		ERROR_LOG("Failed to compute residual map!");
 		return -1;
 	}
 
@@ -281,38 +420,44 @@ int FindSources(){
 	double nestedBlobThrFactor;
 
 	if(GET_OPTION_VALUE(seedBrightThr,seedBrightThr)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get seedBrightThr option!"<<endl;
+		ERROR_LOG("Failed to get seedBrightThr option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(mergeThr,mergeThr)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get mergeThr option!"<<endl;
+		ERROR_LOG("Failed to get mergeThr option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(minNPix,minNPix)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get minNPix option!"<<endl;
+		ERROR_LOG("Failed to get minNPix option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(searchNegativeExcess,searchNegativeExcess)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get searchNegativeExcess option!"<<endl;
+		ERROR_LOG("Failed to get searchNegativeExcess option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(mergeBelowSeed,mergeBelowSeed)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get mergeBelowSeed option!"<<endl;
+		ERROR_LOG("Failed to get mergeBelowSeed option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(searchNestedSources,searchNestedSources)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get searchNestedSources option!"<<endl;
+		ERROR_LOG("Failed to get searchNestedSources option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(nestedBlobThrFactor,nestedBlobThrFactor)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get nestedBlobThrFactor option!"<<endl;
+		ERROR_LOG("Failed to get nestedBlobThrFactor option!");
 		return -1;
 	}
 
+	//## Extract bright source
 	sources.clear();
-	int status= inputImg->FindCompactSource(sources,significanceMap,bkgData,seedBrightThr,mergeThr,minNPix,searchNegativeExcess,mergeBelowSeed,searchNestedSources,nestedBlobThrFactor);
+	int status= inputImg->FindCompactSource(
+		sources,
+		significanceMap,bkgData,
+		seedBrightThr,mergeThr,minNPix,searchNegativeExcess,mergeBelowSeed,
+		searchNestedSources,nestedBlobThrFactor
+	);
 	if(status<0){
-		cerr<<"FindSources(): ERROR: Bright source search failed!"<<endl;
+		ERROR_LOG("Bright source search failed!");
 		return -1;
 	}
 
@@ -324,36 +469,36 @@ int SelectSources(){
 
 	//## Get options	
 	if(GET_OPTION_VALUE(applySourceSelection,applySourceSelection)<0){
-		cerr<<"SelectSources(): ERROR: Failed to get applySourceSelection option!"<<endl;
+		ERROR_LOG("Failed to get applySourceSelection option!");
 		return -1;
 	}
 	if(!applySourceSelection){
-		cout<<"SelectSources(): WARN: No source selection requested!"<<endl;
+		INFO_LOG("No source selection requested!");
 		return 0;
 	}
 	
 	if(GET_OPTION_VALUE(sourceMinBoundingBox,sourceMinBoundingBox)<0){
-		cerr<<"SelectSources(): ERROR: Failed to get sourceMinBoundingBox option!"<<endl;
+		ERROR_LOG("Failed to get sourceMinBoundingBox option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(psCircRatioThr,psCircRatioThr)<0){
-		cerr<<"SelectSources(): ERROR: Failed to get psCircRatioThr option!"<<endl;
+		ERROR_LOG("Failed to get psCircRatioThr option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(psElongThr,psElongThr)<0){
-		cerr<<"SelectSources(): ERROR: Failed to get psElongThr option!"<<endl;
+		ERROR_LOG("Failed to get psElongThr option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(psEllipseAreaRatioMinThr,psEllipseAreaRatioMinThr)<0){
-		cerr<<"SelectSources(): ERROR: Failed to get psEllipseAreaRatioMinThr option!"<<endl;
+		ERROR_LOG("Failed to get psEllipseAreaRatioMinThr option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(psEllipseAreaRatioMaxThr,psEllipseAreaRatioMaxThr)<0){
-		cerr<<"SelectSources(): ERROR: Failed to get psEllipseAreaRatioMaxThr option!"<<endl;
+		ERROR_LOG("Failed to get psEllipseAreaRatioMaxThr option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(psMaxNPix,psMaxNPix)<0){
-		cerr<<"SelectSources(): ERROR: Failed to get psMaxNPix option!"<<endl;
+		ERROR_LOG("Failed to get psMaxNPix option!");
 		return -1;
 	}
 	
@@ -374,14 +519,14 @@ int SelectSources(){
 
 		//Is bad source (i.e. line-like blob, etc...)?
 		if(!IsGoodSource(sources[i])) {
-			cout<<"SelectSources(): INFO: Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!"<<endl;
+			INFO_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!");
 			sources[i]->SetGoodSourceFlag(false);
 			continue;
 		}
 			
 		//Is point-like source?
 		if( IsPointLikeSource(sources[i]) ){
-			cout<<"SelectSources(): INFO: Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as a point-like source ..."<<endl;
+			INFO_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as a point-like source ...");
 			sources[i]->SetType(Source::ePointLike);
 		}
 
@@ -395,11 +540,11 @@ int SelectSources(){
 			double nestedY0= nestedSources[j]->Y0;
 
 			if(!IsGoodSource(nestedSources[j])) {
-				cout<<"SelectSources(): INFO: Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as bad source, skipped!"<<endl;
+				INFO_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as bad source, skipped!");
 				nestedSources[j]->SetGoodSourceFlag(false);
 			}
 			if( IsPointLikeSource(nestedSources[j]) ){
-				cout<<"SelectSources(): INFO: Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as a point-like source ..."<<endl;
+				INFO_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as a point-like source ...");
 				nestedSources[j]->SetType(Source::ePointLike);
 			}
 		}//end loop nested sources
@@ -410,7 +555,7 @@ int SelectSources(){
 	}//end loop sources
 
 	
-	cout<<"SelectSources(): INFO: Added "<<nSelSources<<" bright sources to the selected list..."<<endl;	
+	INFO_LOG("Adding #"<<nSelSources<<" bright sources to the selected source list...");
 
 	//Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
 	sources.clear();
@@ -431,13 +576,13 @@ bool IsGoodSource(Source* aSource){
 
 	//## Check for line-like source
 	if( (aSource->GetContours()).size()<=0) {
-		cerr<<"IsGoodSource(): WARN: No contour stored for this source, cannot perform check!"<<endl;
+		WARN_LOG("No contour stored for this source, cannot perform check!");
 		return true;
 	}
 
 	double BoundingBoxMin= ((aSource->GetContours())[0])->BoundingBoxMin;
 	if(BoundingBoxMin<sourceMinBoundingBox) {
-		cerr<<"IsGoodSource(): INFO: BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<sourceMinBoundingBox<<")"<<endl;
+		DEBUG_LOG("BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<sourceMinBoundingBox<<")");
 		return false;
 	}
 
@@ -453,7 +598,7 @@ bool IsPointLikeSource(Source* aSource){
 
 	if(!aSource) return false;
 	if(!aSource->HasParameters()) {
-		cerr<<"IsPointLikeSource(): WARN: No parameters are available for this source (did you compute them?)...test cannot be performed!"<<endl;
+		WARN_LOG("No parameters are available for this source (did you compute them?)...test cannot be performed!");
 		return true;
 	}
 
@@ -478,14 +623,14 @@ bool IsPointLikeSource(Source* aSource){
 
 		//Test elongation (how symmetrical is the shape): 0=circle,square
 		if(thisContour->Elongation>psElongThr) {
-			cout<<"IsPointLikeSource: INFO: Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass Elongation cut (ELONG="<<thisContour->CircularityRatio<<">"<<psElongThr<<")"<<endl;
+			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass Elongation cut (ELONG="<<thisContour->CircularityRatio<<">"<<psElongThr<<")");
 			isPointLike= false;
 			break;	
 		}
 
 		//Test ellipse fit
 		if(thisContour->EllipseAreaRatio<psEllipseAreaRatioMinThr || thisContour->EllipseAreaRatio>psEllipseAreaRatioMaxThr) {
-			cout<<"IsPointLikeSource: INFO: Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass EllipseAreaRatio cut (EAR="<<thisContour->EllipseAreaRatio<<" outside range ["<<psEllipseAreaRatioMinThr<<","<<psEllipseAreaRatioMaxThr<<"])"<<endl;
+			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass EllipseAreaRatio cut (EAR="<<thisContour->EllipseAreaRatio<<" outside range ["<<psEllipseAreaRatioMinThr<<","<<psEllipseAreaRatioMaxThr<<"])");
 			isPointLike= false;
 			break;	
 		}
@@ -493,9 +638,9 @@ bool IsPointLikeSource(Source* aSource){
 	}//end contour loop
 	
 	//Check number of pixels
-	cout<<"IsPointLikeSource(): INFO: Source (name="<<sourceName<<","<<"id="<<sourceId<<") (NPix="<<aSource->NPix<<">"<<psMaxNPix<<")"<<endl;
+	DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") (NPix="<<aSource->NPix<<">"<<psMaxNPix<<")");
 	if(aSource->NPix>psMaxNPix){
-		cout<<"IsPointLikeSource(): INFO: Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nMaxPix cut (NPix="<<aSource->NPix<<">"<<psMaxNPix<<")"<<endl;
+		DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nMaxPix cut (NPix="<<aSource->NPix<<">"<<psMaxNPix<<")");
 		isPointLike= false;
 	}
 
@@ -505,63 +650,134 @@ bool IsPointLikeSource(Source* aSource){
 
 }//close IsPointLikeSource()
 
+int ComputeStats(){
+
+	//## Compute stats
+	INFO_LOG("Computing input image stats...");
+	if(inputImg->ComputeStats(true,false,false)<0){
+		ERROR_LOG("Stats computing failed!");
+		return -1;
+	}
+	inputImg->PrintStats();	
+
+	return 0;
+
+}//close ComputeStats()
+
 int ComputeBkg(){
 
 	//## Get bkg options
+	//Beam info
+	bool useBeamInfoInBkg;
+	if(GET_OPTION_VALUE(useBeamInfoInBkg,useBeamInfoInBkg)<0){
+		ERROR_LOG("Failed to get useBeamInfoInBkg option!");
+		return -1;
+	}
+	int nPixelsInBeam= 0;
+	if(useBeamInfoInBkg && inputImg->HasMetaData()){
+		nPixelsInBeam= inputImg->GetMetaData()->GetBeamSizeInPixel();	
+	}
+		
+	//Box size
 	if(GET_OPTION_VALUE(boxSizeX,boxSizeX)<0 || GET_OPTION_VALUE(boxSizeY,boxSizeY)<0){
-		cerr<<"ComputeBkg(): ERROR: Failed to get boxSize option!"<<endl;
-		return -1;
-	}
-	if(GET_OPTION_VALUE(gridSizeX,gridSizeX)<0 || GET_OPTION_VALUE(gridSizeY,gridSizeY)<0){
-		cerr<<"ComputeBkg(): ERROR: Failed to get gridSize option!"<<endl;
-		return -1;
-	}
-	if(GET_OPTION_VALUE(bkgEstimator,bkgEstimator)<0){
-		cerr<<"ComputeBkg(): ERROR: Failed to get bkgEstimator option!"<<endl;
-		return -1;
-	}
-	if(GET_OPTION_VALUE(useLocalBkg,useLocalBkg)<0){
-		cerr<<"ComputeBkg(): ERROR: Failed to get useLocalBkg option!"<<endl;
-		return -1;
-	}
-	if(GET_OPTION_VALUE(use2ndPassInLocalBkg,use2ndPassInLocalBkg)<0){
-		cerr<<"ComputeBkg(): ERROR: Failed to get use2ndPassInLocalBkg option!"<<endl;
-		return -1;
-	}
-	if(GET_OPTION_VALUE(skipOutliersInLocalBkg,skipOutliersInLocalBkg)<0){
-		cerr<<"ComputeBkg(): ERROR: Failed to get skipOutliersInLocalBkg option!"<<endl;
+		ERROR_LOG("Failed to get boxSize option!");
 		return -1;
 	}
 
-	//## Get options
-	double seedBrightThr, mergeThr;
+	//Grid size
+	if(GET_OPTION_VALUE(gridSizeX,gridSizeX)<0 || GET_OPTION_VALUE(gridSizeY,gridSizeY)<0){
+		ERROR_LOG("Failed to get gridSize option!");
+		return -1;
+	}
+	
+	//Bkg estimator
+	if(GET_OPTION_VALUE(bkgEstimator,bkgEstimator)<0){
+		ERROR_LOG("Failed to get bkgEstimator option!");
+		return -1;
+	}
+
+	//Local bkg flag
+	bool use2ndPassInLocalBkg;
+	bool skipOutliersInLocalBkg;
 	int minNPix;
+	double seedBrightThr;
+	double mergeThr;
+
+	if(GET_OPTION_VALUE(useLocalBkg,useLocalBkg)<0){
+		ERROR_LOG("Failed to get useLocalBkg option!");
+		return -1;
+	}
+
+	if(GET_OPTION_VALUE(use2ndPassInLocalBkg,use2ndPassInLocalBkg)<0){
+		ERROR_LOG("Failed to get use2ndPassInLocalBkg option!");
+		return -1;
+	}
+	
+	if(GET_OPTION_VALUE(skipOutliersInLocalBkg,skipOutliersInLocalBkg)<0){
+		ERROR_LOG("Failed to get skipOutliersInLocalBkg option!");
+		return -1;
+	}
+	
+	if(GET_OPTION_VALUE(minNPix,minNPix)<0){
+		ERROR_LOG("Failed to get minNPix option!");
+		return -1;
+	}
 	
 	if(GET_OPTION_VALUE(seedBrightThr,seedBrightThr)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get seedBrightThr option!"<<endl;
-		return -1;
-	}	
-	if(GET_OPTION_VALUE(mergeThr,mergeThr)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get mergeThr option!"<<endl;
+		ERROR_LOG("Failed to get seedBrightThr option!");
 		return -1;
 	}
-	if(GET_OPTION_VALUE(minNPix,minNPix)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get minNPix option!"<<endl;
+	
+	if(GET_OPTION_VALUE(mergeThr,mergeThr)<0){
+		ERROR_LOG("Failed to get mergeThr option!");
 		return -1;
-	}	
+	}
 
+
+	//Compute box size
+	//double Nx= static_cast<double>(inputImg->GetNbinsX());
+	//double Ny= static_cast<double>(inputImg->GetNbinsY());
+	double Nx= static_cast<double>(inputImg->GetNx());
+	double Ny= static_cast<double>(inputImg->GetNy());
+	if(useBeamInfoInBkg && nPixelsInBeam>0){
+		INFO_LOG("Setting bkg boxes as ("<<boxSizeX<<","<<boxSizeY<<") x beam (beam="<<nPixelsInBeam<<" pixels) ...");
+		boxSizeX*= nPixelsInBeam;
+		boxSizeY*= nPixelsInBeam;
+	}
+	else{
+		WARN_LOG("Beam information is not available or its usage has been turned off, using image fractions...");
+		
+		boxSizeX*= Nx;
+		boxSizeY*= Ny;
+	}
+	INFO_LOG("Setting bkg boxes to ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
+
+	gridSizeX*= boxSizeX;
+	gridSizeY*= boxSizeY;
+	INFO_LOG("Setting grid size to ("<<gridSizeX<<","<<gridSizeY<<") pixels ...");
+	
 	//## Check grid & box size
-	int Nx= inputImg->GetNbinsX();
-	int Ny= inputImg->GetNbinsY();
 	if(boxSizeX>=Nx || boxSizeY>=Ny || gridSizeX>=Nx || gridSizeY>=Ny){
-		cerr<<"ComputeBkg(): ERROR: Box/grid size are too large compared to image size ("<<Nx<<","<<Ny<<")"<<endl;
+		ERROR_LOG("Box/grid size are too large compared to image size ("<<Nx<<","<<Ny<<")");
 		return -1;
 	}
 
 	//Compute bkg & noise maps
-	bkgData= inputImg->ComputeBkg(bkgEstimator,useLocalBkg,boxSizeX,boxSizeY,gridSizeX,gridSizeY,use2ndPassInLocalBkg,skipOutliersInLocalBkg,seedBrightThr,mergeThr,minNPix);
+	bkgData= inputImg->ComputeBkg(
+		bkgEstimator,
+		useLocalBkg,boxSizeX,boxSizeY,gridSizeX,gridSizeY,
+		use2ndPassInLocalBkg,
+		skipOutliersInLocalBkg,seedBrightThr,mergeThr,minNPix
+	);
 	if(!bkgData){
-		cerr<<"ComputeBkg(): ERROR: Failed to compute bkg data!"<<endl;
+		ERROR_LOG("Failed to compute bkg data!");
+		return -1;
+	}
+
+	//Compute significance
+	significanceMap= inputImg->GetSignificanceMap(bkgData,useLocalBkg);
+	if(!significanceMap){
+		ERROR_LOG("Failed to compute significance map!");
 		return -1;
 	}
 
@@ -574,66 +790,59 @@ int ReadImage(){
 
 	//## Get options
 	if(GET_OPTION_VALUE(inputFile,inputFileName)<0){
-		cerr<<"ReadImage(): ERROR: Failed to get inputFile option!"<<endl;
+		ERROR_LOG("Failed to get inputFile option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(inputImage,imageName)<0){
-		cerr<<"ReadImage(): ERROR: Failed to get inputImage option!"<<endl;
+		ERROR_LOG("Failed to get inputImage option!");
 		return -1;
 	}
 	
 	//## Check given input file and get info
 	Caesar::FileInfo info;
 	if(!Caesar::SysUtils::CheckFile(inputFileName,info,false)){
-		cerr<<"ReadImage(): ERROR: Invalid input file ("<<inputFileName<<") specified!"<<endl;
+		ERROR_LOG("Invalid input file ("<<inputFileName<<") specified!");
 		return -1;
 	}
 	std::string file_extension= info.extension;
 	if(file_extension!= ".fits" && file_extension!=".root") {
-		cerr<<"ReadImage(): ERROR: Invalid file extension ("<<file_extension<<")...nothing to be done!"<<endl;
+		ERROR_LOG("Invalid file extension ("<<file_extension<<")...nothing to be done!");
 		return -1;
 	}
 
 	//## Read image
 	//===== ROOT reading =====
 	if(file_extension==".root"){// Read image from ROOT file
-		cout<<"INFO: Reading ROOT input file "<<inputFileName<<"..."<<endl;
+		INFO_LOG("Reading ROOT input file "<<inputFileName<<"...");
 		inputFile = new TFile(inputFileName.c_str(),"READ");
 		if(!inputFile || inputFile->IsZombie()){
-			cerr<<"ReadImage(): ERROR: Cannot open input file "<<inputFileName<<"!"<<endl;
+			ERROR_LOG("Cannot open input file "<<inputFileName<<"!");
 			return -1;
 		}
-		inputImg=  (Img*)inputFile->Get(imageName.c_str());
+		//inputImg=  (Img*)inputFile->Get(imageName.c_str());	
+		inputImg=  (Image*)inputFile->Get(imageName.c_str());
 		if(!inputImg){
-			cerr<<"ReadImage(): ERROR: Cannot get image from input file "<<inputFileName<<"!"<<endl;
+			ERROR_LOG("Cannot get image from input file "<<inputFileName<<"!");
 			return -1;
 		}
 	}//close if
 
 	//===== FITS reading =====
 	if(file_extension==".fits"){// Read image from FITS file
-		cout<<"ReadImage(): INFO: Reading FITS input file "<<inputFileName<<"..."<<endl;
-		inputImg= new Caesar::Img; 
+		INFO_LOG("Reading FITS input file "<<inputFileName<<"...");
+		//inputImg= new Caesar::Img; 
+		inputImg= new Caesar::Image; 	
 		inputImg->SetNameTitle(imageName.c_str(),imageName.c_str());
 		if(inputImg->ReadFITS(inputFileName)<0){
-			cerr<<"ReadImage(): ERROR: Failed to read image from input file "<<inputFileName<<"!"<<endl;	
+			ERROR_LOG("Failed to read image from input file "<<inputFileName<<"!");	
 			return -1;
 		}
 	}//close else if
 
 	if(!inputImg){
-		cerr<<"ReadImage(): ERROR: Failed to read image from input file "<<inputFileName<<"!"<<endl;	
+		ERROR_LOG("Failed to read image from input file "<<inputFileName<<"!");
 		return -1;
 	}
-
-	// Compute stats
-	cout<<"INFO: Computing input image stats..."<<endl;
-	if(inputImg->ComputeStats(true,false,false)<0){
-		cerr<<"ReadImage(): ERROR: Stats computing failed!"<<endl;
-		inputImg->Delete();
-		return -1;
-	}
-	inputImg->PrintStats();	
 
 	return 0;
 
@@ -643,79 +852,79 @@ int OpenOutputFile(){
 
 	//Get options
 	if(GET_OPTION_VALUE(outputFile,outputFileName)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get outputFile option!"<<endl;
+		ERROR_LOG("Failed to get outputFile option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(saveToFile,saveToFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveToFile option!"<<endl;
+		ERROR_LOG("Failed to get saveToFile option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(saveConfig,saveConfig)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveConfig option!"<<endl;
+		ERROR_LOG("Failed to get saveConfig option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(saveResidualMap,saveResidualMap)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveResidualMap option!"<<endl;
+		ERROR_LOG("Failed to get saveResidualMap option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(saveBkgMap,saveBkgMap)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveBkgMap option!"<<endl;
+		ERROR_LOG("Failed to get saveBkgMap option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(saveNoiseMap,saveNoiseMap)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveNoiseMap option!"<<endl;
+		ERROR_LOG("Failed to get saveNoiseMap option!");
 		return -1;
 	}		
 	if(GET_OPTION_VALUE(saveSignificanceMap,saveSignificanceMap)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveSignificanceMap option!"<<endl;
+		ERROR_LOG("Failed to get saveSignificanceMap option!");
 		return -1;
 	}	
 	if(GET_OPTION_VALUE(saveInputMap,saveInputMap)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveInputMap option!"<<endl;
+		ERROR_LOG("Failed to get saveInputMap option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(saveSaliencyMap,saveSaliencyMap)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveSaliencyMap option!"<<endl;
+		ERROR_LOG("Failed to get saveSaliencyMap option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(saveSources,saveSources)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveSources option!"<<endl;
+		ERROR_LOG("Failed to get saveSources option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(saveToFITSFile,saveToFITSFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saveToFITSFile option!"<<endl;
+		ERROR_LOG("Failed to get saveToFITSFile option!");
 		return -1;
 	}
 
 	if(GET_OPTION_VALUE(residualMapFITSFile,residualMapFITSFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get residualMapFITSFile option!"<<endl;
+		ERROR_LOG("Failed to get residualMapFITSFile option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(inputMapFITSFile,inputMapFITSFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get inputMapFITSFile option!"<<endl;
+		ERROR_LOG("OpenOutputFile(): ERROR: Failed to get inputMapFITSFile option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(saliencyMapFITSFile,saliencyMapFITSFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get saliencyMapFITSFile option!"<<endl;
+		ERROR_LOG("Failed to get saliencyMapFITSFile option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(bkgMapFITSFile,bkgMapFITSFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get bkgMapFITSFile option!"<<endl;
+		ERROR_LOG("Failed to get bkgMapFITSFile option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(noiseMapFITSFile,noiseMapFITSFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get noiseMapFITSFile option!"<<endl;
+		ERROR_LOG("Failed to get noiseMapFITSFile option!");
 		return -1;
 	}
 	if(GET_OPTION_VALUE(significanceMapFITSFile,significanceMapFITSFile)<0){
-		cerr<<"OpenOutputFile(): ERROR: Failed to get significanceMapFITSFile option!"<<endl;
+		ERROR_LOG("Failed to get significanceMapFITSFile option!");
 		return -1;
 	}
 
 	if(saveToFile){
 		outputFile= new TFile(outputFileName.c_str(),"RECREATE");
 		if(!outputFile || !outputFile->IsOpen()){
-			cerr<<"OpenOutputFile(): ERROR: Failed to open output file!"<<endl;
+			ERROR_LOG("Failed to open output file!");
 			return -1;
 		}
 	}
@@ -727,11 +936,19 @@ int OpenOutputFile(){
 
 int Clear(){
 
+	//Clear input image
 	if(inputImg) inputImg->Delete();
+
+	//Clear bkg data
 	if(bkgData){ 
 		delete bkgData;
 		bkgData= 0;
 	}
+
+	//Delete significance map
+	if(significanceMap) significanceMap->Delete();
+
+	//Delete sources
 	for(unsigned int i=0;i<sources.size();i++){
 		if(sources[i]){
 			delete sources[i];
@@ -739,6 +956,8 @@ int Clear(){
 		}
 	}
 	sources.clear();
+
+	//Delete residual image
 	if(residualImg) residualImg->Delete();
 
 	return 0;
@@ -754,17 +973,26 @@ int Save(){
 			TTree* configTree= ConfigParser::Instance().GetConfigTree();
 			if(configTree) configTree->Write();
 		}
-		if(saveInputMap && inputImg) inputImg->Write();
+		if(saveInputMap && inputImg) {
+			inputImg->SetName("img");
+			inputImg->Write();
+		}
 		if(saveBkgMap && bkgData->BkgMap) {
+			(bkgData->BkgMap)->SetName("img_bkg");
 			(bkgData->BkgMap)->Write();
 		}
 		if(saveNoiseMap && bkgData->NoiseMap) {
+			(bkgData->NoiseMap)->SetName("img_rms");
 			(bkgData->NoiseMap)->Write();
 		}
-		if(saveSignificanceMap && significanceMap) {	
+		if(saveSignificanceMap && significanceMap) {		
+			significanceMap->SetName("img_significance");
 			significanceMap->Write();
 		}
-		if(saveResidualMap && residualImg) residualImg->Write();
+		if(saveResidualMap && residualImg) {
+			residualImg->SetName("img_residual");
+			residualImg->Write();	
+		}
 		outputFile->Close();
 	}
 
