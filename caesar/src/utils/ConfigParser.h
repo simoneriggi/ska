@@ -80,7 +80,7 @@ class ConfigParser : public TObject {
 		/** 
 		\brief Read the config file, parse and set info to be used by other classes
  		*/
-		int Parse(std::string filename);
+		int Parse(std::string filename="");
 		
 		/** 
 		\brief Print registered options
@@ -130,7 +130,7 @@ class ConfigParser : public TObject {
 		
 	private:
 
-		std::string m_ConfigFile;
+		static std::string m_ConfigFile;
 		static bool m_HasRegisteredOptions;
 		
 	ClassDef(ConfigParser,1)

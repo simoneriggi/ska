@@ -110,6 +110,35 @@ struct OptionHelper  {
 
 
 template <>
+struct OptionHelper<std::string> {
+
+	static bool CheckRange(std::string& value,std::string& minValue,std::string& maxValue){
+		return true;
+	}
+	static int SetValueFromStream(std::stringstream& sstream,std::string& value,std::string& minValue,std::string& maxValue) {
+		std::string tmpValue= "";	
+		sstream>>tmpValue;	
+		if(!CheckRange(tmpValue,minValue,maxValue)) return -1;
+		value= tmpValue;
+		return 0;
+	}
+	static int GetJson(Json::Value& root,std::string& name,std::string& value,std::string& defaultValue,std::string& minValue,std::string& maxValue) {
+		root["name"]= name;
+		root["value"]= value;	
+		root["default"]= defaultValue;
+		root["min"]= minValue;
+		root["max"]= maxValue;
+		return 0;
+	}
+	static std::string GetPrintable(std::string& name,std::string& value,std::string& defaultValue,std::string& minValue,std::string& maxValue){
+		std::stringstream ss;
+		ss<<"Option: {\"name\": \""<<name<<"\", \"value\": "<<value<<", \"default\": "<<defaultValue<<", \"min\": "<<minValue<<" \"max\": "<<maxValue<<"}";
+		return ss.str();
+	}
+
+};//close template specialization for string
+
+template <>
 struct OptionHelper<long int> {
 	
 	static bool CheckRange(long int& value,long int& minValue,long int& maxValue){
@@ -714,8 +743,7 @@ class OptionFactory : public TObject {
  		*/
 		OptionBasePtr GetOptionBase(std::string name){
 			OptionMap::iterator it= m_RegisteredOptions.find(name);
-			if ( m_RegisteredOptions.empty() || it==m_RegisteredOptions.end() )
-				return 0;
+			if ( m_RegisteredOptions.empty() || it==m_RegisteredOptions.end() ) return nullptr;
 			return it->second;
 		}
 

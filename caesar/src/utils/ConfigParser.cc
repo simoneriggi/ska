@@ -44,6 +44,7 @@ ClassImp(Caesar::ConfigParser)
 namespace Caesar {
 
 bool ConfigParser::m_HasRegisteredOptions;
+std::string ConfigParser::m_ConfigFile= "";
 
 ConfigParser::ConfigParser() {
 
@@ -59,11 +60,18 @@ ConfigParser::~ConfigParser(){
 int ConfigParser::Parse(std::string filename){
 	
 	//## Check and read file
+	if(filename==""){
+		cerr<<"ConfigParser::Parse(): ERROR: Empty filename string given!"<<endl;
+		return -1;
+	}
+
 	Caesar::FileInfo info;
 	if(!SysUtils::CheckFile(filename,info,false)){
 		cerr<<"ConfigParser::Parse(): ERROR: Invalid config file specified (check if file actually exist)!"<<endl;
 		return -1;
 	}
+
+	//## Open file for reading
 	ifstream in;  
   in.open(filename.c_str());
   if(!in.good()) {
@@ -102,7 +110,7 @@ int ConfigParser::Parse(std::string filename){
 		//Get and set option value
 		std::string optionValue= "";
 		line >> optionValue;
-		//cout<<"optionKey="<<optionKey<<" optionValue="<<optionValue<<endl;
+		
 		if(SetOptionFromString(optionKey,optionValue)<0){
 			cerr<<"ConfigParser::Parse(): WARN: Failed to set option "<<optionKey<<" (unregistered?)...skip it!"<<endl;
 			continue;
@@ -163,6 +171,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//=======================================
 		//==  Distributed processing options   ==
 		//=======================================
+		REGISTER_OPTION(nThreads,int,-1,-1,100);
 		REGISTER_OPTION(tileSizeX,long int,1000,1,10000000);
 		REGISTER_OPTION(tileSizeY,long int,1000,1,10000000);	
 		REGISTER_OPTION(useTileOverlap,bool,false,false,true);

@@ -625,7 +625,7 @@ class StatsUtils : public TObject {
 
 					int thread_id= omp_get_thread_num();
 					int nthreads= SysUtils::GetOMPThreads();
-					INFO_LOG("Starting image moment computing in thread "<<thread_id<<" (nthreads="<<nthreads<<") ...");
+					DEBUG_LOG("Starting image moment computing in thread "<<thread_id<<" (nthreads="<<nthreads<<") ...");
 			
 					//Init moments
 					minVal_t= std::numeric_limits<T>::max();
@@ -658,7 +658,7 @@ class StatsUtils : public TObject {
   					M2_t+= f;
 					}//end loop vector
 
-					INFO_LOG("Thread id="<<omp_get_thread_num()<<": N="<<N_t<<", M1="<<M1_t<<", M2="<<M2_t<<", M3="<<M3_t<<", M4="<<M4_t);
+					DEBUG_LOG("Thread id="<<omp_get_thread_num()<<": N="<<N_t<<", M1="<<M1_t<<", M2="<<M2_t<<", M3="<<M3_t<<", M4="<<M4_t);
 
 					//Fill moments for this thread
 					moments_parallel[thread_id].N= N_t;
