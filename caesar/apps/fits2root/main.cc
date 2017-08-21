@@ -18,6 +18,8 @@
 #include <FITSReader.h>
 #include <SysUtils.h>
 #include <Img.h>
+#include <Image.h>
+#include <Logger.h>
 
 #include <TFITS.h>
 #include <TColor.h>
@@ -62,15 +64,13 @@
 #include <ctime>
 #include <vector>
 #include <stdexcept>
-
+#include <chrono>
 #include <vector>
 
 #include <getopt.h>
 
 using namespace std;
-
-std::string FullFileName;
-TStyle* myStyle;
+using namespace Caesar;
 
 void Usage(char* exeName){
 	cout<<"=========== USAGE ==========="<<endl;
@@ -85,6 +85,7 @@ void Usage(char* exeName){
 	cout<<"-Y, --ymax \t Maximum y pixel id to be read"<<endl;
 	cout<<"-o, --output \t Output file name (ROOT format)"<<endl;
 	cout<<"-I, --imgname \t Image name in input ROOT file (if non standard)"<<endl;
+	cout<<"-v, --verbosity \t Log level (<=0=OFF, 1=FATAL, 2=ERROR, 3=WARN, 4=INFO, >=5=DEBUG)"<<endl;
 	cout<<"=============================="<<endl;
 }//close Usage()
 
@@ -98,14 +99,119 @@ static const struct option options_tab[] = {
 	{ "ymax", optional_argument, 0, 'Y' },
 	{ "imgname", optional_argument, 0, 'I' },
 	{ "output", optional_argument, 0, 'o' },
+	{ "verbosity", required_argument, 0, 'v'},
   {(char*)0, (int)0, (int*)0, (int)0}
 };
 
-void SetGraphicsStyle();
+
+//Options
+std::string inputFileName= "";
+std::string outputFileName= "";
+bool readFullImage= true;
+bool useDefaultOutput= true;
+int minx= -1;
+int maxx= -1;
+int miny= -1;
+int maxy= -1;
+std::string imageName= "img";
+int verbosity;
+
+//Variables
+Caesar::FileInfo info;
+Image* inputImg= 0;
+//Img* inputImg= 0;
+TFile* outputFile;
+
+//Functions
+int ParseOptions(int argc, char *argv[]);
+std::string GetStringLogLevel(int verbosity);
+int OpenOutputFile();
+void Clear();
+int ReadImage();
+void Save();
 
 
 int main(int argc, char **argv){
 
+	auto t0 = chrono::steady_clock::now();
+	
+	//================================
+	//== Parse command line options
+	//================================
+	auto t0_parse = chrono::steady_clock::now();
+	if(ParseOptions(argc,argv)<0){
+		ERROR_LOG("Failed to parse command line options!");
+		Clear();
+		return -1;
+	}
+	auto t1_parse = chrono::steady_clock::now();
+	double dt_parse= chrono::duration <double, milli> (t1_parse-t0_parse).count();
+		
+	//=======================
+	//== Open out file
+	//=======================
+	auto t0_outfile = chrono::steady_clock::now();
+	if(OpenOutputFile()<0){
+		ERROR_LOG("Failed to open output file!");
+		Clear();
+		return -1;	
+	}
+	auto t1_outfile = chrono::steady_clock::now();
+	double dt_outfile= chrono::duration <double, milli> (t1_outfile-t0_outfile).count();
+
+	//=======================
+	//== Read image
+	//=======================
+	auto t0_read = chrono::steady_clock::now();
+	if(ReadImage()<0){
+		ERROR_LOG("Failed to read image from file!");		
+		Clear();
+		return -1;
+	}
+	auto t1_read = chrono::steady_clock::now();
+	double dt_read= chrono::duration <double, milli> (t1_read-t0_read).count();
+
+	//=======================
+	//== Save to file
+	//=======================
+	auto t0_save = chrono::steady_clock::now();	
+	Save();
+	auto t1_save = chrono::steady_clock::now();
+	double dt_save= chrono::duration <double, milli> (t1_save-t0_save).count();
+
+	//=======================
+	//== Clear data
+	//=======================
+	Clear();
+
+	//=======================
+	//== Print perf stats
+	//=======================
+	auto t1 = chrono::steady_clock::now();
+	double dt= chrono::duration <double, milli> (t1-t0).count();
+
+	INFO_LOG("===========================");
+	INFO_LOG("===   PERFORMANCE INFO  ===");
+	INFO_LOG("===========================");
+	INFO_LOG("dt(ms)= "<<dt);
+	INFO_LOG("dt_parse(ms)= "<<dt_parse<<" ["<<dt_parse/dt*100.<<"%]");
+	INFO_LOG("dt_outfile(ms)= "<<dt_outfile<<" ["<<dt_outfile/dt*100.<<"%]");
+	INFO_LOG("dt_read(ms)= "<<dt_read<<" ["<<dt_read/dt*100.<<"%]");
+	INFO_LOG("dt_save(ms)= "<<dt_save<<" ["<<dt_save/dt*100.<<"%]");
+	INFO_LOG("===========================");
+	
+	
+	INFO_LOG("End FITS2ROOT application");
+
+
+	return 0; 
+
+}//close macro
+
+
+int ParseOptions(int argc, char *argv[])
+{
+	//## Check args given
 	if(argc<2){
 		cerr<<"ERROR: Invalid number of arguments...see macro usage!"<<endl;
 		Usage(argv[0]);
@@ -115,17 +221,9 @@ int main(int argc, char **argv){
 	//## Get command args
 	int c = 0;
   int option_index = 0;
-	std::string inputFileName= "";
-	std::string outputFileName= "";
-	bool readFullImage= true;
-	bool useDefaultOutput= true;
-	int minx= -1;
-	int maxx= -1;
-	int miny= -1;
-	int maxy= -1;
-	std::string imageName= "img";
 	
-	while((c = getopt_long(argc, argv, "hi:x::X::y::Y::o::I::",options_tab, &option_index)) != -1) {
+	
+	while((c = getopt_long(argc, argv, "hi:x::X::y::Y::o::I::v:",options_tab, &option_index)) != -1) {
     
     switch (c) {
 			case 0 : 
@@ -177,6 +275,11 @@ int main(int argc, char **argv){
 				imageName= std::string(optarg);	
 				break;	
 			}
+			case 'v':	
+			{
+				verbosity= atoi(optarg);	
+				break;	
+			}
     	default:
 			{
       	Usage(argv[0]);	
@@ -185,191 +288,118 @@ int main(int argc, char **argv){
     }//close switch
 	}//close while
 
+	//## Set logging level
+	std::string sloglevel= GetStringLogLevel(verbosity);
+	LoggerManager::Instance().CreateConsoleLogger(sloglevel,"logger","System.out");
+
 	//## Check coords range in case 
 	if(!readFullImage) {
 		if(minx>=maxx || miny>=maxy){
-			cerr<<"ERROR: Invalid coord range selected (x["<<minx<<","<<maxx<<"] y["<<miny<<","<<maxy<<"])"<<endl;
-			exit(1);
+			ERROR_LOG("Invalid coord range selected (x["<<minx<<","<<maxx<<"] y["<<miny<<","<<maxy<<"])");
+			return -1;
 		}
 	}
 
 	//## Check given input file and get info
-	cout<<"INFO: Check input file name "<<inputFileName<<" ..."<<endl;
-	Caesar::FileInfo info;
+	INFO_LOG("Check input file name "<<inputFileName<<" ...");
 	if(!Caesar::SysUtils::CheckFile(inputFileName,info,true,".fits")){
-		cerr<<"ERROR: Invalid input file ("<<inputFileName<<") specified!"<<endl;
-		exit(1);
+		ERROR_LOG("Invalid input file ("<<inputFileName<<") specified!");
+		return -1;
 	}
+
 	if(useDefaultOutput){
 		std::string basefilename_wext= info.filename_wext;
 		outputFileName= basefilename_wext + std::string(".root");
 	}
-	
+
 	//## Print options
-	cout<<"*******************************"<<endl;
-	cout<<"input file: "<<inputFileName<<endl;
-	if(!readFullImage) cout<<"x["<<minx<<","<<maxx<<"] y["<<miny<<","<<maxy<<"]"<<endl;
-	cout<<"image name: "<<imageName<<endl;
-	cout<<"output file: "<<outputFileName<<endl;
-	cout<<"*******************************"<<endl;
-	
-	
+	INFO_LOG("========= OPTIONS ============");
+	INFO_LOG("input file: "<<inputFileName);
+	if(!readFullImage) INFO_LOG("x["<<minx<<","<<maxx<<"] y["<<miny<<","<<maxy<<"]");
+	INFO_LOG("image name: "<<imageName);
+	INFO_LOG("output file: "<<outputFileName);
+	INFO_LOG("===============================");
 	
 
-	//## Run program
-	Caesar::Img* image= 0;
-	TFile* OutputFile= 0;
-
-	try{
-		// Set graphics style
-		SetGraphicsStyle();
-
-		//Create output file
-		OutputFile= new TFile(outputFileName.c_str(),"RECREATE");	
-		OutputFile->cd();
-
-		// Read image
-		cout<<"INFO: Reading image from file..."<<endl;
-		
-		image= new Caesar::Img; 
-		image->SetNameTitle(imageName.c_str(),imageName.c_str());
-
-		int status= 0;
-		if(readFullImage){
-			status= image->ReadFITS(inputFileName);
-		}
-		else {
-			status= image->ReadFITS(inputFileName,minx,maxx,miny,maxy);
-		}
-		
-		if(status<0){
-			cerr<<"ERROR: Failed to read image from FITS file!"<<endl;
-			if(image) image->Delete();
-			if(OutputFile && OutputFile->IsOpen()) OutputFile->Close();
-			return -1;
-		}
-
-		int nX= image->GetNbinsX();
-		int nY= image->GetNbinsY();
-		cout<<"INFO: image info: nX="<<nX<<" nY="<<nY<<endl;
-		
+	return 0;
 	
+}//close ParseOptions()
 
-		cout<<"INFO: Writing to file..."<<endl;
-		if(OutputFile && OutputFile->IsOpen()){
-			if(image) image->Write();
-			OutputFile->Close();
-		}
+std::string GetStringLogLevel(int verbosity){
 
-	}//close try block
-	catch(std::exception const & e) {
-		cerr << "ERROR: Image read failed with status "<<e.what()<<endl;
-		if(image) image->Delete();
-		if(OutputFile && OutputFile->IsOpen()) OutputFile->Close();
+	std::string slevel= "";
+	if(verbosity<=0) slevel= "FATAL";
+	else if(verbosity==1) slevel= "FATAL";
+	else if(verbosity==2) slevel= "ERROR";
+	else if(verbosity==3) slevel= "WARN";
+	else if(verbosity==4) slevel= "INFO";
+	else if(verbosity>5) slevel= "DEBUG";
+	else slevel= "OFF";
+
+	return slevel;
+
+}//close GetStringLogLevel()
+
+
+int OpenOutputFile(){
+
+	//Find output file name
+	if(useDefaultOutput){
+		std::string basefilename_wext= info.filename_wext;
+		outputFileName= basefilename_wext + std::string(".root");
+	}
+
+	//Open output file
+	outputFile= new TFile(outputFileName.c_str(),"RECREATE");	
+	
+	return 0;
+
+}//close OpenOutputFile()
+
+
+int ReadImage(){
+
+	//## Create image
+	//inputImg= new Caesar::Img; 
+	inputImg= new Caesar::Image; 
+	
+	//## Create image
+	int status= 0;
+	if(readFullImage) status= inputImg->ReadFITS(inputFileName);
+	else status= inputImg->ReadFITS(inputFileName,minx,maxx,miny,maxy);
+	
+	if(status<0){
+		ERROR_LOG("Failed to read image from FITS file!");
 		return -1;
 	}
 
-	return 0; 
+	return 0;
 
-}//close macro
+}//close ReadImage()
 
 
-void SetGraphicsStyle(){
-
-	myStyle= new TStyle("myStyle","myStyle");
-	myStyle->SetCanvasDefH(700); 
-  myStyle->SetCanvasDefW(700); 
-
-	myStyle->SetFrameBorderMode(0);
-	myStyle->SetCanvasBorderMode(0);
-  myStyle->SetPadBorderMode(0);
-  myStyle->SetPadColor(0);
-  myStyle->SetCanvasColor(0);
-  myStyle->SetTitleFillColor(0);
-  myStyle->SetTitleBorderSize(1);
-  myStyle->SetStatColor(0);
-  myStyle->SetStatBorderSize(1);
-  myStyle->SetOptTitle(0);
-  myStyle->SetOptStat(0);
-  myStyle->SetOptFit(1);
-	myStyle->SetOptLogx(0);
-	myStyle->SetOptLogy(0);
-  //myStyle->SetPalette(1,0);
-  myStyle->SetTitleBorderSize(0);//border size of Title PavelLabel
-  myStyle->SetTitleX(0.1f);
-	myStyle->SetTitleW(0.8f);
-  myStyle->SetStatY(0.975);                
-  myStyle->SetStatX(0.95);                
-  myStyle->SetStatW(0.2);                
-  myStyle->SetStatH(0.15);                
-  myStyle->SetTitleXOffset(0.8);
-  myStyle->SetTitleYOffset(1.1);
-  myStyle->SetMarkerStyle(8);
-  myStyle->SetMarkerSize(0.4);
-  myStyle->SetFuncWidth(1.);
-  myStyle->SetPadTopMargin(0.1);
-  myStyle->SetPadBottomMargin(0.12);
-  myStyle->SetPadLeftMargin(0.15);
-  myStyle->SetPadRightMargin(0.15);
-  myStyle->SetTitleSize(0.06,"X");
-  myStyle->SetTitleSize(0.06,"Y");
-  myStyle->SetTitleSize(0.06,"Z");
-  myStyle->SetTitleFont(52,"X");
-  myStyle->SetTitleFont(52,"Y");
-  myStyle->SetTitleFont(52,"Z");
-  myStyle->SetLabelFont(42,"X");
-  myStyle->SetLabelFont(42,"Y");
-  myStyle->SetLabelFont(42,"Z");
-
-  myStyle->SetErrorX(0.);
+void Save(){
 	
-	gROOT->SetStyle("myStyle");
-
-	/*
-	const int ncolors= 2000;	
-	const int Number= 12;
-	int myTemperaturePalette[ncolors];
-  double r[]    = {0.164, 0.150, 0.250, 0.450, 0.670, 0.880, 1.000, 1.000,1.000,0.970,0.850,0.650};
-  double g[]    = {0.043, 0.306, 0.630, 0.853, 0.973, 1.000,1.000,0.880,0.679,0.430,0.150,0.000};
-  double b[]    = {0.850,1.000,1.000,1.000,1.000,1.000,0.750,0.600,0.450,0.370,0.196,0.130};
-  double stop[] = {0.,0.2,0.3,0.4,0.5,0.7,0.75,0.8,0.85,0.9,0.95,1};
-  int FI = TColor::CreateGradientColorTable(Number, stop, r, g, b, ncolors);
-  for (int i=0;i<ncolors;i++) {
-		myTemperaturePalette[i] = FI+i;
+	//Save image to ROOT file
+	if(outputFile && outputFile->IsOpen()){
+		outputFile->cd();
+		if(inputImg) {
+			inputImg->SetName(imageName);
+			inputImg->Write();
+		}
+		outputFile->Close();
 	}
-	*/
 
-	/*
-  int HotToColdPalette[ncolors];
-  double r_HotToCold[Number];
-  double g_HotToCold[Number];
-  double b_HotToCold[Number];
-  //double stop_HotToCold[] = {0.,0.05,0.1,0.15,0.2,0.25,0.3,0.5,0.6,0.7,0.8,1};
-	double stop_HotToCold[] = {0.,0.05,0.1,0.15,0.2,0.3,0.4,0.5,0.6,0.7,0.8,1};
+}//close Save()
 
-  for (int i=0;i<Number;i++) {
-   r_HotToCold[i]= r[Number-i-1];
-   g_HotToCold[i]= g[Number-i-1];
-   b_HotToCold[i]= b[Number-i-1];
-  }
-  int FI_HotToCold = TColor::CreateGradientColorTable(Number, stop_HotToCold, r_HotToCold, g_HotToCold, b_HotToCold, ncolors);
-  for (int i=0;i<ncolors;i++) {
-  	HotToColdPalette[i] = FI_HotToCold + i;
-  }
-	*/
+void Clear(){
 
+	//Clear input image
+	if(inputImg) inputImg->Delete();
 
-	gStyle->SetNumberContours(999);
-	//gStyle->SetPalette(ncolors,myTemperaturePalette);
-
-	//gStyle->SetPalette(53);//Black Body
-	//gStyle->SetPalette(52);//Black & White
-	gStyle->SetPalette(55);//Rainbow
-
-
-}//close SetGraphicsStyle()
-
-
-
+	//Close output file if open			
+	if(outputFile && outputFile->IsOpen()) outputFile->Close();
+	
+}//close Clear()
 
 
