@@ -233,7 +233,7 @@ void Blob::ResetStats(){
 
 void Blob::ClearPixels(){
 
-	for(unsigned int i=0;i<m_Pixels.size();i++){
+	for(size_t i=0;i<m_Pixels.size();i++){
 		if(m_Pixels[i]){
 			delete m_Pixels[i];
 			m_Pixels[i]= 0;
@@ -246,7 +246,7 @@ void Blob::ClearPixels(){
 
 void Blob::ClearContours(){
 
-	for(unsigned int i=0;i<m_Contours.size();i++){
+	for(size_t i=0;i<m_Contours.size();i++){
 		if(m_Contours[i]){
 			delete m_Contours[i];
 			m_Contours[i]= 0;

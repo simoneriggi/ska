@@ -43,6 +43,7 @@
 namespace Caesar{
 
 class Img;
+class Image;
 
 class ChanVeseSegmenter : public TObject {
 
@@ -92,6 +93,17 @@ class ChanVeseSegmenter : public TObject {
 
 	public:
 		
+		//===============================================
+		//==          NEW IMAGE METHODS
+		//===============================================
+		/**
+		* \brief Find the ChanVese segmentation of input image
+		*/
+		static Image* FindSegmentation(Image* img,bool returnContourImg=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1,double initContourRadius=1);
+
+		//===============================================
+		//==          OLD IMAGE METHODS
+		//===============================================
 		/**
 		* \brief Find the ChanVese segmentation of input image
 		*/
@@ -99,16 +111,40 @@ class ChanVeseSegmenter : public TObject {
 		
 
 	private:
-		// Initialize algorithm
+
+		//===============================================
+		//==          NEW IMAGE METHODS
+		//===============================================		
+		/**
+		* \brief Initialize algorithm
+		*/
+		static CVdata* Init(Image* img,double initContourRadius=1);
+
+		//===============================================
+		//==          OLD IMAGE METHODS
+		//===============================================
+		/**
+		* \brief Initialize algorithm
+		*/
 		static CVdata* Init(Img* img,double initContourRadius=1);
 
-		// Main segmentation algorithm
+
+		//===============================================
+		//==          CHAN-VESE INTERNAL METHODS
+		//===============================================
+		/**
+		* \brief Main segmentation algorithm
+		*/
 		static void CVSegmentation(TMatrixD* img,TMatrixD* phi0,TMatrixD** phi,struct CVsetup* pCVinputs);
     
-		// Compute gray level averages in foreground and background regions defined by level set function phi
+		/**
+		* \brief Compute gray level averages in foreground and background regions defined by level set function phi
+		*/
 		static void GetRegionAverages(TMatrixD* img, TMatrixD* phi,double epsilon,double &c1,double &c2);
 
-		// Compute coefficients needed in Chan-Vese segmentation algorithm given current level set function
+		/**
+		* \brief Compute coefficients needed in Chan-Vese segmentation algorithm given current level set function
+		*/
 		static void GetChanVeseCoefficients(TMatrixD* phi,struct CVsetup* pCVinputs,
 														 unsigned int i,
 														 unsigned int j,
@@ -120,10 +156,13 @@ class ChanVeseSegmenter : public TObject {
                              double& F,
                              double& deltaPhi);
                              
-                             
-		// Reinitialize a function to the signed distance function to its zero contour
+    /**
+		* \brief Reinitialize a function to the signed distance function to its zero contour
+		*/                         
 		static void ReinitPhi(TMatrixD* phiIn,TMatrixD** psiOut,double dt,double h,unsigned int numIts);
-
+		/**
+		* \brief Compute zero crossings
+		*/ 
 		static void ZeroCrossings(TMatrixD* imageIn,TMatrixD** edges,double fg,double bg);
 
 	

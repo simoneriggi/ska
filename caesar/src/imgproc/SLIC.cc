@@ -77,18 +77,18 @@ int SLIC::Init(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edge
 	slicData->Clear();
 	
 	//## Compute image stats
-	DEBUG_LOG("Computing image stats...");
 	if(!img->HasStats()){
+		INFO_LOG("Input image has no stats computed, computing them...");
 		if(img->ComputeStats(true,false,true)<0) {
-			cerr<<"SLIC::Init(): ERROR: Failed to compute input image stats!"<<endl;
+			ERROR_LOG("Failed to compute input image stats!");
 			return -1;
 		}
 	}
 	
 	//## Compute and set input image for SLIC generation (normalized to range [1-256])
-	DEBUG_LOG("Computing norm image...");
 	double normmin= 1;
 	double normmax= 256;
+	INFO_LOG("Normalize input image in range ["<<normmin<<","<<normmax<<"...");
 	if(useLogScaleMapping) {
 		slicData->inputImage= img->GetNormalizedImage("LOG",normmin,normmax,true);
 	}
@@ -100,8 +100,9 @@ int SLIC::Init(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edge
 		return -1;
 	}
 
-	DEBUG_LOG("Computing norm image stats...");
-	if(!((slicData->inputImage)->HasStats())){
+	
+	if(!((slicData->inputImage)->HasStats())){	
+		INFO_LOG("Computing norm image stats...");
 		if((slicData->inputImage)->ComputeStats(true,false,false)<0) {
 			ERROR_LOG("Failed to compute norm image stats!");
 			return -1;
@@ -110,13 +111,14 @@ int SLIC::Init(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edge
 	
 
 	//## Compute and set laplacian image
-	DEBUG_LOG("Computing laplacian image...");
+	INFO_LOG("Computing laplacian image...");
 	slicData->laplImage= img->GetLaplacianImage(true);
 	if(!slicData->laplImage){
 		ERROR_LOG("Failed to compute lapl image!");
 		return -1;
 	}
 	if(!((slicData->laplImage)->HasStats())){
+		INFO_LOG("Laplacian image has no stats computed, computing them...");
 		if((slicData->laplImage)->ComputeStats(true,false,false)<0) {
 			ERROR_LOG("Failed to compute lapl image stats!");
 			return -1;
@@ -159,6 +161,7 @@ int SLIC::Init(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edge
 	if(edgeImage){
 		slicData->edgeImage= edgeImage;
 		if(!(slicData->edgeImage)->HasStats()){
+			INFO_LOG("Edge image has no stats computed, computing them...");
 			if((slicData->edgeImage)->ComputeStats(true,false,false)<0) {
 				ERROR_LOG("Failed to compute edge image stats!");
 				return -1;
@@ -173,7 +176,7 @@ int SLIC::Init(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edge
 
 	for(long int i=0;i<img->GetNx();i++){
 		(slicData->labels).push_back( std::vector<long int>() );
-		for(long int j=0;i<img->GetNy();j++){
+		for(long int j=0;j<img->GetNy();j++){
 			(slicData->labels)[i].push_back(0);
 		}//end loop bins Y
 	}//end loop bins X
@@ -198,7 +201,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
 	}
 
 	//## Initialize SLIC storage data
-	DEBUG_LOG("Initialize SLIC storage data...");
+	INFO_LOG("Initialize SLIC storage data...");
 	SLICData* slicData= new SLICData;
 	if(Init(slicData,img,useLogScaleMapping,edgeImage)<0){
 		ERROR_LOG("Initialization failed!");
@@ -208,6 +211,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
 	}
 
 	//## Init SLIC algo data
+	INFO_LOG("Allocating SLIC algo data...");
 	Image* normImg= slicData->inputImage;
 	const unsigned long long maxNumIterations = 100;
 	const long long numRegionsX = (unsigned long long) ceil( (double)Nx/regionSize) ;
@@ -245,7 +249,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
 	}
 
 	//## Compute edge map (gradient strength)
-	DEBUG_LOG("Compute edge map (gradient strength)...");
+	INFO_LOG("Compute edge map (gradient strength)...");
 	for (long long j=1;j<Ny-1;++j) {
 		long int iy= j;
   	for (long long i=1;i<Nx-1;++i) {
@@ -261,7 +265,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
   
 	//## Initialize K-means centers
   long long i = 0;
-	DEBUG_LOG("Initializing K-means centers...");
+	INFO_LOG("Initializing K-means centers...");
  
   for (long long v=0; v<(signed)numRegionsY; ++v) {
     for (long long u=0; u<(signed)numRegionsX; ++u) {
@@ -289,13 +293,13 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
       // Initialize the new center at this location
       centers[i++] = (float) centerx ;
       centers[i++] = (float) centery ;
-      centers[i++] = normImg->GetBinContent(centerx+1,centery+1);
+      centers[i++] = normImg->GetBinContent(centerx,centery);
     }//end loop X
   }//end loop Y
 
 
 	//## Run k-means iterations
-	DEBUG_LOG("Running "<<maxNumIterations<<" iterations...");
+	INFO_LOG("Running "<<maxNumIterations<<" iterations...");
  	double previousEnergy = std::numeric_limits<double>::infinity();
   double startingEnergy= 0;
 
@@ -316,7 +320,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
             double centerx = centers[3*region + 0];
             double centery = centers[3*region + 1];
 						double centerz = centers[3*region + 2];
-						float z = normImg->GetBinContent(x+1,y+1);
+						float z = normImg->GetBinContent(x,y);
 
             double spatial = (x - centerx) * (x - centerx) + (y - centery) * (y - centery);
             double appearance = (z - centerz) * (z - centerz);
@@ -372,7 +376,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
   free(edgeMap);
 
 	//## Eliminate small regions
-  DEBUG_LOG("Eliminating small regions...");
+  INFO_LOG("Eliminating small regions...");
   unsigned int* cleaned = (unsigned int*)calloc(numPixels, sizeof(unsigned int));
   unsigned long long* segment = (unsigned long long*)malloc(sizeof(unsigned long long) * numPixels);
 	if(!cleaned || !segment){	
@@ -446,7 +450,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
 	
 	//## Fill segmentation labels and compute stats/contours/...
 	// Allocate regions
-	DEBUG_LOG("Allocating region list...");
+	INFO_LOG("Allocating region list...");
 	ImgStats* imgStats= img->GetPixelStats();	
 	ImgStats* edgeImgStats= 0;
 	if(slicData->edgeImage) edgeImgStats= (slicData->edgeImage)->GetPixelStats();
@@ -471,7 +475,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
 	
 	
 	//Fill regions
-	DEBUG_LOG("Filling regions...");
+	INFO_LOG("Filling regions...");
 	Pixel* aPixel= 0;
 	for (int ix=0; ix<Nx; ix++) {
 		//double binX= img->GetXaxis()->GetBinCenter(ix+1);
@@ -493,7 +497,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
 			(slicData->labels)[ix][iy]= pixelLabel; 
 
 			if(pixelLabel<0 || pixelLabel>=(signed)numRegions){
-				cout<<"SLIC::SPGenerator(): WARNING: Skip this pixel label: "<<pixelLabel<<endl;
+				WARN_LOG("Skip this pixel label: "<<pixelLabel);
 				continue;
 			}
 
@@ -518,7 +522,7 @@ SLICData* SLIC::SPGenerator(Image* img,int regionSize,double regParam, int minRe
 	
 
 	//## Remove regions without pixels (important in case of empty image zones)
-	DEBUG_LOG("Removing regions without pixels...");
+	INFO_LOG("Removing regions without pixels...");
 	std::vector<int> regionsToBeDeleted;
 	std::map<int,int> goodRegionIdMap;
 	for(unsigned int k=0;k<(slicData->regions).size();k++) {	
@@ -670,7 +674,7 @@ int SLIC::Init(SLICData* slicData,Img* img,bool useLogScaleMapping,Img* edgeImg)
 
 	for(int i=0;i<img->GetNbinsX();i++){
 		(slicData->labels).push_back( std::vector<long int>() );
-		for(int j=0;i<img->GetNbinsY();j++){
+		for(int j=0;j<img->GetNbinsY();j++){
 			(slicData->labels)[i].push_back(0);
 		}//end loop bins Y
 	}//end loop bins X

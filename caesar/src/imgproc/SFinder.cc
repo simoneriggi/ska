@@ -593,7 +593,7 @@ int SFinder::FindExtendedSources_HClust(Image*){
 
 int SFinder::FindExtendedSources_ChanVese(Image* inputImg){
 
-	/*
+	//## Check input image
 	if(!inputImg){
 		ERROR_LOG("Null ptr to input image given!");
 		return -1;
@@ -601,7 +601,12 @@ int SFinder::FindExtendedSources_ChanVese(Image* inputImg){
 
 	//## Perform segmentation
 	std::vector<Source*> sources;
-	int status= inputImg->FindExtendedSource_CV(sources,m_ResidualBkgData,m_NMinPix,m_SearchNegativeExcess,m_cvTimeStepPar,m_cvWindowSizePar,m_cvLambda1Par,m_cvLambda2Par,m_cvMuPar,m_cvNuPar,m_cvPPar);
+	int status= inputImg->FindExtendedSource_CV(
+		sources,
+		m_ResidualBkgData, m_NMinPix, m_SearchNegativeExcess,
+		m_cvTimeStepPar,m_cvWindowSizePar,m_cvLambda1Par,m_cvLambda2Par,m_cvMuPar,m_cvNuPar,m_cvPPar
+	);
+
 	if(status<0){
 		ERROR_LOG("ChanVese Segmentation failed!");
 		return -1;
@@ -609,8 +614,7 @@ int SFinder::FindExtendedSources_ChanVese(Image* inputImg){
 
 	//## Add sources to extended sources
 	m_ExtendedSources.insert(m_ExtendedSources.end(),sources.begin(),sources.end());		
-	m_SourceCollection.insert(m_SourceCollection.end(),sources.begin(),sources.end());		
-	*/
+	m_SourceCollection.insert(m_SourceCollection.end(),sources.begin(),sources.end());
 
 	return 0;
 
@@ -618,17 +622,16 @@ int SFinder::FindExtendedSources_ChanVese(Image* inputImg){
 
 int SFinder::FindExtendedSources_WT(Image* inputImg){
 
-	/*
+	//## Check input image
 	if(!inputImg){
 		ERROR_LOG("Null ptr to input image given!");
 		return -1;
 	}
 	
-	//## Find extended sources in the W3, W5 scales of the residual image where ONLY POINT-LIKE SOURCES are removed
+	//## Find extended sources in the scales of the residual image (with POINT-LIKE SOURCES removed)
 	INFO_LOG("Find extended sources in the residual image WT-"<<m_wtScaleExtended<<"  scale ...");
-	std::vector<Img*> wt_extended= inputImg->GetWaveletDecomposition(m_wtScaleExtended);
+	std::vector<Image*> wt_extended= inputImg->GetWaveletDecomposition(m_wtScaleExtended);
 	
-
 	std::vector<Source*> sources;
 	int status= FindSources(sources,wt_extended[m_wtScaleExtended],m_SeedThr,m_MergeThr);
 	if(status<0){
@@ -652,7 +655,6 @@ int SFinder::FindExtendedSources_WT(Image* inputImg){
 	for(unsigned int i=0;i<wt_extended.size();i++){
 		if(wt_extended[i]) wt_extended[i]->Delete();
 	}
-	*/
 
 	return 0;
 
