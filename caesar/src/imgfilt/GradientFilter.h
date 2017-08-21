@@ -80,7 +80,7 @@ class GradientFilter : public TObject {
 		/**
 		* \brief Apply a gradient filter to image and return filtered image
 		*/	
-		//static Image* GetGradientFilter(Image* image);
+		static Image* GetGradientFilter(Image* image);
 	
 		/**
 		* \brief Apply a laplacian filter to image and return filtered image

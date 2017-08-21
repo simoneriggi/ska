@@ -41,6 +41,7 @@ namespace cv {
 namespace Caesar{
 
 class Img;
+class Image;
 
 class LoGFilter : public TObject {
 
@@ -58,13 +59,31 @@ class LoGFilter : public TObject {
 
 	public:
 	
+
+		//===================================
+		//==        NEW IMAGE METHODS
+		//===================================
+		static Image* GetLoGFilter(Image* image);
+		static Image* GetNormLoGFilter(Image* image,int size,double scale);
+
+		//===================================
+		//==        OLD IMAGE METHODS
+		//===================================
 		static Img* GetLoGFilter(Img* image);
 		static Img* GetNormLoGFilter(Img* image,int size,double scale);
 
 	private:
-
+		/**
+		* \brief Build standard filter kernel
+		*/
 		static cv::Mat BuildStandardKernel();
+		/**
+		* \brief Build filter kernel
+		*/
 		static cv::Mat BuildKernel(int kernSize,double scale);
+		/**
+		* \brief Normalized LoG kernel definition
+		*/
 		static double NormLoGKernel(double x,double y,double sigma);
 
 	private:

@@ -71,6 +71,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,i
 	//## Normalize image
 	double NormMin= 1;
 	double NormMax= 256;
+	INFO_LOG("Normalize image to range ["<<NormMin<<","<<NormMax<<"]");
 	Image* img_norm= img->GetNormalizedImage("LINEAR",NormMin,NormMax);
 	if(!img_norm){
 		ERROR_LOG("Failed to normalize input image!");
@@ -78,6 +79,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,i
 	}
 
 	//## Compute segmentation in superpixels
+	INFO_LOG("Generate superpixel partition @ reso="<<reso<<" (beta="<<regFactor<<", minRegionSize="<<minRegionSize<<")...");
 	bool useLogScaleMapping= false;
 	SLICData* slicData= SLIC::SPGenerator(img_norm,reso,regFactor,minRegionSize,useLogScaleMapping,0);	//pass null edgeImg (not needed here)
 	if(!slicData){
@@ -86,6 +88,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,i
 	}
 
 	//Get results
+	INFO_LOG("Getting access to generated superpixel list...");
 	std::vector<Region*> regions= (slicData->regions);
 	if(regions.empty()) {
 		ERROR_LOG("Superpixel segmentation returned no regions!");
@@ -94,7 +97,8 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,i
 		return 0;
 	}
 
-	//## Compute saliency map
+	//## Compute saliency map		
+	INFO_LOG("Compute saliency map @ reso="<<reso<<" (knnFactor="<<knnFactor<<", useRobust="<<useRobust<<", expFalloffPar="<<expFalloffPar<<", distanceRegPar="<<distanceRegPar<<")...");
 	Image* saliencyMap= ComputeSaliencyMap(img_norm,regions,knnFactor,useRobust,expFalloffPar,distanceRegPar);
 	if(!saliencyMap){
 		ERROR_LOG("Failed to compute saliency map!");
@@ -104,6 +108,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,i
 	}
 
 	//## Clear memory
+	INFO_LOG("Clear allocated memory for saliency computation @ reso "<<reso);
 	img_norm->Delete();
 	delete slicData;
 	slicData= 0;
@@ -138,7 +143,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 	double diagonal= sqrt(width*width + height*height);
 
 	//## Compute region stats pars
-	DEBUG_LOG("Compute region pars...");
+	INFO_LOG("Compute region pars (#"<<nRegions<<" present) ...");
 	for(size_t i=0;i<nRegions;i++) {
 		if(!regions[i]->HasStats()) regions[i]->ComputeStats(true,false);
 	}
@@ -193,7 +198,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 	//## Normalize distances to [0,1]
 	//## Color distances normalized to min & max
 	//## Spatial distances normalized to image diagonal
-	DEBUG_LOG("Color dist min/max: "<<dist_c_min<<"/"<<dist_c_max<<", Spatial dist min/max: "<<dist_s_min<<"/"<<dist_s_max<<" img size("<<width<<" x "<<height<<" (diagonal="<<diagonal<<")");
+	INFO_LOG("Color dist min/max: "<<dist_c_min<<"/"<<dist_c_max<<", Spatial dist min/max: "<<dist_s_min<<"/"<<dist_s_max<<" img size("<<width<<" x "<<height<<" (diagonal="<<diagonal<<")");
 	
 	double NormMin= 0;
 	double NormMax= 1;
@@ -215,7 +220,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 		}//end loop regions
 	}//end loop regions
 	
-	DEBUG_LOG("Color dist min/max: "<<ColorDistMatrix->Min()<<"/"<<ColorDistMatrix->Max()<<", Spatial dist min/max: "<<SpatialDistMatrix->Min()<<"/"<<SpatialDistMatrix->Max());
+	INFO_LOG("Color dist min/max: "<<ColorDistMatrix->Min()<<"/"<<ColorDistMatrix->Max()<<", Spatial dist min/max: "<<SpatialDistMatrix->Min()<<"/"<<SpatialDistMatrix->Max());
 
 	//## Create saliency image
 	TString imgName= Form("%s_saliency",img->GetName().c_str());
@@ -224,7 +229,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 	saliencyImg->Reset();
 
 	//## Compute saliency 
-	DEBUG_LOG("Computing saliency ...");
+	INFO_LOG("Computing saliency map ...");
 	double Smin= 1.e+99;
 	double Smax= -1.e+99;
 	std::vector<double> SList;
@@ -301,13 +306,13 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 
 	//## Check input img
 	if(!img){
-		cerr<<"SaliencyFilter::ComputeMultiResoSaliencyMap(): ERROR: Null ptr to given input image!"<<endl;
+		ERROR_LOG("Null ptr to given input image!");
 		return 0;
 	}
 	
 	//## Check bkg data	
 	if(!bkgData && (addBkgMap || addNoiseMap)){
-		cerr<<"SaliencyFilter::ComputeMultiResoSaliencyMap(): ERROR: Selected to use bkgdata in saliency computation but no bkg data given!"<<endl;
+		ERROR_LOG("Selected to use bkgdata in saliency computation but no bkg data given!");
 		return 0;
 	}
 
@@ -329,8 +334,6 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	saliencyImg_mean->SetName(std::string(imgName));
 	saliencyImg_mean->Reset();
 
-	//double NormMin= 0;
-	//double NormMax= 1;
 	double NormMin= 1;
 	double NormMax= 256;
 	std::vector<Image*> salMaps;
@@ -338,33 +341,44 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	int nbins= 100;
 	
 	for(int i=0;i<nReso;i++){
+		
+		//Compute saliency map @ current reso
 		int reso= resoMin + i*resoStep;
-		INFO_LOG("Computing saliency map @ reso "<<reso<<" (step="<<resoStep<<")");
-
-		//Compute saliency map @ current reso and normalize
+		INFO_LOG("Computing saliency map @ reso "<<reso<<" (step="<<resoStep<<"/"<<nReso<<")");
 		Image* salMap= ComputeSaliencyMap(img,reso,beta,minRegionSize,knnFactor,useRobustPars,expFalloffPar,distanceRegPar);
+
+		//Normalize saliency map
+		INFO_LOG("Normalizing saliency map @ reso "<<reso<<" (step="<<resoStep<<"/"<<nReso<<")");
 		Image* salMap_norm= salMap->GetNormalizedImage("LINEAR",NormMin,NormMax);
-		saliencyImg_mean->Add(salMap_norm);		
-		if(salMap) salMap->Delete();
+		if(salMap) {
+			delete salMap;	
+			salMap= 0;
+		}
+
+		INFO_LOG("Add saliency map @ reso "<<reso<<" to cumulative map...");
+		saliencyImg_mean->Add(salMap_norm);
 		salMaps.push_back(salMap_norm);
 
 		//Compute stats		
+		INFO_LOG("Computing stats for normalized saliency map @ reso "<<reso<<" (step="<<resoStep<<")");
 		salMap_norm->ComputeStats(true,false,false);
 		double salMedian= (salMap_norm->GetPixelStats())->median;
 		double medianThr= saliencyThrFactor*salMedian;
-		double otsuThr= salMap_norm->FindOtsuThreshold(nbins);
-		double valleyThr= salMap_norm->FindValleyThreshold(nbins,true);
+		//double otsuThr= salMap_norm->FindOtsuThreshold(nbins);
+		//double valleyThr= salMap_norm->FindValleyThreshold(nbins,true);
 		//double salThr= std::max(medianThr,otsuThr);
 		//double salThr= std::max(std::min(otsuThr,valleyThr),medianThr);
 		double salThr= medianThr;
 		salMapsThresholds.push_back(salThr);
+
 	}//end loop reso
 	
 	//Normalize final saliency
-	saliencyImg_mean->Scale(1./(double)nReso);
+	if(nReso>1){
+		saliencyImg_mean->Scale(1./(double)nReso);
+	}
 	double minSaliency= saliencyImg_mean->GetMinimum();
 	
-	DEBUG_LOG("Normalize saliency sum over reso...");
 	imgName= Form("%s_saliencyCombined",img->GetName().c_str());
 	Image* saliencyImg= (Image*)saliencyImg_mean->GetCloned(std::string(imgName),true,true);
 	saliencyImg->SetName(std::string(imgName));
@@ -374,6 +388,8 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	//## Normalize saliency (using adaptive threshold)
 	int salientMultiplicityThr= static_cast<int>(std::round(salientMultiplicityThrFactor*nReso));
 
+	INFO_LOG("Normalize saliency sum over reso (minSaliency="<<minSaliency<<", salientMultiplicityThr="<<salientMultiplicityThr<<")...");
+	
 	for(long int i=0;i<saliencyImg->GetNx();i++){
 		for(long int j=0;j<saliencyImg->GetNy();j++){
 			double imgBinContent= img->GetBinContent(i,j);	
@@ -382,7 +398,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 			double wmin= 1.e+99;
 			double wmax= -1.e+99;
 			int saliencyMultiplicity= 0;
-			for(unsigned int k=0;k<salMaps.size();k++){
+			for(size_t k=0;k<salMaps.size();k++){
 				double thisw= salMaps[k]->GetBinContent(i,j);
 				double thisThreshold= salMapsThresholds[k];
 				if(thisw>thisThreshold) saliencyMultiplicity++;
@@ -409,7 +425,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	
 	//Normalize bkg and noise maps
 	if(addBkgMap){
-		DEBUG_LOG("Normalize bkg map...");
+		INFO_LOG("Normalize and add bkg map to saliency estimate...");
 		Image* bkgImg= (bkgData->BkgMap)->GetNormalizedImage("LINEAR",NormMin,NormMax);
 		if(bkgImg){
 			saliencyImg->Add(bkgImg);	
@@ -421,6 +437,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	}//close if
 
 	if(addNoiseMap){
+		INFO_LOG("Normalize and add noise map to saliency estimate...");
 		Image* noiseImg= (bkgData->NoiseMap)->GetNormalizedImage("LINEAR",NormMin,NormMax);
 		if(noiseImg){
 			saliencyImg->Add(noiseImg);
@@ -443,7 +460,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 		for(long int j=0;j<saliencyMap->GetNy();j++){
 			double imgBinContent= img->GetBinContent(i,j);
 			if(imgBinContent==0){
-				saliencyMap->SetBinContent(i,j,0);
+				saliencyMap->SetBinContent(i,j,0.);
 			}
 		}
 	}		

@@ -27,6 +27,7 @@
 
 #include <LoGFilter.h>
 #include <Img.h>
+#include <Image.h>
 #include <MathUtils.h>
 
 #include <TObject.h>
@@ -55,57 +56,69 @@ LoGFilter::~LoGFilter(){
 
 }//close destructor
 
-cv::Mat LoGFilter::BuildStandardKernel(){
 
-	const int kernSize= 7;
-	double kernValues[kernSize][kernSize]= { 
-		{0,0,1,1,1,0,0}, 
-		{0,1,3,3,3,1,0}, 
-		{1,3,0,-7,0,3,1}, 
-		{1,3,-7,-24,-7,3,1}, 
-		{0,0,1,1,1,0,0}, 
-		{0,1,3,3,3,1,0}, 
-		{1,3,0,-7,0,3,1} 
-	};
+//===================================
+//==        NEW IMAGE METHODS
+//===================================
+Image* LoGFilter::GetLoGFilter(Image* image){
+
+	//## Check image
+	if(!image){
+		ERROR_LOG("Null prt to given image!");
+		return 0;
+	}
+
+	//## Init kernels
+	cv::Mat kernel= BuildStandardKernel();
 	
-	cv::Mat kernel(kernSize,kernSize,CV_64F);
-	int rows = kernel.rows;
-	int cols = kernel.cols;
+	//## Convert input image to OpenCV mat
+	cv::Mat I= image->GetOpenCVMat("64");
 
-	for (int i=0; i<rows;i++){
-  	for (int j=0; j<cols;j++) { 
-			kernel.at<double>(i,j)= kernValues[i][j];
-		}
-	}	
-	return kernel;
+	//## Compute convolution
+	cv::Mat filteredMat= Caesar::MathUtils::GetConvolution(I,kernel);	
 
-}//close BuildStandardKernel()
+	//## Convert OpenCV mat list to Img
+	TString imgName= Form("%s_NormLoG",image->GetName().c_str());
+	Image* filteredImg= image->GetCloned(std::string(imgName),true,true);
+	filteredImg->Reset();
+	filteredImg->FillFromMat(filteredMat);
+
+	return filteredImg;
+
+}//close GetLoGFilter()
 
 
-cv::Mat LoGFilter::BuildKernel(int kernSize,double scale){
-
-	cv::Mat kernel(kernSize,kernSize,CV_64F);
-	int nrows = kernel.rows;
-	int ncols = kernel.cols;
-	int halfSize= (kernSize-1)/2;
-		
-	for (int i=0;i<nrows;i++){
-  	for (int j=0;j<ncols;j++){
-  		double x = j - halfSize;
-  	  double y = i - halfSize;
-			double kernValue= NormLoGKernel(x,y,scale);
-			kernel.at<double>(i,j)= kernValue;
-		}//end loop j
-	}//end loop i
+Image* LoGFilter::GetNormLoGFilter(Image* image,int size,double scale){
 	
-	cv::Scalar kernelMean= cv::mean(kernel);
-	cv::subtract(kernel,kernelMean,kernel);
+	//## Check image
+	if(!image){
+		ERROR_LOG("Null prt to given image!");
+		return 0;
+	}
 
-	return kernel;
+	//## Init kernels
+	cv::Mat kernel= BuildKernel(size,scale);
+	
+	//## Convert input image to OpenCV mat
+	cv::Mat I= image->GetOpenCVMat("64");
+	
+	//## Compute convolution
+	cv::Mat filteredMat= Caesar::MathUtils::GetConvolution(I,kernel);	
 
-}//close BuildKernel()
+	//## Convert OpenCV mat list to Img
+	TString imgName= Form("%s_NormLoG",image->GetName().c_str());
+	Image* filteredImg= image->GetCloned(std::string(imgName),true,true);
+	filteredImg->Reset();
+	filteredImg->FillFromMat(filteredMat);
+
+	return filteredImg;
+
+}//close GetNormLoGFilter()
 
 
+//===================================
+//==        OLD IMAGE METHODS
+//===================================
 Img* LoGFilter::GetLoGFilter(Img* image){
 
 	//## Check image
@@ -160,6 +173,57 @@ Img* LoGFilter::GetNormLoGFilter(Img* image,int size,double scale){
 	return filteredImg;
 
 }//close GetNormLoGFilter()
+
+
+cv::Mat LoGFilter::BuildStandardKernel(){
+
+	const int kernSize= 7;
+	double kernValues[kernSize][kernSize]= { 
+		{0,0,1,1,1,0,0}, 
+		{0,1,3,3,3,1,0}, 
+		{1,3,0,-7,0,3,1}, 
+		{1,3,-7,-24,-7,3,1}, 
+		{0,0,1,1,1,0,0}, 
+		{0,1,3,3,3,1,0}, 
+		{1,3,0,-7,0,3,1} 
+	};
+	
+	cv::Mat kernel(kernSize,kernSize,CV_64F);
+	int rows = kernel.rows;
+	int cols = kernel.cols;
+
+	for (int i=0; i<rows;i++){
+  	for (int j=0; j<cols;j++) { 
+			kernel.at<double>(i,j)= kernValues[i][j];
+		}
+	}	
+	return kernel;
+
+}//close BuildStandardKernel()
+
+
+cv::Mat LoGFilter::BuildKernel(int kernSize,double scale){
+
+	cv::Mat kernel(kernSize,kernSize,CV_64F);
+	int nrows = kernel.rows;
+	int ncols = kernel.cols;
+	int halfSize= (kernSize-1)/2;
+		
+	for (int i=0;i<nrows;i++){
+  	for (int j=0;j<ncols;j++){
+  		double x = j - halfSize;
+  	  double y = i - halfSize;
+			double kernValue= NormLoGKernel(x,y,scale);
+			kernel.at<double>(i,j)= kernValue;
+		}//end loop j
+	}//end loop i
+	
+	cv::Scalar kernelMean= cv::mean(kernel);
+	cv::subtract(kernel,kernelMean,kernel);
+
+	return kernel;
+
+}//close BuildKernel()
 
 
 double LoGFilter::NormLoGKernel(double x,double y,double sigma){
