@@ -110,53 +110,7 @@ int Save();
 
 int main(int argc, char *argv[]){
 
-	/*
-	if(argc<2){
-		cerr<<"ERROR: Invalid number of arguments...see macro usage!"<<endl;
-		Usage(argv[0]);
-		exit(1);
-	}
-	int c = 0;
-  int option_index = 0;
 	
-	//Parse options
-	std::string configFileName= "";
-
-	while((c = getopt_long(argc, argv, "hc:",options_tab, &option_index)) != -1) {
-    
-    switch (c) {
-			case 0 : 
-			{
-				break;
-			}
-			case 'h':
-			{
-      	Usage(argv[0]);	
-				exit(0);
-			}
-    	case 'c':	
-			{
-				configFileName= std::string(optarg);	
-				break;	
-			}
-			default:
-			{
-      	Usage(argv[0]);	
-				exit(0);
-			}
-    }//close switch
-	}//close while
-
-	//=======================
-	//== Read config options 
-	//=======================
-	if(ConfigParser::Instance().Parse(configFileName)<0){
-		cerr<<"ERROR: Failed to parse config options!"<<endl;
-		return -1;
-	}
-	PRINT_OPTIONS();
- 	*/
-
 	auto t0 = chrono::steady_clock::now();
 	
 	//================================
@@ -196,6 +150,19 @@ int main(int argc, char *argv[]){
 	auto t1_read = chrono::steady_clock::now();
 	double dt_read= chrono::duration <double, milli> (t1_read-t0_read).count();
 
+	
+	//=======================
+	//== Apply smoothing
+	//=======================
+	auto t0_smooth = chrono::steady_clock::now();	
+	if(ApplySmoothing()<0){
+		ERROR_LOG("Failed to perform image smoothing!");
+		Clear();
+		return -1;
+	}
+	auto t1_smooth = chrono::steady_clock::now();
+	double dt_smooth= chrono::duration <double, milli> (t1_smooth-t0_smooth).count();
+
 	//=======================
 	//== Compute stats
 	//=======================
@@ -220,19 +187,6 @@ int main(int argc, char *argv[]){
 	}
 	auto t1_bkg = chrono::steady_clock::now();
 	double dt_bkg= chrono::duration <double, milli> (t1_bkg-t0_bkg).count();
-
-
-	//=======================
-	//== Apply smoothing
-	//=======================
-	auto t0_smooth = chrono::steady_clock::now();	
-	if(ApplySmoothing()<0){
-		ERROR_LOG("Failed to perform image smoothing!");
-		Clear();
-		return -1;
-	}
-	auto t1_smooth = chrono::steady_clock::now();
-	double dt_smooth= chrono::duration <double, milli> (t1_smooth-t0_smooth).count();
 
 
 	//=======================
@@ -478,13 +432,15 @@ int FindSaliency(){
 		return -1;
 	}
 		
+	/*
 	bool saliencyUseCurvInDiss;	
 	if(GET_OPTION_VALUE(saliencyUseCurvInDiss,saliencyUseCurvInDiss)<0){
 		ERROR_LOG("Failed to get saliencyUseCurvInDiss option!");
 		return -1;
 	}
+	*/
 		
-	DEBUG_LOG("saliencyReso("<<saliencyResoMin<<","<<saliencyResoMax<<","<<saliencyResoStep<<") spBeta="<<spBeta<<". spMinArea="<<spMinArea<<", saliencyUseRobustPars="<<saliencyUseRobustPars<<", saliencyUseCurvInDiss="<<saliencyUseCurvInDiss<<" saliencyMultiResoCombThrFactor="<<saliencyMultiResoCombThrFactor<<" saliencyUseBkgMap="<<saliencyUseBkgMap<<" saliencyUseNoiseMap="<<saliencyUseNoiseMap<<" saliencyThrFactor="<<saliencyThrFactor<<", saliencyImgThrFactor="<<saliencyImgThrFactor);
+	INFO_LOG("saliencyReso("<<saliencyResoMin<<","<<saliencyResoMax<<","<<saliencyResoStep<<") spBeta="<<spBeta<<". spMinArea="<<spMinArea<<", saliencyNNFactor="<<saliencyNNFactor<<",  saliencyUseRobustPars="<<saliencyUseRobustPars<<" saliencyDissExpFalloffPar="<<saliencyDissExpFalloffPar<<", saliencySpatialDistRegPar="<<saliencySpatialDistRegPar<<", saliencyMultiResoCombThrFactor="<<saliencyMultiResoCombThrFactor<<" saliencyUseBkgMap="<<saliencyUseBkgMap<<" saliencyUseNoiseMap="<<saliencyUseNoiseMap<<" saliencyThrFactor="<<saliencyThrFactor<<", saliencyImgThrFactor="<<saliencyImgThrFactor);
 
 	//## Compute saliency
 	saliencyImg= inputImg->GetMultiResoSaliencyMap(
@@ -563,12 +519,14 @@ int ApplySmoothing(){
 	}
 
 	// Compute stats
+	/*
 	INFO_LOG("Computing input image stats...");
 	if(smoothedImg->ComputeStats(true,false,false)<0){
 		ERROR_LOG("Stats computing failed!");
 		smoothedImg->Delete();
 		return -1;
 	}
+	*/
 	
 	//## Replace input image with smoothed map
 	TString imgName= inputImg->GetName();
@@ -744,7 +702,7 @@ int ReadImage(){
 	//## Read image
 	//===== ROOT reading =====
 	if(file_extension==".root"){// Read image from ROOT file
-		INFO_LOG("Reading ROOT input file "<<inputFileName<<"...");
+		INFO_LOG("Reading ROOT input file "<<inputFileName<<" (image name="<<imageName<<")...");
 		inputFile = new TFile(inputFileName.c_str(),"READ");
 		if(!inputFile || inputFile->IsZombie()){
 			ERROR_LOG("Cannot open input file "<<inputFileName<<"!");

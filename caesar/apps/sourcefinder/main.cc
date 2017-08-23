@@ -15,7 +15,11 @@
 // * have received a copy of the GNU General Public License along with   * 
 // * Caesar. If not, see http://www.gnu.org/licenses/.                   *
 // ***********************************************************************
+#include <Img.h>
+#include <Image.h>
 #include <SourceFinder.h>
+#include <SFinder.h>
+
 #include <ConfigParser.h>
 #include <Logger.h>
 #include <CodeUtils.h>
@@ -49,22 +53,68 @@ static const struct option options_tab[] = {
   {(char*)0, (int)0, (int*)0, (int)0}
 };
 
+
+//Options
 std::string configFileName= "";
 
+//Variables
+//...
 
-int main(int argc, char *argv[]){
+//Functions
+int ParseOptions(int argc, char *argv[]);
 
+
+int main(int argc, char *argv[])
+{
+	//================================
+	//== Parse command line options
+	//================================
+	if(ParseOptions(argc,argv)<0){
+		ERROR_LOG("Failed to parse command line options!");
+		return -1;
+	}
+	
+	//=======================
+	//== Run SourceFinder
+	//=======================
+	INFO_LOG("Starting source finding");
+	//SourceFinder finder;
+	SFinder finder;
+	if(finder.Run()<0){
+		ERROR_LOG("Source finding failed!");
+		return -1;
+	}
+
+	INFO_LOG("End source finding");
+
+	return 0;
+
+}//close main
+
+
+
+int ParseOptions(int argc, char *argv[])
+{
+	
+	//## Check args
 	if(argc<2){
 		cerr<<"ERROR: Invalid number of arguments...see macro usage!"<<endl;
 		Usage(argv[0]);
 		exit(1);
 	}
+
+	//## Parse options
+	std::string configFileName= "";
 	int c = 0;
   int option_index = 0;
-	
+
 	while((c = getopt_long(argc, argv, "hc:",options_tab, &option_index)) != -1) {
     
     switch (c) {
+			case 0 : 
+			{
+				break;
+			}
 			case 'h':
 			{
       	Usage(argv[0]);	
@@ -75,7 +125,7 @@ int main(int argc, char *argv[]){
 				configFileName= std::string(optarg);	
 				break;	
 			}
-    	default:
+			default:
 			{
       	Usage(argv[0]);	
 				exit(0);
@@ -83,10 +133,7 @@ int main(int argc, char *argv[]){
     }//close switch
 	}//close while
  
-	//=======================
-	//== Read config options 
-	//=======================
-	cout<<"INFO: Get configuration options from file "<<configFileName<<" ..."<<endl;
+	//## Read config options 
 	if(ConfigParser::Instance().Parse(configFileName)<0){
 		cerr<<"ERROR: Failed to parse config options!"<<endl;
 		return -1;
@@ -141,15 +188,16 @@ int main(int argc, char *argv[]){
 	}
 
 	//=======================
-	//== Run SourceFinder
+	//== Init thread numbers 
 	//=======================
-	INFO_LOG("Starting source finding");
-	SourceFinder finder;
-	finder.Run();
-	INFO_LOG("End source finding");
+	int nThreads;
+	if(GET_OPTION_VALUE(nThreads,nThreads)<0){
+		ERROR_LOG("Failed to get nThreads option!");
+		return -1;
+	}
+	if(nThreads>0) SysUtils::SetOMPThreads(nThreads);
 
 	return 0;
 
-}//close main
-
+}//close ParseOptions()
 

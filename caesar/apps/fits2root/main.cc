@@ -114,7 +114,7 @@ int maxx= -1;
 int miny= -1;
 int maxy= -1;
 std::string imageName= "img";
-int verbosity;
+int verbosity= 4;
 
 //Variables
 Caesar::FileInfo info;
