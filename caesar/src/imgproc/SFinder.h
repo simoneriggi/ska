@@ -172,6 +172,16 @@ class SFinder : public TObject {
 		*/
 		int DrawSources(Image* image,std::vector<Source*>& sources);
 
+		/**
+		* \brief Deblend sources
+		*/
+		int DeblendSources(std::vector<Source*>& sources);
+
+		/**
+		* \brief Print performance stats
+		*/
+		void PrintPerformanceStats();
+
 	public:
 		
 		//Input data
@@ -186,15 +196,31 @@ class SFinder : public TObject {
 		bool m_IsInteractiveRun;
 		std::string m_OutputFileName;
 		TFile* m_OutputFile;
-		bool m_SaveToFile;
-		bool m_SaveConfig;
-		bool m_SaveDS9Region;
+		bool m_saveToFile;
+		bool m_saveConfig;
+		bool m_saveDS9Region;
 		FILE* m_DS9CatalogFilePtr;	
 		std::string m_DS9CatalogFileName;
 		int m_DS9RegionFormat;		
 		TTree* m_SourceTree;
-		bool m_SaveSources;
-		bool m_SaveResidualMap;
+		bool m_saveSources;
+		bool m_saveResidualMap;
+		bool m_saveInputMap;
+		bool m_saveSignificanceMap;
+		bool m_saveBkgMap;
+		bool m_saveNoiseMap;
+
+		//Performance stats data
+		TTree* m_PerfTree;
+		double totTime;
+		double initTime;
+		double readImageTime;
+		double compactSourceTime;
+		double sourceSelectionTime;
+		double imgResidualTime;
+		double extendedSourceTime;
+		double sourceDeblendTime;
+		double saveTime;
 
 		//Source
 		Source* m_Source;
@@ -262,6 +288,12 @@ class SFinder : public TObject {
 		double m_psEllipseAreaRatioMinThr;
 		double m_psEllipseAreaRatioMaxThr;
 		double m_psMaxNPix;
+
+		//Source deblending
+		bool m_deblendSources;
+		double m_deblendCurvThr;
+		double m_deblendComponentMinNPix;
+		
 
 		//Saliency computation
 		Image* m_SaliencyImg;

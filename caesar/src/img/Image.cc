@@ -243,6 +243,7 @@ void Image::Copy(TObject& obj) const
 	}
 	
 	DEBUG_LOG("Copying stats data...");
+	((Image&)obj).m_StatMoments= m_StatMoments;
 	if(m_Stats){
 		((Image&)obj).m_Stats= new ImgStats;
 		*((Image&)obj).m_Stats = *m_Stats;
@@ -1671,9 +1672,19 @@ Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,
 
 Image* Image::GetNormalizedImage(std::string normScale,int normmin,int normmax,bool skipEmptyBins){
 
+	//Check if image has data
+	if(m_pixels.empty()){
+		ERROR_LOG("Image has no data stored!");
+		return nullptr;
+	}
+
 	//Get image content min/max
 	double wmin= (this->m_StatMoments).minVal;
 	double wmax= (this->m_StatMoments).maxVal;
+	if(TMath::IsNaN(wmin) || fabs(wmin)==TMath::Infinity() || TMath::IsNaN(wmax) || fabs(wmax)==TMath::Infinity()){
+		ERROR_LOG("Min ("<<wmin<<") or max ("<<wmax<<") image values are nan or inf, this should not occur (hint: check moment calculation!)");
+		return nullptr;
+	}
 	
 	//Create normalized image
 	TString imgName= Form("%s_Normalized",m_name.c_str());	

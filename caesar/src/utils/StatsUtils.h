@@ -95,6 +95,23 @@ class ClippedStats : public TObject {
  		*/
 		virtual ~ClippedStats(){}
 
+		/** 
+		\brief Operator ==
+ 		*/
+		ClippedStats& operator=(const ClippedStats &m) { 
+  		if (this != &m) ((ClippedStats&)m).Copy(*this);
+ 		 	return *this;
+		}
+
+		/** 
+		\brief Copy object
+ 		*/
+		void Copy(TObject& obj) const {
+			((ClippedStats&)obj).median= median;
+			((ClippedStats&)obj).mean= mean;
+			((ClippedStats&)obj).stddev= stddev;
+		}
+
 	ClassDef(ClippedStats,1)
 
 };//close ClippedStats class
@@ -123,6 +140,28 @@ class StatMoments : public TObject {
  		*/
 		virtual ~StatMoments(){}
 
+		/** 
+		\brief Operator ==
+ 		*/
+		StatMoments& operator=(const StatMoments &m) { 
+  		if (this != &m) ((StatMoments&)m).Copy(*this);
+ 		 	return *this;
+		}
+
+		/** 
+		\brief Copy object
+ 		*/
+		void Copy(TObject& obj) const {
+			((StatMoments&)obj).N= N;
+			((StatMoments&)obj).M1= M1;
+			((StatMoments&)obj).M2= M2;
+			((StatMoments&)obj).M3= M3;
+			((StatMoments&)obj).M4= M4;
+			((StatMoments&)obj).minVal= minVal;
+			((StatMoments&)obj).maxVal= maxVal;
+		}
+
+
 	public:
 		/** 
 		\brief Reset moments
@@ -135,6 +174,16 @@ class StatMoments : public TObject {
 			M4= T(0);
 			minVal= std::numeric_limits<T>::max();
 			maxVal= -std::numeric_limits<T>::max();
+		}
+		/** 
+		\brief Print moments
+ 		*/
+		void Print(){
+			cout<<"*** STAT MOMENTS ***"<<endl;
+			cout<<"N="<<N<<" min/max="<<minVal<<"/"<<maxVal<<endl;
+			cout<<"M1: "<<M1<<", M2="<<M2<<endl;
+			cout<<"M3: "<<M3<<", M4="<<M4<<endl;
+			cout<<"*****************"<<endl;
 		}
 
 	ClassDef(StatMoments,1)
@@ -524,6 +573,8 @@ class StatsUtils : public TObject {
 				moments.M2= parallel_moments[0].M2;
 				moments.M3= parallel_moments[0].M3;
 				moments.M4= parallel_moments[0].M4;
+				moments.minVal= parallel_moments[0].minVal;
+				moments.maxVal= parallel_moments[0].maxVal;
 				return 0;
 			}
 		

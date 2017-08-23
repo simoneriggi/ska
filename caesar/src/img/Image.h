@@ -493,12 +493,17 @@ class Image : public TNamed {
 		}//close LogStats()
 
 		/**
-		* \brief Set moments
+		* \brief Set stat moments
 		*/
-		void SetMoments(Caesar::StatMoments<double>& moments){
+		void SetMoments(Caesar::StatMoments<double> moments){
 			m_StatMoments= moments;
 			this->ResetImgStats(false,true);
 		}
+		
+		/**
+		* \brief Get stat moments
+		*/
+		Caesar::StatMoments<double> GetMoments(){return m_StatMoments;}
 
 		/**
 		* \brief Get tile mean stats
@@ -540,6 +545,12 @@ class Image : public TNamed {
 		* \brief Compute pixel histo
 		*/
 		TH1D* GetPixelHisto(int nbins=100,bool normalize=false);
+
+		/**
+		* \brief Find optimal global threshold
+		*/
+		double FindOptimalGlobalThreshold(int nbins=100);
+
 		/**
 		* \brief Find Otsu threshold
 		*/

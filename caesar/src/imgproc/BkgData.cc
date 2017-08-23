@@ -73,7 +73,11 @@ void ImgBkgData::CopyBkgMap(Caesar::Image* aMap){
 		delete BkgMap;
 		BkgMap= 0;
 	}
-	BkgMap= aMap->GetCloned(std::string(mapName),true,true);
+
+	bool copyMetaData= true;
+	bool resetStats= false;
+	BkgMap= aMap->GetCloned(std::string(mapName),copyMetaData,resetStats);
+
 }//close CopyBkgMap()
 		
 void ImgBkgData::CopyNoiseMap(Caesar::Image* aMap){
@@ -84,7 +88,10 @@ void ImgBkgData::CopyNoiseMap(Caesar::Image* aMap){
 		delete NoiseMap;
 		NoiseMap= 0;
 	}
-	NoiseMap= aMap->GetCloned(std::string(mapName),true,true);
+
+	bool copyMetaData= true;
+	bool resetStats= false;
+	NoiseMap= aMap->GetCloned(std::string(mapName),copyMetaData,resetStats);
 
 }//close CopyNoiseMap()
 		
@@ -113,7 +120,11 @@ void BkgData::CopyBkgMap(Caesar::Img* aMap){
 		delete BkgMap;
 		BkgMap= 0;
 	}
-	BkgMap= aMap->GetCloned(std::string(mapName),true,true);
+	
+	bool copyMetaData= true;
+	bool resetStats= false;
+	BkgMap= aMap->GetCloned(std::string(mapName),copyMetaData,resetStats);
+	
 }//close CopyBkgMap()
 		
 void BkgData::CopyNoiseMap(Caesar::Img* aMap){
@@ -124,7 +135,9 @@ void BkgData::CopyNoiseMap(Caesar::Img* aMap){
 		delete NoiseMap;
 		NoiseMap= 0;
 	}
-	NoiseMap= aMap->GetCloned(std::string(mapName),true,true);
+	bool copyMetaData= true;
+	bool resetStats= false;
+	NoiseMap= aMap->GetCloned(std::string(mapName),copyMetaData,resetStats);
 
 }//close CopyNoiseMap()
 		

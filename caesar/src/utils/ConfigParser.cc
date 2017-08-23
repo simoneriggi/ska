@@ -261,6 +261,13 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(dilateSourceModel,int,1,1,2);
 		REGISTER_OPTION(dilateRandomize,bool,false,false,true);
 
+		//==================================
+		//==  Source deblending options   ==
+		//==================================
+		REGISTER_OPTION(deblendSources,bool,false,false,true);
+		REGISTER_OPTION(deblendCurvThr,double,0,-0.0001,1.00001);	
+		REGISTER_OPTION(deblendComponentMinNPix,double,5,0,100000);				
+		
 		//===================================
 		//==  Chan-Vese algorithm options  ==
 		//===================================
@@ -286,7 +293,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(saliencyUseBkgMap,bool,true,false,true);
 		REGISTER_OPTION(saliencyUseNoiseMap,bool,true,false,true);
 		REGISTER_OPTION(saliencyUseCurvInDiss,bool,true,false,true);
-		REGISTER_OPTION(saliencyNNFactor,double,0.2,0,1);
+		REGISTER_OPTION(saliencyNNFactor,double,0.2,0,1.0001);
 		REGISTER_OPTION(saliencySpatialRegFactor,double,6,0,100);
 		REGISTER_OPTION(saliencyMultiResoCombThrFactor,double,0.7,0,1);
 		REGISTER_OPTION(saliencyDissExpFalloffPar,double,100,1.e-6,1.e+6);

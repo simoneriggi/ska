@@ -57,6 +57,7 @@
 #include <time.h>
 #include <ctime>
 #include <queue>
+#include <chrono>
 
 using namespace std;
 
@@ -94,14 +95,17 @@ void SFinder::InitOptions()
 	m_OutputFileName= "";
 	m_Application= 0;
 	m_IsInteractiveRun= false;
-	m_SaveToFile= true;
-	m_SaveConfig= true;
-	m_SaveSources= true;	
+	m_saveToFile= true;
+	m_saveConfig= true;
+	m_saveSources= true;	
+	m_saveResidualMap= true;
+	m_saveInputMap= true;
 	m_SourceTree= 0;
-	m_SaveDS9Region= true;
+	m_saveDS9Region= true;
 	m_DS9CatalogFileName= "";
 	m_DS9CatalogFilePtr= 0;
 	m_DS9RegionFormat= 1;
+	m_PerfTree= 0;
 		
 	//Source 
 	m_Source= 0;
@@ -126,6 +130,17 @@ void SFinder::InitOptions()
 	//Saliency img
 	m_SaliencyImg= 0;
 
+	//Performance stats
+	totTime= 0;
+	initTime= 0;
+	readImageTime= 0;
+	compactSourceTime= 0;
+	sourceSelectionTime= 0;
+	imgResidualTime= 0;
+	extendedSourceTime= 0;
+	sourceDeblendTime= 0;	
+	saveTime= 0;
+
 }//close InitOptions()
 
 int SFinder::Init(){
@@ -145,12 +160,12 @@ int SFinder::Init(){
 	}	
 
 	//## Create output file
-	if(m_SaveToFile){
+	if(m_saveToFile){
 		m_OutputFile= new TFile(m_OutputFileName.c_str(),"RECREATE");	
 		m_OutputFile->cd();
 	
 		//Init source tree
-		if(m_SaveSources){
+		if(m_saveSources){
 			m_Source= 0;
 			if(!m_SourceTree) m_SourceTree= new TTree("SourceInfo","SourceInfo");
 			m_SourceTree->Branch("Source",&m_Source);
@@ -159,6 +174,18 @@ int SFinder::Init(){
 
 		//Init DS9 catalog
 		if(!m_DS9CatalogFilePtr) m_DS9CatalogFilePtr= fopen(m_DS9CatalogFileName.c_str(),"w");
+
+		//Init time performance tree
+		if(!m_PerfTree) m_PerfTree= new TTree("PerformanceInfo","PerformanceInfo");
+		m_PerfTree->Branch("tot",&totTime,"tot/D");
+		m_PerfTree->Branch("init",&initTime,"init/D");
+		m_PerfTree->Branch("read",&readImageTime,"read/D");
+		m_PerfTree->Branch("sfinder",&compactSourceTime,"sfinder/D");
+		m_PerfTree->Branch("sselector",&sourceSelectionTime,"sselector/D");
+		m_PerfTree->Branch("imgres",&imgResidualTime,"imgres/D");
+		m_PerfTree->Branch("extsfinder",&extendedSourceTime,"extsfinder/D");
+		m_PerfTree->Branch("sdeblend",&sourceDeblendTime,"sdeblend/D");
+		//m_PerfTree->Branch("save",&saveTime,"save/D");
 
 	}//close if saveToFile
 
@@ -184,14 +211,19 @@ int SFinder::Configure(){
 
 	//Get output file options
 	GET_OPTION_VALUE(outputFile,m_OutputFileName);
-	GET_OPTION_VALUE(saveToFile,m_SaveToFile);
-	GET_OPTION_VALUE(saveConfig,m_SaveConfig);
-	GET_OPTION_VALUE(saveDS9Region,m_SaveDS9Region);
+	GET_OPTION_VALUE(saveToFile,m_saveToFile);
+	GET_OPTION_VALUE(saveConfig,m_saveConfig);
+	GET_OPTION_VALUE(saveDS9Region,m_saveDS9Region);
 	GET_OPTION_VALUE(ds9RegionFile,m_DS9CatalogFileName);
 	GET_OPTION_VALUE(DS9RegionFormat,m_DS9RegionFormat);
-	GET_OPTION_VALUE(saveSources,m_SaveSources);
+	GET_OPTION_VALUE(saveSources,m_saveSources);
 	GET_OPTION_VALUE(isInteractiveRun,m_IsInteractiveRun);
-	GET_OPTION_VALUE(saveResidualMap,m_SaveResidualMap);
+	GET_OPTION_VALUE(saveResidualMap,m_saveResidualMap);
+	GET_OPTION_VALUE(saveInputMap,m_saveInputMap);
+	GET_OPTION_VALUE(saveSignificanceMap,m_saveSignificanceMap);
+	GET_OPTION_VALUE(saveBkgMap,m_saveBkgMap);
+	GET_OPTION_VALUE(saveNoiseMap,m_saveNoiseMap);
+	
 	
 	//Get bkg options
 	GET_OPTION_VALUE(useLocalBkg,m_UseLocalBkg);
@@ -217,6 +249,8 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(searchNestedSources,m_SearchNestedSources);
 	GET_OPTION_VALUE(nestedBlobThrFactor,m_NestedBlobThrFactor);
 	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
+
+	
 	
 	//Get source selection options
 	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
@@ -234,6 +268,12 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(dilateSourceModel,m_DilateSourceModel);
 	GET_OPTION_VALUE(dilateRandomize,m_DilateRandomize);
 	
+	//Get source deblending options
+	GET_OPTION_VALUE(deblendSources,m_deblendSources);
+	GET_OPTION_VALUE(deblendCurvThr,m_deblendCurvThr);
+	GET_OPTION_VALUE(deblendComponentMinNPix,m_deblendComponentMinNPix);
+	
+
 	//Get smoothing options
 	GET_OPTION_VALUE(usePreSmoothing,m_UsePreSmoothing);
 	GET_OPTION_VALUE(smoothFilter,m_SmoothFilter);
@@ -263,8 +303,8 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(searchExtendedSources,m_SearchExtendedSources);
 	GET_OPTION_VALUE(extendedSearchMethod,m_ExtendedSearchMethod);
 	GET_OPTION_VALUE(wtScaleExtended,m_wtScaleExtended);
+	GET_OPTION_VALUE(useResidualInExtendedSearch,m_UseResidualInExtendedSearch);
 			
-
 	//Get superpixel options
 	GET_OPTION_VALUE(spSize,m_spSize);
 	GET_OPTION_VALUE(spBeta,m_spBeta);
@@ -288,56 +328,118 @@ int SFinder::Configure(){
 
 int SFinder::Run(){
 
-	//## Init options
+	//Start timer
+	auto t0 = chrono::steady_clock::now();	
+
+	//===========================
+	//== Init options & data
+	//===========================
 	INFO_LOG("Initializing source finder...");
+	auto t0_init = chrono::steady_clock::now();	
 	if(Init()<0){
 		ERROR_LOG("Initialization failed!");
 		return -1;
 	}
+	auto t1_init = chrono::steady_clock::now();	
+	initTime= chrono::duration <double, milli> (t1_init-t0_init).count();
 	
-	//## Read input image
+	//===========================
+	//== Read image
+	//===========================
 	INFO_LOG("Reading input image...");
+	auto t0_read = chrono::steady_clock::now();	
 	if(ReadImage()<0){
 		ERROR_LOG("Reading of input image failed!");
 		return -1;
 	}
+	auto t1_read = chrono::steady_clock::now();	
+	readImageTime= chrono::duration <double, milli> (t1_read-t0_read).count();
 
-	//## Find compact sources
+	//============================
+	//== Find compact sources
+	//============================
 	INFO_LOG("Searching compact sources...");
+	auto t0_sfinder = chrono::steady_clock::now();	
 	if(m_SearchCompactSources && FindCompactSources()<0){
 		ERROR_LOG("Compact source search failed!");
 		return -1;
 	}
+	auto t1_sfinder = chrono::steady_clock::now();	
+	compactSourceTime= chrono::duration <double, milli> (t1_sfinder-t0_sfinder).count();
 
 
-	//## Find extended sources
+	//============================
+	//== Find extended sources
+	//============================
 	if(m_SearchExtendedSources){
 		INFO_LOG("Searching extended sources...");
 
 		// Find residual map
+		auto t0_res = chrono::steady_clock::now();	
 		if(FindResidualMap()<0){
 			ERROR_LOG("Residual map computation failed!");
 			return -1;
 		}
+		auto t1_res = chrono::steady_clock::now();	
+		imgResidualTime= chrono::duration <double, milli> (t1_res-t0_res).count();
 
 		//Find extended sources
+		auto t0_extsfinder = chrono::steady_clock::now();
 		if(FindExtendedSources()<0){
 			ERROR_LOG("Extended source search failed!");
 			return -1;
 		}
+		auto t1_extsfinder = chrono::steady_clock::now();	
+		extendedSourceTime= chrono::duration <double, milli> (t1_extsfinder-t0_extsfinder).count();
 
 	}//close if search extended sources
 
 	
-	//## Deblend sources
-	//if(fDeblendSources) DeblendSources(fInputImg);
+	//============================
+	//== Deblend sources
+	//============================
+	if(m_deblendSources) {
+		auto t0_sdeblend = chrono::steady_clock::now();	
+		if(DeblendSources(m_SourceCollection)<0){
+			ERROR_LOG("Failed to deblend sources!");
+			return -1;
+		}
+		auto t1_sdeblend = chrono::steady_clock::now();	
+		sourceDeblendTime= chrono::duration <double, milli> (t1_sdeblend-t0_sdeblend).count();
+	}
 
-	//## Draw final sources
-	if(m_IsInteractiveRun) DrawSources(m_InputImg,m_SourceCollection);
+	//============================
+	//== Draw images
+	//============================
+	if(m_IsInteractiveRun) {
+		DrawSources(m_InputImg,m_SourceCollection);
+	}
 
-	//## Save to file
-	if(m_SaveToFile) Save();	
-	if(m_Application && m_IsInteractiveRun) m_Application->Run();
+	//Stop timer
+	auto t1 = chrono::steady_clock::now();	
+	totTime= chrono::duration <double, milli> (t1-t0).count();
+
+	//============================
+	//== Save to file
+	//============================
+	if(m_saveToFile) {	
+		auto t0_save = chrono::steady_clock::now();	
+		Save();	
+		auto t1_save = chrono::steady_clock::now();	
+		saveTime= chrono::duration <double, milli> (t1_save-t0_save).count();
+	}
+
+	//===============================
+	//== Print performance stats
+	//===============================
+	PrintPerformanceStats();
+
+	//==========================================
+	//== Run TApplication (interactive run)
+	//==========================================
+	if(m_Application && m_IsInteractiveRun) {
+		m_Application->Run();
+	}
 	
 	return 0;
 
@@ -449,15 +551,6 @@ int SFinder::FindCompactSources(){
 
 	INFO_LOG("#"<<nSelSources<<" bright sources to the list...");
 
-
-	//## Draw significance map
-	//TCanvas* SignificancePlot= new TCanvas("SignificancePlot","SignificancePlot");
-	//SignificancePlot->cd();
-	//m_SignificanceMap->Draw("COLZ");
-
-	//## Clear-up
-	//if(significanceMap) significanceMap->Delete();
-	
 	return 0;
 
 }//close FindCompactSources()
@@ -467,6 +560,7 @@ int SFinder::FindResidualMap(){
 	//Compute residual map
 	Image* residualImg= 0;
 	if(m_UseResidualInExtendedSearch && m_CompactSources.size()>0){
+		INFO_LOG("Computing residual image (#"<<m_CompactSources.size()<<" sources present)...");
 		residualImg= m_InputImg->GetSourceResidual(
 			m_CompactSources,
 			m_DilateKernelSize,m_DilateSourceModel,m_DilatedSourceType,m_DilateNestedSources,	
@@ -475,6 +569,7 @@ int SFinder::FindResidualMap(){
 		);
 	}//close if
 	else{
+		INFO_LOG("Setting residual image to input image...");
 		residualImg= m_InputImg->GetCloned("residualImg",true,true);
 	}
 
@@ -485,6 +580,7 @@ int SFinder::FindResidualMap(){
 	m_ResidualImg= residualImg;
 	
 	//Compute bkg & noise map for residual img
+	INFO_LOG("Computing residual image stats & bkg...");
 	m_ResidualBkgData= ComputeStatsAndBkg(m_ResidualImg);
 	if(!m_ResidualBkgData){
 		ERROR_LOG("Failed to compute bkg data for residual map!");
@@ -508,12 +604,12 @@ int SFinder::FindExtendedSources(){
 			smoothedImg= m_ResidualImg->GetGuidedFilterImage(m_GuidedFilterRadius,m_GuidedFilterColorEps);
 		}
 		else{
-			cerr<<"SourceFinder::FindResidualMap(): ERROR: Invalid smoothing algo selected!"<<endl;
+			ERROR_LOG("Invalid smoothing algo selected!");
 			return -1;
 		}
 
 		if(!smoothedImg){
-			cerr<<"SourceFinder::FindResidualMap(): ERROR: Source residual image smoothing failed!"<<endl;
+			ERROR_LOG("Source residual image smoothing failed!");
 			return -1;
 		}
 		smoothedImg->SetName("smoothedImg");
@@ -540,7 +636,7 @@ int SFinder::FindExtendedSources(){
 	}
 	
 	if(status<0){
-		cerr<<"FindExtendedSources(): ERROR: Failed to run the segmentation algorithm!"<<endl;
+		ERROR_LOG("Failed to run the segmentation algorithm!");
 		return -1;
 	}
 
@@ -560,7 +656,7 @@ int SFinder::FindExtendedSources_HClust(Image*){
 		m_SaliencyThrFactor,m_SaliencyImgThrFactor
 	);
 	if(!m_SaliencyImg){
-		cerr<<"FindSaliency(): ERROR: Failed to compute saliency map!"<<endl;
+		ERROR_LOG("Failed to compute saliency map!");
 		return -1;
 	}
 
@@ -570,8 +666,8 @@ int SFinder::FindExtendedSources_HClust(Image*){
 	double bkgThr= m_SaliencyImg->FindMedianThreshold(m_SaliencyBkgThrFactor);
 
 	double fgValue= 1;
-	Img* signalMarkerImg= m_SaliencyImg->GetBinarizedImage(signalThr,fgValue,false);
-	Img* bkgMarkerImg= m_SaliencyImg->GetBinarizedImage(bkgThr,fgValue,true);
+	Image* signalMarkerImg= m_SaliencyImg->GetBinarizedImage(signalThr,fgValue,false);
+	Image* bkgMarkerImg= m_SaliencyImg->GetBinarizedImage(bkgThr,fgValue,true);
 	
 	//## Compute the Superpixel partition
 	//SLICData* slicData= SLIC::SPGenerator(this,int regionSize,double regParam, int minRegionSize, bool useLogScaleMapping, Img* edgeImg);
@@ -691,7 +787,7 @@ int SFinder::SelectSources(std::vector<Source*>& sources){
 
 		//Tag nested sources
 		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();
-		for(unsigned int j=0;j<nestedSources.size();j++){
+		for(size_t j=0;j<nestedSources.size();j++){
 			std::string nestedSourceName= nestedSources[j]->Name;
 			int nestedSourceId= nestedSources[j]->Id;
 			long int nestedNPix= nestedSources[j]->NPix;
@@ -808,7 +904,38 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 
 }//close IsPointLikeSource()
 
+int SFinder::DeblendSources(std::vector<Source*>& sources){
 
+	//Check given source list
+	if(sources.empty()){
+		WARN_LOG("Empty source list, nothing to be deblended!");
+		return 0;
+	}
+
+	//## Loop over image sources and perform deblending stage for non-extended sources
+	for(size_t i=0;i<sources.size();i++){
+
+		//Skip non point-like sources
+		int sourceType= sources[i]->Type;
+		if(sourceType!=Source::ePointLike) continue;
+	
+		//Deblend mother source
+		//if(sources[i]->Deblend(m_deblendCurvThr,deblendComponentMinNPix)<0) {//TO BE IMPLEMENTED!!!
+		//	WARN_LOG("Failed to deblend source no. "<<i<<"!");
+		//}
+
+		//Deblend nested sources
+		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();	
+		for(size_t j=0;j<nestedSources.size();j++){
+			//if(nestedSources[j] && nestedSources[j]->Deblend(m_deblendCurvThr,deblendComponentMinNPix)<0){//TO BE IMPLEMENTED!!!
+			//	WARN_LOG("Failed to deblend nested source no. "<<j<<" of source no. "<<i<<"...");
+			//}
+		}//end loop nested sources
+	}//end loop sources
+	
+	return 0;
+
+}//close DeblendSources()
 
 int SFinder::ReadImage(){
 
@@ -949,7 +1076,7 @@ int SFinder::Save(){
 	INFO_LOG("Storing results to file & catalog...");
 
 	//Save DS9 regions?
-	if(m_SaveDS9Region && m_DS9CatalogFilePtr){
+	if(m_saveDS9Region && m_DS9CatalogFilePtr){
 		DEBUG_LOG("Saving DS9 region header...");
 	
 		fprintf(m_DS9CatalogFilePtr,"global color=red font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n");
@@ -986,25 +1113,53 @@ int SFinder::Save(){
 	m_OutputFile->cd();
 
 	//Save source tree?
-	if(m_SaveSources){
+	if(m_saveSources){
 		DEBUG_LOG("Writing tree to file...");
 		m_SourceTree->Write();
 	}
 	
 	//Save config?
-	if(m_SaveConfig){
+	if(m_saveConfig){
 		TTree* ConfigTree= ConfigParser::Instance().GetConfigTree("ConfigInfo");
 		if(ConfigTree) ConfigTree->Write();
 	}	
+
+	//Save performance stats	
+	if(m_PerfTree){
+		m_PerfTree->Fill();
+		m_PerfTree->Write();
+	}
+
+	//Save input image to file?
+	if(m_saveInputMap && m_InputImg){
+		m_InputImg->SetNameTitle("img","img");
+		m_InputImg->Write();
+	}
 	
-	//Save residual map
-	if(m_SaveResidualMap && m_ResidualImg){
+	//Save residual map?
+	if(m_saveResidualMap && m_ResidualImg){
+		m_ResidualImg->SetNameTitle("img_residual","img_residual");
 		m_ResidualImg->Write();
+	}
+	
+	//Save significance map?
+	if(m_saveSignificanceMap && m_SignificanceMap){
+		m_SignificanceMap->SetNameTitle("img_significance","img_significance");
+		m_SignificanceMap->Write();
+	}
+
+	//Save bkg & noise maps
+	if(m_saveBkgMap && m_BkgData && m_BkgData->BkgMap){
+		(m_BkgData->BkgMap)->SetNameTitle("img_bkg","img_bkg");
+		(m_BkgData->BkgMap)->Write();
+	}
+	if(m_saveNoiseMap && m_BkgData && m_BkgData->NoiseMap){
+		(m_BkgData->NoiseMap)->SetNameTitle("img_rms","img_rms");
+		(m_BkgData->NoiseMap)->Write();
 	}
 
 	/*
-	//Save image to file?
-	if(m_SaveImageToFile){
+	if(m_saveImageToFile){
 		if(fSaveImageType==eInputImage) fInputImg->Write();
 		else if(fSaveImageType==eResidualImage){
 			Img* residualImg= fInputImg->GetSourceResidual(fUseLocalBackground,fSourceDilateKernelSize,fDilateNestedSources,fDilatedSourceType,fDilateSourceModel,fRandomizeInDilate,fRandSigmaInDilate);
@@ -1024,7 +1179,7 @@ int SFinder::Save(){
 		}
 
 		if(fSPMergingInfo) fSPMergingInfo->Write();
-		if(fConfigInfo) fConfigInfo->Write();
+		
 	}//close if save image to file
 	*/
 
@@ -1038,5 +1193,25 @@ int SFinder::Save(){
 	return 0;
 
 }//close Save()
+
+
+void SFinder::PrintPerformanceStats()
+{
+	INFO_LOG("===========================");
+	INFO_LOG("===   PERFORMANCE INFO  ===");
+	INFO_LOG("===========================");
+	INFO_LOG("tot (ms)= "<<totTime);
+	INFO_LOG("init (ms)= "<<initTime<<" ["<<initTime/totTime*100.<<"%]");
+	INFO_LOG("read image (ms)= "<<readImageTime<<" ["<<readImageTime/totTime*100.<<"%]");
+	INFO_LOG("source finding (ms)= "<<compactSourceTime<<" ["<<compactSourceTime/totTime*100.<<"%]");
+	INFO_LOG("source selection (ms)= "<<sourceSelectionTime<<" ["<<sourceSelectionTime/totTime*100.<<"%]");
+	INFO_LOG("img residual (ms)= "<<imgResidualTime<<" ["<<imgResidualTime/totTime*100.<<"%]");
+	INFO_LOG("ext source finding (ms)= "<<extendedSourceTime<<" ["<<extendedSourceTime/totTime*100.<<"%]");
+	INFO_LOG("source deblending (ms)= "<<sourceDeblendTime<<" ["<<sourceDeblendTime/totTime*100.<<"%]");
+	INFO_LOG("save (ms)= "<<saveTime<<" ["<<saveTime/totTime*100.<<"%]");
+	INFO_LOG("===========================");
+
+}//close PrintPerformanceStats()
+
 
 }//close namespace

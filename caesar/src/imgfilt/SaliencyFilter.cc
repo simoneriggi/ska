@@ -425,9 +425,10 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	
 	//Normalize bkg and noise maps
 	if(addBkgMap){
-		INFO_LOG("Normalize and add bkg map to saliency estimate...");
+		INFO_LOG("Normalize bkg map ...");
 		Image* bkgImg= (bkgData->BkgMap)->GetNormalizedImage("LINEAR",NormMin,NormMax);
 		if(bkgImg){
+			INFO_LOG("Adding bkg map to saliency estimate...");
 			saliencyImg->Add(bkgImg);	
 			bkgImg->Delete();
 		}

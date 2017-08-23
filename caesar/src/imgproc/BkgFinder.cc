@@ -162,6 +162,8 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 			return 0;
 		}//close if
 
+		INFO_LOG("img without outliers info: min/max="<<img_wOutliers->GetMinimum()<<"/"<<img_wOutliers->GetMaximum());
+
 		//Recompute bkg on residual map (using this function recursively)
 		//Do not skip outliers this time!
 		INFO_LOG("Recomputing bkg on residual map...");
@@ -181,6 +183,8 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 			blobs.clear();
 			return 0;
 		}
+		INFO_LOG("Robust bkg map min/max="<<(robustBkgData->BkgMap)->GetMinimum()<<"/"<<(robustBkgData->BkgMap)->GetMaximum()<<", rms map min/max="<<(robustBkgData->NoiseMap)->GetMinimum()<<"/"<<(robustBkgData->NoiseMap)->GetMaximum());
+
 
 		//Override main bkgData with robust estimates
 		for(unsigned int i=0;i<(robustBkgData->BkgSamplings).size();i++) {
@@ -563,24 +567,39 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
 			//bkg_parallel_moments.push_back(bkg_moments_t);
 			//rms_parallel_moments.push_back(rms_moments_t);
 			bkg_parallel_moments[thread_id]= bkg_moments_t;
-			rms_parallel_moments[thread_id]= bkg_moments_t;
+			rms_parallel_moments[thread_id]= rms_moments_t;
+
+			DEBUG_LOG("Thread id="<<thread_id<<" bkg min/max="<<bkg_parallel_moments[thread_id].minVal<<"/"<<bkg_parallel_moments[thread_id].maxVal);
+			DEBUG_LOG("Thread id="<<thread_id<<" rms min/max="<<rms_parallel_moments[thread_id].minVal<<"/"<<rms_parallel_moments[thread_id].maxVal);
 			
 		}//close parallel section
 
 		//Update moments from parallel estimates
+		//- Bkg map moments
 		Caesar::StatMoments<double> bkg_moments;
 		if(Caesar::StatsUtils::ComputeMomentsFromParallel(bkg_moments,bkg_parallel_moments)<0){
 			ERROR_LOG("Failed to compute cumulative bkg map moments from parallel estimates (NB: image will have wrong moments!)");
 			return -1;
 		}
+		//DEBUG_LOG("bkg moments aggregated");
+		//bkg_moments.Print();
 		(bkgData->BkgMap)->SetMoments(bkg_moments);
+		
+		//DEBUG_LOG("bkg moments aggregated (after set)");
+		//((bkgData->BkgMap)->GetMoments()).Print();
 
+		//- RMS map moments
 		Caesar::StatMoments<double> rms_moments;
 		if(Caesar::StatsUtils::ComputeMomentsFromParallel(rms_moments,rms_parallel_moments)<0){
 			ERROR_LOG("Failed to compute cumulative rms map moments from parallel estimates (NB: image will have wrong moments!)");
 			return -1;
 		}
+		//DEBUG_LOG("rms moments aggregated");
+		//rms_moments.Print();
 		(bkgData->NoiseMap)->SetMoments(rms_moments);
+
+		//DEBUG_LOG("rms moments aggregated (after set)");
+		//((bkgData->NoiseMap)->GetMoments()).Print();
 
 	#else
 		for (size_t i=0; i<interp_gridX.size(); i++) {
