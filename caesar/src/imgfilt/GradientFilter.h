@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef GradientFilter_h
-#define GradientFilter_h 1
+#ifndef _GRADIENT_FILTER_h
+#define _GRADIENT_FILTER_h 1
 
 //ROOT
 #include <TObject.h>
@@ -55,7 +55,6 @@ namespace cv {
 
 namespace Caesar{
 
-class Img;
 class Image;
 
 class GradientFilter : public TObject {
@@ -87,22 +86,16 @@ class GradientFilter : public TObject {
 		*/
 		static Image* GetLaplaceFilter(Image* image);
 
-		//===================================
-		//==        OLD IMAGE METHODS
-		//===================================
-		/**
-		* \brief Apply a gradient filter to image and return filtered image
-		*/	
-		static Img* GetGradientFilter(Img* image);
-	
-		/**
-		* \brief Apply a laplacian filter to image and return filtered image
-		*/
-		static Img* GetLaplaceFilter(Img* image);
 
 	private:
 
+		/**
+		* \brief Build the gradient filter kernel
+		*/	
 		static std::vector<cv::Mat> BuildGradientKernels();
+		/**
+		* \brief Build the Laplacian filter kernel
+		*/
 		static cv::Mat BuildLaplaceKernel();
 		
 	private:

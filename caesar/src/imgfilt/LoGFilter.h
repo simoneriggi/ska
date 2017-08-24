@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef LoGFilter_h
-#define LoGFilter_h 1
+#ifndef _LOG_FILTER_h
+#define _LOG_FILTER_h 1
 
 //ROOT
 #include <TObject.h>
@@ -40,7 +40,6 @@ namespace cv {
 
 namespace Caesar{
 
-class Img;
 class Image;
 
 class LoGFilter : public TObject {
@@ -66,11 +65,6 @@ class LoGFilter : public TObject {
 		static Image* GetLoGFilter(Image* image);
 		static Image* GetNormLoGFilter(Image* image,int size,double scale);
 
-		//===================================
-		//==        OLD IMAGE METHODS
-		//===================================
-		static Img* GetLoGFilter(Img* image);
-		static Img* GetNormLoGFilter(Img* image,int size,double scale);
 
 	private:
 		/**

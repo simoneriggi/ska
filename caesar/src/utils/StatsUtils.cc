@@ -27,7 +27,6 @@
 
 
 #include <StatsUtils.h>
-#include <Img.h>
 
 #include <TObject.h>
 #include <TMath.h>

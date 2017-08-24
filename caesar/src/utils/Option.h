@@ -24,8 +24,10 @@
 * @date 5/6/2016
 */
 
-#ifndef Option_h
-#define Option_h 1
+#ifndef _OPTION_h
+#define _OPTION_h 1
+
+#include <Logger.h>
 
 #include <json/json.h>
 
@@ -36,7 +38,9 @@
 #include <vector>
 #include <string>
 
-#include <Img.h>
+#include <string>
+
+using namespace std;
 
 namespace Caesar{
 
@@ -493,7 +497,7 @@ class Option : public OptionBase {
 		int GetJsonString(std::string& jsonString,bool isMinified=true){
 			Json::Value jsonObj;
 			if(GetJson(jsonObj)<0) {
-				cerr<<"Option::GetJsonString(): ERROR: Failed to encode option to json object!"<<endl;
+				ERROR_LOG("Failed to encode option to json object!");
 				return -1;
 			}
 			try {
@@ -507,7 +511,7 @@ class Option : public OptionBase {
 				}
 			}
 			catch(...){
-				cerr<<"Option::GetJsonString(): ERROR: Failed to encode argument to json string!"<<endl;
+				ERROR_LOG("Failed to encode argument to json string!");
 				return -1;
 			}
 			return 0;
@@ -559,12 +563,12 @@ class Option : public OptionBase {
  		*/
 		int AddBranch(TTree* tree){
 			if(!tree) {
-				cerr<<"Option::AddBranch(): WARN: Null tree ptr given!"<<endl;			
+				ERROR_LOG("Null tree ptr given!");
 				return -1;
 			}
 			TBranch* branch= tree->Branch(m_name.c_str(),this);
 			if(!branch) {
-				cerr<<"Option::AddBranch(): WARN: Failed to create a branch for this option..."<<endl;
+				WARN_LOG("Failed to create a branch for this option...");
 				return -1;
 			}
 			return 0;

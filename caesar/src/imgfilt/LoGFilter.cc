@@ -26,7 +26,6 @@
 */
 
 #include <LoGFilter.h>
-#include <Img.h>
 #include <Image.h>
 #include <MathUtils.h>
 
@@ -115,64 +114,6 @@ Image* LoGFilter::GetNormLoGFilter(Image* image,int size,double scale){
 
 }//close GetNormLoGFilter()
 
-
-//===================================
-//==        OLD IMAGE METHODS
-//===================================
-Img* LoGFilter::GetLoGFilter(Img* image){
-
-	//## Check image
-	if(!image){
-		cerr<<"LoGFilter::GetLoGFilter(): ERROR: Null prt to given image!"<<endl;
-		return 0;
-	}
-
-	//## Init kernels
-	cv::Mat kernel= BuildStandardKernel();
-	
-	//## Convert input image to OpenCV mat
-	cv::Mat I= image->ImgToMat("64");
-
-	//## Compute convolution
-	cv::Mat filteredMat= Caesar::MathUtils::GetConvolution(I,kernel);	
-
-	//## Convert OpenCV mat list to Img
-	TString imgName= Form("%s_NormLoG",image->GetName());
-	Img* filteredImg= image->GetCloned(std::string(imgName),true,true);
-	filteredImg->Reset();
-	filteredImg->FillFromMat(filteredMat);
-
-	return filteredImg;
-
-}//close LoGFilter::GetLoGFilter()
-
-
-Img* LoGFilter::GetNormLoGFilter(Img* image,int size,double scale){
-	
-	//## Check image
-	if(!image){
-		cerr<<"LoGFilter::GetLoGFilter(): ERROR: Null prt to given image!"<<endl;
-		return 0;
-	}
-
-	//## Init kernels
-	cv::Mat kernel= BuildKernel(size,scale);
-	
-	//## Convert input image to OpenCV mat
-	cv::Mat I= image->ImgToMat("64");
-	
-	//## Compute convolution
-	cv::Mat filteredMat= Caesar::MathUtils::GetConvolution(I,kernel);	
-
-	//## Convert OpenCV mat list to Img
-	TString imgName= Form("%s_NormLoG",image->GetName());
-	Img* filteredImg= image->GetCloned(std::string(imgName),true,true);
-	filteredImg->Reset();
-	filteredImg->FillFromMat(filteredMat);
-
-	return filteredImg;
-
-}//close GetNormLoGFilter()
 
 
 cv::Mat LoGFilter::BuildStandardKernel(){

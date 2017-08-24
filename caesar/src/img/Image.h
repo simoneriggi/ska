@@ -355,6 +355,24 @@ class Image : public TNamed {
 		*/
 
 		/**
+		* \brief Find bin corresponding to physical coordinates (x,y)
+		*/
+		long int FindBin(double x,double y){
+			double xmin= GetXmin();
+			double xmax= GetXmax();
+			double ymin= GetYmin();
+			double ymax= GetYmax();
+			if(x<xmin || x>xmax || y<ymin || y>ymax){
+				WARN_LOG("Cannot find bin (x,y)=("<<x<<","<<y<<") (hint: overflow/underflow bins)!");
+				return -1;
+			}
+			long int binx= static_cast<long int>( m_Nx*(x-xmin)/(xmax-xmin) );
+			long int biny= static_cast<long int>( m_Ny*(y-ymin)/(ymax-ymin) );
+			long int gbin= GetBin(binx,biny); 
+			return gbin;
+		}
+
+		/**
 		* \brief Check if bin content is within given value range
 		*/
 		bool IsBinContentInRange(long int binIdX,long int binIdY,double minThr,double maxThr){	
@@ -391,12 +409,14 @@ class Image : public TNamed {
 		*/
 		int FillPixel(long int ix,long int iy,double w,bool useNegativePixInStats=true);
 		int FillPixel(long int gbin,double w,bool useNegativePixInStats=true);
+		int Fill(double x,double y,double w,bool useNegativePixInStats=true);
 		/**
 		* \brief Fill pixel (multithreaded version). This updated the moments per thread. To get the cumulative moments use the StatsUtils
 		*/
 		#ifdef OPENMP_ENABLED
 		int FillPixelMT(Caesar::StatMoments<double>& moments,long int ix,long int iy,double w,bool useNegativePixInStats=true);
 		int FillPixelMT(Caesar::StatMoments<double>& moments,long int gbin,double w,bool useNegativePixInStats=true);
+		int FillMT(Caesar::StatMoments<double>& moments,double x,double y,double w,bool useNegativePixInStats=true);
 		#endif		
 
 		/**
@@ -547,14 +567,13 @@ class Image : public TNamed {
 		TH1D* GetPixelHisto(int nbins=100,bool normalize=false);
 
 		/**
-		* \brief Find optimal global threshold
-		*/
-		double FindOptimalGlobalThreshold(int nbins=100);
-
-		/**
 		* \brief Find Otsu threshold
 		*/
 		double FindOtsuThreshold(int nbins=100);
+		/**
+		* \brief Find Otsu threshold
+		*/
+		double FindOtsuThreshold(TH1D* pixelHisto);
 		/**
 		* \brief Find valley threshold
 		*/
@@ -562,11 +581,11 @@ class Image : public TNamed {
 		/**
 		* \brief Find median global threshold
 		*/
-		//double FindMedianThreshold(double thrFactor);
+		double FindMedianThreshold(double thrFactor);
 		/**
 		* \brief Find optimal global threshold
 		*/
-		//double FindOptimalGlobalThreshold(double thrFactor,int nbins=100,bool smooth=true);
+		double FindOptimalGlobalThreshold(double thrFactor,int nbins=100,bool smooth=true);
 		/**
 		* \brief Get binarized image
 		*/
@@ -716,7 +735,7 @@ class Image : public TNamed {
 		/**
 		* \brief Draw image
 		*/
-		//int Plot(std::vector<Source*>const&,bool useCurrentCanvas=true,bool drawFull=false,int paletteStyle=Caesar::eRAINBOW,bool drawColorPalette=true,bool putWCAxis=false,int coordSystem=-1,std::string units="Jy/beam");
+		int Plot(std::vector<Source*>const&,bool useCurrentCanvas=true,bool drawFull=false,int paletteStyle=Caesar::eRAINBOW,bool drawColorPalette=true,bool putWCAxis=false,int coordSystem=-1,std::string units="Jy/beam");
 		/**
 		* \brief Set draw range
 		*/

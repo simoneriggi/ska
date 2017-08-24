@@ -301,13 +301,28 @@ int ConfigParser::RegisterPredefinedOptions(){
 
 		
 		//==============================================
-		//==  Superpixel Generation/Merging options   ==
+		//==  Superpixel Generation options           ==
 		//==============================================
 		REGISTER_OPTION(spSize,int,20,5,10000);
 		REGISTER_OPTION(spBeta,double,1,1.e-10,1.e+10);
 		REGISTER_OPTION(spMinArea,int,10,1,10000);
 		REGISTER_OPTION(spUseLogContrast,bool,false,false,true);
-				
+
+		//==============================================
+		//==  Hierarchical clustering algo options    ==
+		//==============================================
+		REGISTER_OPTION(spMergingNSegmentsToStop,int,1,0,1000);
+		REGISTER_OPTION(spMergingRatio,double,0.3,0,1.0001);
+		REGISTER_OPTION(spMergingMaxDissRatio,double,1000,0,100000);
+		REGISTER_OPTION(spMergingMaxDissRatio2ndNeighbours,double,1.05,0,100000);
+		REGISTER_OPTION(spMergingDissThreshold,double,3,0,100000);
+		REGISTER_OPTION(spMergingEdgeModel,int,2,1,2);
+		REGISTER_OPTION(spMergingRegPar,double,0.5,-0.0001,1.0001);
+		REGISTER_OPTION(spMergingIncludeSpatialPars,bool,false,false,true);
+		REGISTER_OPTION(spMergingUse2ndNeighbours,bool,true,false,true);
+		
+		
+
 		//Set has_registered flag (otherwise options are re-built)
 		m_HasRegisteredOptions= true;
 

@@ -39,6 +39,7 @@
 #include <SLIC.h>
 #include <SLICUtils.h>
 #include <SLICSegmenter.h>
+#include <ChanVeseSegmenter.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -223,8 +224,8 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(saveSignificanceMap,m_saveSignificanceMap);
 	GET_OPTION_VALUE(saveBkgMap,m_saveBkgMap);
 	GET_OPTION_VALUE(saveNoiseMap,m_saveNoiseMap);
-	
-	
+	GET_OPTION_VALUE(saveSaliencyMap,m_saveSaliencyMap);
+		
 	//Get bkg options
 	GET_OPTION_VALUE(useLocalBkg,m_UseLocalBkg);
 	GET_OPTION_VALUE(use2ndPassInLocalBkg,m_Use2ndPassInLocalBkg);
@@ -250,7 +251,6 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(nestedBlobThrFactor,m_NestedBlobThrFactor);
 	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
 
-	
 	
 	//Get source selection options
 	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
@@ -320,7 +320,17 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(cvNuPar,m_cvNuPar);
 	GET_OPTION_VALUE(cvPPar,m_cvPPar);
 
-		
+	//Hierarchical clustering options
+	GET_OPTION_VALUE(spMergingEdgeModel,m_spMergingEdgeModel);
+	GET_OPTION_VALUE(spMergingRegPar,m_spMergingRegPar);
+	GET_OPTION_VALUE(spMergingIncludeSpatialPars,m_spMergingIncludeSpatialPars);
+	GET_OPTION_VALUE(spMergingNSegmentsToStop,m_spMergingNSegmentsToStop);
+	GET_OPTION_VALUE(spMergingRatio,m_spMergingRatio);
+	GET_OPTION_VALUE(spMergingMaxDissRatio,m_spMergingMaxDissRatio);
+	GET_OPTION_VALUE(spMergingMaxDissRatio2ndNeighbours,m_spMergingMaxDissRatio2ndNeighbours);
+	GET_OPTION_VALUE(spMergingDissThreshold,m_spMergingDissThreshold);
+	
+
 	return 0;
 
 }//close Configure()
@@ -646,7 +656,9 @@ int SFinder::FindExtendedSources(){
 
 int SFinder::FindExtendedSources_HClust(Image*){
 
-	/*
+	//==========================================
+	//==    PRELIMINARY STAGES
+	//==========================================
 	//## Compute saliency
 	m_SaliencyImg= m_ResidualImg->GetMultiResoSaliencyMap(
 		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
@@ -661,31 +673,96 @@ int SFinder::FindExtendedSources_HClust(Image*){
 	}
 
 	//## Threshold saliency map and get signal and bkg markers
-	int nbins= 100;
-	double signalThr= m_SaliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,nbins,true);
+	bool smoothPixelHisto= true;
+	int pixelHistoNBins= 100;
+	double signalThr= m_SaliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
 	double bkgThr= m_SaliencyImg->FindMedianThreshold(m_SaliencyBkgThrFactor);
 
 	double fgValue= 1;
 	Image* signalMarkerImg= m_SaliencyImg->GetBinarizedImage(signalThr,fgValue,false);
 	Image* bkgMarkerImg= m_SaliencyImg->GetBinarizedImage(bkgThr,fgValue,true);
 	
+	//## Compute edge image	
+	m_EdgeImg= ComputeEdgeImage(m_ResidualImg,m_spMergingEdgeModel);
+	if(!m_EdgeImg){
+		ERROR_LOG("Failed to compute the edge image, cannot perform extended source finding!");
+		return -1;
+	}
+
 	//## Compute the Superpixel partition
-	//SLICData* slicData= SLIC::SPGenerator(this,int regionSize,double regParam, int minRegionSize, bool useLogScaleMapping, Img* edgeImg);
+	SLICData* slicData_init= SLIC::SPGenerator(m_ResidualImg,m_spSize,m_spBeta,m_spMinArea,m_spUseLogContrast,m_EdgeImg);
+	if(!slicData_init){
+		ERROR_LOG("Failed to compute the initial superpixel partition, cannot perform extended source finding!");	
+		return -1;
+	}
 
-	
 	//## Tag the superpixel partition
-	//...	
+	if(SLICUtils::TagRegions(slicData_init->regions,bkgMarkerImg,signalMarkerImg)<0){
+		ERROR_LOG("Failed to tag (signal vs bkg) the initial superpixel partition, cannot perform extended source finding!");
+		delete slicData_init;
+		slicData_init= 0;
+		return -1;
+	}
+	
+	//==========================================
+	//==    RUN SEGMENTATION
+	//==========================================
+	//## Run the segmentation	
+	SLICData slicData_segm;
+	SLICSegmenter::FindSegmentation(
+		*slicData_init, slicData_segm,
+		m_spMergingRegPar, m_spMergingIncludeSpatialPars, m_spMergingUse2ndNeighbours,
+		m_spMergingNSegmentsToStop,m_spMergingRatio,
+		m_spMergingMaxDissRatio,m_spMergingMaxDissRatio2ndNeighbours,m_spMergingDissThreshold
+	);
 
-	//## Run the segmentation
-	//...
+	//## Get results
 	//...
 
 	//## Clear-up
-	*/
+	delete slicData_init;
+	slicData_init= 0;
 
 	return 0;
 
 }//close FindExtendedSources_HClust()
+
+
+Image* SFinder::ComputeEdgeImage(Image* inputImg,int edgeModel){
+
+	//Check input image
+	if(!inputImg){
+		ERROR_LOG("Null ptr to given input image!");
+		return nullptr;
+	}
+
+	//Compute edge image according to desired model
+	Image* edgeImg= 0;
+	if(edgeModel == eKirschEdge){
+		edgeImg= inputImg->GetKirschImage();	
+	}
+	else if(edgeModel == eChanVeseEdge){
+		bool returnContourImg= true;
+		edgeImg= ChanVeseSegmenter::FindSegmentation(
+			inputImg, returnContourImg,
+			m_cvTimeStepPar, m_cvWindowSizePar, m_cvLambda1Par, m_cvLambda2Par, m_cvMuPar, m_cvNuPar, m_cvPPar
+		);
+	}
+	else {
+		ERROR_LOG("Invalid edge model selected!");
+		return nullptr;
+	}
+
+	//Check if edge image computing failed
+	if(!edgeImg){
+		ERROR_LOG("Failed to compute edge image!");
+		return nullptr;
+	}
+	
+	return edgeImg;
+
+}//close ComputeEdgeImage()
+
 
 int SFinder::FindExtendedSources_ChanVese(Image* inputImg){
 
@@ -1156,6 +1233,12 @@ int SFinder::Save(){
 	if(m_saveNoiseMap && m_BkgData && m_BkgData->NoiseMap){
 		(m_BkgData->NoiseMap)->SetNameTitle("img_rms","img_rms");
 		(m_BkgData->NoiseMap)->Write();
+	}
+
+	//Save saliency map
+	if(m_saveSaliencyMap && m_SaliencyImg){
+		m_SaliencyImg->SetNameTitle("img_saliency","img_saliency");
+		m_SaliencyImg->Write();
 	}
 
 	/*

@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef Source_h
-#define Source_h 1
+#ifndef _SOURCE_h
+#define _SOURCE_h 1
 
 #include <Blob.h>
 #include <TObject.h>
@@ -53,7 +53,6 @@
 namespace Caesar {
 
 class Contour;
-class Img;
 
 class Source : public Blob {
 

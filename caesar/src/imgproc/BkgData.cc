@@ -26,7 +26,6 @@
 */
 
 #include <BkgData.h>
-#include <Img.h>
 #include <Image.h>
 
 #include <TObject.h>
@@ -44,7 +43,6 @@ using namespace std;
 
 
 ClassImp(Caesar::BkgSampleData)
-ClassImp(Caesar::BkgData)
 ClassImp(Caesar::ImgBkgData)
 
 namespace Caesar {
@@ -89,52 +87,6 @@ void ImgBkgData::CopyNoiseMap(Caesar::Image* aMap){
 		NoiseMap= 0;
 	}
 
-	bool copyMetaData= true;
-	bool resetStats= false;
-	NoiseMap= aMap->GetCloned(std::string(mapName),copyMetaData,resetStats);
-
-}//close CopyNoiseMap()
-		
-
-//=====================================
-//==   OLD BKG DATA
-//=====================================
-
-BkgData::BkgData() {
-	BkgSamplings.clear();
-	BkgMap= 0;
-	NoiseMap= 0;
-	gBkg= 0;
-	gNoise= 0;
-}//close costructor
-
-BkgData::~BkgData() {
-	Clear();
-}//close destructor
-
-void BkgData::CopyBkgMap(Caesar::Img* aMap){
-	if(!aMap) return;
-	TString mapName= "bkgMap";
-	if(BkgMap) {
-		mapName= BkgMap->GetName();
-		delete BkgMap;
-		BkgMap= 0;
-	}
-	
-	bool copyMetaData= true;
-	bool resetStats= false;
-	BkgMap= aMap->GetCloned(std::string(mapName),copyMetaData,resetStats);
-	
-}//close CopyBkgMap()
-		
-void BkgData::CopyNoiseMap(Caesar::Img* aMap){
-	if(!aMap) return;
-	TString mapName= "noiseMap";
-	if(NoiseMap) {
-		mapName= NoiseMap->GetName();	
-		delete NoiseMap;
-		NoiseMap= 0;
-	}
 	bool copyMetaData= true;
 	bool resetStats= false;
 	NoiseMap= aMap->GetCloned(std::string(mapName),copyMetaData,resetStats);

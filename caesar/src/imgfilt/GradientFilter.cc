@@ -27,7 +27,6 @@
 
 
 #include <GradientFilter.h>
-#include <Img.h>
 #include <Image.h>
 #include <MathUtils.h>
 
@@ -102,88 +101,7 @@ cv::Mat GradientFilter::BuildLaplaceKernel(){
 }//close BuildLaplaceKernel()
 
 
-//===================================
-//==        OLD IMAGE METHODS
-//===================================
-Img* GradientFilter::GetGradientFilter(Img* image){
 
-	//## Check image
-	if(!image){
-		cerr<<"GradientFilter::GetGradientFilter(): ERROR: Null prt to given image!"<<endl;
-		return 0;
-	}
-
-	//## Init kernels
-	std::vector<cv::Mat> kernelList= BuildGradientKernels();
-	
-	//## Convert input image to OpenCV mat
-	cv::Mat I= image->ImgToMat("64");
-	int nrows= I.rows;
-	int ncols= I.cols;
-
-	//## Compute convolutions for all kernel directions
-	std::vector<cv::Mat> filteredEnsemble;
-	for(unsigned int k=0;k<kernelList.size();k++){
-		filteredEnsemble.push_back( cv::Mat::zeros(nrows,ncols,CV_64FC1) );
-		filteredEnsemble[k]= Caesar::MathUtils::GetConvolution(I,kernelList[k]);	
-	}//end loop kernel directions
-
-	//## Compute gradient as sqrt(gradX^2+gradY^2)
-	cv::Mat filteredMat= cv::Mat::zeros(nrows,ncols,CV_64FC1);
-	for (int i=0; i<nrows;i++){
-  	for (int j=0; j<ncols;j++) { 
-			double sum2= 0;
-			for(unsigned int k=0;k<filteredEnsemble.size();k++){
-				double w= filteredEnsemble[k].at<double>(i,j);
-				double w2= w*w;
-				sum2+= w2;
-			}//end loop kernels
-			double val= sqrt(sum2);
-			filteredMat.at<double>(i,j)= val;
-		}//end loop cols	
-	}//end loop rows
-
-	//## Convert OpenCV mat list to Img
-	TString imgName= Form("%s_Grad",image->GetName());
-	Img* filteredImg= image->GetCloned(std::string(imgName),true,true);
-	filteredImg->Reset();
-	filteredImg->FillFromMat(filteredMat);
-
-	return filteredImg;
-
-}//close GradientFilter::GetGradientFilter()
-
-
-Img* GradientFilter::GetLaplaceFilter(Img* image){
-	
-	//## Check image
-	if(!image){
-		cerr<<"GradientFilter::GetLaplaceFilter(): ERROR: Null prt to given image!"<<endl;
-		return 0;
-	}
-
-	//## Init kernels
-	cv::Mat kernel= BuildLaplaceKernel();
-	
-	//## Convert input image to OpenCV mat
-	cv::Mat I= image->ImgToMat("64");
-	
-	//## Compute convolution
-	cv::Mat filteredMat= Caesar::MathUtils::GetConvolution(I,kernel);	
-
-	//## Convert OpenCV mat list to Img
-	TString imgName= Form("%s_Lapl",image->GetName());
-	Img* filteredImg= image->GetCloned(std::string(imgName),true,true);
-	if(!filteredImg){
-		cerr<<"GradientFilter::GetLaplaceFilter(): ERROR: Failed to clone image!"<<endl;
-		return 0;
-	}
-	filteredImg->Reset();
-	filteredImg->FillFromMat(filteredMat);
-
-	return filteredImg;
-
-}//close GetLaplaceFilter()
 
 //===================================
 //==        NEW IMAGE METHODS

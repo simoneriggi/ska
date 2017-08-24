@@ -27,7 +27,7 @@
 
 
 #include <Blob.h>
-#include <Img.h>
+#include <Image.h>
 #include <Pixel.h>
 #include <Contour.h>
 #include <StatsUtils.h>
@@ -638,8 +638,7 @@ int Blob::ComputeMorphologyParams(){
 
 }//close ComputeMorphologyParams()
 
-//Img* Blob::GetImage(Img::ImgType mode){
-Img* Blob::GetImage(ImgType mode){
+Image* Blob::GetImage(ImgType mode){
 
 	//Bounding box in (x,y) coordinates
 	double xRange[2]= {m_Xmin,m_Xmax};
@@ -651,35 +650,35 @@ Img* Blob::GetImage(ImgType mode){
 	boundingBoxX[1]= xRange[1]+deltaPix;
 	boundingBoxY[0]= yRange[0]-deltaPix;
 	boundingBoxY[1]= yRange[1]+deltaPix;
-	int nBoxX= boundingBoxX[1]-boundingBoxX[0]+1;
-	int nBoxY= boundingBoxY[1]-boundingBoxY[0]+1;
+	long int nBoxX= boundingBoxX[1]-boundingBoxX[0]+1;
+	long int nBoxY= boundingBoxY[1]-boundingBoxY[0]+1;
 
 	//## Fill image and binarized image
 	TString imgName= Form("SourceImg_%s_mode%d",Name.c_str(),mode);
-	Img* blobImg= new Img(imgName,imgName,nBoxX,boundingBoxX[0]-0.5,boundingBoxX[1]+0.5,nBoxY,boundingBoxY[0]-0.5,boundingBoxY[1]+0.5);
+	//Image* blobImg= new Image(nBoxX,boundingBoxX[0]-0.5,boundingBoxX[1]+0.5,nBoxY,boundingBoxY[0]-0.5,boundingBoxY[1]+0.5,imgName);
+	Image* blobImg= new Image(nBoxX,nBoxY,boundingBoxX[0]-0.5,boundingBoxY[0]-0.5,std::string(imgName));
 	
-	//if(mode==Img::eBinaryMap){
 	if(mode==eBinaryMap){
-		for(unsigned int k=0;k<m_Pixels.size();k++){
+		for(size_t k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
 			double thisY= thisPixel->y;
-			blobImg->FillPixel(thisX,thisY,1);
+			blobImg->Fill(thisX,thisY,1);
 		}//end loop pixels
 	}//close if
-	//else if(mode==Img::eFluxMap){
+	
 	else if(mode==eFluxMap){
-		for(unsigned int k=0;k<m_Pixels.size();k++){
+		for(size_t k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
 			double thisY= thisPixel->y;
 			double thisS= thisPixel->S;	
-			blobImg->FillPixel(thisX,thisY,thisS);
+			blobImg->Fill(thisX,thisY,thisS);
 		}//end loop pixels
 	}//close else
-	//else if(mode==Img::eSignificanceMap){
+	
 	else if(mode==eSignificanceMap){
-		for(unsigned int k=0;k<m_Pixels.size();k++){
+		for(size_t k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
 			double thisY= thisPixel->y;
@@ -688,38 +687,38 @@ Img* Blob::GetImage(ImgType mode){
 			double thisNoise= thisPixel->noiseLevel;
 			double thisZ= 0;
 			if(thisNoise!=0) thisZ= (thisS-thisBkg)/thisNoise;	
-			blobImg->FillPixel(thisX,thisY,thisZ);
+			blobImg->Fill(thisX,thisY,thisZ);
 		}//end loop pixels
 	}//close else
-	//else if(mode==Img::ePullMap){
+	
 	else if(mode==ePullMap){
-		for(unsigned int k=0;k<m_Pixels.size();k++){
+		for(size_t k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
 			double thisY= thisPixel->y;
 			double thisS= thisPixel->S;	
 			double thisPull= (thisS-Median)/MedianRMS;
-			blobImg->FillPixel(thisX,thisY,thisPull);
+			blobImg->Fill(thisX,thisY,thisPull);
 		}//end loop pixels
 	}//close else if
-	//else if(mode==Img::eCurvatureMap){
+	
 	else if(mode==eCurvatureMap){
-		for(unsigned int k=0;k<m_Pixels.size();k++){
+		for(size_t k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
 			double thisY= thisPixel->y;
 			double thisCurv= thisPixel->S_curv;	
-			blobImg->FillPixel(thisX,thisY,thisCurv);
+			blobImg->Fill(thisX,thisY,thisCurv);
 		}//end loop pixels
 	}//close else if
 	
-	//else if(mode==Img::eMeanFluxMap){
+	
 	else if(mode==eMeanFluxMap){
-		for(unsigned int k=0;k<m_Pixels.size();k++){
+		for(size_t k=0;k<m_Pixels.size();k++){
 			Pixel* thisPixel= m_Pixels[k];
 			double thisX= thisPixel->x;
 			double thisY= thisPixel->y;
-			blobImg->FillPixel(thisX,thisY,Mean);
+			blobImg->Fill(thisX,thisY,Mean);
 		}//end loop pixels
 	}
 

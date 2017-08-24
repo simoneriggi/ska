@@ -26,7 +26,6 @@
 */
 
 #include <WTFilter.h>
-#include <Img.h>
 #include <Image.h>
 #include <MathUtils.h>
 #include <WTFilter.h>
@@ -106,63 +105,6 @@ std::vector<Image*> WTFilter::GetDecomposition(Image* image,int nScales){
 
 	for(int n=0;n<nScales+1;n++){
 		TString imgName= Form("%s_WT%d",image->GetName().c_str(),n);
-		image_helper= image->GetCloned(std::string(imgName),true,true);
-		image_helper->Reset();
-		image_helper->FillFromMat(W[n]);
-		imgCollection.push_back(image_helper);
-	}//end loop scales
-	
-	return imgCollection;
-
-}//close GetDecomposition()
-
-//================================================
-//==         OLD IMAGE METHODS 
-//================================================
-std::vector<Img*> WTFilter::GetDecomposition(Img* image,int nScales){
-	
-	//## Check image
-	std::vector<Img*> imgCollection;
-	imgCollection.clear();
-	imgCollection.resize(0);
-	if(!image){
-		ERROR_LOG("Null prt to given image!");
-		return imgCollection;
-	}
-
-	//## Init kernels
-	cv::Mat H= BuildB3SlineKernel();
-	
-	//## Convert input image to OpenCV mat
-	cv::Mat I= image->ImgToMat("64");
-	int nrows= I.rows;
-	int ncols= I.cols;
-	
-	//## Init filt mat
-	std::vector<cv::Mat> F;
-	std::vector<cv::Mat> W;//W(0) is the smoothed array
-	for(int k=0;k<nScales+1;k++){
-		F.push_back( cv::Mat::zeros(nrows,ncols,CV_64FC1) );
-		W.push_back( cv::Mat::zeros(nrows,ncols,CV_64FC1) );
-	}
-
-	//## Compute convolution at all WT scales
-	//Init F[0] with full reso input image
-	F[0]= I;
-
-	for(int n=1;n<nScales+1;n++){
-		DEBUG_LOG("Compute convolution at scale "<<n<<" ...");
-		F[n]= Caesar::MathUtils::GetATrousConvolution(F[n-1],H,n);
-		W[n-1]= F[n-1]-F[n];
-	}//end loop scales
-
-	W[nScales]= F[nScales];
-
-	//## Convert OpenCV mat list to Img
-	Img* image_helper= 0;
-
-	for(int n=0;n<nScales+1;n++){
-		TString imgName= Form("%s_WT%d",image->GetName(),n);
 		image_helper= image->GetCloned(std::string(imgName),true,true);
 		image_helper->Reset();
 		image_helper->FillFromMat(W[n]);

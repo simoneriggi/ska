@@ -56,7 +56,6 @@ using namespace std;
 
 namespace Caesar {
 
-class Img;
 
 class Region : public Blob {
 

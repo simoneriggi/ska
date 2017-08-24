@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef WTFilter_h
-#define WTFilter_h 1
+#ifndef _WT_FILTER_h
+#define _WT_FILTER_h 1
 
 
 //ROOT
@@ -40,7 +40,6 @@ class Mat;
 
 namespace Caesar{
 
-class Img;
 class Image;
 
 class WTFilter : public TObject {
@@ -66,14 +65,6 @@ class WTFilter : public TObject {
 		* \brief Get Wavelet Transform decomposition of input image
 		*/
 		static std::vector<Image*> GetDecomposition(Image* image,int nScales);
-		
-		//================================================
-		//==         OLD IMAGE METHODS 
-		//================================================
-		/**
-		* \brief Get Wavelet Transform decomposition of input image
-		*/	
-		static std::vector<Img*> GetDecomposition(Img* image,int nScales);
 		
 
 	private:

@@ -1,7 +1,6 @@
 ## INC & SOURCE DIRS
 set(INC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-message (STATUS "INC_DIR: ${INC_DIR}")
 
 ## GET SOURCES and HEADERS
 file(GLOB_RECURSE THIS_SRCS ${SRC_DIR}/*.cc)
@@ -19,7 +18,6 @@ set(
 	Blob.h
 	BlobFinder.h
 	Source.h
-	SourceFinder.h
 	SFinder.h	
 	Contour.h
 	ChanVeseSegmenter.h
@@ -38,7 +36,6 @@ set(
 	${SRC_DIR}/Blob.cc
 	${SRC_DIR}/Source.cc
 	${SRC_DIR}/BlobFinder.cc
-	#${SRC_DIR}/SourceFinder.cc
 	${SRC_DIR}/SFinder.cc
 	${SRC_DIR}/Contour.cc
 	${SRC_DIR}/ChanVeseSegmenter.cc
@@ -52,12 +49,6 @@ foreach (_headerFile ${THIS_HEADERS})
 endforeach()
 list(REMOVE_DUPLICATES THIS_HEADERS_WPATH)
 
-
-MESSAGE(STATUS "THIS_SRCS: ${THIS_SRCS}")
-MESSAGE(STATUS "THIS_HEADERS: ${THIS_HEADERS}")
-MESSAGE(STATUS "THIS_HEADERS_WPATH: ${THIS_HEADERS_WPATH}")
-MESSAGE(STATUS "THIS_DICT_HEADERS: ${THIS_DICT_HEADERS}")
-MESSAGE(STATUS "THIS_DICT_SRCS: ${THIS_DICT_SRCS}")
 
 ## Append srcs and heads to project srcs and heads
 list (APPEND SRCS ${THIS_SRCS})

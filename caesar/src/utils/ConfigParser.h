@@ -38,7 +38,6 @@
 #include <vector>
 #include <string>
 
-#include <Img.h>
 
 namespace Caesar{
 

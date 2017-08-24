@@ -26,8 +26,8 @@
 */
 
 
-#ifndef GraphicsUtils_h
-#define GraphicsUtils_h 1
+#ifndef _GRAPHICS_UTILS_h
+#define _GRAPHICS_UTILS_h 1
 
 #include <TObject.h>
 #include <TGaxis.h>
@@ -35,19 +35,8 @@
 
 namespace Caesar {
 
-class Img;
 class Image;
 
-/*
-enum ColorPaletteStyle {
-	eRAINBOW= 0,
-	eBLACKWHITE= 1,
-	eBLACKBODY= 2,
-	eHOT2COLD= 3,
-	eCOLD2HOT= 4,
-	eTHERMAL= 5
-};
-*/
 
 class GraphicsUtils : public TObject {
 
@@ -90,21 +79,22 @@ class GraphicsUtils : public TObject {
 
 		
 		//=========================================
-		//==  OLD IMAGE METHODS 
+		//==  NEW IMAGE METHODS 
 		//=========================================
+		
 		/**
 		* \brief Set WCS axis
 		*/
-		static int SetWCSAxis(Img* img,TGaxis& xaxis,TGaxis& yaxis,int coordSystem=-1);
+		static int SetWCSAxis(Image* img,TGaxis& xaxis,TGaxis& yaxis,int coordSystem=-1);
 
 		/**
 		* \brief Set WCS proj grid
 		*/
-		static int SetWCSProjGrid(Img* img,std::vector<TPolyLine>& gridx,std::vector<TPolyLine>& gridy,int coordSystem);
+		static int SetWCSProjGrid(Image* img,std::vector<TPolyLine>& gridx,std::vector<TPolyLine>& gridy,int coordSystem);
 		/**
 		* \brief Retrieve image from pad
 		*/
-		static Img* FindImageFromPad();
+		static Image* FindImageFromPad();
 		/**
 		* \brief Update pad
 		*/
@@ -114,12 +104,6 @@ class GraphicsUtils : public TObject {
 		*/
 		static int UpdateGAxis();
 
-
-
-		//=========================================
-		//==  NEW IMAGE METHODS 
-		//=========================================
-		
 
 	private:
 	

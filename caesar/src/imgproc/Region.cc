@@ -28,7 +28,6 @@
 #include <Region.h>
 #include <Pixel.h>
 #include <Blob.h>
-#include <Img.h>
 #include <StatsUtils.h>
 
 #include <TObject.h>
@@ -68,7 +67,7 @@ Region::~Region(){
 Region::RegionPars* Region::GetParams(bool includeCurvPar){
 
 	if(!m_HasStats){
-		cerr<<"Region::GetParams(): ERROR: No stats computed for this region!"<<endl;
+		ERROR_LOG("No stats computed for this region!");
 		return 0;
 	}
 
@@ -113,7 +112,7 @@ Region::RegionPars* Region::GetParams(bool includeCurvPar){
 int Region::AddRegion(Region* aRegion,bool addPixels,bool copyPixels){
 
 	if(!aRegion) {
-		cerr<<"Region::AddRegion(): ERROR: Null prt to given region, nothing will be added!"<<endl;
+		ERROR_LOG("Null prt to given region, nothing will be added!");
 		return -1;
 	}
 	
@@ -278,7 +277,7 @@ int Region::GetDistance(double& dist_color,double& dist_space,Region* aRegion,bo
 	dist_color= 1.e+99;
 	dist_space= 1.e+99;
 	if(!aRegion){
-		cerr<<"Region::GetDistance(): ERROR: Null ptr to given region...returning inf dists!"<<endl;
+		ERROR_LOG("Null ptr to given region...returning inf dists!");
 		return -1;
 	}
 
@@ -419,7 +418,7 @@ int Region::GetAsymmDistance(double& dist,double& dist_neighbor,Region* aRegion,
 	dist= 1.e+99;
 	dist_neighbor= 1.e+99;
 	if(!aRegion){
-		cerr<<"Region::GetAsymmDistance(): ERROR: Null ptr to given region...returning inf dists!"<<endl;
+		ERROR_LOG("Null ptr to given region...returning inf dists!");
 		return -1;
 	}
 	
@@ -433,7 +432,7 @@ int Region::GetAsymmDistance(double& dist,double& dist_neighbor,Region* aRegion,
 		double dist_color, dist_space;
 		int status= this->GetDistance(dist_color,dist_space,&mergedRegion,useRobustParams,normalizeParams,addCurvDist);
 		if(status<0){
-			cerr<<"Region::GetAsymmDistance(): ERROR: Failed to compute symm region distance!"<<endl;
+			ERROR_LOG("Failed to compute symm region distance!");
 			return -1;
 		}
 		dist= dist_color;
@@ -441,7 +440,7 @@ int Region::GetAsymmDistance(double& dist,double& dist_neighbor,Region* aRegion,
 		//Find distance between neighbor region and merged region
 		status= aRegion->GetDistance(dist_color, dist_space,&mergedRegion,useRobustParams,normalizeParams,addCurvDist);
 		if(status<0){
-			cerr<<"Region::GetAsymmDistance(): ERROR: Failed to compute symm neighbor region distance!"<<endl;
+			ERROR_LOG("Failed to compute symm neighbor region distance!");
 			return -1;
 		}
 		dist_neighbor= dist_color;

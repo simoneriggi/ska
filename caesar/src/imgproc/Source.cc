@@ -27,9 +27,9 @@
 
 
 #include <Source.h>
-//#include <Pixel.h>
+
 #include <Blob.h>
-#include <Img.h>
+#include <Image.h>
 #include <Contour.h>
 
 #include <TObject.h>

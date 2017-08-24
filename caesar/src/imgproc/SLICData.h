@@ -56,9 +56,6 @@
 
 namespace Caesar {
 
-//enum SLICEdgeModel {eKirschEdge,eChanVeseEdge};
-
-class Img;
 class Image;
 
 class SLICData : public TObject {
@@ -135,16 +132,21 @@ class SLICData : public TObject {
 		
 	public:
 
-		Image* inputImage;//the image passed to SLIC generator (normalized)
-		Image* edgeImage;//the image borders passed to SLIC generator
-		Image* laplImage;//the image laplacian
+		//- The image passed to SLIC generator (normalized)
+		Image* inputImg;
 
-		Img* inputImg;//the image passed to SLIC generator (normalized)
-		Img* edgeImg;//the image borders passed to SLIC generator
-		Img* laplImg;//the image laplacian
-		//TMatrixD* pixelLabels;//matrix with pixel region labels
+		//- The image borders passed to SLIC generator
+		Image* edgeImg;
+
+		//- The image laplacian
+		Image* laplImg; 
+
+		//- Matrix with pixel region labels
+		//TMatrixD* pixelLabels;
 		std::vector< std::vector<long int> > labels;
-		std::vector<Region*> regions;//list of generated superpixels
+
+		//- The list of generated superpixels
+		std::vector<Region*> regions;
 
 		ClassDef(SLICData,1)
 

@@ -24,10 +24,10 @@
 * @date 15/06/2015
 */
 
-#ifndef ChanVeseSegmenter_H
-#define ChanVeseSegmenter_H
+#ifndef _CHANVESE_SEGMENTER_H
+#define _CHANVESE_SEGMENTER_H 1
 
-#include <Img.h>
+
 #include <Contour.h>
 
 #include <TObject.h>
@@ -42,7 +42,6 @@
 
 namespace Caesar{
 
-class Img;
 class Image;
 
 class ChanVeseSegmenter : public TObject {
@@ -101,13 +100,6 @@ class ChanVeseSegmenter : public TObject {
 		*/
 		static Image* FindSegmentation(Image* img,bool returnContourImg=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1,double initContourRadius=1);
 
-		//===============================================
-		//==          OLD IMAGE METHODS
-		//===============================================
-		/**
-		* \brief Find the ChanVese segmentation of input image
-		*/
-		static Img* FindSegmentation(Img* img,bool returnContourImg=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1,double initContourRadius=1);
 		
 
 	private:
@@ -119,14 +111,6 @@ class ChanVeseSegmenter : public TObject {
 		* \brief Initialize algorithm
 		*/
 		static CVdata* Init(Image* img,double initContourRadius=1);
-
-		//===============================================
-		//==          OLD IMAGE METHODS
-		//===============================================
-		/**
-		* \brief Initialize algorithm
-		*/
-		static CVdata* Init(Img* img,double initContourRadius=1);
 
 
 		//===============================================

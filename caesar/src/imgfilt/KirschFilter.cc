@@ -26,7 +26,6 @@
 */
 
 #include <KirschFilter.h>
-#include <Img.h>
 #include <Image.h>
 #include <MathUtils.h>
 
@@ -112,57 +111,6 @@ Image* KirschFilter::GetKirschFilter(Image* image)
 }//close GetKirschFilter()
 
 
-//===================================
-//==        OLD IMAGE METHODS
-//===================================
-Img* KirschFilter::GetKirschFilter(Img* image){
-	
-	//## Check image
-	if(!image){
-		cerr<<"KirschFilter::GetKirschFilter(): ERROR: Null prt to given image!"<<endl;
-		return 0;
-	}
-
-	//## Init kernels
-	std::vector<cv::Mat> kernelList= BuildKernels();
-	
-	//## Convert input image to OpenCV mat
-	cv::Mat I= image->ImgToMat("64");
-	int nrows= I.rows;
-	int ncols= I.cols;
-	
-	//## Compute convolutions for all kernel directions
-	std::vector<cv::Mat> filteredEnsemble;
-	cv::Mat filteredMat= cv::Mat::zeros(nrows,ncols,CV_64FC1);
-	for(unsigned int k=0;k<kernelList.size();k++){
-		filteredEnsemble.push_back( cv::Mat::zeros(nrows,ncols,CV_64FC1) );
-		//cv::filter2D(I, filteredEnsemble[k],-1,kernelList[k], cv::Point(-1,-1), 0, cv::BORDER_DEFAULT );
-		filteredEnsemble[k]= Caesar::MathUtils::GetConvolution(I,kernelList[k]);	
-	}//end loop kernel directions
-
-	//## Set final filtered image to maximum pixel value across all direction convolutions
-	for(int i=0;i<nrows;i++){
-		for(int j=0;j<ncols;j++){
-			double maxVal= -1.e+99;
-			for(unsigned int k=0;k<kernelList.size();k++){
-				double val= filteredEnsemble[k].at<double>(i,j);
-				if(val>maxVal) maxVal= val;
-			}	
-			filteredMat.at<double>(i,j)= maxVal;
-		}//end loop cols
-	}//end loop rows
-
-
-	//## Convert OpenCV mat list to Img
-	TString imgName= Form("%s_Kirsch",image->GetName());
-	Img* filteredImg= image->GetCloned(std::string(imgName),true,true);
-	filteredImg->Reset();
-	filteredImg->FillFromMat(filteredMat);
-
-	return filteredImg;
-
-}//close GetKirschFilter()
-
 
 std::vector<cv::Mat> KirschFilter::BuildKernels(){
 
@@ -188,8 +136,6 @@ std::vector<cv::Mat> KirschFilter::BuildKernels(){
 				kernelList[k].at<double>(i,j)= kernValues[k][i][j];
 			}
 		}	
-		//cout<<"Kernel no. "<<k<<endl;
-		//cout<<kernelList[k]<<endl;
 	}//end loop kernel list
 
 	return kernelList;

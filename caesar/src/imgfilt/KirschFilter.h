@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef KirschFilter_h
-#define KirschFilter_h 1
+#ifndef _KIRSCH_FILTER_h
+#define _KIRSCH_FILTER_h 1
 
 #include <TObject.h>
 
@@ -38,7 +38,6 @@ namespace cv {
 
 namespace Caesar{
 
-class Img;
 class Image;
 
 class KirschFilter : public TObject {
@@ -64,14 +63,6 @@ class KirschFilter : public TObject {
 		* \brief Apply Kirsh filter to input image and return filtered image
 		*/
 		static Image* GetKirschFilter(Image* image);
-		
-		//===================================
-		//==        OLD IMAGE METHODS
-		//===================================
-		/**
-		* \brief Apply Kirsh filter to input image and return filtered image
-		*/
-		static Img* GetKirschFilter(Img* image);
 		
 
 	private:

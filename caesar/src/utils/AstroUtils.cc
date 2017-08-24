@@ -27,11 +27,9 @@
 
 
 #include <AstroUtils.h>
-#include <Img.h>
+#include <Image.h>
 
 #include <TObject.h>
-
-
 
 #include <iomanip>
 #include <iostream>
@@ -50,17 +48,18 @@ ClassImp(Caesar::AstroUtils)
 
 namespace Caesar {
 
-AstroUtils::AstroUtils(){
+AstroUtils::AstroUtils()
+{
 
 }
 
-AstroUtils::~AstroUtils(){
+AstroUtils::~AstroUtils()
+{
 
 }
 
 
-
-int AstroUtils::PixelToWCSCoords(Caesar::Img* image,WorldCoor* wcs,double ix,double iy,double& xpos, double& ypos) {
+int AstroUtils::PixelToWCSCoords(Caesar::Image* image,WorldCoor* wcs,double ix,double iy,double& xpos, double& ypos) {
 
 	//Check pixel values in input
 	if(!image){
@@ -69,21 +68,19 @@ int AstroUtils::PixelToWCSCoords(Caesar::Img* image,WorldCoor* wcs,double ix,dou
 	}
 
 	//Get image range
-	int Nx= image->GetNbinsX();
-	int Ny= image->GetNbinsY();
-	double xmin= image->GetXaxis()->GetXmin();
-	double ymin= image->GetYaxis()->GetXmin();
-	double xmax= image->GetXaxis()->GetXmax();
-	double ymax= image->GetYaxis()->GetXmax();
+	double xmin= image->GetXmin();
+	double ymin= image->GetYmin();
+	double xmax= image->GetXmax();
+	double ymax= image->GetYmax();
 
 	if(ix<xmin || iy<ymin || ix>xmax || iy>ymax ){
-		cerr<<"AstroUtils::PixelToWCSCoords(): ERROR: Invalid pix range selected (ix="<<ix<<", iy="<<iy<<")"<<endl;
+		ERROR_LOG("Invalid pix range selected (ix="<<ix<<", iy="<<iy<<")");
 		return -1;	
 	}
 
 	//Check WCS
 	if(!wcs){
-		cerr<<"AstroUtils::PixelToWCSCoords(): ERROR: Null ptr to given WCS!"<<endl;
+		ERROR_LOG("Null ptr to given WCS!");
 		return -1;
 	}
 
@@ -95,31 +92,28 @@ int AstroUtils::PixelToWCSCoords(Caesar::Img* image,WorldCoor* wcs,double ix,dou
 }//close PixelToWCSCoords()
 
 
-int AstroUtils::PixelToWCSCoords(Caesar::Img* image,double ix,double iy,double& xpos, double& ypos,int coordSystem) {
+int AstroUtils::PixelToWCSCoords(Caesar::Image* image,double ix,double iy,double& xpos, double& ypos,int coordSystem) {
 
 	//Check pixel values in input
 	if(!image){
-		cerr<<"AstroUtils::PixelToWCSCoords(): ERROR: Null image ptr given!"<<endl;
+		ERROR_LOG("Null image ptr given!");
 		return -1;	
 	}
 
 	//Get image range
-	int Nx= image->GetNbinsX();
-	int Ny= image->GetNbinsY();
-	double xmin= image->GetXaxis()->GetXmin();
-	double ymin= image->GetYaxis()->GetXmin();
-	double xmax= image->GetXaxis()->GetXmax();
-	double ymax= image->GetYaxis()->GetXmax();
+	double xmin= image->GetXmin();
+	double ymin= image->GetYmin();
+	double xmax= image->GetXmax();
+	double ymax= image->GetYmax();
 
 	if(ix<xmin || iy<ymin || ix>xmax || iy>ymax ){
-		cerr<<"AstroUtils::PixelToWCSCoords(): ERROR: Invalid pix range selected (ix="<<ix<<", iy="<<iy<<")"<<endl;
+		ERROR_LOG("Invalid pix range selected (ix="<<ix<<", iy="<<iy<<")");
 		return -1;	
 	}
 
-	
 	//Check image meta-data
 	if(!image->HasMetaData() ){
-    cerr<<"AstroUtils::PixelToWCSCoords(): WARNING: No metadata available in image!"<<endl;
+    ERROR_LOG("No metadata available in image!");
 		return -1;
 	}
 	Caesar::ImgMetaData* metadata= image->GetMetaData();	
@@ -127,7 +121,7 @@ int AstroUtils::PixelToWCSCoords(Caesar::Img* image,double ix,double iy,double& 
 	//Get the coord system
 	WorldCoor* wcs= metadata->GetWorldCoord(coordSystem);
 	if(!wcs){
-		cerr<<"AstroUtils::PixelToWCSCoords: WARNING: Failed to get WorldCoord system from metadata!"<<endl;
+		ERROR_LOG("Failed to get WorldCoord system from metadata!");
 		return -1;
 	}
 
@@ -141,10 +135,6 @@ int AstroUtils::PixelToWCSCoords(Caesar::Img* image,double ix,double iy,double& 
 	return 0;
 		
 }//close PixelToWCSCoords()
-
-
-
-
 
 
 

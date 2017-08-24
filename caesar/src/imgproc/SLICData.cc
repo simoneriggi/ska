@@ -27,7 +27,6 @@
 
 #include <SLICData.h>
 #include <Region.h>
-#include <Img.h>
 #include <Image.h>
 
 #include <TObject.h>
@@ -55,42 +54,50 @@ ClassImp(Caesar::SLICSimilarityData)
 
 namespace Caesar {
 
-SLICData::SLICData() {
+SLICData::SLICData() 
+{
+	//Init data
 	inputImg= 0;
 	edgeImg= 0;
 	laplImg= 0;
-
-	inputImage= 0;
-	edgeImage= 0;
-	laplImage= 0;
-
 	regions.clear();
 	labels.clear();
+
 }//close costructor
 
-SLICData::~SLICData(){
+SLICData::~SLICData()
+{
+	//Clear data
 	Clear();
+
 }//close destructor
 
-void SLICData::Clear(){
-
+void SLICData::Clear()
+{
+	//Clear images
 	ClearImages();
+	
+	//Clear regions
 	ClearRegions();
 
 }//close ClearAll() 
 
 
 void SLICData::ClearImages(){
+
+	//Delete images
 	if(inputImg) inputImg->Delete();
 	if(edgeImg) edgeImg->Delete();
 	if(laplImg) laplImg->Delete();	
-	if(inputImage) inputImage->Delete();
-	if(edgeImage) edgeImage->Delete();
-	if(laplImage) laplImage->Delete();
+	//if(inputImage) inputImage->Delete();
+	//if(edgeImage) edgeImage->Delete();
+	//if(laplImage) laplImage->Delete();
+
 }//close ClearImages()
 
 void SLICData::ClearRegions(){
 	
+	//Delete regions
 	for(unsigned int i=0;i<regions.size();i++){
 		if(regions[i]){
 			delete regions[i];

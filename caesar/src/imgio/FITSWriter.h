@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef FITSWriter_h
-#define FITSWriter_h 1
+#ifndef _FITS_WRITER_h
+#define _FITS_WRITER_h 1
 
 
 #include <TObject.h>
@@ -49,7 +49,7 @@ using namespace std;
 
 namespace Caesar {
 
-class Img;
+
 class Image;
 class ImgMetaData;
 
@@ -69,10 +69,16 @@ class FITSWriter : public TObject {
 
 
 	public:
-		static int WriteFITS(Img* img,std::string outfilename);
+		/**
+		* \brief Write image to FITS file
+		*/
 		static int WriteFITS(Image* img,std::string outfilename);
 		
 	private:
+
+		/**
+		* \brief Initialize python interface
+		*/
 		static int Init();
 		
 	private:

@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef SLICUtils_h
-#define SLICUtils_h 1
+#ifndef _SLIC_UTILS_h
+#define _SLIC_UTILS_h 1
 
 #include <Contour.h>
 
@@ -53,8 +53,7 @@
 
 namespace Caesar {
 
-
-class Img;
+class Image;
 class Region;
 class SLICContourData;
 class SLICSimilarityData;
@@ -76,14 +75,35 @@ class SLICUtils : public TObject {
 
 	public:
 		
+		/** 
+		\brief Compute superpixel boundary contours
+ 		*/
 		static SLICContourData* ComputeBoundaryContours(SLICData* slicData);
+
+		/** 
+		\brief Compute region similarities
+ 		*/
 		static SLICSimilarityData* ComputeRegionSimilarity(SLICData* slicData,std::vector<SLICNeighborCollection>& neighbors,double beta=0.5);
 
+		/** 
+		\brief Find superpixel neighbors
+ 		*/
 		static int FindNeighbors(std::vector<SLICNeighborCollection>& neighbors,SLICData* slicData,SLICContourData* contourData,bool get2ndNeighbors=true,int selectedTag=-1,bool includeSpatialDist=false);
 
-		static Img* GetSegmentedImage(Img* img,std::vector<Region*>const& regions,int selectedTag=-1,bool normalize=false,bool binarize=false);
+		/** 
+		\brief Compute segmented image given a list of tagged regions
+ 		*/
+		static Image* GetSegmentedImage(Image* img,std::vector<Region*>const& regions,int selectedTag=-1,bool normalize=false,bool binarize=false);
+
+		/** 
+		\brief Count number of regions per tag
+ 		*/
 		static int CountTaggedRegions(std::vector<Region*>const& regions,int& NSig,int& NBkg,int& NUntagged);		
-		static int TagRegions(std::vector<Region*>& regions,Img* binaryMap_bkg,Img* binaryMap_signal);
+
+		/** 
+		\brief Tag regions into signal/bkg according to signal & bkg marker images
+ 		*/
+		static int TagRegions(std::vector<Region*>& regions,Image* binaryMap_bkg,Image* binaryMap_signal);
 
 	public:
 		

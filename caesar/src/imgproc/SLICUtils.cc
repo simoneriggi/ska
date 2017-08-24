@@ -31,7 +31,7 @@
 #include <SLICData.h>
 #include <StatsUtils.h>
 #include <CodeUtils.h>
-#include <Img.h>
+#include <Image.h>
 
 
 #include <TObject.h>
@@ -67,17 +67,17 @@ SLICUtils::~SLICUtils(){
 
 }//close destructor
 
-Img* SLICUtils::GetSegmentedImage(Img* image,std::vector<Region*>const& regions,int selectedTag,bool normalize,bool binarize){
+Image* SLICUtils::GetSegmentedImage(Image* image,std::vector<Region*>const& regions,int selectedTag,bool normalize,bool binarize){
 
 	//## Check input
 	if(!image) {
-		cerr<<"SLICUtils::GetSegmentedImage(): ERROR: Null ptr to input image given!"<<endl;
+		ERROR_LOG("Null ptr to input image given!");
 		return 0;
 	}
 
 	int nRegions= (int)regions.size();
 	if(nRegions<=0) {
-		cerr<<"SLICUtils::GetSegmentedImage(): ERROR: No regions available, nothing to be done!"<<endl;
+		ERROR_LOG("No regions available, nothing to be done!");
 		return 0;
 	}
 
@@ -93,14 +93,14 @@ Img* SLICUtils::GetSegmentedImage(Img* image,std::vector<Region*>const& regions,
 	}	
 	
 	//## Fill image with region means
-	TString imgName= Form("%s_segmented",image->GetName());
-	Img* segmentedImg= (Img*)image->GetCloned(std::string(imgName),true,true);
+	TString imgName= Form("%s_segmented",image->GetName().c_str());
+	Image* segmentedImg= (Image*)image->GetCloned(std::string(imgName),true,true);
 	segmentedImg->Reset();
 	
   for(int i=0;i<nRegions;i++){//loop on regions
 		int regionTag= regions[i]->Tag;
 		int nPixelsInRegion= (int)regions[i]->NPix;
-		cout<<"Region no. "<<i<<" N="<<nPixelsInRegion<<" regionTag="<<regionTag<<endl;
+		DEBUG_LOG("Region no. "<<i<<" N="<<nPixelsInRegion<<" regionTag="<<regionTag);
 		
 		if(selectedTag!=-1 && regionTag!=selectedTag) continue;
 		
@@ -111,7 +111,7 @@ Img* SLICUtils::GetSegmentedImage(Img* image,std::vector<Region*>const& regions,
 		for(int j=0;j<nPixelsInRegion;j++){//loop on pixels inside region
 			double thisPixelX= (regions[i]->GetPixel(j))->x;
 			double thisPixelY= (regions[i]->GetPixel(j))->y;
-			segmentedImg->FillPixel(thisPixelX,thisPixelY,colorValue);
+			segmentedImg->Fill(thisPixelX,thisPixelY,colorValue);
 		}//end loop pixels in region	
 	}//end loop regions
 	
@@ -129,8 +129,8 @@ SLICContourData* SLICUtils::ComputeBoundaryContours(SLICData* slicData) {
 
 	//## Init data
 	cout<<"SLICUtils::ComputeBoundaryContours(): INFO: Computing contours from NR="<<nRegions<<" regions..."<<endl;
-	int Nx= (slicData->inputImg)->GetNbinsX();
-	int Ny= (slicData->inputImg)->GetNbinsY();
+	long int Nx= (slicData->inputImg)->GetNx();
+	long int Ny= (slicData->inputImg)->GetNy();
 	const int dx8[8] = {-1, -1,  0,  1, 1, 1, 0, -1};
 	const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1,  1};
 		
@@ -149,8 +149,8 @@ SLICContourData* SLICUtils::ComputeBoundaryContours(SLICData* slicData) {
 	}//end loop regions 
 
   //## Loop over all the pixels
-  for (int i=0; i<Nx; i++) {
-  	for (int j=0; j<Ny; j++) {
+  for (long int i=0; i<Nx; i++) {
+  	for (long int j=0; j<Ny; j++) {
 			//int regionId= (slicData->pixelLabels)->operator()(i,j);
 			int regionId= (slicData->labels)[i][j];
 			if(regionId<0) continue;
@@ -173,7 +173,7 @@ SLICContourData* SLICUtils::ComputeBoundaryContours(SLICData* slicData) {
         	if (regionId!=regionId_neighbor && regionId_neighbor>=0) {	
           	nr_p++;
 						connectedRegionCounterMap[regionId_neighbor]++;
-						int gBin_neighbor= (slicData->inputImg)->GetBin(x+1,y+1);
+						long int gBin_neighbor= (slicData->inputImg)->GetBin(x,y);
 						connectedRegionBoundaryPixelListMap[regionId_neighbor];
 						connectedRegionBoundaryPixelListMap[regionId_neighbor].push_back(gBin_neighbor);
           }
@@ -182,9 +182,9 @@ SLICContourData* SLICUtils::ComputeBoundaryContours(SLICData* slicData) {
             
       // Add the pixel to the contour list of corresponding region
      	if (nr_p>= 2) {
-				int gBin= (slicData->inputImg)->GetBin(i+1,j+1);
-				double binX= (slicData->inputImg)->GetXaxis()->GetBinCenter(i+1);
-				double binY= (slicData->inputImg)->GetYaxis()->GetBinCenter(j+1);	
+				long int gBin= (slicData->inputImg)->GetBin(i,j);
+				double binX= (slicData->inputImg)->GetX(i);
+				double binY= (slicData->inputImg)->GetY(j);	
 				(contourData->contour)->AddPoint(TVector2(binX,binY));
       	
 				//Add neighbor ids and boundary pixel ids
@@ -846,20 +846,20 @@ SLICSimilarityData* SLICUtils::ComputeRegionSimilarity(SLICData* slicData,SLICCo
 */
 
 
-int SLICUtils::TagRegions(std::vector<Region*>& regions,Img* binaryMap_bkg,Img* binaryMap_signal){
+int SLICUtils::TagRegions(std::vector<Region*>& regions,Image* binaryMap_bkg,Image* binaryMap_signal){
 
 	if(!binaryMap_bkg || !binaryMap_signal ) {
-		cerr<<"SLICUtils::TagRegions(): ERROR: No binary maps provided!"<<endl;
+		ERROR_LOG("No binary maps provided!");
 		return -1;
 	}
 	
 	int nRegions= (int)regions.size();
 	if(nRegions<=0) {
-		cerr<<"SLICUtils::TagRegions(): ERROR: No regions available, nothing to be tagged!"<<endl;
+		ERROR_LOG("No regions available, nothing to be tagged!");
 		return -1;
 	}
 	
-	cout<<"SLICUtils::TagRegions(): INFO: Tag regions..."<<endl;
+	DEBUG_LOG("Tag regions...");
 	int nBkgReg= 0;
 	int nSignalReg= 0;
 	int nUntaggedReg= 0;
@@ -875,7 +875,7 @@ int SLICUtils::TagRegions(std::vector<Region*>& regions,Img* binaryMap_bkg,Img* 
 		}
 
 		for(int j=0;j<nPix;j++){//loop on pixels inside region
-			int pixId= (regions[i]->GetPixel(j))->id;
+			long int pixId= (regions[i]->GetPixel(j))->id;
 			bool isSignal= (binaryMap_signal->GetBinContent(pixId)>0);
 			bool isBkg= (binaryMap_bkg->GetBinContent(pixId)>0);
 			if(isBkg && !isSignal) nBkg++;
@@ -899,7 +899,7 @@ int SLICUtils::TagRegions(std::vector<Region*>& regions,Img* binaryMap_bkg,Img* 
 		}
 	}//end loop regions
 
-	cout<<"SLICUtils::TagRegions(): INFO: (nS,nB,nU)=("<<nSignalReg<<","<<nBkgReg<<","<<nUntaggedReg<<")"<<endl;
+	INFO_LOG("(nS,nB,nU)=("<<nSignalReg<<","<<nBkgReg<<","<<nUntaggedReg<<")");
 
 	return 0;
 
@@ -913,7 +913,7 @@ int SLICUtils::CountTaggedRegions(std::vector<Region*>const& regions,int& nSig,i
 		nSig= 0;
 		nBkg= 0;
 		nUntagged= 0;
-		cerr<<"SLICUtils::CountTaggedRegions(): No regions given!"<<endl;
+		ERROR_LOG("No regions given!");
 		return -1;
 	}
 

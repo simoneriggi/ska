@@ -25,10 +25,9 @@
 * @date 20/01/2015
 */
 
-#ifndef BkgData_h
-#define BkgData_h 1
+#ifndef _BKG_DATA_h
+#define _BKG_DATA_h 1
 
-#include <Img.h>
 #include <Image.h>
 #include <CodeUtils.h>
 #include <Logger.h>
@@ -149,55 +148,9 @@ class ImgBkgData : public TObject {
 };//close class ImgBkgData
 
 
-//=====================================
-//==   OLD BKG DATA
-//=====================================
-
-class BkgData : public TObject {
-
-	public:
-		BkgData();
-		virtual ~BkgData();
-
-	public:
-		void ClearSamplings(){
-			BkgSamplings.clear();
-		}
-		void ClearBkgMap(){
-			if(!BkgMap) return;
-			delete BkgMap;
-			BkgMap= 0;
-		}
-		void ClearNoiseMap(){
-			if(!NoiseMap) return;
-			delete NoiseMap;
-			NoiseMap= 0;
-		}
-
-		void Clear(){
-			ClearSamplings();
-			ClearBkgMap();
-			ClearNoiseMap();
-		}
-		void CopyBkgMap(Caesar::Img* aMap);		
-		void CopyNoiseMap(Caesar::Img* aMap);
-		bool HasLocalBkg(){return (BkgMap && NoiseMap);}
-		
-	public:
-		std::vector<BkgSampleData> BkgSamplings;
-		Img* BkgMap;//the interpolated bkg map
-		Img* NoiseMap;//the interpolated noise map
-		double gBkg;
-		double gNoise;
-
-	ClassDef(BkgData,1)
-
-};//close class
-
 #ifdef __MAKECINT__
 #pragma link C++ class BkgSampleData+;
 #pragma link C++ class vector<BkgSampleData>+;
-#pragma link C++ class BkgData+;
 #pragma link C++ class ImgBkgData+;
 #endif
 

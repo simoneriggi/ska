@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef SaliencyFilter_h
-#define SaliencyFilter_h 1
+#ifndef _SALIENCY_FILTER_h
+#define _SALIENCY_FILTER_h 1
 
 //ROOT
 #include <TObject.h>
@@ -52,8 +52,6 @@
 namespace Caesar{
 
 class Region;
-class Img;
-class BkgData;
 class Image;
 class ImgBkgData;
 
@@ -86,31 +84,15 @@ class SaliencyFilter : public TObject {
 		*/
 		static Image* ComputeMultiResoSaliencyMap(Image* img,int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=1,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,double salientMultiplicityThrFactor=0.7,bool addBkgMap=true,bool addNoiseMap=true,ImgBkgData* bkgData=0,double saliencyThrFactor=2,double imgThrFactor=1);
 
-		//===================================================
-		//==        OLD IMAGE METHODS
-		//===================================================
-		/**
-		* \brief Compute saliency map for one resolution
-		*/
-		static Img* ComputeSaliencyMap(Img* img,int reso=20,double regFactor=1,int minRegionSize=10,double knnFactor=1,bool useRobust=false,double expFalloffPar=100,double distanceRegPar=1);
-		
-		/**
-		* \brief Compute multi resolution saliency map 
-		*/
-		static Img* ComputeMultiResoSaliencyMap(Img* img,int resoMin=20,int resoMax=60,int resoStep=10,double beta=1,int minRegionSize=10,double knnFactor=1,bool useRobustPars=false,double expFalloffPar=100,double distanceRegPar=1,double salientMultiplicityThrFactor=0.7,bool addBkgMap=true,bool addNoiseMap=true,BkgData* bkgData=0,double saliencyThrFactor=2,double imgThrFactor=1);
 
 	private:
 			
-		//===================================================
-		//==        NEW IMAGE METHODS
-		//===================================================
+		/**
+		* \brief Compute saliency map from superpixel list
+		*/
 		static Image* ComputeSaliencyMap(Image* img,std::vector<Region*>const& regions,double knnFactor,bool useRobust,double expFalloffPar,double distanceRegPar);
 
-		//===================================================
-		//==        OLD IMAGE METHODS
-		//===================================================
-		static Img* ComputeSaliencyMap(Img* img,std::vector<Region*>const& regions,double knnFactor,bool useRobust,double expFalloffPar,double distanceRegPar);
-
+		
 	private:
 
 	ClassDef(SaliencyFilter,1)

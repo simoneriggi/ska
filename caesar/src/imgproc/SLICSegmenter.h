@@ -28,8 +28,8 @@
 */
 
 
-#ifndef SLICSegmenter_h
-#define SLICSegmenter_h 1
+#ifndef _SLIC_SEGMENTER_h
+#define _SLIC_SEGMENTER_h 1
 
 
 #include <TObject.h>
@@ -59,7 +59,6 @@ using namespace std;
 namespace Caesar {
 
 class SLICData;
-class Img;
 
 class SLICSegmenter : public TObject {
 
@@ -85,7 +84,7 @@ class SLICSegmenter : public TObject {
 		/**
 		* \brief Initialize and check data
 		*/
-		static int Init(SLICData const& slicData);
+		static int CheckData(SLICData const& slicData);
 		/**
 		\brief Adaptively merge the superpixels using max similarity
  		*/

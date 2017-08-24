@@ -26,8 +26,8 @@
 */
 
 
-#ifndef AstroUtils_h
-#define AstroUtils_h 1
+#ifndef _ASTRO_UTILS_h
+#define _ASTRO_UTILS_h 1
 
 #include <wcs.h>
 
@@ -53,7 +53,7 @@ using namespace std;
 
 namespace Caesar {
 
-class Img;
+class Image;
 class ImgMetaData;
 class ImgStatsData;
 
@@ -72,9 +72,14 @@ class AstroUtils : public TObject {
 
 		
 	public:
-
-		static int PixelToWCSCoords(Caesar::Img* image,WorldCoor* wcs,double ix,double iy,double& xpos, double& ypos);
-		static int PixelToWCSCoords(Caesar::Img* image,double ix,double iy,double& xpos, double& ypos,int coordSystem=-1);
+		/**
+		* \brief Get WCS coordinates corresponding to image coordinates
+		*/
+		static int PixelToWCSCoords(Caesar::Image* image,WorldCoor* wcs,double ix,double iy,double& xpos, double& ypos);
+		/**
+		* \brief Get WCS coordinates corresponding to image coordinates
+		*/
+		static int PixelToWCSCoords(Caesar::Image* image,double ix,double iy,double& xpos, double& ypos,int coordSystem=-1);
 		
 	private:
 	

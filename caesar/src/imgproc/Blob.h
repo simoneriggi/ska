@@ -25,11 +25,11 @@
 * @date 20/01/2015
 */
 
-#ifndef Blob_h
-#define Blob_h 1
+#ifndef _BLOB_h
+#define _BLOB_h 1
 
 #include <Pixel.h>
-#include <Img.h>
+#include <Image.h>
 #include <Consts.h>
 
 
@@ -239,8 +239,7 @@ class Blob : public TObject {
 		/**
 		* \brief Get image
 		*/
-		//Img* GetImage(Img::ImgType mode);
-		Img* GetImage(ImgType mode);
+		Image* GetImage(ImgType mode);
 		/**
 		* \brief Return contours
 		*/

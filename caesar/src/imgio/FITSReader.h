@@ -25,8 +25,8 @@
 * @date 20/01/2015
 */
 
-#ifndef FITSReader_h
-#define FITSReader_h 1
+#ifndef _FITS_READER_h
+#define _FITS_READER_h 1
 
 #include <SysUtils.h>
 #include <StatsUtils.h>
@@ -58,7 +58,7 @@ using namespace std;
 
 namespace Caesar {
 
-class Img;
+
 class ImgMetaData;
 class Image;
 
@@ -157,10 +157,7 @@ class FITSReader : public TObject {
 
 	public:
 	
-		static int Read(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info,bool checkFile=true);
-		static int ReadTile(std::string filename,Caesar::Img& img,Caesar::FITSFileInfo& info,int xMin,int xMax,int yMin,int yMax,bool checkFile=true);	
-		static int ReadTileFast(std::string filename,Caesar::Img& image,Caesar::FITSFileInfo& fits_info,int ix_min,int ix_max,int iy_min,int iy_max,bool checkFile=true);
-
+		
 		/**
 		* \brief Read a FITS image & header and store it in Caesar img format (based on CFITSIO)
 		*/
@@ -168,20 +165,20 @@ class FITSReader : public TObject {
 	
 	private:
 
-		static bool ReadHeader(TFITSHDU* hdu,Caesar::FITSFileInfo& fits_info);
 		
-		static TFITSHDU* ReadFile(std::string filename,Caesar::FITSFileInfo& fits_info,bool checkFile=true);
-
 		/**
 		* \brief Read header of currently open HDU (based on CFITSIO)
 		*/		
 		static int ReadHeader(Caesar::FITSFileInfo& fits_info,fitsfile* fp);
 		/**
-		* \brief Read header of currently open HDU (based on CFITSIO)
+		* \brief Read image (based on CFITSIO)
 		*/		
 		static int ReadImage(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile* fp,std::string filename,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1);
 		
 		#ifdef OPENMP_ENABLED
+		/**
+		* \brief Read image (multithread version) (based on CFITSIO)
+		*/
 		static int ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile* fp,std::string filename,int ix_min=-1,int ix_max=-1,int iy_min=-1,int iy_max=-1);
 		#endif
 

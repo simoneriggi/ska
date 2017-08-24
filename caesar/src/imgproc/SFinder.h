@@ -155,6 +155,12 @@ class SFinder : public TObject {
 		* \brief Find extended sources with Wavelet Transform method
 		*/
 		int FindExtendedSources_WT(Image*);
+
+		/**
+		* \brief Compute edge image
+		*/
+		Image* ComputeEdgeImage(Image* inputImg,int model);
+
 		/**
 		* \brief Select sources according to quality cuts given in configuration
 		*/
@@ -209,6 +215,7 @@ class SFinder : public TObject {
 		bool m_saveSignificanceMap;
 		bool m_saveBkgMap;
 		bool m_saveNoiseMap;
+		bool m_saveSaliencyMap;
 
 		//Performance stats data
 		TTree* m_PerfTree;
@@ -332,7 +339,20 @@ class SFinder : public TObject {
 		double m_cvMuPar;
 		double m_cvNuPar;
 		double m_cvPPar;
+
+		//Hierachical clustering data
+		Image* m_EdgeImg;
+		int m_spMergingNSegmentsToStop;
+		double m_spMergingRatio;
+		double m_spMergingRegPar;
+		double m_spMergingMaxDissRatio;
+		double m_spMergingMaxDissRatio2ndNeighbours;
+		double m_spMergingDissThreshold;
+		int m_spMergingEdgeModel;
+		bool m_spMergingIncludeSpatialPars;
+		bool m_spMergingUse2ndNeighbours;
 		
+
 	ClassDef(SFinder,1)
 
 };//close SourceFinder

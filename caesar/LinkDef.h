@@ -26,13 +26,13 @@
 
 
 //== IMG CLASSES ==
-#pragma link C++ enum Caesar::Img::ImgType;
+//#pragma link C++ enum Caesar::Img::ImgType;
 #pragma link C++ class Caesar::MetaData+;
 #pragma link C++ class Caesar::ImgMetaData+;
 #pragma link C++ class Caesar::ImgStats+;
-#pragma link C++ class Caesar::Img+;
-#pragma link C++ class vector<Caesar::Img>+;
-#pragma link C++ class vector<Caesar::Img*>+;
+//#pragma link C++ class Caesar::Img+;
+//#pragma link C++ class vector<Caesar::Img>+;
+//#pragma link C++ class vector<Caesar::Img*>+;
 //#pragma link C++ enum Caesar::WCSType+;
 
 #pragma link C++ class Caesar::Image+;
@@ -49,6 +49,17 @@
 #pragma link C++ class Caesar::GraphicsUtils+;
 //#pragma link C++ enum Caesar::ColorPaletteStyle+;
 #pragma link C++ class Caesar::StatsUtils+;
+
+#pragma link C++ class Caesar::ClippedStats<int>+;
+#pragma link C++ class Caesar::ClippedStats<long int>+;
+#pragma link C++ class Caesar::ClippedStats<float>+;
+#pragma link C++ class Caesar::ClippedStats<double>+;
+
+#pragma link C++ class Caesar::StatMoments<int>+;
+#pragma link C++ class Caesar::StatMoments<long int>+;
+#pragma link C++ class Caesar::StatMoments<float>+;
+#pragma link C++ class Caesar::StatMoments<double>+;
+
 #pragma link C++ function Caesar::StatsUtils::GetMedianFast<float>;
 #pragma link C++ function Caesar::StatsUtils::GetMedianFast<double>;
 #pragma link C++ function Caesar::StatsUtils::GetMedianFast<int>;
@@ -193,11 +204,13 @@
 //bkg finder
 #pragma link C++ class Caesar::BkgSampleData+;
 #pragma link C++ class vector<Caesar::BkgSampleData>+;
-#pragma link C++ class Caesar::BkgData+;
+//#pragma link C++ class Caesar::BkgData+;
 #pragma link C++ class Caesar::ImgBkgData+;
 #pragma link C++ class Caesar::BkgFinder+;
-#pragma link C++ function Caesar::BlobFinder::FindBlob<Blob>(Caesar::Img*,std::vector<Blob*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
-#pragma link C++ function Caesar::BlobFinder::FindBlob<Source>(Caesar::Img*,std::vector<Source*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
+//#pragma link C++ function Caesar::BlobFinder::FindBlob<Blob>(Caesar::Img*,std::vector<Blob*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
+//#pragma link C++ function Caesar::BlobFinder::FindBlob<Source>(Caesar::Img*,std::vector<Source*>&,Caesar::Img*,Caesar::BkgData*,double,double,int,bool,bool);
+#pragma link C++ function Caesar::BlobFinder::FindBlob<Blob>(Caesar::Img*,std::vector<Blob*>&,Caesar::Image*,Caesar::ImgBkgData*,double,double,int,bool,bool);
+#pragma link C++ function Caesar::BlobFinder::FindBlob<Source>(Caesar::Img*,std::vector<Source*>&,Caesar::Image*,Caesar::ImgBkgData*,double,double,int,bool,bool);
 
 //data class
 #pragma link C++ class Caesar::Pixel+;
@@ -230,7 +243,6 @@
 
 //blob/source finder
 #pragma link C++ class Caesar::BlobFinder+;
-//#pragma link C++ class Caesar::SourceFinder+;
 #pragma link C++ class Caesar::SFinder+;
 //======================
 
@@ -239,7 +251,7 @@
 //======================
 
 //ChanVese segmenter
-#pragma link C++ class Caesar::SourceFinder+;
+//#pragma link C++ class Caesar::SourceFinder+;
 //======================
 
 

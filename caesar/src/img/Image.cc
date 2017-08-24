@@ -471,6 +471,21 @@ int Image::FillPixel(long int ix,long int iy,double w,bool useNegativePixInStats
 
 }//close FillPixel()
 
+
+int Image::Fill(double x,double y,double w,bool useNegativePixInStats){
+
+	//Find global bin
+	long int gbin= FindBin(x,y);
+	if(gbin<0) {
+		WARN_LOG("Underflow/overflow bin requested to be filled!");
+	}
+	
+	//Fill pixel
+	return FillPixel(gbin,w,useNegativePixInStats);
+
+}//close FillPixel()
+
+
 #ifdef OPENMP_ENABLED
 int Image::FillPixelMT(Caesar::StatMoments<double>& moments,long int gbin,double w,bool useNegativePixInStats){
 
@@ -499,6 +514,21 @@ int Image::FillPixelMT(Caesar::StatMoments<double>& moments,long int ix,long int
 	//Compute global bin
 	long int gbin= GetBin(ix,iy);
 	
+	//Fill pixel
+	return FillPixelMT(moments,gbin,w,useNegativePixInStats);
+
+}//close FillPixelMT()
+#endif
+
+#ifdef OPENMP_ENABLED
+int Image::FillMT(Caesar::StatMoments<double>& moments,double x,double y,double w,bool useNegativePixInStats){
+
+	//Find global bin
+	long int gbin= FindBin(x,y);
+	if(gbin<0) {
+		WARN_LOG("Underflow/overflow bin requested to be filled!");
+	}
+
 	//Fill pixel
 	return FillPixelMT(moments,gbin,w,useNegativePixInStats);
 
@@ -1890,6 +1920,7 @@ Image* Image::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,doubl
 }//close GetMultiResoSaliencyMap()
 
 
+
 int Image::Add(Image* img,double c,bool computeStats)
 {
 
@@ -2033,15 +2064,15 @@ TH1D* Image::GetPixelHisto(int nbins,bool normalize){
 }//close GetPixelHisto()
 
 
-double Image::FindOtsuThreshold(int nbins){
-	
-	//## Get histo and normalize
-	TH1D* hist= this->GetPixelHisto(nbins,true);
-	if(!hist) {
-		ERROR_LOG("Failed to compute pixel histo, return thr=0!");
-		return 0;
+double Image::FindOtsuThreshold(TH1D* hist){
+
+	//Check input histo
+	if(!hist){
+		ERROR_LOG("Null ptr to input pixel histo, returning inf!");
+		return TMath::Infinity();
 	}
 
+	//Compute Otsu threshold using pixel histo 
 	int Nx= hist->GetNbinsX();
 	double sum = 0;
 	double Wxs[Nx];
@@ -2091,6 +2122,61 @@ double Image::FindOtsuThreshold(int nbins){
 	return threshold;
 
 }//close FindOtsuThreshold()
+
+
+double Image::FindOtsuThreshold(int nbins){
+	
+	//## Get histo and normalize
+	TH1D* hist= this->GetPixelHisto(nbins,true);
+	if(!hist) {
+		ERROR_LOG("Failed to compute pixel histo, return thr=0!");
+		return 0;
+	}
+
+	//## Compute Otsu threshold
+	return FindOtsuThreshold(hist);
+
+}//close FindOtsuThreshold()
+
+double Image::FindMedianThreshold(double thrFactor){
+
+	//Check if image has stats and get median
+	if(!this->HasStats()){
+		INFO_LOG("Image has no stats computed, computing them...");
+		if(ComputeStats(true,false,false)<0){
+			ERROR_LOG("Failed to compute image stats!");
+			return TMath::Infinity();
+		}
+	}
+	double median= m_Stats->median;
+	double medianThr= thrFactor*median;
+
+	return medianThr;
+
+}//close FindMedianThreshold()
+
+
+double Image::FindOptimalGlobalThreshold(double thrFactor,int nbins,bool smooth){
+
+	//Compute thresholds
+	double medianThr= FindMedianThreshold(thrFactor);
+	double otsuThr= FindOtsuThreshold(nbins);
+	double valleyThr= FindValleyThreshold(nbins,smooth); 	
+	if( TMath::IsNaN(medianThr) || fabs(medianThr)==TMath::Infinity() ||
+			TMath::IsNaN(otsuThr) || fabs(otsuThr)==TMath::Infinity() ||
+			TMath::IsNaN(valleyThr) || fabs(valleyThr)==TMath::Infinity() 
+	)
+	{
+		ERROR_LOG("Failed to compute one/more thresholds (inf values), returning inf!");
+		return TMath::Infinity();
+	}
+
+	//Compute optimal threshold
+	double optimalThr= std::max(std::min(otsuThr,valleyThr),medianThr);
+
+	return optimalThr;
+
+}//close FindOptimalGlobalThreshold()
 
 
 double Image::FindValleyThreshold(int nbins,bool smooth){
@@ -2412,6 +2498,131 @@ int Image::Draw(std::vector<Source*>const& sources,int palette,bool drawFull,boo
 	return 0;
 
 }//close Draw()
+
+
+int Image::Plot(std::vector<Source*>const& sources,bool useCurrentCanvas,bool drawFull,int paletteStyle,bool drawColorPalette,bool putWCSAxis,int coordSystem,std::string units){
+
+	//Set palette
+	Caesar::GraphicsUtils::SetPalette(paletteStyle);
+
+	//Get temp histogram
+	TH2D* htemp= GetHisto2D("htemp");
+	if(!htemp){
+		ERROR_LOG("Failed to get histo from this image!");
+		return -1;
+	}
+	
+	//Set canvas
+	TString canvasName= Form("%s_Plot",this->GetName().c_str());	
+	TCanvas* canvas= 0;
+	if(useCurrentCanvas && gPad) {
+		canvas= gPad->GetCanvas();
+		canvas->SetName(canvasName);
+		canvas->SetTitle(canvasName);
+	}
+	else{
+		canvas= new TCanvas(canvasName,canvasName,720,700);
+	}
+
+	if(!canvas){
+		ERROR_LOG("Failed to retrieve or set canvas!");
+		return -1;
+	}
+
+	//Draw full image (without borders)
+	canvas->cd();
+	htemp->SetStats(0);
+	
+	if(drawFull){
+		canvas->ToggleEventStatus();
+  	canvas->SetRightMargin(0.0);
+  	canvas->SetLeftMargin(0.0);
+  	canvas->SetTopMargin(0.0);
+  	canvas->SetBottomMargin(0.0);
+		htemp->Draw("COLA");
+	}
+	else{
+		gStyle->SetPadTopMargin(0.1);
+  	gStyle->SetPadBottomMargin(0.1);
+  	gStyle->SetPadLeftMargin(0.15);
+  	//gStyle->SetPadRightMargin(0.19);
+		gStyle->SetPadRightMargin(0.15);
+
+		
+		gPad->SetTopMargin(0.1);
+		gPad->SetBottomMargin(0.1);
+		gPad->SetLeftMargin(0.15);
+		//gPad->SetRightMargin(0.19);
+  	gPad->SetRightMargin(0.15);
+  		
+		if(drawColorPalette) {
+			//Set palette axis title	
+			htemp->GetZaxis()->SetTitle(units.c_str());
+			htemp->GetZaxis()->SetTitleSize(0.05);
+			htemp->GetZaxis()->SetTitleOffset(0.9);
+			htemp->Draw();
+			gPad->Update();
+			if(putWCSAxis) htemp->Draw("COLAZ");
+			else htemp->Draw("COLZ");
+			gPad->Update();
+		}//close if
+		else {
+			if(putWCSAxis) htemp->Draw("COLA");
+			else htemp->Draw("COL");
+		}
+	}
+
+
+	//## Draw WCS axis?
+	if(putWCSAxis){
+		gPad->Update();
+		TGaxis* xaxis_wcs= new TGaxis;
+		TGaxis* yaxis_wcs= new TGaxis;
+		int status= GraphicsUtils::SetWCSAxis(this,*xaxis_wcs,*yaxis_wcs,coordSystem);
+		if(status>=0){
+			TExec* ex = new TExec("ex","GraphicsUtils::PadUpdater()");
+   		htemp->GetListOfFunctions()->Add(ex);
+
+			xaxis_wcs->Draw("same");
+			yaxis_wcs->Draw("same");
+		}
+		else{
+			WARN_LOG("Failed to set gAxis!");
+		}
+	}//close if
+
+	//## Draw sources
+	for(unsigned int k=0;k<sources.size();k++){	
+		int type= sources[k]->Type;
+		int lineColor= kBlack;
+		if(type==Source::eCompact)
+			lineColor= kBlack;	
+		else if(type==Source::ePointLike)
+			lineColor= kRed;
+		else if(type==Source::eExtended)
+			lineColor= kGreen+1;	
+		sources[k]->Draw(false,false,true,lineColor);
+	}//end loop sources
+	
+	return 0;
+
+}//close Img::Plot()
+
+/*
+void Image::SetDrawRange(double zmin,double zmax){
+
+	if(zmin>=zmax) return;
+
+	for(long int i=0;i<this->GetNbinsX();i++){
+		for(int j=0;j<this->GetNbinsY();j++){
+			double w= this->GetBinContent(i+1,j+1);
+			if(w<zmin) this->SetBinContent(i+1,j+1,zmin);
+			if(w>zmax) this->SetBinContent(i+1,j+1,zmax);
+		}//end loop bins y
+	}//end loop bins x
+
+}//close Img::SetDrawRange()
+*/
 
 
 }//close namespace

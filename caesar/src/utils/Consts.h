@@ -106,8 +106,8 @@ enum FileType{
 };
 
 enum SLICEdgeModel {
-	eKirschEdge= 0,
-	eChanVeseEdge= 1
+	eKirschEdge= 1,
+	eChanVeseEdge= 2
 };
 
 #ifdef __MAKECINT__
