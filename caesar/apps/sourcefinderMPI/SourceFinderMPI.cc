@@ -30,7 +30,7 @@
 
 //Caesar headers
 #include <BlobFinder.h>
-#include <Img.h>
+#include <Image.h>
 #include <Source.h>
 #include <Contour.h>
 #include <ConfigParser.h>
@@ -389,13 +389,13 @@ int SourceFinderMPI::PrepareWorkerTasks(){
 				ERROR_LOG("[PROC "<<myid<<"] - Failed to open input file image "<<m_InputFileName<<" and get image size!");
 				return -1;
 			}
-			Img* inputImg= (Img*)inputFile->Get(m_InputImgName.c_str());
+			Image* inputImg= (Image*)inputFile->Get(m_InputImgName.c_str());
 			if(!inputImg) {
 				ERROR_LOG("[PROC "<<myid<<"] - Failed to open input file image "<<m_InputFileName<<" and get image size!");
 				return -1;	
 			}
-			Nx= inputImg->GetNbinsX();
-			Ny= inputImg->GetNbinsY();
+			Nx= inputImg->GetNx();
+			Ny= inputImg->GetNy();
 		}
 	}//close if
 	else if(info.extension==".fits"){//FITS
@@ -688,19 +688,19 @@ int SourceFinderMPI::Run(){
 
 		//## Read input image
 		INFO_LOG("[PROC "<<myid<<"] - Reading input image ["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"]...");
-		Img* taskImg= ReadImage(ix_min,ix_max,iy_min,iy_max);
+		Image* taskImg= ReadImage(ix_min,ix_max,iy_min,iy_max);
 		if(!taskImg){
 			ERROR_LOG("Reading of input image failed, skip to next task...");
 			continue;
 		}
 
 		//## Set image physical boundary in task data
-		long int Nx= taskImg->GetNbinsX();
-		long int Ny= taskImg->GetNbinsY();
-		double xmin= taskImg->GetXaxis()->GetBinCenter(1);
-		double xmax= taskImg->GetXaxis()->GetBinCenter(Nx);
-		double ymin= taskImg->GetYaxis()->GetBinCenter(1);
-		double ymax= taskImg->GetYaxis()->GetBinCenter(Ny);
+		long int Nx= taskImg->GetNx();
+		long int Ny= taskImg->GetNy();
+		double xmin= taskImg->GetXmin();//taskImg->GetXaxis()->GetBinCenter(1);
+		double xmax= taskImg->GetXmax();//taskImg->GetXaxis()->GetBinCenter(Nx);
+		double ymin= taskImg->GetYmin();//taskImg->GetYaxis()->GetBinCenter(1);
+		double ymax= taskImg->GetYmax();//taskImg->GetYaxis()->GetBinCenter(Ny);
 		m_taskDataPerWorkers[myid][j]->x_min= xmin;
 		m_taskDataPerWorkers[myid][j]->x_max= xmax;
 		m_taskDataPerWorkers[myid][j]->y_min= ymin;
@@ -1262,20 +1262,20 @@ int SourceFinderMPI::MergeSourcesAtEdge(){
 }//close MergeSourcesAtEdge()
 
 
-int SourceFinderMPI::FindSources(std::vector<Source*>& sources,Img* inputImg,double seedThr,double mergeThr){
+int SourceFinderMPI::FindSources(std::vector<Source*>& sources,Image* inputImg,double seedThr,double mergeThr){
 
 	if(!inputImg) return -1;
 
 	//## Compute stats and bkg
 	INFO_LOG("Computing image stats/bkg...");
-	BkgData* bkgData= ComputeStatsAndBkg(inputImg);	
+	ImgBkgData* bkgData= ComputeStatsAndBkg(inputImg);	
 	if(!bkgData){
 		ERROR_LOG("Failed to compute stats/bkg info!");
 		return -1;
 	}
 
 	//## Compute significance map
-	Img* significanceMap= inputImg->GetSignificanceMap(bkgData,m_UseLocalBkg);
+	Image* significanceMap= inputImg->GetSignificanceMap(bkgData,m_UseLocalBkg);
 	if(!significanceMap){
 		ERROR_LOG("Failed to compute significance map!");
 		return -1;
@@ -1305,7 +1305,7 @@ int SourceFinderMPI::FindSources(std::vector<Source*>& sources,Img* inputImg,dou
 }//close FindSources()
 
 
-int SourceFinderMPI::FindCompactSources(TaskData* taskData, Img* img){
+int SourceFinderMPI::FindCompactSources(TaskData* taskData, Image* img){
 
 	//## Check img
 	if(!img || !taskData){
@@ -1315,14 +1315,14 @@ int SourceFinderMPI::FindCompactSources(TaskData* taskData, Img* img){
 	
 	//## Compute stats and bkg
 	INFO_LOG("Computing image stats/bkg...");	
-	BkgData* bkgData= ComputeStatsAndBkg(img);	
+	ImgBkgData* bkgData= ComputeStatsAndBkg(img);	
 	if(!bkgData){
 		ERROR_LOG("Failed to compute stats/bkg info!");
 		return -1;
 	}
 
 	//## Compute significance map
-	Img* significanceMap= img->GetSignificanceMap(bkgData,m_UseLocalBkg);
+	Image* significanceMap= img->GetSignificanceMap(bkgData,m_UseLocalBkg);
 	if(!significanceMap){
 		ERROR_LOG("Failed to compute significance map!");
 		return -1;
@@ -1378,7 +1378,7 @@ int SourceFinderMPI::FindCompactSources(TaskData* taskData, Img* img){
 int SourceFinderMPI::FindResidualMap(){
 
 	//Compute residual map
-	Img* residualImg= 0;
+	Image* residualImg= 0;
 	if(m_UseResidualInExtendedSearch && m_CompactSources.size()>0){
 		residualImg= m_InputImg->GetSourceResidual(m_CompactSources,m_DilateKernelSize,m_DilateSourceModel,m_DilatedSourceType,m_DilateNestedSources,m_BkgData,m_UseLocalBkg,m_DilateRandomize,m_SeedBrightThr);
 	}//close if
@@ -1407,8 +1407,8 @@ int SourceFinderMPI::FindResidualMap(){
 int SourceFinderMPI::FindExtendedSources(){
 
 	//## Set input map for extended source search
-	Img* inputImg= 0;
-	Img* smoothedImg= 0;	
+	Image* inputImg= 0;
+	Image* smoothedImg= 0;	
 	if(m_UsePreSmoothing){//Apply a smoothing stage?
 		if(m_SmoothFilter==eGausFilter){
 			smoothedImg= m_ResidualImg->GetSmoothedImage(m_GausFilterKernSize,m_GausFilterKernSize,m_GausFilterSigma,m_GausFilterSigma);
@@ -1457,7 +1457,7 @@ int SourceFinderMPI::FindExtendedSources(){
 
 }//close FindExtendedSources()
 
-int SourceFinderMPI::FindExtendedSources_HClust(Img*){
+int SourceFinderMPI::FindExtendedSources_HClust(Image*){
 
 	//## Compute saliency
 	m_SaliencyImg= m_ResidualImg->GetMultiResoSaliencyMap(
@@ -1478,11 +1478,11 @@ int SourceFinderMPI::FindExtendedSources_HClust(Img*){
 	double bkgThr= m_SaliencyImg->FindMedianThreshold(m_SaliencyBkgThrFactor);
 
 	double fgValue= 1;
-	Img* signalMarkerImg= m_SaliencyImg->GetBinarizedImage(signalThr,fgValue,false);
-	Img* bkgMarkerImg= m_SaliencyImg->GetBinarizedImage(bkgThr,fgValue,true);
+	Image* signalMarkerImg= m_SaliencyImg->GetBinarizedImage(signalThr,fgValue,false);
+	Image* bkgMarkerImg= m_SaliencyImg->GetBinarizedImage(bkgThr,fgValue,true);
 	
 	//## Compute the Superpixel partition
-	//SLICData* slicData= SLIC::SPGenerator(this,int regionSize,double regParam, int minRegionSize, bool useLogScaleMapping, Img* edgeImg);
+	//SLICData* slicData= SLIC::SPGenerator(this,int regionSize,double regParam, int minRegionSize, bool useLogScaleMapping, Image* edgeImg);
 
 	
 	//## Tag the superpixel partition
@@ -1498,7 +1498,7 @@ int SourceFinderMPI::FindExtendedSources_HClust(Img*){
 
 }//close FindExtendedSources_HClust()
 
-int SourceFinderMPI::FindExtendedSources_ChanVese(Img* inputImg){
+int SourceFinderMPI::FindExtendedSources_ChanVese(Image* inputImg){
 
 	if(!inputImg){
 		ERROR_LOG("Null ptr to input image given!");
@@ -1521,7 +1521,7 @@ int SourceFinderMPI::FindExtendedSources_ChanVese(Img* inputImg){
 
 }//close FindExtendedSources_ChanVese()
 
-int SourceFinderMPI::FindExtendedSources_WT(Img* inputImg){
+int SourceFinderMPI::FindExtendedSources_WT(Image* inputImg){
 
 	if(!inputImg){
 		//cerr<<"SourceFinder::FindExtendedSources_WT(): ERROR: Null ptr to input image given!"<<endl;
@@ -1532,7 +1532,7 @@ int SourceFinderMPI::FindExtendedSources_WT(Img* inputImg){
 	//## Find extended sources in the W3, W5 scales of the residual image where ONLY POINT-LIKE SOURCES are removed
 	//cout<<"SourceFinder::FindExtendedSources_WT(): INFO: Find extended sources in the residual image WT-"<<m_wtScaleExtended<<"  scale ..."<<endl;
 	INFO_LOG("Find extended sources in the residual image WT-"<<m_wtScaleExtended<<"  scale ...");
-	std::vector<Img*> wt_extended= inputImg->GetWaveletDecomposition(m_wtScaleExtended);
+	std::vector<Image*> wt_extended= inputImg->GetWaveletDecomposition(m_wtScaleExtended);
 	
 
 	std::vector<Source*> sources;
@@ -1712,7 +1712,7 @@ bool SourceFinderMPI::IsPointLikeSource(Source* aSource){
 
 
 
-Img* SourceFinderMPI::ReadImage(long int ix_min,long int ix_max,long int iy_min,long int iy_max){
+Image* SourceFinderMPI::ReadImage(long int ix_min,long int ix_max,long int iy_min,long int iy_max){
 
 	//## Check file
 	FileInfo info;
@@ -1724,7 +1724,7 @@ Img* SourceFinderMPI::ReadImage(long int ix_min,long int ix_max,long int iy_min,
 	m_InputFileExtension= info.extension;
 
 
-	Img* img= 0;
+	Image* img= 0;
 
 	//=== ROOT reading ===
 	if(m_InputFileExtension==".root"){// Read image from ROOT file
@@ -1734,7 +1734,7 @@ Img* SourceFinderMPI::ReadImage(long int ix_min,long int ix_max,long int iy_min,
 			return 0;
 		}
 		
-		Img* fullImg= (Img*)inputFile->Get(m_InputImgName.c_str());
+		Image* fullImg= (Image*)inputFile->Get(m_InputImgName.c_str());
 		if(!fullImg){
 			ERROR_LOG("Cannot get image from input file "<<m_InputFileName<<"!");
 			return 0;
@@ -1750,7 +1750,7 @@ Img* SourceFinderMPI::ReadImage(long int ix_min,long int ix_max,long int iy_min,
 
 	//=== FITS reading ===
 	else if(m_InputFileExtension==".fits"){// Read image from FITS file
-		img= new Img;
+		img= new Image;
 		int status= img->ReadFITS(m_InputFileName,ix_min,ix_max,iy_min,iy_max);
 		if(status<0){
 			ERROR_LOG("Failed to read image from input file "<<m_InputFileName<<"!");
@@ -1771,7 +1771,7 @@ Img* SourceFinderMPI::ReadImage(long int ix_min,long int ix_max,long int iy_min,
 }//close ReadImage()
 
 
-BkgData* SourceFinderMPI::ComputeStatsAndBkg(Img* img){
+ImgBkgData* SourceFinderMPI::ComputeStatsAndBkg(Image* img){
 
 	//## Check input img
 	if(!img){
@@ -1808,8 +1808,8 @@ BkgData* SourceFinderMPI::ComputeStatsAndBkg(Img* img){
 	}
 	else{
 		WARN_LOG("Beam information is not available or its usage has been turned off, using image fractions...");
-		double Nx= img->GetNbinsX();
-		double Ny= img->GetNbinsY();
+		double Nx= static_cast<double>(img->GetNx());
+		double Ny= static_cast<double>(img->GetNy());
 		boxSizeX= m_BoxSizeX*Nx;
 		boxSizeY= m_BoxSizeY*Ny;
 	}
@@ -1818,7 +1818,7 @@ BkgData* SourceFinderMPI::ComputeStatsAndBkg(Img* img){
 	double gridSizeY= m_GridSizeY*boxSizeY;
 
 	//## Compute Bkg
-	BkgData* bkgData= img->ComputeBkg(m_BkgEstimator,m_UseLocalBkg,boxSizeX,boxSizeY,gridSizeX,gridSizeY,m_Use2ndPassInLocalBkg,m_SkipOutliersInLocalBkg,m_SeedThr,m_MergeThr,m_NMinPix);
+	ImgBkgData* bkgData= img->ComputeBkg(m_BkgEstimator,m_UseLocalBkg,boxSizeX,boxSizeY,gridSizeX,gridSizeY,m_Use2ndPassInLocalBkg,m_SkipOutliersInLocalBkg,m_SeedThr,m_MergeThr,m_NMinPix);
 
 	if(!bkgData) {
 		ERROR_LOG("Bkg computing failed!");
@@ -1830,7 +1830,7 @@ BkgData* SourceFinderMPI::ComputeStatsAndBkg(Img* img){
 }//close ComputeStatsAndBkg()
 
 
-int SourceFinderMPI::DrawSources(Img* image,std::vector<Source*>& sources){
+int SourceFinderMPI::DrawSources(Image* image,std::vector<Source*>& sources){
 
 	//cout<<"SourceFinder::DrawSources(): INFO: Drawing sources..."<<endl;
 	INFO_LOG("Drawing sources...");

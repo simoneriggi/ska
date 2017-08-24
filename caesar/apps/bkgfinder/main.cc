@@ -17,7 +17,6 @@
 // ***********************************************************************
 
 //Caesar headers
-#include <Img.h>
 #include <Image.h>
 #include <Logger.h>
 #include <SysUtils.h>

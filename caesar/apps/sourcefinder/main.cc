@@ -15,9 +15,8 @@
 // * have received a copy of the GNU General Public License along with   * 
 // * Caesar. If not, see http://www.gnu.org/licenses/.                   *
 // ***********************************************************************
-#include <Img.h>
+
 #include <Image.h>
-#include <SourceFinder.h>
 #include <SFinder.h>
 
 #include <ConfigParser.h>

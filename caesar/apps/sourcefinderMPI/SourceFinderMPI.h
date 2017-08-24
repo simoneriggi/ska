@@ -57,18 +57,11 @@
 
 namespace Caesar {
 
-class Img;
+class Image;
 class Source;
-class BkgData;
+class ImgBkgData;
 class TaskData;
 
-/*
-enum SegmAlgo {
-	eWaveletTransform= 1,
-	eHClust= 2,
-	eChanVese= 3,
-};
-*/
 
 class SourceFinderMPI : public TObject {
 
@@ -101,12 +94,12 @@ class SourceFinderMPI : public TObject {
 		/**
 		* \brief Read image
 		*/
-		Img* ReadImage(long int ix_min,long int ix_max,long int iy_min,long int iy_max);
+		Image* ReadImage(long int ix_min,long int ix_max,long int iy_min,long int iy_max);
 
 		/**
 		* \brief Compute Stats and Bkg info
 		*/
-		BkgData* ComputeStatsAndBkg(Img*);
+		ImgBkgData* ComputeStatsAndBkg(Image*);
 
 	public:
 		/**
@@ -130,13 +123,13 @@ class SourceFinderMPI : public TObject {
 		int Init();
 		int PrepareWorkerTasks();
 		int Save();	
-		int FindSources(std::vector<Source*>& sources,Img* inputImg,double seedThr,double mergeThr);
-		int FindCompactSources(TaskData*,Img*);
+		int FindSources(std::vector<Source*>& sources,Image* inputImg,double seedThr,double mergeThr);
+		int FindCompactSources(TaskData*,Image*);
 		int FindResidualMap();
 		int FindExtendedSources();
-		int FindExtendedSources_HClust(Img*);
-		int FindExtendedSources_ChanVese(Img*);
-		int FindExtendedSources_WT(Img*);
+		int FindExtendedSources_HClust(Image*);
+		int FindExtendedSources_ChanVese(Image*);
+		int FindExtendedSources_WT(Image*);
 	
 
 		int SelectSources(std::vector<Source*>& sources);
@@ -144,7 +137,7 @@ class SourceFinderMPI : public TObject {
 
 		bool IsGoodSource(Source* aSource);
 		bool IsPointLikeSource(Source* aSource);
-		int DrawSources(Img* image,std::vector<Source*>& sources);
+		int DrawSources(Image* image,std::vector<Source*>& sources);
 
 		int UpdateTaskDataFromWorkers();
 		int FindSourcesAtEdge();
@@ -157,7 +150,7 @@ class SourceFinderMPI : public TObject {
 		std::string m_InputImgName;
 		std::string m_InputFileExtension;
 		int m_InputFileType;
-		Img* m_InputImg;
+		Image* m_InputImg;
 
 		//Output data
 		TApplication* m_Application;
@@ -201,8 +194,8 @@ class SourceFinderMPI : public TObject {
 		double m_TileStepSizeY;
 
 		//Bkg computation
-		BkgData* m_BkgData;
-		Img* m_SignificanceMap;
+		ImgBkgData* m_BkgData;
+		Image* m_SignificanceMap;
 		bool m_UseLocalBkg;	
 		bool m_Use2ndPassInLocalBkg;
 		bool m_SkipOutliersInLocalBkg;
@@ -215,8 +208,8 @@ class SourceFinderMPI : public TObject {
 		double m_GridSizeY;
 
 		//Residual map
-		Img* m_ResidualImg;
-		BkgData* m_ResidualBkgData;
+		Image* m_ResidualImg;
+		ImgBkgData* m_ResidualBkgData;
 		bool m_DilateNestedSources;
 		int m_DilateKernelSize;
 		int m_DilatedSourceType;
@@ -256,7 +249,7 @@ class SourceFinderMPI : public TObject {
 		double m_psMaxNPix;
 
 		//Saliency computation
-		Img* m_SaliencyImg;
+		Image* m_SaliencyImg;
 		double m_SaliencyThrFactor;
 		double m_SaliencyBkgThrFactor;
 		double m_SaliencyImgThrFactor;

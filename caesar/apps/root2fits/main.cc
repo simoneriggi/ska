@@ -17,7 +17,6 @@
 // ***********************************************************************
 #include <FITSWriter.h>
 #include <SysUtils.h>
-#include <Img.h>
 #include <Image.h>
 #include <Logger.h>
 
