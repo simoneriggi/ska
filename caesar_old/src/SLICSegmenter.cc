@@ -116,10 +116,25 @@ SLICSegmenter::~SLICSegmenter() {
 	fMergedRegions.clear();
 	
 	cout<<"SLICSegmenter::~SLICSegmenter(): INFO: Deleting filter images..."<<endl;
-	if(fLUT) fLUT->Delete();
-	if(fLaplImg) fLaplImg->Delete();
-	if(fEdgeFilterImg) fEdgeFilterImg->Delete();
-	if(fKirschEdgeFilterImg) fKirschEdgeFilterImg->Delete();
+	if(fLUT) {
+		delete fLUT;
+		fLUT= 0;
+	}
+	if(fLaplImg) {
+		//fLaplImg->Delete();
+		delete fLaplImg;
+		fLaplImg= 0;
+	}
+	if(fEdgeFilterImg) {
+		//fEdgeFilterImg->Delete();
+		delete fEdgeFilterImg;
+		fEdgeFilterImg= 0;
+	}
+	if(fKirschEdgeFilterImg) {
+		//	fKirschEdgeFilterImg->Delete();
+		delete fKirschEdgeFilterImg;
+		fKirschEdgeFilterImg= 0;
+	}
 	
 	cout<<"SLICSegmenter::~SLICSegmenter(): INFO: Deleting norm image..."<<endl;
 	if(fImg) fImg->Delete();
@@ -131,6 +146,7 @@ SLICSegmenter::~SLICSegmenter() {
 		delete fCVSegmentation;
 		fCVSegmentation= 0;
 	}
+
 	
 }//close constructor
 
@@ -172,7 +188,11 @@ int SLICSegmenter::Init(Img* inputImage){
 	int nlevels= 255;
 	double zmin = fImg->GetMinimum();
 	double zmax = fImg->GetMaximum();
-	if(!fLUT) fLUT= new TH1D("LUT","LUT",nlevels,zmin,zmax);
+	if(!fLUT) {
+		//Find if histo with the same name exist
+		//bool alreadyExist= (gROOT->FindObject("LUT")!=nullptr);
+		fLUT= new TH1D("","",nlevels,zmin,zmax);//do not give a name!
+	}
 	
 	//## Compute laplacian images
 	fLaplImg= fInputImg->GetLaplacianImage(true);

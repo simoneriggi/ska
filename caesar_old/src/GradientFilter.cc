@@ -427,7 +427,8 @@ Img* GradientFilter::GetFilteredImage(Img* image,int KernelType,int size, double
 
 	//## Convert TMatrixD in image
 	TString imgName= Form("%s-Filter%d",image->GetName(),KernelType);
-	Img* filteredImage= new Img(imgName,imgName,image->GetNbinsX(),image->GetXaxis()->GetXmin(),image->GetXaxis()->GetXmax(),image->GetNbinsY(),image->GetYaxis()->GetXmin(),image->GetYaxis()->GetXmax());
+	//Img* filteredImage= new Img(imgName,imgName,image->GetNbinsX(),image->GetXaxis()->GetXmin(),image->GetXaxis()->GetXmax(),image->GetNbinsY(),image->GetYaxis()->GetXmin(),image->GetYaxis()->GetXmax());
+	Img* filteredImage= new Img("","",image->GetNbinsX(),image->GetXaxis()->GetXmin(),image->GetXaxis()->GetXmax(),image->GetNbinsY(),image->GetYaxis()->GetXmin(),image->GetYaxis()->GetXmax());
 	
 	for(int i=0;i<nrows;i++){
 		for(int j=0;j<ncols;j++){
