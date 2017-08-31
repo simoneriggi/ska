@@ -26,18 +26,13 @@
 
 
 //== IMG CLASSES ==
-//#pragma link C++ enum Caesar::Img::ImgType;
 #pragma link C++ class Caesar::MetaData+;
 #pragma link C++ class Caesar::ImgMetaData+;
 #pragma link C++ class Caesar::ImgStats+;
-//#pragma link C++ class Caesar::Img+;
-//#pragma link C++ class vector<Caesar::Img>+;
-//#pragma link C++ class vector<Caesar::Img*>+;
-//#pragma link C++ enum Caesar::WCSType+;
-
 #pragma link C++ class Caesar::Image+;
 #pragma link C++ class vector<Caesar::Image>+;
 #pragma link C++ class vector<Caesar::Image*>+;
+#pragma link C++ class Caesar::ImgRange+;
 //================
 
 //== UTILS CLASSES ==
