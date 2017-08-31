@@ -1507,7 +1507,7 @@ int SourceFinderMPI::FindExtendedSources_ChanVese(Image* inputImg){
 
 	//## Perform segmentation
 	std::vector<Source*> sources;
-	int status= inputImg->FindExtendedSource_CV(sources,m_ResidualBkgData,m_NMinPix,m_SearchNegativeExcess,m_cvTimeStepPar,m_cvWindowSizePar,m_cvLambda1Par,m_cvLambda2Par,m_cvMuPar,m_cvNuPar,m_cvPPar);
+	int status= inputImg->FindExtendedSource_CV(sources,0,m_ResidualBkgData,m_NMinPix,m_SearchNegativeExcess,m_cvTimeStepPar,m_cvWindowSizePar,m_cvLambda1Par,m_cvLambda2Par,m_cvMuPar,m_cvNuPar,m_cvPPar);
 	if(status<0){
 		ERROR_LOG("ChanVese Segmentation failed!");
 		return -1;
@@ -1573,7 +1573,7 @@ int SourceFinderMPI::SelectSources(std::vector<Source*>& sources){
 	std::vector<Source*> sources_sel;
 
 	for(int i=0;i<nSources;i++){	
-		std::string sourceName= sources[i]->Name;
+		std::string sourceName= sources[i]->GetName();
 		int sourceId= sources[i]->Id;
 		long int NPix= sources[i]->NPix;
 		double X0= sources[i]->X0;
@@ -1595,7 +1595,7 @@ int SourceFinderMPI::SelectSources(std::vector<Source*>& sources){
 		//Tag nested sources
 		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();
 		for(unsigned int j=0;j<nestedSources.size();j++){
-			std::string nestedSourceName= nestedSources[j]->Name;
+			std::string nestedSourceName= nestedSources[j]->GetName();
 			int nestedSourceId= nestedSources[j]->Id;
 			long int nestedNPix= nestedSources[j]->NPix;
 			double nestedX0= nestedSources[j]->X0;
@@ -1662,7 +1662,7 @@ bool SourceFinderMPI::IsPointLikeSource(Source* aSource){
 		return true;
 	}
 
-	std::string sourceName= aSource->Name;
+	std::string sourceName= aSource->GetName();
 	int sourceId= aSource->Id;
 
 	//Loop over contours and check if all of them have circular features

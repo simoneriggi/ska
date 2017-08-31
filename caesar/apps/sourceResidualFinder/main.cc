@@ -510,7 +510,7 @@ int SelectSources(){
 
 	std::vector<Source*> sources_sel;
 	for(int i=0;i<nSources;i++){	
-		std::string sourceName= sources[i]->Name;
+		std::string sourceName= sources[i]->GetName();
 		int sourceId= sources[i]->Id;
 		long int NPix= sources[i]->NPix;
 		double X0= sources[i]->X0;
@@ -532,7 +532,7 @@ int SelectSources(){
 		//Tag nested sources
 		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();
 		for(unsigned int j=0;j<nestedSources.size();j++){
-			std::string nestedSourceName= nestedSources[j]->Name;
+			std::string nestedSourceName= nestedSources[j]->GetName();
 			int nestedSourceId= nestedSources[j]->Id;
 			long int nestedNPix= nestedSources[j]->NPix;
 			double nestedX0= nestedSources[j]->X0;
@@ -571,7 +571,10 @@ bool IsGoodSource(Source* aSource){
 
 
 	//## Check for pixels 	
-	if(aSource->NPix<=0 || (aSource->GetPixels()).size()<=0) return false;
+	if(aSource->NPix<=0 || (aSource->GetPixels()).size()<=0) {
+		WARN_LOG("No pixels present in this source, cannot perform check!");
+		return false;
+	}
 
 	//## Check for line-like source
 	if( (aSource->GetContours()).size()<=0) {
@@ -581,7 +584,7 @@ bool IsGoodSource(Source* aSource){
 
 	double BoundingBoxMin= ((aSource->GetContours())[0])->BoundingBoxMin;
 	if(BoundingBoxMin<sourceMinBoundingBox) {
-		DEBUG_LOG("BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<sourceMinBoundingBox<<")");
+		INFO_LOG("BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<sourceMinBoundingBox<<")");
 		return false;
 	}
 
@@ -601,7 +604,7 @@ bool IsPointLikeSource(Source* aSource){
 		return true;
 	}
 
-	std::string sourceName= aSource->Name;
+	std::string sourceName= aSource->GetName();
 	int sourceId= aSource->Id;
 
 	//Loop over contours and check if all of them have circular features
