@@ -211,10 +211,15 @@ class StatsUtils : public TObject {
 		* \brief Compute median using nth_element (should run in O(n))
 		*/
 		template < typename T >
-		static T GetMedianFast(std::vector<T>&vec, bool useParallelVersion=false){
+		static T GetMedianFast(std::vector<T>& vec, bool useParallelVersion=false){
+
+			//Check empty vector
+			if(vec.size()<=0) {
+				WARN_LOG("Empty data vector, returning zero!");
+				return 0;
+			}
 			std::size_t n = vec.size()/2;
   		
-			if(n<=0) return -999;
 			#ifdef OPENMP_ENABLED
 				if(useParallelVersion) __gnu_parallel::__parallel_nth_element(vec.begin(),vec.begin()+n, vec.end(), std::less<T>());
 				else nth_element(vec.begin(),vec.begin()+n, vec.end());
@@ -223,7 +228,7 @@ class StatsUtils : public TObject {
 			#endif
 			
 			double median= vec[n];//Odd number of elements
-    	if(vec.size()%2==0){//Even numbers
+    	if(n%2==0){//Even numbers
 				double a= *std::max_element(vec.begin(),vec.begin()+n);
 				double median_even= (median+a)/2.;
 				median= median_even;
@@ -238,7 +243,10 @@ class StatsUtils : public TObject {
 		template < typename T >
 		static T GetMADFast( std::vector<T>const &vec, T median,bool useParallelVersion=false){
 			size_t n = vec.size();
-			if(n<=0) return -999;
+			if(n<=0) {
+				WARN_LOG("Empty data vector, returning zero!");
+				return 0;
+			}
 			std::vector<T> MADs;
 			MADs.resize(n);
 			
@@ -267,7 +275,10 @@ class StatsUtils : public TObject {
 		template < typename T >
 		static T GetMedian( std::vector<T>&vec, bool isSorted=false){//this should run in O(nlog(n))
 			size_t n = vec.size();
-			if(n<=0) return -999;
+			if(n<=0) {
+				WARN_LOG("Empty data vector, returning zero!");
+				return 0;
+			}
   		if(!isSorted) std::sort(vec.begin(), vec.end());
 			double median= 0;		
   		if(n%2==0) median = (vec[n/2-1] + vec[n/2])/2;	
@@ -281,7 +292,10 @@ class StatsUtils : public TObject {
 		template < typename T >
 		static T GetMAD( std::vector<T>const &vec, T median){
 			size_t n = vec.size();
-			if(n<=0) return -999;
+			if(n<=0) {
+				WARN_LOG("Empty data vector, returning zero!");
+				return 0;
+			}
 			std::vector<double> MADs;
   		for(int j=0;j<n;j++){
 				double diff= fabs(vec[j]-median);
@@ -298,7 +312,8 @@ class StatsUtils : public TObject {
 		*/
 		template <typename T>
 		static void ComputeMeanAndRMS(T& mean,T& stddev,std::vector<T>const &vec){
-			mean= stddev= -999;
+
+			mean= stddev= 0;
 			if(vec.empty()) return;
 			size_t n= vec.size();
 
@@ -341,6 +356,12 @@ class StatsUtils : public TObject {
 			for(auto x : vec) {
 				T diff= fabs(x-median);
 				if(diff<clipsig*stddev) vec_clipped.push_back(diff);
+			}
+
+			//Check if there are still data
+			if(vec_clipped.empty()){
+				INFO_LOG("Clipped data is empty, return.");
+				return -1;
 			}
 
 			/*
@@ -767,12 +788,80 @@ class StatsUtils : public TObject {
 
 		}//close ComputeStatsMoments()
 
-
-  	//Mahalanobis distance
+		/** 
+		\brief Compute Mahalanobis distance of input matrix
+ 		*/
 		static double GetMahalanobisDistance(TMatrixD x, TMatrixD mean, TMatrixD Sigma,bool isInverted=false);
 
-		//PageRank
+		
+		/** 
+		\brief Compute page rank of input matrix
+ 		*/
 		static int ComputePageRank(std::vector<double>& ranks,TMatrixD& M,double d=0.85,double tol=1.e-4);
+
+		/** 
+		\brief Compute norm mean after linear transformation from [DataMin,DataMax] to [NormMin,NormMax]
+ 		*/
+		template<typename T>
+		static T ComputeNormMean(T mean,T DataMin,T DataMax,T NormMin,T NormMax){
+			T A= NormMin - (NormMax-NormMin)*DataMin/(DataMax-DataMin);
+			T B= (NormMax-NormMin)/(DataMax-DataMin);
+			T mean_transf= A + B*mean;//mean under linear transformation
+			return mean_transf;
+		} 
+
+		/** 
+		\brief Compute norm difference between two values after linear transformation from [DataMin,DataMax] to [NormMin,NormMax]
+ 		*/
+		template<typename T>
+		static T ComputeNormDiff(T diff,T DataMin,T DataMax,T NormMin,T NormMax){
+			T B= (NormMax-NormMin)/(DataMax-DataMin);
+			T diff_transf= B*diff;//difference under linear transformation
+			return diff_transf;
+		}
+
+		template<typename T>
+		static T ComputeNormDiffSqr(T diff2,T DataMin,T DataMax,T NormMin,T NormMax){
+			T B= (NormMax-NormMin)/(DataMax-DataMin);
+			T diff2_transf= B*B*diff2;//difference under linear transformation
+			return diff2_transf;
+		} 
+
+		/** 
+		\brief Get mean/rms after linear transformation from [DataMin,DataMax] to [NormMin,NormMax]
+ 		*/
+		template<typename T>
+		static void ComputeNormMeanAndRMS(T& mean_transf,T& rms_transf,T mean,T rms,T DataMin,T DataMax,T NormMin,T NormMax){
+			T A= NormMin - (NormMax-NormMin)*DataMin/(DataMax-DataMin);
+			T B= (NormMax-NormMin)/(DataMax-DataMin);
+			mean_transf= A + B*mean;//mean under linear transformation
+			rms_transf= B*rms;
+		} 
+
+		/** 
+		\brief Get value normalized in a range
+ 		*/
+		template<typename T>
+		static T GetNormValue(T x,T xmin,T xmax,T NormMin,T NormMax){
+			T xnorm= NormMin + (NormMax-NormMin)*(x-xmin)/(xmax-xmin);
+			return xnorm;
+		}
+
+		/** 
+		\brief Normalize a vector	in a range
+ 		*/
+		template<typename T>	
+		static void NormalizeVector(std::vector<T>& data,T NormMin=0,T NormMax=1){
+			//Find vector min & max
+			T xmax = *max_element(data.begin(), data.end());
+			T xmin = *min_element(data.begin(), data.end());
+
+			//Transform vector
+			std::transform(data.begin(), data.end(), data.begin(), 
+   			[&NormMin,&NormMax,&xmin,&xmax](T x) -> T { return GetNormValue(x,xmin,xmax,NormMin,NormMax); }
+			);
+		}
+		
 
 	private:
 	

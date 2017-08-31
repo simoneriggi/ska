@@ -61,6 +61,29 @@ class SLICNeighborData;
 class SLICNeighborCollection;
 class SLICData;
 
+
+struct RegionDistNormData {
+
+	RegionDistNormData(){
+		ImgDiagonal= 0;
+		Smin= 0;
+		Smax= 0;
+		Smin_curv= 0;
+		Smax_curv= 0;
+		NormMin= 0;
+		NormMax= 1;
+	}
+
+	double ImgDiagonal;
+	double Smin;
+	double Smax;
+	double Smin_curv;
+	double Smax_curv;
+	double NormMin;
+	double NormMax;
+};
+
+
 class SLICUtils : public TObject {
 
 	public:
@@ -76,10 +99,15 @@ class SLICUtils : public TObject {
 	public:
 		
 		/** 
+		\brief Generate superpixel partition
+ 		*/
+		static SLICData* SPGenerator(Image* img, int regionSize=20,double regParam=1, int minRegionSize=10, bool normalizeImage=true, bool useLogScaleMapping=false, Image* laplImg=0, Image* edgeImg=0);
+
+		/** 
 		\brief Compute superpixel boundary contours
  		*/
 		static SLICContourData* ComputeBoundaryContours(SLICData* slicData);
-
+		
 		/** 
 		\brief Compute region similarities
  		*/
@@ -88,7 +116,7 @@ class SLICUtils : public TObject {
 		/** 
 		\brief Find superpixel neighbors
  		*/
-		static int FindNeighbors(std::vector<SLICNeighborCollection>& neighbors,SLICData* slicData,SLICContourData* contourData,bool get2ndNeighbors=true,int selectedTag=-1,bool includeSpatialDist=false);
+		static int FindNeighbors(std::vector<SLICNeighborCollection>& neighbors,SLICData* slicData,SLICContourData* contourData,bool get2ndNeighbors=true,int selectedTag=-1,bool includeSpatialDist=false,bool normalizeParams=true,bool useRobustParams=false,bool addCurvDist=true);
 
 		/** 
 		\brief Compute segmented image given a list of tagged regions
@@ -104,6 +132,16 @@ class SLICUtils : public TObject {
 		\brief Tag regions into signal/bkg according to signal & bkg marker images
  		*/
 		static int TagRegions(std::vector<Region*>& regions,Image* binaryMap_bkg,Image* binaryMap_signal);
+
+		/** 
+		\brief Compute distance between regions
+ 		*/
+		static int ComputeRegionDistance(double& dist,double& dist_spatial,Region* region_i,Region* region_j,RegionDistNormData normPars, bool normalizeParams=true,bool useRobustParams=false,bool addCurvDist=false);
+
+		/** 
+		\brief Compute asymmetric distance between regions
+ 		*/
+		static int ComputeRegionAsymmDistance(double& dist,double& dist_neighbor,Region* region_i,Region* region_j,RegionDistNormData normPars, bool normalizeParams=true,bool useRobustParams=false,bool addCurvDist=false,bool addSpatialDist=false);
 
 	public:
 		

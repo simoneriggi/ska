@@ -127,6 +127,11 @@ class SFinder : public TObject {
 		int Save();	
 
 		/**
+		* \brief Save source region file
+		*/
+		int SaveDS9RegionFile();
+
+		/**
 		* \brief Find sources from input image
 		*/
 		int FindSources(std::vector<Source*>& sources,Image* inputImg,double seedThr,double mergeThr);
@@ -142,7 +147,7 @@ class SFinder : public TObject {
 		/**
 		* \brief Find extended sources
 		*/
-		int FindExtendedSources();
+		int FindExtendedSources(Image*);
 		/**
 		* \brief Find extended sources with hierarchical clustering method
 		*/
@@ -155,11 +160,21 @@ class SFinder : public TObject {
 		* \brief Find extended sources with Wavelet Transform method
 		*/
 		int FindExtendedSources_WT(Image*);
+		/**
+		* \brief Find extended sources with Saliency Map thresholding method
+		*/
+		int FindExtendedSources_SalThr(Image*);
 
+		
 		/**
 		* \brief Compute edge image
 		*/
 		Image* ComputeEdgeImage(Image* inputImg,int model);
+
+		/**
+		* \brief Compute laplacian image
+		*/
+		Image* ComputeLaplacianImage(Image* inputImg);
 
 		/**
 		* \brief Select sources according to quality cuts given in configuration
@@ -205,7 +220,7 @@ class SFinder : public TObject {
 		bool m_saveToFile;
 		bool m_saveConfig;
 		bool m_saveDS9Region;
-		FILE* m_DS9CatalogFilePtr;	
+		//FILE* m_DS9CatalogFilePtr;	
 		std::string m_DS9CatalogFileName;
 		int m_DS9RegionFormat;		
 		TTree* m_SourceTree;
@@ -216,6 +231,9 @@ class SFinder : public TObject {
 		bool m_saveBkgMap;
 		bool m_saveNoiseMap;
 		bool m_saveSaliencyMap;
+		bool m_saveEdgenessMap;
+		bool m_saveCurvatureMap;
+		bool m_saveSegmentedMap;
 
 		//Performance stats data
 		TTree* m_PerfTree;
@@ -341,18 +359,21 @@ class SFinder : public TObject {
 		double m_cvPPar;
 
 		//Hierachical clustering data
+		Image* m_LaplImg;
 		Image* m_EdgeImg;
+		Image* m_SegmImg;
 		int m_spMergingNSegmentsToStop;
 		double m_spMergingRatio;
 		double m_spMergingRegPar;
 		double m_spMergingMaxDissRatio;
 		double m_spMergingMaxDissRatio2ndNeighbours;
 		double m_spMergingDissThreshold;
-		int m_spMergingEdgeModel;
-		bool m_spMergingIncludeSpatialPars;
+		int m_spMergingEdgeModel;		
 		bool m_spMergingUse2ndNeighbours;
+		bool m_spMergingIncludeSpatialPars;
+		bool m_spMergingAddCurvDist;
+		bool m_spMergingUseRobustPars;
 		
-
 	ClassDef(SFinder,1)
 
 };//close SourceFinder

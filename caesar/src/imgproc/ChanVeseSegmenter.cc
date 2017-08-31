@@ -54,7 +54,7 @@ ChanVeseSegmenter::~ChanVeseSegmenter() {
 //===============================================
 //==          NEW IMAGE METHODS
 //===============================================
-ChanVeseSegmenter::CVdata* ChanVeseSegmenter::Init(Image* img,double initContourRadius){
+ChanVeseSegmenter::CVdata* ChanVeseSegmenter::Init(Image* img,Image* initSegmImg,double initContourRadius){
 
 	//## Normalize image
 	double norm_min= 0;
@@ -92,26 +92,41 @@ ChanVeseSegmenter::CVdata* ChanVeseSegmenter::Init(Image* img,double initContour
 	pCVdata->imgMatrixOut = new TMatrixD(nRows,nCols);
 	(pCVdata->imgMatrixOut)->Zero();
   
-	//## Set up initial circular contour for a 256x256 image
-	double rowCenter= nRows/2.0;
-	double colCenter= nCols/2.0;
-	DEBUG_LOG("Init contour center("<<rowCenter<<","<<colCenter<<")");
+
+	if(initSegmImg){
+		INFO_LOG("Initial segmentation given, initializing level set from that...");
+		for (int i=0; i<nRows; ++i) {
+			long int iy= i;
+    	for (int j=0; j<nCols; ++j) {
+				long int ix= j;
+				double w= initSegmImg->GetPixelValue(ix,iy);
+				if(w>0) (pCVdata->phi0)->operator()(i,j)= 1;	
+				else (pCVdata->phi0)->operator()(i,j)= -1;//bkg shall be set to negative (not to 0)
+    	}//end loop cols
+  	}//end loop rows
+	}//close if
+	else{
+		//## Set up initial circular contour for a 256x256 image
+		double rowCenter= nRows/2.0;
+		double colCenter= nCols/2.0;
+		INFO_LOG("Initializing level set from dummy gaussian (center("<<rowCenter<<","<<colCenter<<", radiu="<<initContourRadius<<")");
 	
-	for (int i=0; i<nRows; ++i) {
-    for (int j=0; j<nCols; ++j) {
-			double x= double(i) - rowCenter;
-			double y= double(j) - colCenter;
-			double w= 900.0/(900.0 + x*x + y*y ) - initContourRadius;
-			(pCVdata->phi0)->operator()(i,j)= w;
-    }//end loop cols
-  }//end loop rows
+		for (int i=0; i<nRows; ++i) {
+    	for (int j=0; j<nCols; ++j) {
+				double x= double(i) - rowCenter;
+				double y= double(j) - colCenter;
+				double w= 900.0/(900.0 + x*x + y*y ) - initContourRadius;
+				(pCVdata->phi0)->operator()(i,j)= w;
+    	}//end loop cols
+  	}//end loop rows
+	}//close else
 
 	return pCVdata;
 	
 }//close Init()
 
 
-Image* ChanVeseSegmenter::FindSegmentation(Image* img,bool returnContourImg,double dt,double h,double lambda1,double lambda2,double mu,double nu,double p,double initContourRadius){
+Image* ChanVeseSegmenter::FindSegmentation(Image* img,Image* initSegmImg,bool returnContourImg,double dt,double h,double lambda1,double lambda2,double mu,double nu,double p,double initContourRadius){
 
 	//Check input image
 	if(!img){
@@ -130,10 +145,10 @@ Image* ChanVeseSegmenter::FindSegmentation(Image* img,bool returnContourImg,doub
   pCVinputs->mu = mu;
   pCVinputs->nu = nu;
   pCVinputs->p = p;
-	DEBUG_LOG("CV PARS: lambda1="<<lambda1<<", lambda2="<<lambda2<<" mu="<<mu<<" nu="<<nu<<" p="<<p);
+	INFO_LOG("Running Chan-Vese segmentation with pars {dt="<<dt<<", h="<<h<<", lambda1="<<lambda1<<", lambda2="<<lambda2<<" mu="<<mu<<" nu="<<nu<<" p="<<p<<"}");
 	
 	//## Initialize algo data
-	ChanVeseSegmenter::CVdata* pCVdata= Init(img,initContourRadius);
+	ChanVeseSegmenter::CVdata* pCVdata= Init(img,initSegmImg,initContourRadius);
 	if(!pCVdata){
 		ERROR_LOG("Failed to initialize!");
 		if(pCVinputs){
@@ -162,32 +177,34 @@ Image* ChanVeseSegmenter::FindSegmentation(Image* img,bool returnContourImg,doub
 
 	if(returnContourImg){
 		for (int i=0;i<nRows; ++i) {
-			int iy= i;
+			long int iy= i;
 			for (int j=0;j<nCols; ++j) {
-				int ix= j;
+				long int ix= j;
 				double w= (pCVdata->edges)->operator()(i,j);
-      	if ( w == norm_max) {
-					outputImg->FillPixel(ix,iy,1.);
-				}
+      	if (w == norm_max) outputImg->FillPixel(ix,iy,1.);
+				else outputImg->FillPixel(ix,iy,0.);
     	}//end loop 
   	}//end loop
 
 	}//close if
 	else{		
 		for (int i=0; i<nRows; ++i) {
-			int iy= i;
-			//double y= img->GetYaxis()->GetBinCenter(iy+1);
-    	for (int j=0;j<nCols;++j) {
-				int ix= j;
-				//double x= img->GetXaxis()->GetBinCenter(ix+1);
-				double w= (pCVdata->phi)->operator()(i,j);
-				//if (w>=0) outputImg->FillPixel(x,y,norm_max);
+			long int iy= i;
+			for (int j=0;j<nCols;++j) {
+				long int ix= j;
+				double w= (pCVdata->phi)->operator()(i,j);	
 				if (w>=0) outputImg->FillPixel(ix,iy,norm_max);
+				else outputImg->FillPixel(ix,iy,0.);
   		}//end loop
 		}//end loop
 	}//close else
 
 	//## Clear up
+	if(pCVinputs){
+		delete pCVinputs;
+		pCVinputs= 0;
+	}
+
 	if(pCVdata){
 		delete pCVdata;
 		pCVdata= 0;
@@ -340,7 +357,7 @@ void ChanVeseSegmenter::ReinitPhi(TMatrixD* phiIn,TMatrixD** psiOut,double dt,do
     
     if (Q < dt*h*h){
       fStop = true;
-      cout << "ChanVeseSegmenter::ReinitPhi(): INFO: Stopping condition reached at " << k+1 << " iterations; Q = " << Q << endl;
+      INFO_LOG("Stopping condition reached at " << k+1 << " iterations (Q="<<Q<<")");
     }
     else {
       //cout << "Iteration " << k << ", Q = " << Q << " > " << dt*h*h << endl;
@@ -448,7 +465,6 @@ void ChanVeseSegmenter::CVSegmentation(TMatrixD* img,TMatrixD* phi0,TMatrixD** p
   for (unsigned int k = 0; k < 5 && fStop == false; ++k) {
     *phiOld= (**phi);
     
-
     // Compute region averages for current level set function
     // Main segmentation algorithm
     GetRegionAverages(img, *phi, h, c1, c2);
@@ -460,7 +476,6 @@ void ChanVeseSegmenter::CVSegmentation(TMatrixD* img,TMatrixD* phi0,TMatrixD** p
       if (1 == p) L = 1.0;
       else L = 1.0; // fix this!!
      
-      
       // Loop through all interior image pixels
       for (int i = 1; i < img->GetNrows()-1; ++i) {
         for (int j = 1; j < img->GetNcols()-1; ++j) {
@@ -491,7 +506,7 @@ void ChanVeseSegmenter::CVSegmentation(TMatrixD* img,TMatrixD* phi0,TMatrixD** p
       }
  
       // Reinitialize phi to the signed distance function to its zero contour
-			int nIterations= 200;//100
+			int nIterations= 1000;//200;//100
       ReinitPhi(*phi, phi, 0.1, h, nIterations);
     }
     

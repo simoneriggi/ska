@@ -143,7 +143,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(outputFile,std::string,"Output.root","","");
 		REGISTER_OPTION(ds9RegionFile,std::string,"DS9SourceRegion.reg","","");
 		REGISTER_OPTION(saveDS9Region,bool,true,false,true);
-		REGISTER_OPTION(DS9RegionFormat,int,1,1,2);
+		REGISTER_OPTION(DS9RegionFormat,int,1,0,3);
 		REGISTER_OPTION(saveToFile,bool,true,false,true);
 		REGISTER_OPTION(saveConfig,bool,true,false,true);
 		REGISTER_OPTION(saveResidualMap,bool,true,false,true);
@@ -153,6 +153,9 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(saveInputMap,bool,true,false,true);
 		REGISTER_OPTION(saveSaliencyMap,bool,true,false,true);
 		REGISTER_OPTION(saveSources,bool,true,false,true);
+		REGISTER_OPTION(saveEdgenessMap,bool,false,false,true);
+		REGISTER_OPTION(saveCurvatureMap,bool,false,false,true);
+		REGISTER_OPTION(saveSegmentedMap,bool,true,false,true);
 		REGISTER_OPTION(saveToFITSFile,bool,false,false,true);
 		REGISTER_OPTION(residualMapFITSFile,std::string,"ResidualMap.fits","","");
 		REGISTER_OPTION(inputMapFITSFile,std::string,"InputMap.fits","","");
@@ -237,7 +240,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//==  Extended Source finding options  ==
 		//=======================================
 		REGISTER_OPTION(searchExtendedSources,bool,false,false,true);
-		REGISTER_OPTION(extendedSearchMethod,int,2,1,3);		
+		REGISTER_OPTION(extendedSearchMethod,int,2,0,10);		
 		REGISTER_OPTION(useResidualInExtendedSearch,bool,true,false,true);
 		REGISTER_OPTION(wtScaleExtended,int,6,1,10);
 		
@@ -283,7 +286,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//===================================
 		//==  Saliency filtering options   ==
 		//===================================
-		REGISTER_OPTION(saliencyThrFactor,double,2.8,1,10);
+		REGISTER_OPTION(saliencyThrFactor,double,2.8,0,10);
 		REGISTER_OPTION(saliencyBkgThrFactor,double,1,0.01,10);
 		REGISTER_OPTION(saliencyImgThrFactor,double,1,0.01,10);
 		REGISTER_OPTION(saliencyResoMin,int,20,1,1000);
@@ -319,6 +322,8 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(spMergingEdgeModel,int,2,1,2);
 		REGISTER_OPTION(spMergingRegPar,double,0.5,-0.0001,1.0001);
 		REGISTER_OPTION(spMergingIncludeSpatialPars,bool,false,false,true);
+		REGISTER_OPTION(spMergingAddCurvDist,bool,true,false,true);
+		REGISTER_OPTION(spMergingUseRobustPars,bool,false,false,true);
 		REGISTER_OPTION(spMergingUse2ndNeighbours,bool,true,false,true);
 		
 		

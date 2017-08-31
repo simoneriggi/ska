@@ -77,7 +77,7 @@ class SLICSegmenter : public TObject {
 		/**
 		\brief Merge the superpixels (main methods)
  		*/
-		static int FindSegmentation(SLICData const& slicData,SLICData& segmSlicData,double SPMergingRegularization,bool SPMergingIncludeSpatialPars,bool use2ndNeighborsInSPMerging,int minMergedSP=1,double SPMergingRatio=0.3,double SPMergingMaxDissRatio=1000,double SPMergingMaxDissRatio_2nd=1.05,double SPMergingDissThreshold=3);
+		static int FindSegmentation(SLICData const& slicData,SLICData& segmSlicData,double SPMergingRegularization,bool use2ndNeighborsInSPMerging,int minMergedSP=1,double SPMergingRatio=0.3,double SPMergingMaxDissRatio=1000,double SPMergingMaxDissRatio_2nd=1.05,double SPMergingDissThreshold=3,bool SPMergingIncludeSpatialPars=true,bool SPMergingUseRobustPars=false,bool SPMergingUseCurvDist=true);
 
 		
 	private:		
@@ -88,16 +88,16 @@ class SLICSegmenter : public TObject {
 		/**
 		\brief Adaptively merge the superpixels using max similarity
  		*/
-		static int MultiStepSPMerger(SLICData const& slicData,SLICData& segmSlicData,double SPMergingRegularization,bool SPMergingIncludeSpatialPars,bool use2ndNeighborsInSPMerging);
+		static int MultiStepSPMerger(SLICData const& slicData,SLICData& segmSlicData,double SPMergingRegularization,bool use2ndNeighborsInSPMerging,bool SPMergingIncludeSpatialPars,bool SPMergingUseRobustPars,bool SPMergingUseCurvDist);
 		/**
 		\brief Hierarchical merge the superpixels 
  		*/
-		static int SPHierarchicalMerger(SLICData& slicData,int mergerTag,int mergedTag,int minMergedSP,double SPMergingRatio,double SPMergingRegularization,bool includeSpatialPars,bool use2ndNeighborsInSPMerging,double SPMergingMaxDissRatio,double SPMergingMaxDissRatio_2nd,double SPMergingDissThreshold);
+		static int SPHierarchicalMerger(SLICData& slicData,int mergerTag,int mergedTag,int minMergedSP,double SPMergingRatio,double SPMergingRegularization,bool use2ndNeighborsInSPMerging,double SPMergingMaxDissRatio,double SPMergingMaxDissRatio_2nd,double SPMergingDissThreshold,bool SPMergingIncludeSpatialPars,bool SPMergingUseRobustPars,bool SPMergingUseCurvDist);
 
 		/**
 		\brief Merge the superpixels according to max similarity
  		*/
-		static int SPMaxSimilarityMerger(SLICData& segmSlicData,int mergerTag=1,int mergedTag=1,double SPMergingRegularization=0.5,bool SPMergingIncludeSpatialPars=false,bool use2ndNeighborsInSPMerging=false);		
+		static int SPMaxSimilarityMerger(SLICData& segmSlicData,int mergerTag=1,int mergedTag=1,double SPMergingRegularization=0.5,bool use2ndNeighborsInSPMerging=false,bool SPMergingIncludeSpatialPars=false,bool SPMergingUseRobustPars=false,bool SPMergingUseCurvDist=true);		
 
 		
 	private:

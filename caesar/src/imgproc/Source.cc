@@ -61,12 +61,32 @@ Source::Source() : Blob() {
 
 }//close costructor
 
+//Source::Source(ImgRange img_range,std::string name)
+//	: Blob(img_range, name)
+Source::Source(std::string name)
+	: Blob(name)
+{
+
+}//close parametric constructor
+
+
+//Source::Source(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name)
+//	: Blob(pixels,img_range,name)
+Source::Source(std::vector<Pixel*>const& pixels,std::string name)
+	: Blob(pixels,name)
+{
+
+}//close parametric constructor
+
+
 Source::~Source(){
 	
 }//close destructor
 
 
-Source::Source(const Source& source) : Blob() {
+Source::Source(const Source& source) 
+//	: Blob() 
+{
   // Contour copy constructor
 	DEBUG_LOG("Copy constuctor called...");
   Init();
@@ -75,8 +95,10 @@ Source::Source(const Source& source) : Blob() {
 
 void Source::Copy(TObject &obj) const {
 
-	// Copy this source to source obj
+	//Copy mother blob 
 	Blob::Copy((Source&)obj);
+
+	// Copy this source to source obj	
   ((Source&)obj).Type = Type;
 	((Source&)obj).Flag = Flag;	
 	((Source&)obj).m_BeamFluxIntegral = m_BeamFluxIntegral;
@@ -360,6 +382,7 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 	return 0;
 	
 }//close MergeSource()
+
 
 
 }//close namespace

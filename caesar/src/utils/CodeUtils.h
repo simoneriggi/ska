@@ -224,13 +224,14 @@ class CodeUtils : public TObject {
 		/**
 		* \brief Delete selected items from a vector
 		*/
-		template<class T>
-			static void DeleteItems(std::vector<T>& data, const std::vector<int>& deleteIndices) {
+		template<class T,typename K>
+			static void DeleteItems(std::vector<T>& data, const std::vector<K>& deleteIndices) {
     	std::vector<bool> markedElements(data.size(), false);
     	std::vector<T> tempBuffer;
     	tempBuffer.reserve(data.size()-deleteIndices.size());
 
-   	 	for (std::vector<int>::const_iterator itDel = deleteIndices.begin(); itDel != deleteIndices.end(); itDel++)
+			typedef typename std::vector<K>::const_iterator Iter;
+   	 	for (Iter itDel = deleteIndices.begin(); itDel != deleteIndices.end(); itDel++)
       	markedElements[*itDel] = true;
 
     	for (size_t i=0; i<data.size(); i++) {

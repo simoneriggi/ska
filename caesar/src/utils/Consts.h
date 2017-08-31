@@ -77,6 +77,7 @@ enum SegmAlgo {
 	eWaveletTransform= 1,
 	eHClust= 2,
 	eChanVese= 3,
+	eSaliencyThr= 4,
 };
 
 enum BkgEstimator {
@@ -108,6 +109,11 @@ enum FileType{
 enum SLICEdgeModel {
 	eKirschEdge= 1,
 	eChanVeseEdge= 2
+};
+
+enum DS9RegionFormat {
+	eEllipseRegion= 1,
+	ePolygonRegion= 2
 };
 
 #ifdef __MAKECINT__

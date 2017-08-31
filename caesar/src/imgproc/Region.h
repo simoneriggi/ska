@@ -25,10 +25,11 @@
 * @date 20/01/2015
 */
 
-#ifndef Region_h
-#define Region_h 1
+#ifndef _REGION_h
+#define _REGION_h 1
 
 #include <Blob.h>
+#include <CodeUtils.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -57,6 +58,18 @@ using namespace std;
 namespace Caesar {
 
 
+struct DistPars {
+	DistPars(){
+		dist2= 0;
+		dist2_curv= 0;
+		dist2_spatial= 0;
+	}
+	double dist2;
+	double dist2_curv;
+	double dist2_spatial;
+};
+
+
 class Region : public Blob {
 
 	public:
@@ -64,13 +77,42 @@ class Region : public Blob {
 		\brief Class constructor: initialize structures.
  		*/
 		Region();
+		/** 
+		\brief Parametric constructor
+ 		*/
+		//Region(ImgRange img_range,std::string name="");		
+		Region(std::string name);		
+		/** 
+		\brief Parametric constructor
+ 		*/
+		//Region(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name="");
+		Region(std::vector<Pixel*>const& pixels,std::string name="");
+		/**
+		* \brief Copy constructor
+		*/
+		Region(const Region& region);
 		/**
 		* \brief Class destructor: free allocated memory
 		*/
 		virtual ~Region();
+		/**
+		* \brief Assignment Operator
+		*/
+		Region& operator=(const Region& region);
+		/**
+		* \brief Copy method
+		*/
+		void Copy(TObject& region) const;
 
+	public:
+		/**
+		* \brief Region tag enumeration
+		*/
 		enum RegionTag {eBkgTag=0,eSignalTag=1,eUntagged=2};
 	
+		/**
+		* \brief Region pars
+		*/
 		struct RegionPars {
 			TVectorD* pars;
 			TVectorD* robustPars;
@@ -88,24 +130,94 @@ class Region : public Blob {
 		};//close RegionPars()
 
 	public:
+
+		/**
+		* \brief Get region parameters
+		*/
 		Region::RegionPars* GetParams(bool includeCurvPar=true);
-		int GetDistance(double& dist_color,double& dist_space,Region* aRegion,bool useRobustParams=false,bool normalizeParams=true,bool addCurvDist=true);
-		int GetAsymmDistance(double& dist,double& dist_neighbor,Region* aRegion,bool useRobustParams=false,bool normalizeParams=true,bool addSpatialDist=false,bool addCurvDist=true);
+
+		/**
+		* \brief Get distance squared between this and given region
+		*/	
+		int GetDistance(DistPars& distPars,Region* aRegion,bool useRobustParams=false);
+	
+		/**
+		* \brief Get asymmetric color & space symmetric distance between this and given region
+		*/
+		int GetAsymmDistance(DistPars& distPars,DistPars& distPars_neighbor,Region* aRegion,bool useRobustParams=false);
+
+
+		/**
+		* \brief Get color & space symmetric distance among two regions
+		*/
+		//int GetDistance(double& dist_color,double& dist_space,Region* aRegion,bool useRobustParams=false,bool normalizeParams=true,bool addCurvDist=true);
+
+		
+		/**
+		* \brief Get color & space asymmetric distance among two regions
+		*/
+		//int GetAsymmDistance(double& dist,double& dist_neighbor,Region* aRegion,bool useRobustParams=false,bool normalizeParams=true,bool addSpatialDist=false,bool addCurvDist=true);
+
+		/**
+		* \brief Merge a region to this
+		*/
 		int AddRegion(Region* aRegion,bool addPixels=true,bool copyPixels=false);
-		void AddSubRegionId(int id){m_SubRegionIds.push_back(id);}
-		int GetNSubRegions(){return (int)(m_SubRegionIds.size());}
-		const std::vector<int>& GetSubRegionIds() const {return m_SubRegionIds;}
-		int GetSubRegionId(int index){
-			if(GetNSubRegions()<=0 || index<0 || index>=GetNSubRegions() )
+
+		/**
+		* \brief Add a sub-region id to list
+		*/
+		int AddSubRegionId(long int id){
+			//Search if a sub region with same id was already added
+			int pos= -1;
+			if(Caesar::CodeUtils::FindItem(m_SubRegionIds,id,pos)){
+				WARN_LOG("Sub-region id "<<id<<" was already added as sub-region for region id="<<Id<<" (CHECK!!!)");
 				return -1;
+			}
+			m_SubRegionIds.push_back(id);
+			return 0;
+		}
+
+		/**
+		* \brief Get number of sub-regions present in list
+		*/
+		int GetNSubRegions(){return (int)(m_SubRegionIds.size());}
+
+		/**
+		* \brief Get the list of sub-region ids
+		*/
+		const std::vector<long int>& GetSubRegionIds() const {return m_SubRegionIds;}
+
+		/**
+		* \brief Get sub-region id at given index
+		*/
+		long int GetSubRegionId(int index){
+			size_t nSubRegions= m_SubRegionIds.size();
+			if(nSubRegions<=0 || index<0 || index>=(signed)(nSubRegions) ) return -1;
 			return m_SubRegionIds[index];
 		}
+
+	private:
+		/**
+		* \brief Get color distance between this and a given region
+		*/
+		double GetColorDistanceSqr(Region* aRegion,bool useRobustParams=false);
+
+		/**
+		* \brief Get color curvature distance between this and a given region
+		*/
+		double GetColorCurvDistanceSqr(Region* aRegion);
+
+		/**
+		* \brief Get spatial distance between this and a given region centroid
+		*/
+		double GetSpatialDistanceSqr(Region* aRegion);
+
 
 	public:
 		int Tag;
 
 	protected:
-		std::vector<int> m_SubRegionIds;
+		std::vector<long int> m_SubRegionIds;
 
 	ClassDef(Region,1)
 
@@ -115,9 +227,17 @@ class Region : public Blob {
 class RegionCollection : public TObject {
 	
 	public:
+
+		/**
+		* \brief Constructor
+		*/
 		RegionCollection(){
 			regions.clear();
 		};
+
+		/**
+		* \brief Destructor
+		*/
 		virtual ~RegionCollection(){
 			for(unsigned int i=0;i<regions.size();i++){
 				if(regions[i]) {
@@ -129,6 +249,10 @@ class RegionCollection : public TObject {
 		};
 
 	private:
+
+		/**
+		* \brief Matcher predicated function to find regions in collection by id
+		*/
 		struct MatchId {
  			MatchId(const int& id) : m_id(id) {}
  			bool operator()(const Region* obj) const {
@@ -140,8 +264,16 @@ class RegionCollection : public TObject {
 		
 
 	public: 
+
+		/**
+		* \brief Add a region to collection
+		*/
 		void Add(Region* aRegion){regions.push_back(aRegion);}
-		int GetN(){return (int)(regions.size());}
+
+		/**
+		* \brief Get number of regions present in collection
+		*/
+		int GetN(){return static_cast<int>(regions.size());}
 
 		/**
 		* \brief Get region by id

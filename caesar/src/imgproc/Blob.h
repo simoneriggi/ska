@@ -71,13 +71,25 @@ struct MatchPixelType {
 };
 
 
-class Blob : public TObject {
+class Blob : public TNamed {
 
 	public:
 		/** 
 		\brief Class constructor: initialize structures.
  		*/
 		Blob();
+		/** 
+		\brief Parametric constructor
+ 		*/
+		//Blob(ImgRange img_range,std::string name="");			
+		Blob(std::string name);			
+		
+		/** 
+		\brief Parametric constructor
+ 		*/
+		//Blob(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name="");			
+		Blob(std::vector<Pixel*>const& pixels,std::string name="");			
+
 		/**
 		* \brief Copy constructor
 		*/
@@ -95,29 +107,109 @@ class Blob : public TObject {
 		*/
 		void Copy(TObject& blob) const;
 
+
 	public:
+	
+		//================================================
+		//==         MAIN PARAMETERS 
+		//================================================
+		/**
+		* \brief Set blob id
+		*/
 		void SetId(int id){Id=id;}
-		void SetName(std::string name){Name=name;}
+		
+		/**
+		* \brief Set blob name
+		*/
+		//void SetName(std::string name){Name=name;}
+		void SetName(std::string name){TNamed::SetName(name.c_str());}
+
+		/**
+		* \brief Set image range
+		*/
+		//void SetImageRange(Caesar::ImgRange range){m_ImgRange= range;}
+		/**
+		* \brief Set image range
+		*/
+		/*
+		void SetImageRange(float xmin,float xmax,float ymin,float ymax){
+			m_ImgRange= Caesar::ImgRange(xmin,xmax,ymin,ymax);
+			//m_ImageMinX= xmin;
+			//m_ImageMaxX= xmax;
+			//m_ImageMinY= ymin;
+			//m_ImageMaxY= ymax;
+		}
+		*/
+
+		/**
+		* \brief Get image range
+		*/
+		/*
+		void GetImageRange(float& xmin,float& xmax,float& ymin,float& ymax){
+			m_ImgRange.GetRange(xmin,xmax,ymin,ymax);
+			//xmin= m_ImageMinX;
+			//xmax= m_ImageMaxX;
+			//ymin= m_ImageMinY;
+			//ymax= m_ImageMaxY;
+		}
+		*/
+
+		/**
+		* \brief Get image range
+		*/	
+		//const ImgRange& GetImageRange() const {return m_ImgRange;}
+
+		/**
+		* \brief Is blob at image edge
+		*/
 		bool IsAtEdge(){return HasPixelsAtEdge;}	
+
+		/**
+		* \brief Set edge flag 
+		*/
 		void SetEdgeFlag(bool choice){HasPixelsAtEdge=choice;}
 
-		//Pixel handlers
-		//PixelCollection GetPixels(){return m_Pixels;}
-		int GetNPixels(){return (int)(m_Pixels.size());}	
+		
+
+		//================================================
+		//==         PIXELS 
+		//================================================
+		/**
+		* \brief Get number of pixels
+		*/
+		int GetNPixels(){return static_cast<int>(m_Pixels.size());}
+
+		/**
+		* \brief Get pixel collection
+		*/	
 		const PixelCollection& GetPixels() const {return m_Pixels;}
+
+		/**
+		* \brief Add a pixel to collection
+		*/
 		int AddPixel(Pixel* pixel,bool makeCopy=false);
-		bool HasPixels(){return (GetNPixels()>0);}
+
+		/**
+		* \brief Has pixels stored?
+		*/
+		bool HasPixels(){return (!m_Pixels.empty());}
+
+		/**
+		* \brief Get access to pixel by index
+		*/
 		Pixel* GetPixel(int index) {
-			if(!HasPixels() || index<0 || index>=GetNPixels() ) return 0;
+			if(m_Pixels.empty() || index<0 || index>=(signed)(m_Pixels.size()) ) return nullptr;
 			return m_Pixels[index];
 		}
 
+		/**
+		* \brief Get access to seed pixel indexes
+		*/
 		std::vector<int> GetSeedPixelIndexes(){
 			std::vector<int> seedPixelIndexes;
 			if(m_Pixels.empty()) return seedPixelIndexes;
 			std::vector<Pixel*>::iterator it = m_Pixels.begin();
 			while ((it = std::find_if(it, m_Pixels.end(), MatchPixelType(Pixel::eSeed))) != m_Pixels.end()) {
-    		//int id= (*it)->id;
 				int index = std::distance(m_Pixels.begin(), it);
 				seedPixelIndexes.push_back(index);
     		it++;
@@ -125,66 +217,230 @@ class Blob : public TObject {
 			return seedPixelIndexes;
 		}//close GetSeedPixelIndexes()
 		
-		//Parameters
+		//================================================
+		//==         BLOB PARAMETERS 
+		//================================================
+		/**
+		* \brief Compute stats
+		*/
 		int ComputeStats(bool computeRobustStats=true,bool forceRecomputing=false);
-		bool HasStats(){return m_HasStats;}
-		void SetHasStats(bool value){m_HasStats=value;}
-		int ComputeMorphologyParams();
-		bool HasParameters(){return m_HasParameters;}
-		void SetHasParameters(bool value){m_HasParameters=value;}
 
+		/**
+		* \brief Has stats?
+		*/
+		bool HasStats(){return m_HasStats;}
+
+		/**
+		* \brief Has stats?
+		*/
+		void SetHasStats(bool value){m_HasStats=value;}
+
+		/**
+		* \brief Compute morphology parameters
+		*/
+		int ComputeMorphologyParams();
+
+		/**
+		* \brief Has morphology parameters computed
+		*/
+		bool HasParameters(){return m_HasParameters;}
+		/**
+		* \brief Set has morphology pars
+		*/
+		void SetHasParameters(bool value){m_HasParameters= value;}
+	
+		/**
+		* \brief Get 1st pixel moment (= mean)
+		*/
 		double GetM1(){return m_M1;}
-		void SetM1(double value){m_M1=value;}
+		/**
+		* \brief Set 1st pixel moment (= mean)
+		*/
+		void SetM1(double value){m_M1= value;}
+		/**
+		* \brief Get 2nd pixel moment 
+		*/
 		double GetM2(){return m_M2;}
-		void SetM2(double value){m_M2=value;}
+		/**
+		* \brief Set 2nd pixel moment 
+		*/
+		void SetM2(double value){m_M2= value;}
+
+		/**
+		* \brief Get 3rd pixel moment 
+		*/
 		double GetM3(){return m_M3;}
-		void SetM3(double value){m_M3=value;}
+		/**
+		* \brief Set 3rd pixel moment 
+		*/
+		void SetM3(double value){m_M3= value;}
+		/**
+		* \brief Get 4th pixel moment 
+		*/
 		double GetM4(){return m_M4;}
+
+		/**
+		* \brief Set 4th pixel moment 
+		*/
 		void SetM4(double value){m_M4=value;}
+		/**
+		* \brief Get 1st pixel curvature moment (= mean)
+		*/
 		double GetM1Curv(){return m_M1_curv;}	
+		/**
+		* \brief Set 1st pixel curvature moment (= mean)
+		*/
 		void SetM1Curv(double value){m_M1_curv=value;}
-		double GetM2Curv(){return m_M2_curv;}
+		/**
+		* \brief Get 2nd pixel curvature moment 
+		*/
+		double GetM2Curv(){return m_M2_curv;}	
+		/**
+		* \brief Set 2nd pixel curvature moment 
+		*/
 		void SetM2Curv(double value){m_M2_curv=value;}
 
+		/**
+		* \brief Get pixel flux sum
+		*/
 		double GetS(){return m_S;}
-		void SetS(double value){m_S=value;}
+		/**
+		* \brief Set pixel flux sum
+		*/
+		void SetS(double value){m_S= value;}
+		/**
+		* \brief Get pixel flux max
+		*/
 		double GetSmax(){return m_Smax;}
-		void SetSmax(double value){m_Smax=value;}
+		/**
+		* \brief Set pixel flux max
+		*/
+		void SetSmax(double value){m_Smax= value;}
+		/**
+		* \brief Get pixel flux min
+		*/
 		double GetSmin(){return m_Smin;}
-		void SetSmin(double value){m_Smin=value;}
+		/**
+		* \brief Set pixel flux min
+		*/
+		void SetSmin(double value){m_Smin= value;}
+		/**
+		* \brief Get pixel flux XX correlation
+		*/
 		double GetSxx(){return m_Sxx;}
+		/**
+		* \brief Set pixel flux XX correlation
+		*/
 		void SetSxx(double value){m_Sxx=value;}
+		/**
+		* \brief Get pixel flux YY correlation
+		*/
 		double GetSyy(){return m_Syy;}
+		/**
+		* \brief Get pixel flux YY correlation
+		*/
 		void SetSyy(double value){m_Syy=value;}
+		/**
+		* \brief Get pixel flux XY correlation
+		*/
 		double GetSxy(){return m_Sxy;}
+		/**
+		* \brief Set pixel flux XY correlation
+		*/
 		void SetSxy(double value){m_Sxy=value;}
+
+		/**
+		* \brief Get pixel flux sum weighted by position x
+		*/
 		double GetSx(){return m_Sx;}
-		void SetSx(double value){m_Sx=value;}
+		/**
+		* \brief Set pixel flux sum weighted by position x
+		*/
+		void SetSx(double value){m_Sx= value;}
+		/**
+		* \brief Get pixel flux sum weighted by position y
+		*/
 		double GetSy(){return m_Sy;}
-		void SetSy(double value){m_Sy=value;}
+		/**
+		* \brief Set pixel flux sum weighted by position y
+		*/
+		void SetSy(double value){m_Sy= value;}
+		/**
+		* \brief Get id of maximum flux pixel
+		*/
 		long int GetSmaxPixId() {return m_PixIdmax;}
-		void SetSmaxPixId(long int value){m_PixIdmax=value;}
+		/**
+		* \brief Set id of maximum flux pixel
+		*/
+		void SetSmaxPixId(long int value){m_PixIdmax= value;}
+		/**
+		* \brief Get id of minimum flux pixel
+		*/
 		long int GetSminPixId() {return m_PixIdmin;}
-		void SetSminPixId(long int value){m_PixIdmin=value;}
+		/**
+		* \brief Set id of minimum flux pixel
+		*/
+		void SetSminPixId(long int value){m_PixIdmin= value;}
+		/**
+		* \brief Get pixel sum of curvature
+		*/
 		double GetScurv(){return m_S_curv;}
-		void SetScurv(double value){m_S_curv=value;}
-		double GetSedge(){return m_S_edge;}		
+		/**
+		* \brief Set pixel sum of curvature
+		*/
+		void SetScurv(double value){m_S_curv= value;}
+		/**
+		* \brief Get pixel sum of edgeness
+		*/
+		double GetSedge(){return m_S_edge;}	
+		/**
+		* \brief Set pixel sum of edgeness
+		*/	
 		void SetSedge(double value){m_S_edge=value;}
 		
-		//Image setters/getters
-		void SetImageRange(double xmin,double xmax,double ymin,double ymax){
-			m_ImageMinX= xmin;
-			m_ImageMaxX= xmax;
-			m_ImageMinY= ymin;
-			m_ImageMaxY= ymax;
+		/**
+		* \brief Get source x-y range
+		*/
+		void GetSourceRange(double& xmin,double& xmax,double& ymin,double& ymax){
+			xmin= m_Xmin; 
+			xmax= m_Xmax;
+			ymin= m_Ymin;
+			ymax= m_Ymax;
 		}
-		void GetImageRange(double& xmin,double& xmax,double& ymin,double& ymax){
-			xmin= m_ImageMinX;
-			xmax= m_ImageMaxX;
-			ymin= m_ImageMinY;
-			ymax= m_ImageMaxY;
+		/**
+		* \brief Set source x-y range
+		*/
+		void SetSourceRange(double xmin,double xmax,double ymin,double ymax){
+			m_Xmin= xmin; 
+			m_Xmax= xmax;
+			m_Ymin= ymin;
+			m_Ymax= ymax;
 		}
 
+		/**
+		* \brief Get source pixel coordinate range
+		*/
+		void GetSourcePixelRange(long int& ixmin,long int& ixmax,long int& iymin,long int& iymax){
+			ixmin= m_Ix_min; 
+			ixmax= m_Ix_max;
+			iymin= m_Iy_min;
+			iymax= m_Iy_max;
+		}
+
+		/**
+		* \brief Set source pixel coordinate range
+		*/
+		void SetSourcePixelRange(long int ixmin,long int ixmax,long int iymin,long int iymax){
+			m_Ix_min= ixmin; 
+			m_Ix_max= ixmax;
+			m_Iy_min= iymin;
+			m_Iy_max= iymax;
+		}
+
+		//================================================
+		//==         IMAGE SETTERS/GETTERS 
+		//================================================
+		/*
 		void SetImageSRange(double Smin,double Smax){m_ImageMinS=Smin; m_ImageMaxS=Smax;}
 		void GetImageSRange(double& Smin,double& Smax){Smin=m_ImageMinS; Smax=m_ImageMaxS;}
 
@@ -199,36 +455,11 @@ class Blob : public TObject {
 
 		void SetImageSize(long int Nx,long int Ny){m_ImageSizeX=Nx; m_ImageSizeY=Ny;}
 		void GetImageSize(long int& sizeX,long int& sizeY){sizeX=m_ImageSizeX;sizeY=m_ImageSizeY;}
-
-		void GetSourceRange(double& xmin,double& xmax,double& ymin,double& ymax){
-			xmin= m_Xmin; 
-			xmax= m_Xmax;
-			ymin= m_Ymin;
-			ymax= m_Ymax;
-		}
-		void SetSourceRange(double xmin,double xmax,double ymin,double ymax){
-			m_Xmin= xmin; 
-			m_Xmax= xmax;
-			m_Ymin= ymin;
-			m_Ymax= ymax;
-		}
-
-		void GetSourcePixelRange(long int& ixmin,long int& ixmax,long int& iymin,long int& iymax){
-			ixmin= m_Ix_min; 
-			ixmax= m_Ix_max;
-			iymin= m_Iy_min;
-			iymax= m_Iy_max;
-		}
-
-		void SetSourcePixelRange(long int ixmin,long int ixmax,long int iymin,long int iymax){
-			m_Ix_min= ixmin; 
-			m_Ix_max= ixmax;
-			m_Iy_min= iymin;
-			m_Iy_max= iymax;
-		}
+		*/
+		
 
 		/**
-		* \brief Dump region info
+		* \brief Dump blob info
 		*/
 		void Print(){
 			cout<<"*** REGION NO. "<<Id<<" ***"<<endl;
@@ -237,9 +468,13 @@ class Blob : public TObject {
 			cout<<"****************************"<<endl;
 		}
 		/**
-		* \brief Get image
+		* \brief Generate an image from source pixel
 		*/
 		Image* GetImage(ImgType mode);
+
+		//================================================
+		//==         CONTOURS
+		//================================================
 		/**
 		* \brief Return contours
 		*/
@@ -260,12 +495,31 @@ class Blob : public TObject {
 
 
 	private:
-		//Init functions
+
+		/**
+		* \brief Initialize data
+		*/
 		void Init();
+
+		/**
+		* \brief Update moments with given pixel
+		*/
 		void UpdateMoments(Pixel* pixel);
+		/**
+		* \brief Reset moments
+		*/
 		void ResetMoments();
+		/**
+		* \brief Reset stats
+		*/
 		void ResetStats();
+		/**
+		* \brief Clear pixels
+		*/
 		void ClearPixels();
+		/**
+		* \brief Clear contours
+		*/
 		void ClearContours();
 
 	public:
@@ -276,7 +530,7 @@ class Blob : public TObject {
 
 		//Main params
 		long int Id;//Blob id
-		std::string Name;//Blob name
+		//std::string Name;//Blob name
 			
 		//Stats params
 		long int NPix;//Number of pixels in blob
@@ -300,6 +554,8 @@ class Blob : public TObject {
 		std::vector<double> ZMMoments;	
 
 	protected:
+
+
 		bool m_HasStats;	
 		bool m_HasParameters;	
 
@@ -329,6 +585,9 @@ class Blob : public TObject {
 		double m_S_edge;//sum of edge estimator
 
 		//Image ranges
+		//ImgRange m_ImgRange;
+		
+		/*
 		long int m_ImageSizeX;
 		long int m_ImageSizeY;
 		double m_ImageMinX;
@@ -342,6 +601,7 @@ class Blob : public TObject {
 		double m_ImageMinSedge;
 		double m_ImageMaxSedge;
 		double m_ImageRMS;
+		*/
 
 		double m_Xmin;
 		double m_Xmax;

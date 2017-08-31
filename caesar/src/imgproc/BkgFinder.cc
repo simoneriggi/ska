@@ -33,6 +33,7 @@
 #include <MathUtils.h>
 #include <Logger.h>
 #include <Consts.h>
+#include <SysUtils.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -463,7 +464,7 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
 	#pragma omp parallel num_threads(2) reduction(+: errflag)
 	#endif
 	{
-		int thread_id= omp_get_thread_num();
+		int thread_id= SysUtils::GetOMPThreadId();
 
 		//Perform the bkg map interpolation	
 		if( !splitWork || (splitWork && thread_id==0) ){
@@ -563,8 +564,6 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
   		}//end loop bins X
 		
 			//Fill parallel moments per thread
-			//bkg_parallel_moments.push_back(bkg_moments_t);
-			//rms_parallel_moments.push_back(rms_moments_t);
 			bkg_parallel_moments[thread_id]= bkg_moments_t;
 			rms_parallel_moments[thread_id]= rms_moments_t;
 

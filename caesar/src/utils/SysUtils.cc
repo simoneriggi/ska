@@ -210,6 +210,16 @@ int SysUtils::GetOMPCores(){
 
 }//close GetOMPCores()
 
+int SysUtils::GetOMPThreadId(){
+
+	#ifdef OPENMP_ENABLED
+		return omp_get_thread_num();
+	#endif
+
+	return 0;
+
+}//close GetOMPThreadId()
+
 
 }//close namespace
 

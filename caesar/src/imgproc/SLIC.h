@@ -70,17 +70,17 @@ class SLIC : public TObject {
 	public:
 
 
-		//===================================================
-		//==        NEW IMAGE METHODS
-		//===================================================
+		/** 
+		\brief Generate a superpixel partition given the passed options
+ 		*/
 		static SLICData* SPGenerator(Image* img,int regionSize=10,double regParam=1,int minRegionSize=10,bool useLogScaleMapping=false,Image* edgeImg=0);
 
 		
 	private:
-		//===================================================
-		//==        NEW IMAGE METHODS
-		//===================================================
-		static int Init(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edgeImg);
+		/** 
+		\brief Initialize the superpixel data structure
+ 		*/
+		static int SetSPData(SLICData* slicData,Image* img,bool useLogScaleMapping,Image* edgeImg);
 
 		
 	private:

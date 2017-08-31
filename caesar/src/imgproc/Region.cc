@@ -54,15 +54,66 @@ ClassImp(Caesar::Region)
 
 namespace Caesar {
 
-Region::Region() {
+Region::Region() 
+	: Blob()
+{
 	Tag= eUntagged;
 	m_SubRegionIds.clear();
 }
+
+//Region::Region(ImgRange img_range,std::string name)
+//	: Blob(img_range, name)
+Region::Region(std::string name)
+	: Blob(name)
+{
+	Tag= eUntagged;
+	m_SubRegionIds.clear();
+}//close parametric constructor
+
+
+//Region::Region(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name)
+//	: Blob(pixels,img_range,name)
+Region::Region(std::vector<Pixel*>const& pixels,std::string name)
+	: Blob(pixels,name)
+{
+	Tag= eUntagged;
+	m_SubRegionIds.clear();
+}//close parametric constructor
+
 
 Region::~Region(){
 	
 }//close destructor
 
+
+Region::Region(const Region& region) 
+	//: Blob()
+{
+	// Copy constructor
+	DEBUG_LOG("Copy constuctor called...");
+  ((Region&)region).Copy(*this);
+
+}//close copy constructor
+
+
+void Region::Copy(TObject& obj) const
+{
+	DEBUG_LOG("Copying parent Blob...");
+	Blob::Copy((Region&)obj);
+
+	DEBUG_LOG("Copying main vars...");
+	((Region&)obj).Tag= Tag;
+	
+	DEBUG_LOG("Copying sub-region id collection...");
+	((Region&)obj).m_SubRegionIds= m_SubRegionIds;
+		
+}//close Copy()
+
+Region& Region::operator=(const Region& region) { 
+	// Operator =
+  if (this != &region) ((Region&)region).Copy(*this);
+  return *this;
+}
 
 Region::RegionPars* Region::GetParams(bool includeCurvPar){
 
@@ -261,17 +312,108 @@ int Region::AddRegion(Region* aRegion,bool addPixels,bool copyPixels){
 	}
 
 	//Append subregion ids 
-	int Id_B= aRegion->Id;
-	//std::vector<int> SubRegionIds_B= aRegion->m_SubRegionIds;
-	m_SubRegionIds.push_back(Id_B);
-
-	std::vector<int>::iterator it2= m_SubRegionIds.end();
-	m_SubRegionIds.insert(it2,(aRegion->m_SubRegionIds).begin(),(aRegion->m_SubRegionIds).end());
-
+	long int Id_B= aRegion->Id;
+	//m_SubRegionIds.push_back(Id_B);
+	AddSubRegionId(Id_B);
+	
+	//Append sub-regions present in added region
+	//std::vector<long int>::iterator it2= m_SubRegionIds.end();
+	//m_SubRegionIds.insert(it2,(aRegion->m_SubRegionIds).begin(),(aRegion->m_SubRegionIds).end());
+	for(size_t i=0;i<(aRegion->m_SubRegionIds).size();i++){
+		long int thisId= (aRegion->m_SubRegionIds)[i];
+		AddSubRegionId(thisId);
+	}
+	
 	return 0;
 
 }//close Region::AddRegion()
 
+double Region::GetColorCurvDistanceSqr(Region* aRegion){
+
+	//Get pars
+	double curvMean= this->Mean_curv;
+	double curvMeanN= aRegion->Mean_curv;
+	double curvRMS= this->RMS_curv;
+	double curvRMSN= aRegion->RMS_curv;
+
+	//Compute distance
+	double dist2_mean= (curvMean-curvMeanN)*(curvMean-curvMeanN);
+	double dist2_rms= (curvRMS-curvRMSN)*(curvRMS-curvRMSN);	
+	double dist2= dist2_mean + dist2_rms;
+
+	return dist2;
+
+}//close GetColorCurvDistanceSqr()
+
+double Region::GetColorDistanceSqr(Region* aRegion,bool useRobustParams){
+
+	//Compute distance	
+	double dist2_mean= 0;
+	double dist2_rms= 0;
+
+	if(useRobustParams){
+		double median= this->Median;
+		double medianN= aRegion->Median;
+		double mad= this->MedianRMS;
+		double madN= aRegion->MedianRMS;
+		dist2_mean= (median-medianN)*(median-medianN);
+		dist2_rms= (mad-madN)*(mad-madN);
+	}
+	else{
+		double mean= this->Mean;
+		double meanN= aRegion->Mean;
+		double rms= this->RMS;
+		double rmsN= aRegion->RMS;
+		dist2_mean= (mean-meanN)*(mean-meanN);
+		dist2_rms= (rms-rmsN)*(rms-rmsN);
+	}
+
+	double dist2= dist2_mean + dist2_rms;
+
+	return dist2;
+
+}//close GetColorDistanceSqr()
+
+double Region::GetSpatialDistanceSqr(Region* aRegion){
+
+	//Get pars
+	double X0= this->X0;
+ 	double Y0= this->Y0; 	
+	double X0N= aRegion->X0;
+ 	double Y0N= aRegion->Y0;
+
+	//Centroid distance
+	double dist2_x= (X0-X0N)*(X0-X0N);
+	double dist2_y= (Y0-Y0N)*(Y0-Y0N);
+	double dist2= dist2_x + dist2_y;
+	
+	return dist2;
+
+}//close GetSpatialDistanceSqr()
+
+
+int Region::GetDistance(DistPars& distPars,Region* aRegion,bool useRobustParams){
+
+	//Check given region
+	if(!aRegion){
+		ERROR_LOG("Null ptr to given region...returning inf dists!");
+		return -1;
+	}
+
+	//Compute distances	
+	double dist2= GetColorDistanceSqr(aRegion,useRobustParams);
+	double dist2_spatial= GetSpatialDistanceSqr(aRegion);
+	double dist2_curv= GetColorCurvDistanceSqr(aRegion);
+	distPars.dist2= dist2;
+	distPars.dist2_curv= dist2_curv;
+	distPars.dist2_spatial= dist2_spatial;
+		
+	return 0;
+
+}//close GetDistance()
+
+/*
+//=========== MARKED TO BE REMOVED ================
 int Region::GetDistance(double& dist_color,double& dist_space,Region* aRegion,bool useRobustParams,bool normalizeParams,bool addCurvDist){
 
 	dist_color= 1.e+99;
@@ -411,8 +553,134 @@ int Region::GetDistance(double& dist_color,double& dist_space,Region* aRegion,bo
 	return 0;
 	
 }//close Region::GetDistance()
+//================================================
+*/
 
+int Region::GetAsymmDistance(DistPars& distPars,DistPars& distPars_neighbor,Region* aRegion,bool useRobustParams){
 
+	//Check region
+	if(!aRegion){
+		ERROR_LOG("Null ptr to given region...returning inf dists!");
+		return -1;
+	}
+
+	//If use robust parameters need to merge the two regions in one and recompute stats
+	//otherwise the merged stats can be computed fast
+	if(useRobustParams){
+		
+		//Create a merged region between current and neighbor	
+		Region mergedRegion= *(this);
+		mergedRegion.AddRegion(aRegion,useRobustParams);
+		mergedRegion.ComputeStats(true,false);
+		
+		//Find distance between this region and merged region
+		if(this->GetDistance(distPars,&mergedRegion,useRobustParams)<0){
+			ERROR_LOG("Failed to compute symm region distance between this and merged region!");
+			return -1;
+		}
+		
+		//Find distance between neighbor region and merged region
+		if(aRegion->GetDistance(distPars_neighbor,&mergedRegion,useRobustParams)<0){
+			ERROR_LOG("Failed to compute symm neighbor region distance betweeen the given region and the merged region!");
+			return -1;
+		}
+
+	}//close if use robust pars
+	else{
+		//Compute merged region pars on the fly
+		double N_A= static_cast<double>(this->NPix);
+		double N_B= static_cast<double>(aRegion->NPix);
+		double M1_A= this->m_M1;
+		double M1_B= aRegion->m_M1;
+		double M2_A= this->m_M2;
+		double M2_B= aRegion->m_M2;
+
+		double M1Curv_A= this->m_M1_curv;
+		double M1Curv_B= aRegion->m_M1_curv;
+		double M2Curv_A= this->m_M2_curv;
+		double M2Curv_B= aRegion->m_M2_curv;
+
+		double S_A= this->m_S;
+		double Cx_A= this->m_Sx;
+		double Cy_A= this->m_Sy;
+		double X0_A= this->X0;
+		double Y0_A= this->Y0; 
+		double S_B= aRegion->m_S;
+		double Cx_B= aRegion->m_Sx;
+		double Cy_B= aRegion->m_Sy;
+		double X0_B= aRegion->X0; 
+		double Y0_B= aRegion->Y0; 
+		
+		double Mean_A= this->Mean;
+		double Mean_B= aRegion->Mean;
+		double RMS_A= this->RMS;
+		double RMS_B= aRegion->RMS;
+		double MeanCurv_A= this->Mean_curv;
+		double MeanCurv_B= aRegion->Mean_curv;
+		double RMSCurv_A= this->RMS_curv;
+		double RMSCurv_B= aRegion->RMS_curv;
+
+		//Compute merged region moments
+		double N= N_A + N_B;
+		double M1= (N_A*M1_A + N_B*M1_B)/N;
+		double M2= M2_A + M2_B + pow(N_B*M1_A-N_A*M1_B,2)/(N_A*N_B*N);
+		double M1Curv= (N_A*M1Curv_A + N_B*M1Curv_B)/N;
+		double M2Curv= M2Curv_A + M2Curv_B + pow(N_B*M1Curv_A-N_A*M1Curv_B,2)/(N_A*N_B*N);	
+		double X0= (N_A*X0_A + N_B*X0_B)/N; 
+		double Y0= (N_A*Y0_A + N_B*Y0_B)/N; 
+		//double Cx= Cx_A*S_A/(S_A+S_B) + Cx_B*S_B/(S_A+S_B);
+		//double Cy= Cy_A*S_A/(S_A+S_B) + Cy_B*S_B/(S_A+S_B);
+		
+		//Compute merged region stats
+		double Mean= M1; 
+		double MeanCurv= M1Curv; 
+		double RMS= 0;
+		double RMSCurv= 0;
+		if(N>1) {
+			RMS= sqrt(M2/(N-1));
+			RMSCurv= sqrt(M2Curv/(N-1));
+		}
+
+		//Compute distances: A vs A+B
+		double dist2_mean= (Mean_A-Mean)*(Mean_A-Mean);
+		double dist2_rms= (RMS_A-RMS)*(RMS_A-RMS);
+		double dist2= dist2_mean + dist2_rms;
+		double dist2_x= (X0_A-X0)*(X0_A-X0);
+		double dist2_y= (Y0_A-Y0)*(Y0_A-Y0);
+		//double dist2_x= (Cx_A-Cx)*(Cx_A-Cx);//signal-weighted centroid
+		//double dist2_y= (Cy_A-Cy)*(Cy_A-Cy);
+		double dist2_spatial= dist2_x + dist2_y;
+		double dist2_curvmean= (MeanCurv_A-MeanCurv)*(MeanCurv_A-MeanCurv);
+		double dist2_curvrms= (RMSCurv_A-RMSCurv)*(RMSCurv_A-RMSCurv);
+		double dist2_curv= dist2_curvmean + dist2_curvrms;
+		distPars.dist2= dist2;
+		distPars.dist2_curv= dist2_curv;
+		distPars.dist2_spatial= dist2_spatial;
+		
+		//Compute distances: B vs A+B
+		double dist2_mean_neighbor= (Mean_B-Mean)*(Mean_B-Mean);
+		double dist2_rms_neighbor= (RMS_B-RMS)*(RMS_B-RMS);
+		double dist2_neighbor= dist2_mean_neighbor + dist2_rms_neighbor;
+		double dist2_x_neighbor= (X0_B-X0)*(X0_B-X0);
+		double dist2_y_neighbor= (Y0_B-Y0)*(Y0_B-Y0);
+		//double dist2_x= (Cx_B-Cx)*(Cx_B-Cx);//signal-weighted centroid
+		//double dist2_y= (Cy_B-Cy)*(Cy_B-Cy);
+		double dist2_spatial_neighbor= dist2_x_neighbor + dist2_y_neighbor;
+		double dist2_curvmean_neighbor= (MeanCurv_B-MeanCurv)*(MeanCurv_B-MeanCurv);
+		double dist2_curvrms_neighbor= (RMSCurv_B-RMSCurv)*(RMSCurv_B-RMSCurv);
+		double dist2_curv_neighbor= dist2_curvmean_neighbor + dist2_curvrms_neighbor;
+		distPars_neighbor.dist2= dist2_neighbor;
+		distPars_neighbor.dist2_curv= dist2_curv_neighbor;
+		distPars_neighbor.dist2_spatial= dist2_spatial_neighbor;
+
+	}//close else
+
+	return 0;
+
+}//close GetAsymmDistance()
+
+/*
+//=========== MARKED TO BE REMOVED ================
 int Region::GetAsymmDistance(double& dist,double& dist_neighbor,Region* aRegion,bool useRobustParams,bool normalizeParams,bool addSpatialDist,bool addCurvDist){
 
 	dist= 1.e+99;
@@ -577,6 +845,8 @@ int Region::GetAsymmDistance(double& dist,double& dist_neighbor,Region* aRegion,
 	return 0;
 
 }//close GetAsymmDistance()
+//============================================================
+*/
 
 }//close namespace
 

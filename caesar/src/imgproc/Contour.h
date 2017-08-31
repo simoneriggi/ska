@@ -25,8 +25,8 @@
 * @date 11/07/2015
 */
 
-#ifndef Contour_h
-#define Contour_h 1
+#ifndef _CONTOUR_h
+#define _CONTOUR_h 1
 
 
 
@@ -115,6 +115,17 @@ class Contour : public TObject {
 			return (&m_Points[i]);
 		}
 		/**
+		* \brief Get contour point x & y
+		*/
+		int GetPointXY(double& x, double& y,int i){
+			x= 0; y= 0;
+			if(GetN()<=0 || i<0 || i>=GetN()) return -1;
+			x= m_Points[i].X();
+			y= m_Points[i].Y();
+			return 0;
+		}
+
+		/**
 		* \brief Add contour points
 		*/
 		void AddPoint(TVector2 p){
@@ -199,7 +210,11 @@ class Contour : public TObject {
 		void ComputeRoundness();
 		void ComputeMoments();
 		void ComputeEccentricity();
-		void ComputeFittedEllipse();
+
+		/**
+		* \brief Compute fitted ellipse
+		*/
+		int ComputeFittedEllipse();
 
 		std::vector< std::complex<double> > GetComplexPointRepresentation(bool translateToCentroid=false){
 			std::vector< std::complex<double> > U;
@@ -218,8 +233,19 @@ class Contour : public TObject {
 		void ComputeCentroidDistanceFD();
 		void ComputeBendingEnergy();
 
-		TVectorD EllipseFitter(TGraph*);
-		TVectorD ConicToParametric(const TVectorD &conic);
+		/**
+		* \brief Ellipse fitter
+		*/
+		//TVectorD EllipseFitter(TGraph*);
+		int EllipseFitter(TVectorD&,TGraph*);		
+
+		/**
+		* \brief Ellipse fitter
+		*/
+		//TVectorD ConicToParametric(const TVectorD &conic);
+		int ConicToParametric(TVectorD& ellipse,const TVectorD &conic);
+
+
 		double EllipseFcn(double x, double y, TVectorD params) {
   		double v = 9999.9;
 			double x0= params[0];

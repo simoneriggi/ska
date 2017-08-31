@@ -62,11 +62,41 @@ ClassImp(Caesar::Blob)
 
 namespace Caesar {
 
-Blob::Blob() : TObject() {
+Blob::Blob() : TNamed() {
 
 	Init();
 	
 }//close costructor
+
+//Blob::Blob(ImgRange img_range,std::string name)
+//	: TNamed(name.c_str(),name.c_str()), m_ImgRange(img_range)
+Blob::Blob(std::string name)
+	: TNamed(name.c_str(),name.c_str())
+{
+	//Init pars
+	Init();
+
+}//close constructor
+
+
+//Blob::Blob(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name)
+//	: TNamed(name.c_str(),name.c_str()), m_ImgRange(img_range)
+Blob::Blob(std::vector<Pixel*>const& pixels,std::string name)
+	: TNamed(name.c_str(),name.c_str())
+{
+	//Init pars
+  Init();
+
+	//Fill pixels	
+	bool makeCopy= false;
+	for(size_t i=0;i<pixels.size();i++){
+		if(pixels[i] && AddPixel(pixels[i],makeCopy)<0){
+			ERROR_LOG("Failed to add pixel no. "<<i<<" to blob, skip to next!");
+			continue;
+		}
+	}
+
+}//close constructor
 
 Blob::~Blob(){
 
@@ -76,7 +106,7 @@ Blob::~Blob(){
 }//close destructor
 
 
-Blob::Blob(const Blob& blob) : TObject(blob) {
+Blob::Blob(const Blob& blob) {
   // Contour copy constructor
 	DEBUG_LOG("Copy constuctor called...");
   Init();
@@ -86,11 +116,13 @@ Blob::Blob(const Blob& blob) : TObject(blob) {
 
 void Blob::Copy(TObject &obj) const {
 
+	//Copy TNamed object
+	DEBUG_LOG("Copying parent TNamed...");
+	TNamed::Copy((Blob&)obj);
+
 	// Copy this blob to blob
-  TObject::Copy((Blob&)obj);
   ((Blob&)obj).HasPixelsAtEdge = HasPixelsAtEdge;
 	((Blob&)obj).Id = Id;
-	((Blob&)obj).Name = Name;
 	((Blob&)obj).NPix = NPix;
 	((Blob&)obj).Mean = Mean;
 	((Blob&)obj).RMS = RMS;
@@ -128,19 +160,20 @@ void Blob::Copy(TObject &obj) const {
 	((Blob&)obj).m_S_curv = m_S_curv;
 	((Blob&)obj).m_S_edge = m_S_edge;
 
-	((Blob&)obj).m_ImageSizeX = m_ImageSizeX;
-	((Blob&)obj).m_ImageSizeY = m_ImageSizeY;
-	((Blob&)obj).m_ImageMinX = m_ImageMinX;
-	((Blob&)obj).m_ImageMaxX = m_ImageMaxX;
-	((Blob&)obj).m_ImageMinY = m_ImageMinY;
-	((Blob&)obj).m_ImageMaxY = m_ImageMaxY;
-	((Blob&)obj).m_ImageMinS = m_ImageMinS;
-	((Blob&)obj).m_ImageMaxS = m_ImageMaxS;
-	((Blob&)obj).m_ImageMinScurv = m_ImageMinScurv;
-	((Blob&)obj).m_ImageMaxScurv = m_ImageMaxScurv;
-	((Blob&)obj).m_ImageMinSedge = m_ImageMinSedge;
-	((Blob&)obj).m_ImageMaxSedge = m_ImageMaxSedge;
-	((Blob&)obj).m_ImageRMS = m_ImageRMS;
+	//((Blob&)obj).m_ImgRange = m_ImgRange;
+	//((Blob&)obj).m_ImageSizeX = m_ImageSizeX;
+	//((Blob&)obj).m_ImageSizeY = m_ImageSizeY;
+	//((Blob&)obj).m_ImageMinX = m_ImageMinX;
+	//((Blob&)obj).m_ImageMaxX = m_ImageMaxX;
+	//((Blob&)obj).m_ImageMinY = m_ImageMinY;
+	//((Blob&)obj).m_ImageMaxY = m_ImageMaxY;
+	//((Blob&)obj).m_ImageMinS = m_ImageMinS;
+	//((Blob&)obj).m_ImageMaxS = m_ImageMaxS;
+	//((Blob&)obj).m_ImageMinScurv = m_ImageMinScurv;
+	//((Blob&)obj).m_ImageMaxScurv = m_ImageMaxScurv;
+	//((Blob&)obj).m_ImageMinSedge = m_ImageMinSedge;
+	//((Blob&)obj).m_ImageMaxSedge = m_ImageMaxSedge;
+	//((Blob&)obj).m_ImageRMS = m_ImageRMS;
 	
 	((Blob&)obj).m_Xmin = m_Xmin;
 	((Blob&)obj).m_Xmax = m_Xmax;
@@ -199,8 +232,9 @@ Blob& Blob::operator=(const Blob& blob) {
 
 void Blob::Init(){
 
+	//Initialize parameters & data
 	Id= -999;
-	Name= "";
+	//this->SetNameTitle("","");
 	HasPixelsAtEdge= false;
 	ResetStats();
 	ResetMoments();
@@ -211,6 +245,7 @@ void Blob::Init(){
 
 void Blob::ResetStats(){
 
+	//Reset stats
 	NPix= 0;
 	Mean= 0;
 	RMS= 0;
@@ -583,7 +618,7 @@ int Blob::ComputeMorphologyParams(){
 
 		//Compute contour parameters
 		if(aContour->ComputeParameters()<0){
-			WARN_LOG("Failed to compute parameters for contour no. "<<i<<"!");
+			WARN_LOG("One/more failures occurred while computing contour no. "<<i<<" parameters for blob id "<<Id<<"!");
 			//delete fContour;
 			//continue;
 		}
@@ -654,7 +689,7 @@ Image* Blob::GetImage(ImgType mode){
 	long int nBoxY= boundingBoxY[1]-boundingBoxY[0]+1;
 
 	//## Fill image and binarized image
-	TString imgName= Form("SourceImg_%s_mode%d",Name.c_str(),mode);
+	TString imgName= Form("SourceImg_%s_mode%d",this->GetName(),mode);
 	//Image* blobImg= new Image(nBoxX,boundingBoxX[0]-0.5,boundingBoxX[1]+0.5,nBoxY,boundingBoxY[0]-0.5,boundingBoxY[1]+0.5,imgName);
 	Image* blobImg= new Image(nBoxX,nBoxY,boundingBoxX[0]-0.5,boundingBoxY[0]-0.5,std::string(imgName));
 	
@@ -725,6 +760,8 @@ Image* Blob::GetImage(ImgType mode){
 	return blobImg;
 
 }//close Blob::GetImage()
+
+
 
 
 }//close namespace

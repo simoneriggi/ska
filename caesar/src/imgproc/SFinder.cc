@@ -76,9 +76,21 @@ SFinder::~SFinder(){
 	
 	//if(m_SourceTree) m_SourceTree->Delete();
 	if(m_OutputFile) m_OutputFile->Close();
-	if(m_DS9CatalogFilePtr) fclose(m_DS9CatalogFilePtr);
+	//if(m_DS9CatalogFilePtr) fclose(m_DS9CatalogFilePtr);
 	//if(m_Application) m_Application->Delete();
-	
+
+	//Delete images
+	if(m_EdgeImg){
+		DEBUG_LOG("Deleting edge image...");
+		delete m_EdgeImg;
+		m_EdgeImg= 0;
+	}
+	if(m_LaplImg){
+		DEBUG_LOG("Deleting Laplacian image...");
+		delete m_LaplImg;
+		m_LaplImg= 0;
+	}
+
 }//close destructor
 
 
@@ -101,10 +113,14 @@ void SFinder::InitOptions()
 	m_saveSources= true;	
 	m_saveResidualMap= true;
 	m_saveInputMap= true;
+	m_saveSaliencyMap= false;
+	m_saveEdgenessMap= false;
+	m_saveCurvatureMap= false;
+	m_saveSegmentedMap= true;
 	m_SourceTree= 0;
 	m_saveDS9Region= true;
 	m_DS9CatalogFileName= "";
-	m_DS9CatalogFilePtr= 0;
+	//m_DS9CatalogFilePtr= 0;
 	m_DS9RegionFormat= 1;
 	m_PerfTree= 0;
 		
@@ -142,6 +158,11 @@ void SFinder::InitOptions()
 	sourceDeblendTime= 0;	
 	saveTime= 0;
 
+	//Extended source finder
+	m_EdgeImg= 0;
+	m_LaplImg= 0;
+	m_SegmImg= 0;
+
 }//close InitOptions()
 
 int SFinder::Init(){
@@ -174,7 +195,7 @@ int SFinder::Init(){
 		}
 
 		//Init DS9 catalog
-		if(!m_DS9CatalogFilePtr) m_DS9CatalogFilePtr= fopen(m_DS9CatalogFileName.c_str(),"w");
+		//if(!m_DS9CatalogFilePtr) m_DS9CatalogFilePtr= fopen(m_DS9CatalogFileName.c_str(),"w");
 
 		//Init time performance tree
 		if(!m_PerfTree) m_PerfTree= new TTree("PerformanceInfo","PerformanceInfo");
@@ -225,6 +246,9 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(saveBkgMap,m_saveBkgMap);
 	GET_OPTION_VALUE(saveNoiseMap,m_saveNoiseMap);
 	GET_OPTION_VALUE(saveSaliencyMap,m_saveSaliencyMap);
+	GET_OPTION_VALUE(saveEdgenessMap,m_saveEdgenessMap);
+	GET_OPTION_VALUE(saveCurvatureMap,m_saveCurvatureMap);
+	GET_OPTION_VALUE(saveSegmentedMap,m_saveSegmentedMap);
 		
 	//Get bkg options
 	GET_OPTION_VALUE(useLocalBkg,m_UseLocalBkg);
@@ -323,14 +347,15 @@ int SFinder::Configure(){
 	//Hierarchical clustering options
 	GET_OPTION_VALUE(spMergingEdgeModel,m_spMergingEdgeModel);
 	GET_OPTION_VALUE(spMergingRegPar,m_spMergingRegPar);
-	GET_OPTION_VALUE(spMergingIncludeSpatialPars,m_spMergingIncludeSpatialPars);
 	GET_OPTION_VALUE(spMergingNSegmentsToStop,m_spMergingNSegmentsToStop);
 	GET_OPTION_VALUE(spMergingRatio,m_spMergingRatio);
 	GET_OPTION_VALUE(spMergingMaxDissRatio,m_spMergingMaxDissRatio);
 	GET_OPTION_VALUE(spMergingMaxDissRatio2ndNeighbours,m_spMergingMaxDissRatio2ndNeighbours);
 	GET_OPTION_VALUE(spMergingDissThreshold,m_spMergingDissThreshold);
+	GET_OPTION_VALUE(spMergingIncludeSpatialPars,m_spMergingIncludeSpatialPars);
+	GET_OPTION_VALUE(spMergingUseRobustPars,m_spMergingUseRobustPars);
+	GET_OPTION_VALUE(spMergingAddCurvDist,m_spMergingAddCurvDist);
 	
-
 	return 0;
 
 }//close Configure()
@@ -395,7 +420,7 @@ int SFinder::Run(){
 
 		//Find extended sources
 		auto t0_extsfinder = chrono::steady_clock::now();
-		if(FindExtendedSources()<0){
+		if(FindExtendedSources(m_ResidualImg)<0){
 			ERROR_LOG("Extended source search failed!");
 			return -1;
 		}
@@ -601,17 +626,23 @@ int SFinder::FindResidualMap(){
 
 }//close FindResidualMap()
 
-int SFinder::FindExtendedSources(){
+int SFinder::FindExtendedSources(Image* img){
+
+	//## Check input image
+	if(!img){
+		ERROR_LOG("Null ptr to input image given!");
+		return -1;
+	}
 
 	//## Set input map for extended source search
 	Image* inputImg= 0;
 	Image* smoothedImg= 0;	
 	if(m_UsePreSmoothing){//Apply a smoothing stage?
 		if(m_SmoothFilter==eGausFilter){
-			smoothedImg= m_ResidualImg->GetSmoothedImage(m_GausFilterKernSize,m_GausFilterKernSize,m_GausFilterSigma,m_GausFilterSigma);
+			smoothedImg= img->GetSmoothedImage(m_GausFilterKernSize,m_GausFilterKernSize,m_GausFilterSigma,m_GausFilterSigma);
 		}
 		else if(m_SmoothFilter==eGuidedFilter){
-			smoothedImg= m_ResidualImg->GetGuidedFilterImage(m_GuidedFilterRadius,m_GuidedFilterColorEps);
+			smoothedImg= img->GetGuidedFilterImage(m_GuidedFilterRadius,m_GuidedFilterColorEps);
 		}
 		else{
 			ERROR_LOG("Invalid smoothing algo selected!");
@@ -622,11 +653,11 @@ int SFinder::FindExtendedSources(){
 			ERROR_LOG("Source residual image smoothing failed!");
 			return -1;
 		}
-		smoothedImg->SetName("smoothedImg");
+		//smoothedImg->SetName("smoothedImg");
 		inputImg= smoothedImg;
 	}//close if use smoothing
 	else{
-		inputImg= m_ResidualImg;
+		inputImg= img;
 	}
 
 	//## Run the segmentation	
@@ -640,13 +671,24 @@ int SFinder::FindExtendedSources(){
 	else if(m_ExtendedSearchMethod==eWaveletTransform){
 		status= FindExtendedSources_WT(inputImg);
 	}
+	else if(m_ExtendedSearchMethod==eSaliencyThr){
+		status= FindExtendedSources_SalThr(inputImg);
+	}
 	else{
 		ERROR_LOG("Invalid extended source method selected (method="<<m_ExtendedSearchMethod<<")!");
+		if(smoothedImg){
+			delete smoothedImg;
+			smoothedImg= 0;
+		} 
 		return -1;
 	}
 	
 	if(status<0){
-		ERROR_LOG("Failed to run the segmentation algorithm!");
+		ERROR_LOG("Failed to run the segmentation algorithm!");	
+		if(smoothedImg){
+			delete smoothedImg;
+			smoothedImg= 0;
+		} 
 		return -1;
 	}
 
@@ -654,13 +696,102 @@ int SFinder::FindExtendedSources(){
 
 }//close FindExtendedSources()
 
-int SFinder::FindExtendedSources_HClust(Image*){
+
+int SFinder::FindExtendedSources_SalThr(Image* inputImg){
+
+	//Check input image
+	if(!inputImg){
+		ERROR_LOG("Null ptr to input image given!");
+		return -1;
+	}
 
 	//==========================================
 	//==    PRELIMINARY STAGES
 	//==========================================
 	//## Compute saliency
-	m_SaliencyImg= m_ResidualImg->GetMultiResoSaliencyMap(
+	m_SaliencyImg= inputImg->GetMultiResoSaliencyMap(
+		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
+		m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
+		m_SaliencyMultiResoCombThrFactor,
+		m_SaliencyUseBkgMap,m_SaliencyUseNoiseMap,m_ResidualBkgData,
+		m_SaliencyThrFactor,m_SaliencyImgThrFactor
+	);
+	if(!m_SaliencyImg){
+		ERROR_LOG("Failed to compute saliency map!");
+		return -1;
+	}
+
+	//## Get saliency map optimal threshold
+	bool smoothPixelHisto= true;
+	int pixelHistoNBins= 100;
+	double signalThr= m_SaliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
+	
+	//==========================================
+	//==    FIND SOURCES
+	//==========================================
+	//## Find compact blobs in saliency map by simple thresholding
+	INFO_LOG("Finding blobs in saliency map with threshold="<<signalThr<<"...");	
+	bool findNegativeExcess= false;
+	bool mergeBelowSeed= false;
+	bool findNestedSources= false;
+	int minNPix= m_NMinPix;
+	std::vector<Source*> sources;
+
+	int status= m_InputImg->FindCompactSource(	
+		sources, m_SaliencyImg, 0,
+		signalThr,signalThr,minNPix,
+		findNegativeExcess,mergeBelowSeed,findNestedSources
+	);
+
+	if(status<0){
+		ERROR_LOG("Compact source finding with saliency map failed!");
+		return -1;
+	}
+
+	//## Retrieve found sources 
+	int nSources= static_cast<int>(sources.size());
+	INFO_LOG("#"<<nSources<<" extended sources detected in input image by thresholding the saliency map...");
+	if(nSources<=0) return 0;
+
+	//## Apply source selection?
+	int nSelSources= nSources;
+	//...
+	//...
+	/*
+	if(m_ApplySourceSelection){
+		if(SelectSources(sources)<0){
+			ERROR_LOG("Failed to select sources!");
+			return -1;
+		}
+		nSelSources= sources.size();
+	}//close if source selection
+	*/
+	
+	//## Add detected sources to the list	
+	m_SourceCollection.insert(m_SourceCollection.end(),sources.begin(),sources.end());
+	m_ExtendedSources.insert(m_ExtendedSources.end(),sources.begin(),sources.end());
+
+	INFO_LOG("#"<<nSelSources<<" extended sources to the list...");
+
+
+	return 0;
+
+}//close FindExtendedSources_SalThr()
+
+
+int SFinder::FindExtendedSources_HClust(Image* inputImg){
+
+	//Check input image
+	if(!inputImg){
+		ERROR_LOG("Null ptr to input image given!");
+		return -1;
+	}
+
+	//==========================================
+	//==    PRELIMINARY STAGES
+	//==========================================
+	//## Compute saliency
+	m_SaliencyImg= inputImg->GetMultiResoSaliencyMap(
 		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
 		m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
 		m_SaliencyMultiResoCombThrFactor,
@@ -677,20 +808,32 @@ int SFinder::FindExtendedSources_HClust(Image*){
 	int pixelHistoNBins= 100;
 	double signalThr= m_SaliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
 	double bkgThr= m_SaliencyImg->FindMedianThreshold(m_SaliencyBkgThrFactor);
-
+	
+	INFO_LOG("Computing binarized saliency maps (signalThr="<<signalThr<<", bkgThr="<<bkgThr);
 	double fgValue= 1;
 	Image* signalMarkerImg= m_SaliencyImg->GetBinarizedImage(signalThr,fgValue,false);
 	Image* bkgMarkerImg= m_SaliencyImg->GetBinarizedImage(bkgThr,fgValue,true);
 	
+	//## Compute Laplacian filtered image
+	INFO_LOG("Computing laplacian image...");
+	m_LaplImg= ComputeLaplacianImage(inputImg);
+	if(!m_LaplImg){
+		ERROR_LOG("Failed to compute laplacian image, cannot perform extended source finding!");
+		return -1;
+	}
+
 	//## Compute edge image	
-	m_EdgeImg= ComputeEdgeImage(m_ResidualImg,m_spMergingEdgeModel);
+	INFO_LOG("Computing edgeness image...");
+	m_EdgeImg= ComputeEdgeImage(inputImg,m_spMergingEdgeModel);
 	if(!m_EdgeImg){
-		ERROR_LOG("Failed to compute the edge image, cannot perform extended source finding!");
+		ERROR_LOG("Failed to compute the edgeness image, cannot perform extended source finding!");
 		return -1;
 	}
 
 	//## Compute the Superpixel partition
-	SLICData* slicData_init= SLIC::SPGenerator(m_ResidualImg,m_spSize,m_spBeta,m_spMinArea,m_spUseLogContrast,m_EdgeImg);
+	//SLICData* slicData_init= SLIC::SPGenerator(inputImg,m_spSize,m_spBeta,m_spMinArea,m_spUseLogContrast,m_EdgeImg);
+	bool normalizeImage= true;
+	SLICData* slicData_init= SLICUtils::SPGenerator(inputImg,m_spSize,m_spBeta,m_spMinArea,normalizeImage,m_spUseLogContrast,m_LaplImg,m_EdgeImg);
 	if(!slicData_init){
 		ERROR_LOG("Failed to compute the initial superpixel partition, cannot perform extended source finding!");	
 		return -1;
@@ -707,17 +850,28 @@ int SFinder::FindExtendedSources_HClust(Image*){
 	//==========================================
 	//==    RUN SEGMENTATION
 	//==========================================
-	//## Run the segmentation	
+	//## Run the segmentation
+	INFO_LOG("Running the hierarchical clustering segmenter...");	
 	SLICData slicData_segm;
 	SLICSegmenter::FindSegmentation(
 		*slicData_init, slicData_segm,
-		m_spMergingRegPar, m_spMergingIncludeSpatialPars, m_spMergingUse2ndNeighbours,
+		m_spMergingRegPar, m_spMergingUse2ndNeighbours,
 		m_spMergingNSegmentsToStop,m_spMergingRatio,
-		m_spMergingMaxDissRatio,m_spMergingMaxDissRatio2ndNeighbours,m_spMergingDissThreshold
+		m_spMergingMaxDissRatio,m_spMergingMaxDissRatio2ndNeighbours,m_spMergingDissThreshold,
+		m_spMergingIncludeSpatialPars, m_spMergingUseRobustPars, m_spMergingAddCurvDist
 	);
 
-	//## Get results
-	//...
+	//## Get segmentation results	
+	INFO_LOG("Computing the segmented map from slic segmented data...");
+	bool normalizeSegmImg= true;
+	bool binarizeSegmImg= true;
+	m_SegmImg= SLICUtils::GetSegmentedImage(inputImg,slicData_segm.regions,Region::eSignalTag,normalizeSegmImg,binarizeSegmImg);
+	if(!m_SegmImg){
+		ERROR_LOG("Failed to compute the segmented image from slic segmented data!");
+		delete slicData_init;
+		slicData_init= 0;
+		return -1;
+	}
 
 	//## Clear-up
 	delete slicData_init;
@@ -727,6 +881,36 @@ int SFinder::FindExtendedSources_HClust(Image*){
 
 }//close FindExtendedSources_HClust()
 
+Image* SFinder::ComputeLaplacianImage(Image* inputImg){
+
+	//Check input image
+	if(!inputImg){
+		ERROR_LOG("Null ptr to given input image!");
+		return nullptr;
+	}
+
+	//Compute laplacian image
+	INFO_LOG("Computing Laplacian image ...");
+	Image* laplImg= inputImg->GetLaplacianImage(true);
+	if(!laplImg){
+		ERROR_LOG("Failed to compute Laplacian image!");
+		return nullptr;
+	}
+
+	//Compute laplacian image stats
+	INFO_LOG("Compute Laplacian image stats...");
+	if(laplImg->ComputeStats(true,false,false)<0){	
+		ERROR_LOG("Failed to compute Laplacian image stats, returning nullptr!");
+		delete laplImg;
+		laplImg= 0;
+		return nullptr;
+	}
+	INFO_LOG("Laplacian image stats");
+	laplImg->PrintStats();
+
+	return laplImg;
+
+}//close ComputeLaplacianImage()
 
 Image* SFinder::ComputeEdgeImage(Image* inputImg,int edgeModel){
 
@@ -739,12 +923,14 @@ Image* SFinder::ComputeEdgeImage(Image* inputImg,int edgeModel){
 	//Compute edge image according to desired model
 	Image* edgeImg= 0;
 	if(edgeModel == eKirschEdge){
+		INFO_LOG("Computing edge image using a Kirsch model...");
 		edgeImg= inputImg->GetKirschImage();	
 	}
 	else if(edgeModel == eChanVeseEdge){
+		INFO_LOG("Computing edge image using a Chan-Vese contour model...");	
 		bool returnContourImg= true;
-		edgeImg= ChanVeseSegmenter::FindSegmentation(
-			inputImg, returnContourImg,
+		edgeImg= ChanVeseSegmenter::FindSegmentation (
+			inputImg, 0, returnContourImg,
 			m_cvTimeStepPar, m_cvWindowSizePar, m_cvLambda1Par, m_cvLambda2Par, m_cvMuPar, m_cvNuPar, m_cvPPar
 		);
 	}
@@ -758,6 +944,18 @@ Image* SFinder::ComputeEdgeImage(Image* inputImg,int edgeModel){
 		ERROR_LOG("Failed to compute edge image!");
 		return nullptr;
 	}
+
+	//Compute edge image stats
+	INFO_LOG("Compute edge image stats...");
+	if(edgeImg->ComputeStats(true,false,false)<0){
+		ERROR_LOG("Failed to compute edge image stats, returning nullptr!");
+		delete edgeImg;
+		edgeImg= 0;
+		return nullptr;
+	}
+
+	INFO_LOG("Edgeness image stats");
+	edgeImg->PrintStats();
 	
 	return edgeImg;
 
@@ -772,10 +970,45 @@ int SFinder::FindExtendedSources_ChanVese(Image* inputImg){
 		return -1;
 	}
 
+	INFO_LOG("Searching extended sources with the active contour method...");
+
+	//==========================================
+	//==    PRELIMINARY STAGES
+	//==========================================
+	//## Compute saliency
+	m_SaliencyImg= inputImg->GetMultiResoSaliencyMap(
+		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
+		m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
+		m_SaliencyMultiResoCombThrFactor,
+		m_SaliencyUseBkgMap,m_SaliencyUseNoiseMap,m_ResidualBkgData,
+		m_SaliencyThrFactor,m_SaliencyImgThrFactor
+	);
+	if(!m_SaliencyImg){
+		ERROR_LOG("Failed to compute saliency map!");
+		return -1;
+	}
+
+	//## Get saliency map optimal threshold
+	bool smoothPixelHisto= true;
+	int pixelHistoNBins= 100;
+	double signalThr= m_SaliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
+	
+	//## Get saliency binarized image
+	double fgValue= 1;
+	Image* signalMarkerImg= m_SaliencyImg->GetBinarizedImage(signalThr,fgValue,false);
+	if(!signalMarkerImg){
+		ERROR_LOG("Failed to get saliency binarized map!");
+		return -1;
+	}
+
+	//==========================================
+	//==    RUN CHAN-VESE SEGMENTATION
+	//==========================================
 	//## Perform segmentation
+	/*
 	std::vector<Source*> sources;
 	int status= inputImg->FindExtendedSource_CV(
-		sources,
+		sources,signalMarkerImg,
 		m_ResidualBkgData, m_NMinPix, m_SearchNegativeExcess,
 		m_cvTimeStepPar,m_cvWindowSizePar,m_cvLambda1Par,m_cvLambda2Par,m_cvMuPar,m_cvNuPar,m_cvPPar
 	);
@@ -784,6 +1017,53 @@ int SFinder::FindExtendedSources_ChanVese(Image* inputImg){
 		ERROR_LOG("ChanVese Segmentation failed!");
 		return -1;
 	}
+	*/
+
+	//## Compute segmented image
+	bool returnContourImg= false;
+	m_SegmImg= ChanVeseSegmenter::FindSegmentation (
+		inputImg, signalMarkerImg, returnContourImg,
+		m_cvTimeStepPar,m_cvWindowSizePar,m_cvLambda1Par,m_cvLambda2Par,m_cvMuPar,m_cvNuPar,m_cvPPar
+	);
+	if(!m_SegmImg){
+		ERROR_LOG("Failed to compute ChanVese image segmentation!");
+		return -1;
+	}
+	
+	//## Finding blobs in masked image
+	bool findNegativeExcess= false;
+	bool mergeBelowSeed= false;
+	bool findNestedSources= false;
+	std::vector<Source*> sources;
+	int status= m_InputImg->FindCompactSource(
+		sources, m_SegmImg,
+		m_BkgData, fgValue, fgValue, 
+		m_NMinPix, findNegativeExcess, mergeBelowSeed, findNestedSources
+	);
+	if(status<0){
+		ERROR_LOG("Finding sources in Chan-Vese segmented mask failed!");
+		return -1;
+	}
+
+	//## Tag sources as extended
+	for(size_t k=0;k<sources.size();k++) sources[k]->SetType(Source::eExtended);
+	
+	//## Remove sources of negative excess (because Chan-Vese detects them) (THIS METHOD SHOULD BE IMPROVED)
+	if(m_InputImg->HasStats()){
+		ImgStats* stats= m_InputImg->GetPixelStats();
+		double imgMedian= stats->median;
+
+		std::vector<size_t> sourcesToBeRemoved;				
+		for(size_t k=0;k<sources.size();k++){	
+			double Smedian= sources[k]->Median;
+			if(Smedian<imgMedian) sourcesToBeRemoved.push_back(k);
+		}
+		CodeUtils::DeleteItems(sources, sourcesToBeRemoved);
+
+	}//close if
+	else {
+		WARN_LOG("Input image has no stats computed (hint: you must have computed them before!), cannot remove negative excess from sources!");
+	}	
 
 	//## Add sources to extended sources
 	m_ExtendedSources.insert(m_ExtendedSources.end(),sources.begin(),sources.end());		
@@ -843,7 +1123,7 @@ int SFinder::SelectSources(std::vector<Source*>& sources){
 	std::vector<Source*> sources_sel;
 
 	for(int i=0;i<nSources;i++){	
-		std::string sourceName= sources[i]->Name;
+		std::string sourceName= sources[i]->GetName();
 		int sourceId= sources[i]->Id;
 		long int NPix= sources[i]->NPix;
 		double X0= sources[i]->X0;
@@ -865,7 +1145,7 @@ int SFinder::SelectSources(std::vector<Source*>& sources){
 		//Tag nested sources
 		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();
 		for(size_t j=0;j<nestedSources.size();j++){
-			std::string nestedSourceName= nestedSources[j]->Name;
+			std::string nestedSourceName= nestedSources[j]->GetName();
 			int nestedSourceId= nestedSources[j]->Id;
 			long int nestedNPix= nestedSources[j]->NPix;
 			double nestedX0= nestedSources[j]->X0;
@@ -933,7 +1213,7 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 		return true;
 	}
 
-	std::string sourceName= aSource->Name;
+	std::string sourceName= aSource->GetName();
 	int sourceId= aSource->Id;
 
 	//Loop over contours and check if all of them have circular features
@@ -1148,39 +1428,48 @@ int SFinder::DrawSources(Image* image,std::vector<Source*>& sources){
 }//close DrawSources()
 
 
+int SFinder::SaveDS9RegionFile(){
+
+	//## Open file
+	FILE* fout= fopen(m_DS9CatalogFileName.c_str(),"w");
+
+	//## Saving DS9 file region
+	DEBUG_LOG("Saving DS9 region header...");
+	fprintf(fout,"global color=red font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n");
+	fprintf(fout,"image\n");
+
+	DEBUG_LOG("Saving "<<m_SourceCollection.size()<<" sources to file...");
+
+	for(unsigned int k=0;k<m_SourceCollection.size();k++){
+		DEBUG_LOG("Dumping DS9 region info for source no. "<<k<<" ...");
+		std::string regionInfo= "";
+		if(m_DS9RegionFormat==ePolygonRegion) regionInfo= m_SourceCollection[k]->GetDS9Region(true);
+		else if(m_DS9RegionFormat==eEllipseRegion) regionInfo= m_SourceCollection[k]->GetDS9EllipseRegion(true);
+		else {
+			WARN_LOG("Invalid DS9RegionType given ("<<m_DS9RegionFormat<<")");
+			return -1;
+		}
+
+		fprintf(fout,"%s\n",regionInfo.c_str());
+	  	
+	}//end loop sources
+		
+	DEBUG_LOG("Closing DS9 file region...");
+	fclose(fout);
+
+	return 0;
+
+}//close SaveDS9RegionFile()
+
+
 int SFinder::Save(){
 
 	INFO_LOG("Storing results to file & catalog...");
 
 	//Save DS9 regions?
-	if(m_saveDS9Region && m_DS9CatalogFilePtr){
-		DEBUG_LOG("Saving DS9 region header...");
-	
-		fprintf(m_DS9CatalogFilePtr,"global color=red font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n");
-		fprintf(m_DS9CatalogFilePtr,"image\n");
-
-		DEBUG_LOG("Saving "<<m_SourceCollection.size()<<" sources to file...");
-
-		for(unsigned int k=0;k<m_SourceCollection.size();k++){
-			DEBUG_LOG("Dumping DS9 region info for source no. "<<k<<" ...");
-			std::string regionInfo= "";
-			if(m_DS9RegionFormat==1) regionInfo= m_SourceCollection[k]->GetDS9Region(true);
-			else if(m_DS9RegionFormat==2) regionInfo= m_SourceCollection[k]->GetDS9EllipseRegion(true);
-			else continue;
-
-			fprintf(m_DS9CatalogFilePtr,"%s\n",regionInfo.c_str());
-	  
-			DEBUG_LOG("Set source ptr to source "<<k<<"...");
-			m_Source= m_SourceCollection[k];
-			DEBUG_LOG("Saving source no. "<<k<<" to tree...");
-			m_SourceTree->Fill();
-		}//end loop sources
-		
-		DEBUG_LOG("Closing DS9 file region...");
-		fclose(m_DS9CatalogFilePtr);
-		m_DS9CatalogFilePtr= 0;
-	}//close if SaveDS9Region()
-
+	if(m_saveDS9Region && SaveDS9RegionFile()<0){
+		WARN_LOG("Failed to save sources to DS9 region file!");
+	}
 
 	//Check ROOT output file
 	if(!m_OutputFile) {
@@ -1191,6 +1480,11 @@ int SFinder::Save(){
 
 	//Save source tree?
 	if(m_saveSources){
+		DEBUG_LOG("Filling source ROOT TTree...");
+		for(size_t k=0;k<m_SourceCollection.size();k++){
+			m_Source= m_SourceCollection[k];
+			m_SourceTree->Fill();
+		}
 		DEBUG_LOG("Writing tree to file...");
 		m_SourceTree->Write();
 	}
@@ -1239,6 +1533,24 @@ int SFinder::Save(){
 	if(m_saveSaliencyMap && m_SaliencyImg){
 		m_SaliencyImg->SetNameTitle("img_saliency","img_saliency");
 		m_SaliencyImg->Write();
+	}
+
+	//Save Laplacian
+	if(m_saveCurvatureMap && m_LaplImg){
+		m_LaplImg->SetNameTitle("img_lapl","img_lapl");
+		m_LaplImg->Write();
+	}
+
+	//Save Edgeness
+	if(m_saveEdgenessMap && m_EdgeImg){
+		m_EdgeImg->SetNameTitle("img_edge","img_edge");
+		m_EdgeImg->Write();
+	}
+
+	//Save segmented map
+	if(m_saveSegmentedMap && m_SegmImg){
+		m_SegmImg->SetNameTitle("img_segm","img_segm");
+		m_SegmImg->Write();
 	}
 
 	/*

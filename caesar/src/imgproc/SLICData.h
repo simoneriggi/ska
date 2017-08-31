@@ -31,6 +31,7 @@
 #include <Region.h>
 #include <Contour.h>
 #include <Consts.h>
+#include <CodeUtils.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -66,11 +67,25 @@ class SLICData : public TObject {
  		*/
 		SLICData();
 		/**
+		* \brief Copy constructor
+		*/
+		SLICData(const SLICData& data);
+		/**
 		* \brief Class destructor: free allocated memory
 		*/
 		virtual ~SLICData();
+		/**
+		* \brief Assignment Operator
+		*/
+		SLICData& operator=(const SLICData& region);
+		/**
+		* \brief Copy method
+		*/
+		void Copy(TObject& region) const;
 
 	public:	
+
+		
 		/**
 		* \brief Clear data
 		*/
@@ -83,53 +98,207 @@ class SLICData : public TObject {
 		* \brief Clear regions
 		*/
 		void ClearRegions();
+		/**
+		* \brief Set data (NB: Pointer ownership is taken by this class)
+		*/
+		int SetData(Image* img,Image* lapl_img,Image* edge_img=0);
 
+		/** 
+		\brief Generate a superpixel partition given the passed options
+ 		*/
+		int SPGenerator(Image* img,int regionSize=10,double regParam=1,int minRegionSize=10,bool useLogScaleMapping=false,Image* edgeImg=0);
+	
+		/** 
+		\brief Get segmented image
+ 		*/
+		Image* GetSegmentedImage(Image* image,int selectedTag=-1,bool normalize=false,bool binarize=false);
+
+
+		//=======================================
+		//==       REGION METHODS
+		//=======================================
+		
 		/**
 		* \brief Get number of regions
 		*/
-		int GetNRegions() const {return (int)(regions.size());}
+		int GetNRegions() const {return static_cast<int>(regions.size());}
+		/**
+		* \brief Return regions
+		*/
+		std::vector<Region*> GetRegions() {return regions;}
+
+		/**
+		* \brief Set regions
+		*/
+		void SetRegions(std::vector<Region*>& list) {regions= list;}
+
 		/**
 		* \brief Get region
 		*/
 		Region* GetRegion(int index){
-			if(GetNRegions()<=0 || index<0 || index>=GetNRegions()) return 0;
+			if(regions.empty() || index<0 || index>=(signed)(regions.size())) return nullptr;
 			return regions[index];
 		}
 		/**
 		* \brief Add region
 		*/
-		void AddRegion(Region* aRegion){	
-			if(!aRegion) return;
+		int AddRegion(Region* aRegion){	
+			if(!aRegion) return -1;
 			regions.push_back(aRegion);
+			return 0;
 		}
 
-		
+		/**
+		* \brief Get region id from index (NB: No check done)
+		*/
+		long int GetRegionId(long int index){
+			return regions[index]->Id;
+		}
+
+		/**
+		* \brief Get region size from index (NB: No check done)
+		*/
+		long int GetRegionSize(long int index){
+			return regions[index]->NPix;
+		}
+
+		/**
+		* \brief Compute region parameters
+		*/
+		int ComputeRegionParameters();
+
+		/**
+		* \brief Remove regions without pixels
+		*/
+		void RemoveEmptyRegions();
+
+		/**
+		* \brief Delete regions specified in the list (NB: No check done)
+		*/
+		void DeleteRegions(std::vector<size_t>const& delete_indexes){
+			Caesar::CodeUtils::DeleteItems(regions, delete_indexes);
+		}
+
 		/**
 		* \brief Get region map regionId-->index
 		*/
-		std::map<int,int> GetRegionIdMap() const {
-			std::map<int,int> regionIdMap;
-			for(unsigned int k=0;k<regions.size();k++){
-				int regionId= regions[k]->Id;
-				regionIdMap.insert( std::pair<int,int>(regionId,k) );
-			}
-			return regionIdMap;
-		}//close GetRegionMapping()
+		void GetRegionIdMap(std::map<long int,long int>& regionIdMap) const;
+		
 		
 		/**
 		* \brief Get region index map (index-->regionId)
 		*/
+		void GetRegionIndexMap(std::map<long int,long int>& regionIndexMap) const;
+
+
+
+		//=======================================
+		//==       PIXEL LABELS METHODS
+		//=======================================
+		/**
+		* \brief Set pixel labels 
+		*/
+		void SetPixelLabels(std::vector<long int> list){pixel_labels= list;}
+
+		/**
+		* \brief Set pixel label (NB: No check done)
+		*/
+		int SetPixelLabel(long int gBin,long int label,bool check=true);
+		int SetPixelLabel(long int ix,long int iy,long int label,bool check=true);
+
+		/**
+		* \brief Scale pixel label (NB: No check done)
+		*/	
+		void ScalePixelLabel(long int gBin,long int scale){
+			pixel_labels[gBin]*= scale;
+		}
+
+		/**
+		* \brief Get pixel label (NB: No check is done)
+		*/
+		long int GetPixelLabel(long int ix,long int iy){
+			long int Nx= inputImg->GetNx();
+			long int gBin= ix + iy*Nx;
+			return pixel_labels[gBin];
+		}
+
+		/**
+		* \brief Get pixel label (NB: No check is done)
+		*/
+		long int GetPixelLabel(long int gBin){
+			return pixel_labels[gBin];
+		}
 		
-		std::map<int,int> GetRegionIndexMap() const {
-			std::map<int,int> regionIndexMap;
-			for(unsigned int k=0;k<regions.size();k++){
-				int regionId= regions[k]->Id;
-				regionIndexMap.insert( std::pair<int,int>(k,regionId) );
+		
+
+		/**
+		* \brief Get image curvature stats
+		*/
+		ImgStats* GetCurvStats(){
+			if(!laplImg) return nullptr;
+			return laplImg->GetPixelStats();
+		}
+
+		/**
+		* \brief Get image stats
+		*/
+		ImgStats* GetStats(){
+			if(!inputImg) return nullptr;
+			return inputImg->GetPixelStats();
+		}
+
+		/**
+		* \brief Get image edge stats
+		*/
+		ImgStats* GetEdgeStats(){
+			if(!edgeImg) return nullptr;
+			return edgeImg->GetPixelStats();
+		}
+
+		/**
+		* \brief Get curvature pixel value (NB: No check is done!)
+		*/
+		double GetScurv(long int ix,long int iy){
+			return laplImg->GetPixelValue(ix,iy);
+		}
+		/**
+		* \brief Get edgeness pixel value 
+		*/
+		double GetSedge(long int ix,long int iy){
+			if(!edgeImg) {
+				ERROR_LOG("Trying to access to edge map, which is not allocated, returning zero!");
+				return 0;
 			}
-			return regionIndexMap;
-		}//close GetRegionMapping()
+			return edgeImg->GetPixelValue(ix,iy);
+		}
+		/**
+		* \brief Get pixel value (NB: No check is done!)
+		*/
+		double GetS(long int ix,long int iy){
+			return inputImg->GetPixelValue(ix,iy);
+		}
+
+		/**
+		* \brief Set region id (NB: No checks performed)
+		*/
+		void SetRegionId(int index,int id){
+			regions[index]->Id= id;
+		}
+	
+		/**
+		* \brief Add pixel to region (NB: No checks performed)
+		*/
+		void AddPixelToRegion(int index,Pixel* pixel){
+			regions[index]->AddPixel(pixel);
+		}
 		
-		
+	protected:
+		/** 
+		\brief Initialize the superpixel data structure
+ 		*/
+		int Init(Image* img,bool useLogScaleMapping,Image* edgeImg);
+
+
 	public:
 
 		//- The image passed to SLIC generator (normalized)
@@ -141,12 +310,16 @@ class SLICData : public TObject {
 		//- The image laplacian
 		Image* laplImg; 
 
-		//- Matrix with pixel region labels
+		//- Matrix with pixel region labels (size=image size)
 		//TMatrixD* pixelLabels;
 		std::vector< std::vector<long int> > labels;
+		std::vector<long int> pixel_labels;
 
 		//- The list of generated superpixels
 		std::vector<Region*> regions;
+
+	
+	friend class SLICUtils;
 
 		ClassDef(SLICData,1)
 
@@ -227,7 +400,7 @@ class SLICNeighborData : public TObject {
 		int Index;
 		int Tag;	
 		double D;//dissimilarity Dij
-		double D_n;//dissimilarty Dji
+		double D_n;//dissimilarity Dji
 		double E;//edgeness
 		double E_n;
 		double Dtot;//total dissimilarity (normalized)
@@ -409,6 +582,20 @@ class SLICNeighborCollection : public TObject {
 		SLICNeighborData* GetNeighbor(int index){
 			if(index<0 || index>=GetN()) return 0;
 			return (m_neighbors.data()+index);
+		}
+
+		int SetDtot(int index,double Dtot,double Dtot_n){
+			//Check index
+			if(index<0 || index>=GetN()) {
+				ERROR_LOG("Invalid neighbor index ("<<index<<") requested, valid values are [0,"<<m_neighbors.size()-1<<"]!");
+				return -1;
+			}
+
+			//Set Dtot
+			m_neighbors[index].Dtot= Dtot;
+			m_neighbors[index].Dtot_n= Dtot_n;
+
+			return 0;
 		}
 
 	private:

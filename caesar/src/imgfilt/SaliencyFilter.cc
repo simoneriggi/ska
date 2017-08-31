@@ -28,7 +28,9 @@
 #include <SaliencyFilter.h>
 #include <Image.h>
 #include <Region.h>
-#include <SLIC.h>
+//#include <SLIC.h>
+#include <SLICData.h>
+#include <SLICUtils.h>
 #include <BkgData.h>
 #include <CodeUtils.h>
 
@@ -78,8 +80,10 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,i
 
 	//## Compute segmentation in superpixels
 	INFO_LOG("Generate superpixel partition @ reso="<<reso<<" (beta="<<regFactor<<", minRegionSize="<<minRegionSize<<")...");
+	bool normalizeImg= true;
 	bool useLogScaleMapping= false;
-	SLICData* slicData= SLIC::SPGenerator(img_norm,reso,regFactor,minRegionSize,useLogScaleMapping,0);	//pass null edgeImg (not needed here)
+	//SLICData* slicData= SLIC::SPGenerator(img_norm,reso,regFactor,minRegionSize,useLogScaleMapping,0);	//pass null edgeImg (not needed here)
+	SLICData* slicData= SLICUtils::SPGenerator(img_norm,reso,regFactor,minRegionSize,normalizeImg,useLogScaleMapping,0,0);	//pass null laplImg & edgeImg (not needed here)
 	if(!slicData){
 		ERROR_LOG("Superpixel segmentation failed!");
 		return 0;
@@ -87,7 +91,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,i
 
 	//Get results
 	INFO_LOG("Getting access to generated superpixel list...");
-	std::vector<Region*> regions= (slicData->regions);
+	std::vector<Region*> regions= slicData->GetRegions();
 	if(regions.empty()) {
 		ERROR_LOG("Superpixel segmentation returned no regions!");
 		delete slicData;

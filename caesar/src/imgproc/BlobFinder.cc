@@ -77,6 +77,18 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 		return -1;
 	}
 
+	//Set img range data
+	long int Nx= inputImg->GetNx();
+	long int Ny= inputImg->GetNy();
+	long int Ntot= Nx*Ny;
+	/*
+	float Xmin= inputImg->GetXmin();
+	float Ymin= inputImg->GetYmin();
+	float Smin= inputImg->GetMinimum();
+	float Smax= inputImg->GetMaximum();
+	ImgRange imgRange= ImgRange(Nx,Ny,Smin,Smax,Xmin,Ymin);
+	*/
+
 	//## Check if the flood map is provided otherwise set to the input map
 	//## NB: In source search it should be the significance map
 	//## NB2: It could be used to fill blobs in the input map, conditional to another map (i.e. a binary mask)
@@ -108,9 +120,7 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 	//## Find seed pixels (above seed threshold)	
 	std::vector<long int> pixelSeeds;	
 	std::vector<bool> isNegativeExcessSeed;
-	long int Nx= inputImg->GetNx();
-	long int Ny= inputImg->GetNy();
-	long int Ntot= Nx*Ny;
+	
 	
 	for(long int i=0;i<Nx;i++){
 		for(long int j=0;j<Ny;j++){	
@@ -170,7 +180,7 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 		
 		DEBUG_LOG("Adding new blob (# "<<nBlobs<<") to list...");
 		TString blobName= Form("%s_blobId%d",inputImg->GetName().c_str(),nBlobs);
-		aBlob= new T;
+		aBlob= new T();
 		aBlob->SetId(nBlobs);	
 		aBlob->SetName(std::string(blobName));
 		
@@ -181,8 +191,8 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 
 			long int clusterPixelIdX= inputImg->GetBinX(clusterPixelId);
 			long int clusterPixelIdY= inputImg->GetBinY(clusterPixelId);
-			double S= inputImg->GetBinContent(clusterPixelId);			
-			double Z= floodImg->GetBinContent(clusterPixelId);
+			double S= inputImg->GetPixelValue(clusterPixelId);			
+			double Z= floodImg->GetPixelValue(clusterPixelId);
 
 			double x= inputImg->GetX(clusterPixelIdX);
 			double y= inputImg->GetY(clusterPixelIdY);
@@ -197,17 +207,19 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 			aPixel->SetPhysCoords(x,y);
 			aPixel->SetCoords(ix,iy);
 			
-			if( inputImg->IsEdgeBin(clusterPixelIdX,clusterPixelIdY) ) {
-				aBlob->SetEdgeFlag(true);
-			}
+			
+			//if( inputImg->IsEdgeBin(clusterPixelIdX,clusterPixelIdY) ) {
+			//	aBlob->SetEdgeFlag(true);
+			//}
+			
 
 			//Set bkg data if available
 			if(hasBkgData){
 				double bkgLevel= bkgData->gBkg;
 				double noiseLevel= bkgData->gNoise;
 				if(hasLocalBkg){
-					bkgLevel= (bkgData->BkgMap)->GetBinContent(clusterPixelId);
-					noiseLevel= (bkgData->NoiseMap)->GetBinContent(clusterPixelId);
+					bkgLevel= (bkgData->BkgMap)->GetPixelValue(clusterPixelId);
+					noiseLevel= (bkgData->NoiseMap)->GetPixelValue(clusterPixelId);
 				}
 				aPixel->SetBkg(bkgLevel,noiseLevel);
 			}//close if

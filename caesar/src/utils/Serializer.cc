@@ -230,8 +230,8 @@ int Serializer::EncodePixelToProtobuf(CaesarPB::Pixel& pixel_pb,Pixel* pixel){
 		pixel_pb.set_y(pixel->y);
 		pixel_pb.set_ix(pixel->ix);
 		pixel_pb.set_iy(pixel->iy);
-		pixel_pb.set_isonedge(pixel->isOnEdge);
-		pixel_pb.set_distancetoedge(pixel->distanceToEdge);
+		//pixel_pb.set_isonedge(pixel->isOnEdge);
+		//pixel_pb.set_distancetoedge(pixel->distanceToEdge);
 
 		pixel_pb.set_s_curv(pixel->GetCurv());
 		pixel_pb.set_s_edge(pixel->GetEdge());
@@ -257,7 +257,7 @@ int Serializer::EncodeBlobToProtobuf(CaesarPB::Blob& blob_pb,Source* source){
 	try{
 		blob_pb.set_haspixelsatedge(source->HasPixelsAtEdge);
 		blob_pb.set_id(source->Id);
-		blob_pb.set_name(source->Name);
+		blob_pb.set_name(source->GetName());
 		blob_pb.set_npix(source->NPix);
 		blob_pb.set_mean(source->Mean);
 		blob_pb.set_rms(source->RMS);
@@ -296,17 +296,21 @@ int Serializer::EncodeBlobToProtobuf(CaesarPB::Blob& blob_pb,Source* source){
 		blob_pb.set_m_s_curv(source->GetScurv());
 		blob_pb.set_m_s_edge(source->GetSedge());
 	
-		long int imgsizex, imgsizey;
-		source->GetImageSize(imgsizex,imgsizey);
-		blob_pb.set_m_imagesizex(imgsizex);
-		blob_pb.set_m_imagesizey(imgsizey);
-
-		double xmin, xmax, ymin, ymax;
+	
+		
+		/*
+		//===== MARKED FOR REMOVAL ====
+		float xmin, xmax, ymin, ymax;
 		source->GetImageRange(xmin,xmax,ymin,ymax);
 		blob_pb.set_m_imageminx(xmin);
 		blob_pb.set_m_imagemaxx(xmax);
 		blob_pb.set_m_imageminy(ymin);
 		blob_pb.set_m_imagemaxy(ymax);
+
+		long int imgsizex, imgsizey;
+		source->GetImageSize(imgsizex,imgsizey);
+		blob_pb.set_m_imagesizex(imgsizex);
+		blob_pb.set_m_imagesizey(imgsizey);
 
 		double imgSmin, imgSmax;
 		source->GetImageSRange(imgSmin, imgSmax);
@@ -324,6 +328,8 @@ int Serializer::EncodeBlobToProtobuf(CaesarPB::Blob& blob_pb,Source* source){
 		blob_pb.set_m_imagemaxsedge(imgSmax_edge);
 
 		blob_pb.set_m_imagerms(source->GetImageRMS());
+		//=================================
+		*/
 
 		double sxmin, sxmax, symin, symax;
 		source->GetSourceRange(sxmin,sxmax,symin,symax);
@@ -706,7 +712,7 @@ int Serializer::EncodeProtobufToBlob(Source& source,const CaesarPB::Blob& blob_p
 		//Main params
 		if(blob_pb.has_haspixelsatedge()) source.HasPixelsAtEdge= blob_pb.haspixelsatedge();
 		if(blob_pb.has_id()) source.Id= blob_pb.id();
-		if(blob_pb.has_name()) source.Name= blob_pb.name();
+		if(blob_pb.has_name()) source.SetName(blob_pb.name());
 
 		if(blob_pb.has_npix()) source.NPix= blob_pb.npix();		
 		if(blob_pb.has_mean()) source.Mean= blob_pb.mean();
@@ -757,7 +763,8 @@ int Serializer::EncodeProtobufToBlob(Source& source,const CaesarPB::Blob& blob_p
 		if(blob_pb.has_m_s_curv()) source.SetScurv(blob_pb.m_s_curv());
 		if(blob_pb.has_m_s_edge()) source.SetSedge(blob_pb.m_s_edge());
 
-
+		/*
+		//============= MARKED FOR REMOVAL =================
 		if(blob_pb.has_m_imagesizex() && blob_pb.has_m_imagesizey()) source.SetImageSize(blob_pb.m_imagesizex(),blob_pb.m_imagesizey());
 		if(blob_pb.has_m_imageminx() && blob_pb.has_m_imagemaxx() &&
 			 blob_pb.has_m_imageminy() && blob_pb.has_m_imagemaxy()
@@ -775,8 +782,12 @@ int Serializer::EncodeProtobufToBlob(Source& source,const CaesarPB::Blob& blob_p
 		if(blob_pb.has_m_imageminsedge() && blob_pb.has_m_imagemaxsedge()) {
 			source.SetImageSedgeRange(blob_pb.m_imageminsedge(),blob_pb.m_imagemaxsedge());
 		}
-
+	
 		if(blob_pb.has_m_imagerms()) source.SetImageRMS(blob_pb.m_imagerms());
+		//=======================================================
+		*/
+
+		
 		if( blob_pb.has_m_xmin() && blob_pb.has_m_xmax() &&
 				blob_pb.has_m_ymin() && blob_pb.has_m_ymax()
 		) {
@@ -865,12 +876,9 @@ int Serializer::EncodeProtobufToPixel(Pixel& pixel,const CaesarPB::Pixel& pixel_
 		if(pixel_pb.has_y()) pixel.y= pixel_pb.y();
 		if(pixel_pb.has_ix()) pixel.ix= pixel_pb.ix();
 		if(pixel_pb.has_iy()) pixel.iy= pixel_pb.iy();
-		if(pixel_pb.has_isonedge()) pixel.isOnEdge= pixel_pb.isonedge();
-		if(pixel_pb.has_distancetoedge()) pixel.distanceToEdge= pixel_pb.distancetoedge();
-		if(pixel_pb.has_s()) pixel.S= pixel_pb.s();
-		if(pixel_pb.has_s()) pixel.S= pixel_pb.s();
-		if(pixel_pb.has_s()) pixel.S= pixel_pb.s();
-
+		//if(pixel_pb.has_isonedge()) pixel.isOnEdge= pixel_pb.isonedge();
+		//if(pixel_pb.has_distancetoedge()) pixel.distanceToEdge= pixel_pb.distancetoedge();
+		
 		//Set private fields
 		if(pixel_pb.has_s_curv()) pixel.SetCurv(pixel_pb.s_curv());
 		if(pixel_pb.has_s_edge()) pixel.SetEdge(pixel_pb.s_edge());

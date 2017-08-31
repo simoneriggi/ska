@@ -249,12 +249,16 @@ int Contour::ComputeParameters(){
 		return -1;
 	}
 
+	int status= 0;
 	try{
 		//## Compute Shape Parameters
 		ComputeShapeParams();
 	
 		//## Compute fitted ellipse
-		ComputeFittedEllipse();
+		if(ComputeFittedEllipse()<0){
+			WARN_LOG("Failed to fit an ellipse to the contour!");
+			status= -1;
+		}
 
 		//## Compute moments and HuMoments
 		ComputeMoments();
@@ -270,6 +274,7 @@ int Contour::ComputeParameters(){
 		//ComputeBendingEnergy();		
 
 		HasParameters= true;
+
 	}//close try block
 	catch(cv::Exception ex){//something goes wrong!
   	ERROR_LOG("Computing contour parameters failed (err: "<<ex.msg <<")");
@@ -340,7 +345,10 @@ void Contour::ComputeShapeParams(){
 
 TEllipse* Contour::GetFittedEllipse(){
 
-	if(!HasEllipseFit) return 0;
+	//Check if ellipse fit succeeded
+	if(!HasEllipseFit) return nullptr;
+
+	//Return the ellipse
 	TEllipse* ellipse= new TEllipse;
 	ellipse->SetX1(EllipseCenter.X());
 	ellipse->SetY1(EllipseCenter.Y());
@@ -348,25 +356,45 @@ TEllipse* Contour::GetFittedEllipse(){
 	ellipse->SetTheta(EllipseRotAngle);
 	ellipse->SetR1(EllipseMajAxis/2.);
 	ellipse->SetR2(EllipseMinAxis/2.);	
+
 	return ellipse;
 
 }//close GetFittedEllipse()
 
-void Contour::ComputeFittedEllipse(){
+int Contour::ComputeFittedEllipse(){
 	
+	//## Fit an ellipse to contour points
 	HasEllipseFit= true;//checked in internal routines and swithed to false if the fit fails
-	//Fit an ellipse to contour points
 	
-	
-	// Fit the ellipse
+	// Get the contour graph
 	TGraph* contourGraph= GetGraph();
-  TVectorD conic = EllipseFitter(contourGraph);
-  TVectorD ellipseParams = ConicToParametric(conic);
+	if(!contourGraph){
+		ERROR_LOG("Cannot get contour graph!");
+		return -1;
+	}
 
+	//Get ellipse conic
+	TVectorD conic;
+	if(EllipseFitter(conic,contourGraph)<0){
+		ERROR_LOG("Failed to compute the ellipse conic!");
+		if(contourGraph) contourGraph->Delete();
+		return -1;
+	}
+
+	//Convert to parametric representation
+  //TVectorD conic = EllipseFitter(contourGraph);
+  TVectorD ellipseParams;
+	if(ConicToParametric(ellipseParams,conic)<0){
+		WARN_LOG("Failed to convert ellipse from conic to parametric representation!");
+		if(contourGraph) contourGraph->Delete();	
+		return -1;
+	}
+
+	//Check for errors
 	if(!HasEllipseFit){
 		WARN_LOG("Ellipse fit failed!");
 		if(contourGraph) contourGraph->Delete();	
-		return;
+		return -1;
 	}
 
 	//ellipse[0] = x0; // ellipse's "x" center
@@ -421,22 +449,29 @@ void Contour::ComputeFittedEllipse(){
 	*/
 	if(contourGraph) contourGraph->Delete();
 	
+	return 0;
+
 }//close ComputeFittedEllipse()
 
  
-TVectorD Contour::EllipseFitter(TGraph* contourGraph){
+//TVectorD Contour::EllipseFitter(TGraph* contourGraph){
+int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
 
-  TVectorD ellipse;
+  //TVectorD ellipse;
   if (!contourGraph) {
+		ERROR_LOG("Null ptr to input contour graph, no ellipse fit will be performed!");
 		HasEllipseFit= false;
-		return ellipse; // just a precaution
+		//return ellipse; // just a precaution
+		return -1;
 	}
 
 	//Check number of points
 	int N = contourGraph->GetN();
   if(N<6) {
+		WARN_LOG("Contour has less then 6 points, cannot fit ellipse!");
 		HasEllipseFit= false;
-		return ellipse;
+		//return ellipse;
+		return -1;
 	}
   
 	int i= 0;
@@ -478,7 +513,8 @@ TVectorD Contour::EllipseFitter(TGraph* contourGraph){
   if (tmp == 0.0) {
     WARN_LOG("Linear part of the scatter matrix is singular!");
 		HasEllipseFit= false;
-    return ellipse;
+    //return ellipse;
+		return -1;
   }
   // For getting a2 from a1
   TMatrixD T(S3, TMatrixD::kMultTranspose, S2);
@@ -501,7 +537,8 @@ TVectorD Contour::EllipseFitter(TGraph* contourGraph){
   if ((eig.GetEigenValuesIm()).Norm2Sqr() != 0.0) {
     WARN_LOG("Eigenvalues have nonzero imaginary parts!");
 		HasEllipseFit= false;
-    return ellipse;
+    //return ellipse;
+		return -1;
   }
 
   // Evaluate a’Ca (in order to find the eigenvector for min. pos. eigenvalue)
@@ -513,7 +550,8 @@ TVectorD Contour::EllipseFitter(TGraph* contourGraph){
     WARN_LOG("No min. pos. eigenvalue found!");
     // i = 2;
 		HasEllipseFit= false;
-    return ellipse;
+    //return ellipse;
+		return -1;
   }
 
   // Eigenvector for min. pos. eigenvalue
@@ -525,7 +563,8 @@ TVectorD Contour::EllipseFitter(TGraph* contourGraph){
 	else {
     WARN_LOG("Eigenvector for min. pos. eigenvalue is NULL!");
 		HasEllipseFit= false;
-    return ellipse;
+    //return ellipse;
+		return -1;
   }
   TVectorD a2(T*a1);
   
@@ -540,16 +579,20 @@ TVectorD Contour::EllipseFitter(TGraph* contourGraph){
   ellipse[6] = a2[1]; // "E"
   ellipse[7] = a2[2]; // "F"
   
-  return ellipse;
+  //return ellipse;
+	return 0;
+
 }//close EllipseFitter()
 
-TVectorD Contour::ConicToParametric(const TVectorD &conic) {
+//TVectorD Contour::ConicToParametric(const TVectorD &conic) {
+int Contour::ConicToParametric(TVectorD& ellipse,const TVectorD &conic) {
   
-	TVectorD ellipse;  
+	//TVectorD ellipse;  
   if (conic.GetNrows() != 8) {
     ERROR_LOG("Improper input vector length!");
 		HasEllipseFit= false;
-    return ellipse;
+    //return ellipse;
+		return -1;
   }
   
   double a, b, theta;
@@ -572,7 +615,8 @@ TVectorD Contour::ConicToParametric(const TVectorD &conic) {
   if (!( (Delta != 0.0) && (J < 0.0) && (I != 0.0) && (Delta / I < 0.0) )) {
     ERROR_LOG("Ellipse (real) specific constraints not met!");
 		HasEllipseFit= false;
-    return ellipse;
+    //return ellipse;
+		return -1;
   }
   
   x0 += (C * D - B * F) / J;
@@ -605,7 +649,8 @@ TVectorD Contour::ConicToParametric(const TVectorD &conic) {
   ellipse[3] = b; // ellipse's "semiminor" axis along "y"
   ellipse[4] = theta; // ellipse's axes rotation angle (in degrees)
   
-  return ellipse;
+  //return ellipse;
+	return 0;
 
 }//close ConicToParametric()
 

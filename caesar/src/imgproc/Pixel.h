@@ -94,24 +94,76 @@ class Pixel : public TObject {
 		*/
 		void Copy(TObject& pixel) const;
 
+		/**
+		* \brief Pixel type
+		*/
 		enum PixelType {eNormal=1,eSeed=2,eHalo=3};
 
 	public: 
-		void SetPhysCoords(double xx,double yy){x=xx;y=yy;}
-		void SetCoords(long int i,long int j){ix=i;iy=j;}
-		void SetBkg(double bkg,double noise){bkgLevel=bkg;noiseLevel=noise;}
+		/**
+		* \brief Set physical coordinates
+		*/
+		void SetPhysCoords(double xx,double yy){x=xx; y=yy;}
+		/**
+		* \brief Set coordinates
+		*/
+		void SetCoords(long int i,long int j){ix=i; iy=j;}
+
+		/**
+		* \brief Set bkg and rms value
+		*/
+		void SetBkg(double bkg,double noise){bkgLevel=bkg; noiseLevel=noise;}
+
+		/**
+		* \brief Set curvature information
+		*/
 		void SetCurv(double val){S_curv=val;}
+
+		/**
+		* \brief Set edgeness information
+		*/
 		void SetEdge(double val){S_edge=val;}
+
+		/**
+		* \brief Get bkg and noise
+		*/
 		std::pair<double,double> GetBkg(){return std::make_pair(bkgLevel,noiseLevel);}
+
+		/**
+		* \brief Get curvature information
+		*/
 		double GetCurv(){return S_curv;}
+
+		/**
+		* \brief Get edgeness information
+		*/
 		double GetEdge(){return S_edge;}
 		
 
 	private:
+		/**
+		* \brief Initialize class members
+		*/
 		void Init();
+
+		/**
+		* \brief Update moments
+		*/
 		void UpdateMoments(Pixel* pixel);
+
+		/**
+		* \brief Reset moments
+		*/
 		void ResetMoments();
+
+		/**
+		* \brief Reset stats
+		*/
 		void ResetStats();
+
+		/**
+		* \brief Reset pixels
+		*/
 		void ResetPixels();
 
 	public:
@@ -122,10 +174,10 @@ class Pixel : public TObject {
 		double y;//pixel y coordinate
 		long int ix;//pixel id x
 		long int iy;//pixel id y
-		bool isOnEdge;//flag marking if pixel is found on region contour
-		double distanceToEdge;//distance to the edge (=0 for edge pixels)		
+		//bool isOnEdge;//flag marking if pixel is found on region contour
+		//double distanceToEdge;//distance to the edge (=0 for edge pixels)		
 
-	private:
+	protected:
 		//Set private to force external class to explicitly call setter methods
 		double S_curv;//curvature estimator
 		double S_edge;//edge estimator
@@ -137,7 +189,7 @@ class Pixel : public TObject {
 
 	ClassDef(Pixel,1)
 
-};
+};//close class Pixel
 typedef std::vector<Pixel*> PixelCollection;
 typedef std::map<int,Pixel*> PixelMap;
 

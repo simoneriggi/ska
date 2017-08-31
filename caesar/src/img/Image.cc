@@ -2762,7 +2762,7 @@ int Image::Plot(std::vector<Source*>const& sources,bool useCurrentCanvas,bool dr
 	
 	return 0;
 
-}//close Img::Plot()
+}//close Plot()
 
 /*
 void Image::SetDrawRange(double zmin,double zmax){

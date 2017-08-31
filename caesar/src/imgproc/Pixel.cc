@@ -72,7 +72,10 @@ Pixel::Pixel(const Pixel& pixel) : TObject(pixel) {
 
 void Pixel::Copy(TObject &obj) const {
 
+	//Copy object
 	TObject::Copy((Pixel&)obj);
+
+	//Copy pixel members
   ((Pixel&)obj).id = id;
 	((Pixel&)obj).type = type;
 	((Pixel&)obj).S = S;
@@ -80,8 +83,8 @@ void Pixel::Copy(TObject &obj) const {
 	((Pixel&)obj).y = y;
 	((Pixel&)obj).ix = ix;
 	((Pixel&)obj).iy = iy;
-	((Pixel&)obj).isOnEdge = isOnEdge;
-	((Pixel&)obj).distanceToEdge = distanceToEdge;
+	//((Pixel&)obj).isOnEdge = isOnEdge;
+	//((Pixel&)obj).distanceToEdge = distanceToEdge;
 	((Pixel&)obj).S_curv = S_curv;
 	((Pixel&)obj).S_edge = S_edge;
 	((Pixel&)obj).bkgLevel = bkgLevel;
@@ -107,8 +110,8 @@ void Pixel::Init(){
 	y=-1; 
 	ix= -1; 
 	iy= -1; 
-	isOnEdge= false; 
-	distanceToEdge= std::numeric_limits<double>::infinity();
+	//isOnEdge= false; 
+	//distanceToEdge= std::numeric_limits<double>::infinity();
 	bkgLevel= 0;
 	noiseLevel= 0;
 

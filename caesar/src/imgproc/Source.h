@@ -61,6 +61,16 @@ class Source : public Blob {
 		\brief Class constructor: initialize structures.
  		*/
 		Source();
+		/** 
+		\brief Parametric constructor
+ 		*/
+		//Source(ImgRange img_range,std::string name="");		
+		Source(std::string name);		
+		/** 
+		\brief Parametric constructor
+ 		*/
+		//Source(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name="");	
+		Source(std::vector<Pixel*>const& pixels,std::string name="");			
 		/**
 		* \brief Copy constructor
 		*/
@@ -84,13 +94,38 @@ class Source : public Blob {
 		enum SourceFlag {eReal=1,eCandidate=2,eFake=3};
 
 	public:
+		/**
+		* \brief Set source type
+		*/
 		void SetType(SourceType choice){Type=choice;}
+		/**
+		* \brief Set source flag
+		*/
 		void SetFlag(SourceFlag choice){Flag=choice;}
+		/**
+		* \brief Set beam flux integral
+		*/
 		void SetBeamFluxIntegral(double val){m_BeamFluxIntegral= val;}
+		/**
+		* \brief Get beam flux integral
+		*/
 		double GetBeamFluxIntegral(){return m_BeamFluxIntegral;}
+		/**
+		* \brief Is a "good" source
+		*/
 		bool IsGoodSource(){return m_IsGoodSource;}
+		/**
+		* \brief Set source as "good"
+		*/
 		void SetGoodSourceFlag(bool flag){m_IsGoodSource=flag;}
+
+		/**
+		* \brief Set source depth level (0=mother, 1=nested)
+		*/
 		void SetDepthLevel(int level){m_DepthLevel=level;}		
+		/**
+		* \brief Get source depth level (0=mother, 1=nested)
+		*/
 		int GetDepthLevel(){return m_DepthLevel;}
 
 		/**
@@ -110,7 +145,7 @@ class Source : public Blob {
 			if(!aNestedSource) return;
 			int nNestedSources= (int)m_NestedSources.size();
 			int nestedId= nNestedSources+1;
-			TString nestedName= Form("%s_N%d",Name.c_str(),nestedId);
+			TString nestedName= Form("%s_N%d",this->GetName(),nestedId);
 			aNestedSource->Id= nestedId;
 			aNestedSource->Type= aNestedSource->Type;
 			aNestedSource->m_DepthLevel= this->m_DepthLevel+1;
@@ -130,10 +165,12 @@ class Source : public Blob {
 		* \brief Get nested sources
 		*/
 		std::vector<Source*>& GetNestedSources(){return m_NestedSources;}
+
 		/**
 		* \brief Get nested source number
 		*/
 		int GetNestedSourceNumber(){return m_NestedSources.size();}
+
 		/**
 		* \brief Get nested source
 		*/
@@ -164,12 +201,19 @@ class Source : public Blob {
 		*/
 		int MergeSource(Source* aSource,bool copyPixels=false,bool checkIfAdjacent=true,bool computeStatPars=true,bool computeMorphPars=true);
 
+		
 	private:
+	
+		/**
+		* \brief Initialize class members
+		*/
 		void Init();
 
 	public:
+
 		int Type;
 		int Flag;
+
 	private:
 		double m_BeamFluxIntegral;
 

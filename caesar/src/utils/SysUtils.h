@@ -187,7 +187,11 @@ class SysUtils : public TObject {
 		/**
 		* \brief Get the number of cores currently used by OpenMP (return 0 if OMP is disabled at build)
 		*/
-		static int GetOMPCores();
+		static int GetOMPCores();	
+		/**
+		* \brief Get thread id (return 0 if OMP is disabled at build)
+		*/
+		static int GetOMPThreadId();
 
 	private:
 	
