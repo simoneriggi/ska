@@ -102,6 +102,7 @@ using namespace std;
 
 
 ClassImp(Caesar::Image)
+ClassImp(Caesar::ImgRange)
 
 namespace Caesar {
 
@@ -125,12 +126,16 @@ Image::Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string n
 		ERROR_LOG(ss.str());
 		throw std::out_of_range(ss.str().c_str());
 	}
-
+	
 	//Init pars
   Init();
 
 	//Set image name
 	m_name= name;
+	if(xlow==-1 || ylow==-1){
+		xlow= 0;
+		ylow= 0;
+	}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -155,6 +160,10 @@ Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,flo
 
 	//Set image name
 	m_name= name;
+	if(xlow==-1 || ylow==-1){
+		xlow= 0;
+		ylow= 0;
+	}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -185,6 +194,10 @@ Image::Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::
 
 	//Set image name
 	m_name= name;
+	if(xlow==-1 || ylow==-1){
+		xlow= 0;
+		ylow= 0;
+	}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -476,8 +489,9 @@ int Image::Fill(double x,double y,double w,bool useNegativePixInStats){
 
 	//Find global bin
 	long int gbin= FindBin(x,y);
-	if(gbin<0) {
-		WARN_LOG("Underflow/overflow bin requested to be filled!");
+	if(gbin<0 || gbin>=(long int)(m_pixels.size())) {
+		WARN_LOG("Underflow/overflow bin ("<<gbin<<") corresponding to (x,y)=("<<x<<","<<y<<") given to be filled (hint: check if image size is not initialized)!");
+		return -1;
 	}
 	
 	//Fill pixel
@@ -536,30 +550,161 @@ int Image::FillMT(Caesar::StatMoments<double>& moments,double x,double y,double 
 #endif
 
 
-void Image::FillFromMat(cv::Mat& mat,bool useNegativePixInStats){
+int Image::FillFromMat(cv::Mat& mat,bool useNegativePixInStats){
 
 	//Get image size
 	long int nRows = mat.rows;
   long int nCols = mat.cols;
 	long int Ny= this->GetNy();
+	long int Nx= this->GetNx();
+	if(nRows<=0 || nCols<=0){
+		ERROR_LOG("Matrix has zero rows and/or cols!");
+		return -1;
+	}
+	if(nCols!=Nx || nRows!=Ny){
+		ERROR_LOG("Invalid nrows/ncols (hint: should be equal to image size "<<Nx<<" x "<<Ny<<")!");
+		return -1;
+	}
+
 
 	//Reset this image
 	Reset();
 		
-	#pragma omp parallel for
-	for(long int i=0;i<nRows;++i) {
-		long int rowId= i;
-		long int iy= Ny-1-rowId;
-		double* p = mat.ptr<double>(i);
-    for (long int j=0;j<nCols;++j){
-			long int colId= j;
-			long int ix= colId;
-			double w= p[j];
-			this->FillPixel(ix,iy,w,useNegativePixInStats);
-    }//end loop cols
-  }//end loop rows
-	
+	#ifdef OPENMP_ENABLED
+		
+		Caesar::StatMoments<double> moments_t;		
+		std::vector<Caesar::StatMoments<double>> parallel_moments;
+
+		#pragma omp parallel private(moments_t)
+		{
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+
+			#pragma omp single
+   		{
+     		parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+   		}
+
+			#pragma omp for
+			for(long int i=0;i<nRows;++i) {
+				long int rowId= i;
+				long int iy= Ny-1-rowId;
+				double* p = mat.ptr<double>(i);
+    		for (long int j=0;j<nCols;++j){
+					long int colId= j;
+					long int ix= colId;
+					double w= p[j];
+					this->FillPixelMT(moments_t,ix,iy,w,useNegativePixInStats);
+    		}//end loop cols
+  		}//end loop rows
+		
+			//Fill parallel moments per thread
+			parallel_moments[thread_id]= moments_t;
+			
+		}//close parallel section
+
+		//Update moments from parallel estimates
+		Caesar::StatMoments<double> moments;
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(moments,parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative moments from parallel estimates (NB: image will have wrong moments!)");
+			return -1;
+		}	
+		this->SetMoments(moments);
+
+	#else	
+		for(long int i=0;i<nRows;++i) {
+			long int rowId= i;
+			long int iy= Ny-1-rowId;
+			double* p = mat.ptr<double>(i);
+    	for (long int j=0;j<nCols;++j){
+				long int colId= j;
+				long int ix= colId;
+				double w= p[j];
+				this->FillPixel(ix,iy,w,useNegativePixInStats);
+    	}//end loop cols
+  	}//end loop rows
+	#endif
+
+	return 0;
+
 }//close FillFromMat()
+
+
+int Image::FillFromTMatrix(TMatrixD& mat,bool useNegativePixInStats){
+
+	//Get image size
+	long int nRows = mat.GetNrows();
+  long int nCols = mat.GetNcols();
+	long int Ny= this->GetNy();
+	long int Nx= this->GetNx();
+	if(nRows<=0 || nCols<=0){
+		ERROR_LOG("Matrix has zero rows and/or cols!");
+		return -1;
+	}
+	if(nCols!=Nx || nRows!=Ny){
+		ERROR_LOG("Invalid nrows/ncols (hint: should be equal to image size "<<Nx<<" x "<<Ny<<")!");
+		return -1;
+	}
+
+	//Reset this image
+	Reset();
+
+	//Fill image from TMatrixD
+	#ifdef OPENMP_ENABLED
+		Caesar::StatMoments<double> moments_t;		
+		std::vector<Caesar::StatMoments<double>> parallel_moments;
+
+		#pragma omp parallel private(moments_t)
+		{
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+
+			#pragma omp single
+   		{
+     		parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+   		}
+
+			#pragma omp for
+			for(long int i=0;i<nRows;++i) {
+				long int rowId= i;
+				long int iy= Ny-1-rowId;
+    		for (long int j=0;j<nCols;++j){
+					long int colId= j;
+					long int ix= colId;
+					double w= mat(i,j);
+					this->FillPixelMT(moments_t,ix,iy,w,useNegativePixInStats);
+    		}//end loop cols
+  		}//end loop rows
+		
+			//Fill parallel moments per thread
+			parallel_moments[thread_id]= moments_t;
+			
+		}//close parallel section
+
+		//Update moments from parallel estimates
+		Caesar::StatMoments<double> moments;
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(moments,parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative moments from parallel estimates (NB: image will have wrong moments!)");
+			return -1;
+		}	
+		this->SetMoments(moments);
+		
+	#else
+		for(long int i=0;i<nRows;++i) {
+			long int rowId= i;
+			long int iy= Ny-1-rowId;
+    	for (long int j=0;j<nCols;++j){
+				long int colId= j;
+				long int ix= colId;
+				double w= mat(i,j);
+				this->FillPixel(ix,iy,w,useNegativePixInStats);
+    	}//end loop cols
+  	}//end loop rows
+	#endif
+
+	return 0;
+
+}//close FillFromTMatrix()
 
 
 //================================================================
@@ -863,16 +1008,12 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	//## Remove negative values? 
 	//## NB: Copy vector otherwise it is modified by sorting operation inside median and other robust estimators
 	std::vector<float> pixels;
-	pixels.clear();
-	pixels.resize(0);
-	if(skipNegativePixels){
-		for(size_t i=0;i<m_pixels.size();i++){
-			double pixelValue= m_pixels[i];
-			if( pixelValue==0 || (skipNegativePixels && pixelValue<0) ) continue;
-			pixels.push_back(pixelValue);
-		}
+	for(size_t i=0;i<m_pixels.size();i++){
+		float w= m_pixels[i];
+		if( w==0 || (skipNegativePixels && w<0) ) continue;
+		pixels.push_back(w);
 	}
-
+	
 	//## Compute robust stats (median, MAD, ...)	
 	//Sort and compute median for all image	
 	float median= Caesar::StatsUtils::GetMedianFast<float>(pixels);
@@ -946,7 +1087,7 @@ int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool for
 	ComputeMoments(skipNegativePixels);
 
 	//--> Recompute stats params
-	ComputeStatsParams(true,skipNegativePixels);
+	ComputeStatsParams(computeRobustStats,skipNegativePixels);
 
 	m_HasStats= true;
 
@@ -1281,6 +1422,21 @@ Image* Image::GetSignificanceMap(ImgBkgData* bkgData,bool useLocalBkg){
 //=======================================================
 //==          SOURCE EXTRACTION
 //=======================================================
+int Image::FindCompactSource(std::vector<Source*>& sources,double thr,int minPixels){
+
+	//Find sources by simple thresholding using the same image as significance map and no bkgdata
+	bool findNegativeExcess= false;
+	bool mergeBelowSeed= false;
+	bool findNestedSources= false;
+	if(this->FindCompactSource(sources,this,0,thr,thr,minPixels,findNegativeExcess,mergeBelowSeed,findNestedSources)<0){
+		ERROR_LOG("Compact source finder failed!");
+		return -1;
+	}
+	return 0;
+
+}//close FindCompactSource()
+
+
 int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,bool findNestedSources,double nestedBlobThreshold)
 {
 
@@ -1455,10 +1611,10 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 
 }//close FindNestedSources()
 
-int Image::FindExtendedSource_CV(std::vector<Source*>& sources,ImgBkgData* bkgData,int minPixels,bool findNegativeExcess,double dt,double h,double lambda1,double lambda2,double mu,double nu,double p){
+int Image::FindExtendedSource_CV(std::vector<Source*>& sources,Image* initSegmImg,ImgBkgData* bkgData,int minPixels,bool findNegativeExcess,double dt,double h,double lambda1,double lambda2,double mu,double nu,double p){
 
 	//## Compute segmented image
-	Image* segmentedImg= ChanVeseSegmenter::FindSegmentation(this,false,dt,h,lambda1,lambda2,mu,nu,p);
+	Image* segmentedImg= ChanVeseSegmenter::FindSegmentation(this,initSegmImg,false,dt,h,lambda1,lambda2,mu,nu,p);
 	if(!segmentedImg){
 		ERROR_LOG("Failed to compute ChanVese image segmentation!");
 		return -1;
@@ -1498,7 +1654,7 @@ int Image::FindExtendedSource_CV(std::vector<Source*>& sources,ImgBkgData* bkgDa
 		}//close if
 
 		//Find and remove sources with flux below the input image median (THIS COULD BE IMPROVED!)
-		std::vector<int> sourcesToBeRemoved;		
+		std::vector<size_t> sourcesToBeRemoved;		
 		int imgMedian= m_Stats->median;
 		for(size_t k=0;k<sources.size();k++){
 			//Tag sources as extended

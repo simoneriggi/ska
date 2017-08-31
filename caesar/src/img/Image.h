@@ -78,7 +78,114 @@ namespace cv {
 namespace Caesar{
 
 
-//class Image : public TObject {
+class ImgRange : public TObject {
+
+	public:
+		/** 
+		\brief Constructor
+ 		*/
+		ImgRange() {
+			Init();	
+		}
+		/** 
+		\brief Parametric constructor
+ 		*/
+		ImgRange(long int _nx,long int _ny,float _smin,float _smax,float _xlow,float _ylow)
+			: nx(_nx), ny(_ny), smin(_smin), smax(_smax), xlow(_xlow), ylow(_ylow)
+		{
+			if(nx<=0 || ny<=0 || smin>=smax){
+				std::stringstream ss;
+				ss<<"Invalid image size (<=0) or signal range (given!";
+				ERROR_LOG(ss.str());
+				throw std::out_of_range(ss.str().c_str());
+			}
+		}
+
+		/** 
+		\brief Parametric constructor
+ 		*/
+		ImgRange(long int _nx,long int _ny,float _smin,float _smax)
+			: nx(_nx), ny(_ny), smin(_smin), smax(_smax)
+		{
+			if(nx<=0 || ny<=0){
+				std::stringstream ss;
+				ss<<"Invalid image size (<=0) or signal range given!";
+				ERROR_LOG(ss.str());
+				throw std::out_of_range(ss.str().c_str());
+			}
+			xlow= 0;
+			ylow= 0;
+		}
+
+		/** 
+		\brief Parametric constructor
+ 		*/
+		ImgRange(float _smin,float _smax,float _xlow,float _xup,float _ylow,float _yup)
+			: smin(_smin), smax(_smax), xlow(_xlow), ylow(_ylow)
+		{
+			nx= static_cast<long int>(_xup-xlow+1);
+			ny= static_cast<long int>(_yup-ylow+1);
+			if(nx<=0 || ny<=0 || xlow>=_xup || ylow>=_yup || smin>=smax){
+				std::stringstream ss;
+				ss<<"Invalid image size (<=0) or range given!";
+				ERROR_LOG(ss.str());
+				throw std::out_of_range(ss.str().c_str());
+			}
+		}
+		
+		/** 
+		\brief Destructor
+ 		*/
+		virtual ~ImgRange(){}
+
+	public:
+		/** 
+		\brief Get range
+ 		*/
+		void GetRange(float& xmin,float& xmax,float& ymin,float& ymax){
+			xmin= xlow;
+			xmax= xlow + nx - 1;
+			ymin= ylow;
+			ymax= ylow + ny - 1;
+		}
+		/** 
+		\brief Get signal range
+ 		*/
+		void GetSRange(float& _smin,float& _smax){
+			smin= _smin;
+			smax= _smax;
+		}
+
+	private:		
+		/** 
+		\brief Initialize members
+ 		*/
+		void Init(){
+			nx= 0;
+			ny= 0;
+			xlow= 0;
+			ylow= 0;
+			smin= 0;
+			smax= 0;
+		}
+
+	public:
+		long int nx;
+		long int ny;
+		float smin;
+		float smax;
+		float xlow;
+		float ylow;
+
+	ClassDef(ImgRange,1)
+		
+};//close ImgRange()
+
+#ifdef __MAKECINT__
+#pragma link C++ class ImgRange+;
+#endif
+
+
 class Image : public TNamed {
 
   public:
@@ -191,22 +298,48 @@ class Image : public TNamed {
 		//================================
 		//==       Utils method  
 		//================================
+		/**
+		* \brief Get x value corresponding to pixel bin x (NB: if no x offset is given it should return the same bin)
+		*/
 		float GetX(long int binx){
 			return GetXmin() + binx;
 		}
+		/**
+		* \brief Get y value corresponding to pixel bin y (NB: if no y offset is given it should return the same bin)
+		*/
 		float GetY(long int biny){
 			return GetYmin() + biny;
 		}
+		/**
+		* \brief Get global bin corresponding to x & y bins
+		*/
 		long int GetBin(long int binx,long int biny){
 			return binx + biny*m_Nx;
-		}	
+		}		
+		/**
+		* \brief Get bin x corresponding to global bin
+		*/
 		long int GetBinX(long int gbin){
 			return gbin % m_Nx;
 		}
+		/**
+		* \brief Get bin y corresponding to global bin
+		*/
 		long int GetBinY(long int gbin){
 			long binx= GetBinX(gbin);
 			return ((gbin-binx)/m_Nx)%m_Ny;
 		}	
+
+		/**
+		* \brief Check if this and a given image have the same binnings (and also range if required)
+		*/
+		long int HasSameBinning(Image* img,bool checkRange=false){
+			bool hasSameBins= (
+				(m_Nx==img->GetNx() && m_Ny==img->GetNy()) &&
+				(!checkRange || (checkRange && m_Xmin==img->GetXmin() && m_Ymin==img->GetYmin()) )
+			);
+			return hasSameBins;
+		}
 
 		/**
 		* \brief Get pixel value
@@ -366,8 +499,8 @@ class Image : public TNamed {
 				WARN_LOG("Cannot find bin (x,y)=("<<x<<","<<y<<") (hint: overflow/underflow bins)!");
 				return -1;
 			}
-			long int binx= static_cast<long int>( m_Nx*(x-xmin)/(xmax-xmin) );
-			long int biny= static_cast<long int>( m_Ny*(y-ymin)/(ymax-ymin) );
+			long int binx= static_cast<long int>( (m_Nx-1)*(x-xmin)/(xmax-xmin) );
+			long int biny= static_cast<long int>( (m_Ny-1)*(y-ymin)/(ymax-ymin) );
 			long int gbin= GetBin(binx,biny); 
 			return gbin;
 		}
@@ -422,9 +555,13 @@ class Image : public TNamed {
 		/**
 		* \brief Fill pixels (to be used to compute stats at fill time)
 		*/
-		void FillFromMat(cv::Mat&,bool useNegativePixInStats=true);
+		int FillFromMat(cv::Mat&,bool useNegativePixInStats=true);
 
-		
+		/**
+		* \brief Fill pixels (to be used to compute stats at fill time)
+		*/
+		int FillFromTMatrix(TMatrixD&,bool useNegativePixInStats=true);
+
 
 		//================================
 		//==       READ/WRITE methods
@@ -596,6 +733,10 @@ class Image : public TNamed {
 		//==    SOURCE FINDING METHODS           ==
 		//=========================================
 		/**
+		* \brief Find compact sources by thresholding
+		*/
+		int FindCompactSource(std::vector<Source*>&,double thr,int minPixels=10);
+		/**
 		* \brief Find compact sources
 		*/
 		int FindCompactSource(std::vector<Source*>&,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,bool findNestedSources=false,double nestedBlobThrFactor=1);
@@ -607,7 +748,7 @@ class Image : public TNamed {
 		/**
 		* \brief Find extended sources with ChanVese method
 		*/
-		int FindExtendedSource_CV(std::vector<Source*>&,ImgBkgData* bkgData=0,int minPixels=10,bool findNegativeExcess=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1);
+		int FindExtendedSource_CV(std::vector<Source*>&,Image* initSegmImg=0,ImgBkgData* bkgData=0,int minPixels=10,bool findNegativeExcess=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1);
 
 		/**
 		* \brief Find extended sources with Hierarchical Clustering method
