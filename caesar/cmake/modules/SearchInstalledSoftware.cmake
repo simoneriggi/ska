@@ -137,23 +137,12 @@ option(BUILD_APPS "Enable building of Caesar applications in apps dir" ON)
 if(BUILD_APPS)
 	add_definitions(-DBUILD_CAESAR_APPS)
 
-	#============================
-	#==   Check for MPI       ===
-	#============================
-	MESSAGE(STATUS "Looking for MPI...")
-	find_package(MPI REQUIRED)
-	IF (NOT MPI_FOUND)
-		MESSAGE(SEND_ERROR "MPI not found!")
-	endif()
-	MESSAGE(STATUS "MPI_CXX_INCLUDE_PATH: ${MPI_CXX_INCLUDE_PATH}")
-	MESSAGE(STATUS "MPI_LIBRARIES: ${MPI_LIBRARIES}")
-	MESSAGE(STATUS "MPI_CXX_LIBRARIES: ${MPI_CXX_LIBRARIES}")
-
+	
 endif()
 
-#=======================================
-#==   SET BUILD APPS OPTION          ===
-#=======================================
+#==============================================
+#==   ENABLE OPENMP OPTION?                 ===
+#==============================================
 option(BUILD_WITH_OPENMP "Enable building of Caesar with OpenMP" OFF)
 if(BUILD_WITH_OPENMP)
 	MESSAGE(STATUS "Looking for OpenMP")
@@ -161,9 +150,31 @@ if(BUILD_WITH_OPENMP)
 	if(OPENMP_FOUND)
 		MESSAGE(STATUS "OpenMP found, defining preprocessor flag OPENMP_ENABLED")
 		add_definitions(-DOPENMP_ENABLED=1)
+	else()
+		MESSAGE(SEND_ERROR "OPENMP not found!")
 	endif()
 endif()
 
+
+#==============================================
+#==   ENABLE MPI OPTION?                    ===
+#==============================================
+option(ENABLE_MPI "Enable building of Caesar MPI components" OFF)
+if(ENABLE_MPI)
+	MESSAGE(STATUS "Looking for MPI")
+
+	find_package(MPI REQUIRED)
+	if(MPI_FOUND)
+		MESSAGE(STATUS "MPI found, defining preprocessor flag MPI_ENABLED")
+		add_definitions(-DMPI_ENABLED=1)
+	else()
+		MESSAGE(SEND_ERROR "MPI not found!")
+	endif()
+		
+	#MESSAGE(STATUS "MPI_CXX_INCLUDE_PATH: ${MPI_CXX_INCLUDE_PATH}")
+	#MESSAGE(STATUS "MPI_LIBRARIES: ${MPI_LIBRARIES}")
+	#MESSAGE(STATUS "MPI_CXX_LIBRARIES: ${MPI_CXX_LIBRARIES}")
+endif()
 
 #======================================
 #==   Check for Google Test         ===

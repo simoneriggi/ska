@@ -233,7 +233,6 @@
 #pragma link C++ class Caesar::SLICSimilarityData+;
 #pragma link C++ enum Caesar::SLICEdgeModel+;
 #pragma link C++ class Caesar::SLIC+;
-#pragma link C++ class Caesar::SLICUtils+;
 #pragma link C++ class Caesar::SLICSegmenter+;
 
 //blob/source finder
@@ -243,6 +242,7 @@
 
 //ChanVese segmenter
 #pragma link C++ class Caesar::ChanVeseSegmenter+;
+#pragma link C++ class Caesar::LRACSegmenter+;
 //======================
 
 //ChanVese segmenter

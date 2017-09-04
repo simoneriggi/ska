@@ -94,6 +94,17 @@ if(BUILD_WITH_OPENMP AND OPENMP_FOUND)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
+#===================================================
+#==   INCLUDE MPI FLAGS?
+#===================================================
+if(ENABLE_MPI AND MPI_FOUND)
+	
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_C_COMPILE_FLAGS}")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
+
+endif()
+
 #==============================================================================================
 #===          SET INCLUDES & LIBS
 #==============================================================================================
@@ -155,6 +166,10 @@ if (ENABLE_TEST)
 	list (APPEND INCLUDE_DIRS ${GTEST_INCLUDE_DIRS})
 endif()
 
+if (ENABLE_MPI)
+	list (APPEND INCLUDE_DIRS ${MPI_CXX_INCLUDE_PATH})
+endif()
+
 
 ##if(ENABLE_SERVER)
 ##	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
@@ -188,6 +203,10 @@ list (APPEND LINKED_LIBS ${CFITSIO_LIBRARIES})
 list (APPEND LINKED_LIBS ${PROTOBUF_LIBRARIES})
 if (ENABLE_TEST)
   list (APPEND LINKED_LIBS ${GTEST_BOTH_LIBRARIES})
+endif()
+
+if (ENABLE_MPI)
+	list (APPEND LINKED_LIBS ${MPI_CXX_LIBRARIES})
 endif()
 
 ##if(ENABLE_SERVER)
