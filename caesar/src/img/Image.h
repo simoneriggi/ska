@@ -216,12 +216,11 @@ class Image : public TNamed {
 		/**
 		* \brief Set image name
 		*/
-		//void SetName(std::string name){m_name= name;}
 		void SetName(std::string name){TNamed::SetName(name.c_str());}
+		
 		/**
 		* \brief Get image name
 		*/
-		//std::string GetName(){return m_name;}
 		std::string GetName(){return std::string(TNamed::GetName());}
 
 		/**
@@ -581,7 +580,7 @@ class Image : public TNamed {
 		/**
 		* \brief Read image from an image file
 		*/
-		//int ReadImageFile(std::string filename);
+		int ReadFile(std::string filename,bool invert=false);
 
 		//================================
 		//==       METADATA methods
@@ -748,7 +747,7 @@ class Image : public TNamed {
 		/**
 		* \brief Find extended sources with ChanVese method
 		*/
-		int FindExtendedSource_CV(std::vector<Source*>&,Image* initSegmImg=0,ImgBkgData* bkgData=0,int minPixels=10,bool findNegativeExcess=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1);
+		int FindExtendedSource_CV(std::vector<Source*>&,Image* initSegmImg=0,ImgBkgData* bkgData=0,int minPixels=10,bool findNegativeExcess=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1,int niters=1000);
 
 		/**
 		* \brief Find extended sources with Hierarchical Clustering method

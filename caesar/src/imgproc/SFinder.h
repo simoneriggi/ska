@@ -28,6 +28,8 @@
 #ifndef _SFINDER_h
 #define _SFINDER_h 1
 
+#include <SysUtils.h>
+
 #include <TObject.h>
 #include <TMatrixD.h>
 #include <TApplication.h>
@@ -51,13 +53,16 @@
 #include <time.h>
 #include <ctime>
 
+#ifdef MPI_ENABLED
+#include <mpi.h>
+#endif
 
 namespace Caesar {
 
 class Image;
 class Source;
 class ImgBkgData;
-
+class TaskData;
 
 
 class SFinder : public TObject {
@@ -78,17 +83,25 @@ class SFinder : public TObject {
 		* \brief Run source finder
 		*/
 		int Run();
+	
+		/**
+		* \brief Run source finder in multiprocessor 
+		*/
+		int RunMP();
+		
+		
+		/**
+		* \brief Run source finder task
+		*/
+		int RunTask(TaskData* taskData,bool storeData=false);
+		
 
 		/**
 		* \brief Set options from ConfigParser singleton
 		*/
 		int Configure();
 
-		/**
-		* \brief Read image
-		*/
-		int ReadImage();
-
+		
 		/**
 		* \brief Compute Stats and Bkg info
 		*/
@@ -114,6 +127,11 @@ class SFinder : public TObject {
 	private:
 
 		/**
+		* \brief Clear data
+		*/
+		void Clear();
+
+		/**
 		* \brief Initialize class options from ConfigParser
 		*/
 		void InitOptions();
@@ -127,43 +145,64 @@ class SFinder : public TObject {
 		int Save();	
 
 		/**
+		* \brief Read image
+		*/
+		Image* ReadImage(Caesar::FileInfo& info,std::string filename,std::string imgname="",long int ix_min=-1,long int ix_max=-1,long int iy_min=-1,long int iy_max=-1);
+
+		/**
 		* \brief Save source region file
 		*/
 		int SaveDS9RegionFile();
 
 		/**
+		* \brief Get smoothed image
+		*/
+		Image* ComputeSmoothedImage(Image* inputImg,int model);
+
+		/**
 		* \brief Find sources from input image
 		*/
-		int FindSources(std::vector<Source*>& sources,Image* inputImg,double seedThr,double mergeThr);
+		int FindSources(std::vector<Source*>& sources,Image* inputImg,double seedThr,double mergeThr,Image* searchedImg=0);
 		/**
 		* \brief Find compact sources
 		*/
 		int FindCompactSources();
+		Image* FindCompactSources(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData);
+
 		/**
 		* \brief Compute residual map
 		*/
 		int FindResidualMap();
+		Image* FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<Source*> const & sources);
 
 		/**
 		* \brief Find extended sources
 		*/
 		int FindExtendedSources(Image*);
+		Image* FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,bool storeData=false);
+		
 		/**
 		* \brief Find extended sources with hierarchical clustering method
 		*/
 		int FindExtendedSources_HClust(Image*);
+		Image* FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
+
 		/**
-		* \brief Find extended sources with Chan-Vese method
+		* \brief Find extended sources with Active Contour method
 		*/
-		int FindExtendedSources_ChanVese(Image*);
+		int FindExtendedSources_AC(Image*);
+		Image* FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
+
 		/**
 		* \brief Find extended sources with Wavelet Transform method
 		*/
 		int FindExtendedSources_WT(Image*);
+		Image* FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image* searchedImg=0);
 		/**
 		* \brief Find extended sources with Saliency Map thresholding method
 		*/
 		int FindExtendedSources_SalThr(Image*);
+		Image* FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
 
 		
 		/**
@@ -203,7 +242,30 @@ class SFinder : public TObject {
 		*/
 		void PrintPerformanceStats();
 
+		/**
+		* \brief Prepare worker task data (for MPI run)
+		*/
+		int PrepareWorkerTasks();
+
+		#ifdef MPI_ENABLED
+			/**
+			* \brief Collect task data from workers (for MPI run)
+			*/
+			int GatherTaskDataFromWorkers();
+		#endif
+
+		/**
+		* \brief Merge sources found at each task in collections
+		*/
+		int MergeTaskData();
+
+		/**
+		* \brief Find sources at image edges (for MPI run)
+		*/
+		int FindSourcesAtEdge();
+
 	public:
+		
 		
 		//Input data
 		std::string m_InputFileName;
@@ -211,6 +273,7 @@ class SFinder : public TObject {
 		std::string m_InputFileExtension;
 		int m_InputFileType;
 		Image* m_InputImg;
+		int m_fitsHDUId;
 
 		//Output data
 		TApplication* m_Application;
@@ -259,6 +322,13 @@ class SFinder : public TObject {
 		double m_TileMaxX;
 		double m_TileMinY;
 		double m_TileMaxY;
+
+		//Read distributed options
+		long int m_TileSizeX;
+		long int m_TileSizeY;
+		bool m_UseTileOverlap;
+		double m_TileStepSizeX;
+		double m_TileStepSizeY;
 
 		//Bkg computation
 		ImgBkgData* m_BkgData;
@@ -342,6 +412,7 @@ class SFinder : public TObject {
 		bool m_SearchExtendedSources;
 		int m_ExtendedSearchMethod;
 		int m_wtScaleExtended;
+		int m_activeContourMethod;
 
 		//Superpixel options
 		int m_spSize;
@@ -349,7 +420,8 @@ class SFinder : public TObject {
 		int m_spMinArea;
 		bool m_spUseLogContrast;
 
-		//CHan-Vese options
+		//Chan-Vese options
+		int m_cvNIters;
 		double m_cvTimeStepPar;
 		double m_cvWindowSizePar;
 		double m_cvLambda1Par;
@@ -357,6 +429,12 @@ class SFinder : public TObject {
 		double m_cvMuPar;
 		double m_cvNuPar;
 		double m_cvPPar;
+
+		//LRAC options
+		int m_lracNIters;
+		double m_lracLambdaPar;
+		double m_lracRadiusPar;
+		double m_lracEpsPar;
 
 		//Hierachical clustering data
 		Image* m_LaplImg;
@@ -374,6 +452,29 @@ class SFinder : public TObject {
 		bool m_spMergingAddCurvDist;
 		bool m_spMergingUseRobustPars;
 		
+		//MPI vars
+		int m_nProc;
+		int m_procId;
+		int m_workerRanks;
+		int m_nWorkers;
+		bool m_mpiEnabled;
+		#ifdef MPI_ENABLED
+			MPI_Group m_WorldGroup;
+			MPI_Group m_WorkerGroup;
+			MPI_Comm m_WorkerComm;
+		#endif	
+
+		//Task data
+		std::vector< std::vector<TaskData*> > m_taskDataPerWorkers;
+
+		//Task info tree
+		TTree* m_TaskInfoTree;
+		double m_xmin;
+		double m_xmax;
+		double m_ymin;
+		double m_ymax;
+
+
 	ClassDef(SFinder,1)
 
 };//close SourceFinder

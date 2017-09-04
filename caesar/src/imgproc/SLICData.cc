@@ -27,7 +27,7 @@
 
 #include <SLICData.h>
 #include <Region.h>
-#include <SLICUtils.h>
+#include <SLIC.h>
 #include <Image.h>
 #include <CodeUtils.h>
 #include <Logger.h>
@@ -65,7 +65,6 @@ SLICData::SLICData()
 	edgeImg= 0;
 	laplImg= 0;
 	regions.clear();
-	labels.clear();
 	pixel_labels.clear();
 
 }//close costructor
@@ -144,7 +143,6 @@ void SLICData::Copy(TObject& obj) const
 
 	//## Copy labels
 	DEBUG_LOG("Copying pixel labels...");
-	((SLICData&)obj).labels= labels;
 	((SLICData&)obj).pixel_labels= pixel_labels;
 	
 }//close Copy()
@@ -186,7 +184,6 @@ void SLICData::ClearRegions(){
 		}
 	}
 	regions.clear();
-	labels.clear();
 	pixel_labels.clear();
 
 }//close ClearRegions()
@@ -263,13 +260,6 @@ int SLICData::Init(Image* img,bool useLogScaleMapping,Image* edgeImage){
 	long int npixels= img->GetNPixels();
 	pixel_labels.assign(npixels,0);
 
-	for(long int i=0;i<img->GetNx();i++){
-		labels.push_back( std::vector<long int>() );
-		for(long int j=0;j<img->GetNy();j++){
-			labels[i].push_back(0);
-		}//end loop bins Y
-	}//end loop bins X
-
 	return 0;
 
 }//close Init()
@@ -306,13 +296,6 @@ int SLICData::SetData(Image* img,Image* lapl_img,Image* edge_img){
 	//Set pixel labels to 0	
 	long int npixels= img->GetNPixels();
 	pixel_labels.assign(npixels,0);
-
-	for(long int i=0;i<img->GetNx();i++){
-		labels.push_back( std::vector<long int>() );
-		for(long int j=0;j<img->GetNy();j++){
-			labels[i].push_back(0);
-		}//end loop bins Y
-	}//end loop bins X
 
 	return 0;
 
@@ -611,7 +594,7 @@ int SLICData::SPGenerator(Image* img,int regionSize,double regParam, int minRegi
 			if(edgeImg) edgeImg->GetPixelValue(ix,iy);
 
 			long int label= pixel_labels[id];
-			labels[ix][iy]= label;
+			//labels[ix][iy]= label;
 			
 			if(label<0 || label>=(signed)numRegions){
 				WARN_LOG("Skip label "<<label<<" for pixel ("<<ix<<","<<iy<<")...");
@@ -663,7 +646,7 @@ Image* SLICData::GetSegmentedImage(Image* image,int selectedTag,bool normalize,b
 	}
 
 	//## Compute segmented image
-	return SLICUtils::GetSegmentedImage(image,regions,selectedTag,normalize,binarize);
+	return SLIC::GetSegmentedImage(image,regions,selectedTag,normalize,binarize);
 
 }//close GetSegmentedImage()
 
@@ -720,7 +703,7 @@ void SLICData::RemoveEmptyRegions(){
 	#ifdef OPENMP_ENABLED
 	#pragma omp parallel for
 	#endif
-	for (long int i=0; i<pixel_labels.size(); i++) {
+	for (size_t i=0; i<pixel_labels.size(); i++) {
 		long int labelId= pixel_labels[i];		
 		long int corrFactor= goodRegionIdMap[labelId];		
 		pixel_labels[i]*= corrFactor;

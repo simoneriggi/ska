@@ -3,8 +3,10 @@ set(INC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ## GET SOURCES and HEADERS
-file(GLOB_RECURSE THIS_SRCS ${SRC_DIR}/*.cc)
-file(GLOB_RECURSE THIS_HEADERS ${INC_DIR}/*.h)
+#file(GLOB_RECURSE THIS_SRCS ${SRC_DIR}/*.cc)
+#file(GLOB_RECURSE THIS_HEADERS ${INC_DIR}/*.h)
+file(GLOB THIS_SRCS ${SRC_DIR}/*.cc)
+file(GLOB THIS_HEADERS ${INC_DIR}/*.h)
 set(
 	THIS_DICT_HEADERS 
 	${THIS_DICT_HEADERS} 
@@ -12,7 +14,6 @@ set(
 	BkgData.h 
 	SLIC.h 
 	SLICData.h 
-	SLICUtils.h 
 	Pixel.h 
 	Region.h
 	Blob.h
@@ -22,6 +23,7 @@ set(
 	Contour.h
 	ChanVeseSegmenter.h
 	SLICSegmenter.h
+	LRACSegmenter.h
 )
 set(
 	THIS_DICT_SRCS 
@@ -30,7 +32,6 @@ set(
 	${SRC_DIR}/BkgData.cc 
 	${SRC_DIR}/SLIC.cc 
 	${SRC_DIR}/SLICData.cc
-	${SRC_DIR}/SLICUtils.cc
 	${SRC_DIR}/Pixel.cc 
 	${SRC_DIR}/Region.cc	
 	${SRC_DIR}/Blob.cc
@@ -40,6 +41,7 @@ set(
 	${SRC_DIR}/Contour.cc
 	${SRC_DIR}/ChanVeseSegmenter.cc
 	${SRC_DIR}/SLICSegmenter.cc
+	${SRC_DIR}/LRACSegmenter.cc
 )
 
 set(THIS_HEADERS_WPATH "")

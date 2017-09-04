@@ -65,6 +65,7 @@ class ChanVeseSegmenter : public TObject {
   		double mu; // contour length weighting parameter
   		double nu; // region area weighting parameter
   		unsigned int p; // length weight exponent
+			int niters;
 		};
 
 		struct CVdata {
@@ -95,7 +96,7 @@ class ChanVeseSegmenter : public TObject {
 		/**
 		* \brief Find the ChanVese segmentation of input image
 		*/
-		static Image* FindSegmentation(Image* img,Image* initSegmImg=0,bool returnContourImg=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1,double initContourRadius=1);
+		static Image* FindSegmentation(Image* img,Image* initSegmImg=0,bool returnContourImg=false,double dt=0.1,double h=1,double lambda1=1.0,double lambda2=2.0,double mu=0.5,double nu=0,double p=1,int nIterations=1000);
 
 		
 
@@ -104,7 +105,7 @@ class ChanVeseSegmenter : public TObject {
 		/**
 		* \brief Initialize algorithm
 		*/
-		static CVdata* Init(Image* img,Image* initSegmImg=0,double initContourRadius=1);
+		static CVdata* Init(Image* img,Image* initSegmImg=0);
 
 
 		//===============================================

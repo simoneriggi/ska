@@ -100,9 +100,11 @@ int FITSReader::Read(Caesar::Image& img,Caesar::FITSFileInfo& fits_info,std::str
 	std::string filename_wfilter= filename;
 	if(!readFull){
 		std::stringstream ss;
-		ss<<filename<<"["<<ix_min<<":"<<ix_max<<","<<iy_min<<":"<<iy_max<<"]";
+		//ss<<filename<<"["<<ix_min<<":"<<ix_max<<","<<iy_min<<":"<<iy_max<<"]";
+		ss<<filename<<"["<<ix_min+1<<":"<<ix_max+1<<","<<iy_min+1<<":"<<iy_max+1<<"]";
 		filename_wfilter= ss.str();
 	}
+	INFO_LOG("Reading image "<<filename_wfilter<<"...");
 
 	//## Init vars
 	fitsfile* fp= 0;
@@ -196,7 +198,8 @@ int FITSReader::ReadImage(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile* f
 		xlow= ix_min;
 		ylow= iy_min;
 		std::stringstream ss;
-		ss<<filename<<"["<<ix_min<<":"<<ix_max<<","<<iy_min<<":"<<iy_max<<"]";
+		//ss<<filename<<"["<<ix_min<<":"<<ix_max<<","<<iy_min<<":"<<iy_max<<"]";	
+		ss<<filename<<"["<<ix_min+1<<":"<<ix_max+1<<","<<iy_min+1<<":"<<iy_max+1<<"]";
 		filename_wfilter= ss.str();
 	}
 	INFO_LOG("Reading image data (Nx x Ny)=("<<ImgSizeX<<","<<ImgSizeY<<")");
@@ -368,7 +371,7 @@ int FITSReader::ReadAndFillImageData(Image& img,long int Nx,long int Ny,fitsfile
 
 	//Check pointer
 	if(!fp) {
-		ERROR_LOG("Null ptr to FITS file given!");
+		ERROR_LOG("Null ptr to  FITS file given!");
 		return -1;
 	}
 	
@@ -388,7 +391,8 @@ int FITSReader::ReadAndFillImageData(Image& img,long int Nx,long int Ny,fitsfile
 		int read_status= 0;
 		fits_read_pix(fp,TFLOAT,fpixel,bufsize,(void*)&nullval,(void*)buffer,&anynull, &read_status);
 		if(read_status){
-			ERROR_LOG("Failed to read FITS image data row "<<j<<", skip...");
+			ERROR_LOG("Failed to read FITS image data row "<<j<<" (bufsize="<<bufsize<<"), skip...");
+			HandleError(read_status,fp);
 			err_flag++;
 			continue;
 		}

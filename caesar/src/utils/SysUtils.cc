@@ -44,6 +44,11 @@
   #include <omp.h>
 #endif
 
+//MPI headers
+#ifdef MPI_ENABLED
+	#include <mpi.h>
+#endif
+
 //C++ headers
 #include <iomanip>
 #include <iostream>
@@ -220,6 +225,25 @@ int SysUtils::GetOMPThreadId(){
 
 }//close GetOMPThreadId()
 
+bool SysUtils::IsMPIInitialized(){
+
+	bool isInitialized= false;
+	#ifdef MPI_ENABLED
+		int mpi_init_flag= 0;
+		MPI_Initialized(&mpi_init_flag);
+		if(mpi_init_flag==1) {
+			INFO_LOG("MPI is initialized for this run...");
+			isInitialized= true;	
+		}
+		else {
+			WARN_LOG("MPI was not initialized for this run (hint: call MPI_Init), will run on single processor...");
+			isInitialized= false;
+		}
+	#endif
+	
+	return isInitialized;
+
+}//close IsMPIInitialized()
 
 }//close namespace
 

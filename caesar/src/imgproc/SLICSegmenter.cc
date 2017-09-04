@@ -30,7 +30,7 @@
 #include <SLICSegmenter.h>
 #include <Region.h>
 #include <SLICData.h>
-#include <SLICUtils.h>
+#include <SLIC.h>
 #include <StatsUtils.h>
 #include <CodeUtils.h>
 #include <Image.h>
@@ -144,7 +144,7 @@ int SLICSegmenter::FindSegmentation(SLICData const& slicData,SLICData& segmSlicD
 	int nBkg= 0;
 	int nUntagged= 0;
 	INFO_LOG("Counting tagged regions after adaptive merging stage...");
-	SLICUtils::CountTaggedRegions(slicData_segmMultiStep->regions,nSig,nBkg,nUntagged);
+	SLIC::CountTaggedRegions(slicData_segmMultiStep->regions,nSig,nBkg,nUntagged);
 	if(nSig<=0 || slicData_segmMultiStep->GetNRegions()<=1){
 		WARN_LOG("No signal regions (or no regions) found after adaptive merging, stop processing.");
 		delete slicData_segmMultiStep;
@@ -308,7 +308,7 @@ int SLICSegmenter::MultiStepSPMerger(SLICData const& slicData,SLICData& segmSlic
 	int nSig= 0;
 	int nBkg= 0;
 	int nUntagged= 0;
-	int status= SLICUtils::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
+	int status= SLIC::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
 	if(status<0 || (nSig==0 && nBkg==0) ){
 		ERROR_LOG("Regions are not tagged (hint: you must tag regions before running segmentation)!");
 		return -1;
@@ -332,7 +332,7 @@ int SLICSegmenter::MultiStepSPMerger(SLICData const& slicData,SLICData& segmSlic
 		//## Update tagging stats
 		nTotMergedRegions= 0;
 		if(stageCounter>0){
-			SLICUtils::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
+			SLIC::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
 		}
 		stageCounter++;
 		INFO_LOG("Stage no. "<<stageCounter<<" NR="<<segmSlicData.GetNRegions()<<": (nBkg,nSig,nUntagged)=("<<nBkg<<","<<nSig<<","<<nUntagged<<")");
@@ -356,7 +356,7 @@ int SLICSegmenter::MultiStepSPMerger(SLICData const& slicData,SLICData& segmSlic
 		}//close if	
 
 		//Update tagging stats
-		SLICUtils::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
+		SLIC::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
 		INFO_LOG("After 1st stage: NR="<<segmSlicData.GetNRegions()<<": (nBkg,nSig,nUntagged)=("<<nBkg<<","<<nSig<<","<<nUntagged<<")");
 		
 		//## == STAGE 2 ==
@@ -378,7 +378,7 @@ int SLICSegmenter::MultiStepSPMerger(SLICData const& slicData,SLICData& segmSlic
 		}//close if
 		
 		//Update tagging stats
-		SLICUtils::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
+		SLIC::CountTaggedRegions(segmSlicData.regions,nSig,nBkg,nUntagged);
 		INFO_LOG("After 2nd stage: NR="<<segmSlicData.GetNRegions()<<": (nBkg,nSig,nUntagged)=("<<nBkg<<","<<nSig<<","<<nUntagged<<")");
 	
 		//## Check end condition
@@ -414,7 +414,7 @@ int SLICSegmenter::SPMaxSimilarityMerger(SLICData& segmSlicData,int mergerTag,in
 	
 	//## Compute region contour info (neighbors, ...)
 	INFO_LOG("Finding region neighbors (NR="<<nRegions<<") ...");
-	SLICContourData* contourData= SLICUtils::ComputeBoundaryContours(&segmSlicData);
+	SLICContourData* contourData= SLIC::ComputeBoundaryContours(&segmSlicData);
 	if(!contourData){
 		ERROR_LOG("Failed to compute the slic contour data!");
 		return -1;
@@ -425,7 +425,7 @@ int SLICSegmenter::SPMaxSimilarityMerger(SLICData& segmSlicData,int mergerTag,in
 	int selectedTag= -1;//mergedTag
 	bool normalizeParams= true;
 	
-	int status= SLICUtils::FindNeighbors(neighbors,&segmSlicData,contourData,use2ndNeighborsInSPMerging,selectedTag,SPMergingIncludeSpatialPars,normalizeParams,SPMergingUseRobustPars,SPMergingUseCurvDist);
+	int status= SLIC::FindNeighbors(neighbors,&segmSlicData,contourData,use2ndNeighborsInSPMerging,selectedTag,SPMergingIncludeSpatialPars,normalizeParams,SPMergingUseRobustPars,SPMergingUseCurvDist);
 	if(status<0){
 		ERROR_LOG("Failed to find neighbors list!");
 		return -1;
@@ -440,7 +440,7 @@ int SLICSegmenter::SPMaxSimilarityMerger(SLICData& segmSlicData,int mergerTag,in
 
 	//## Compute similarity matrix	
 	INFO_LOG("Compute region similarity matrix...");
-	SLICSimilarityData* similarityData= SLICUtils::ComputeRegionSimilarity(&segmSlicData,neighbors,SPMergingRegularization);
+	SLICSimilarityData* similarityData= SLIC::ComputeRegionSimilarity(&segmSlicData,neighbors,SPMergingRegularization);
 	if(!similarityData){
 		ERROR_LOG("Failed to compute region similarity matrix, cannot perform region merging!");
 		return -1;
@@ -661,12 +661,12 @@ int SLICSegmenter::SPHierarchicalMerger(SLICData& slicData,int mergerTag,int mer
 
 		//## Compute region contour info (neighbors, ...)
 		INFO_LOG("Finding region neighbors at hierarchy level "<<hierarchyLevel<<", NR="<<slicData.GetNRegions()<<" ...");
-		SLICContourData* contourData= SLICUtils::ComputeBoundaryContours(&slicData);
+		SLICContourData* contourData= SLIC::ComputeBoundaryContours(&slicData);
 		
 		//## Find neighbors list
 		SLICNeighborCollections neighbors;
 		int selectedTag= mergedTag;
-		int status= SLICUtils::FindNeighbors(neighbors,&slicData,contourData,use2ndNeighborsInSPMerging,selectedTag,SPMergingIncludeSpatialPars,normalizeParams,SPMergingUseRobustPars,SPMergingUseCurvDist);
+		int status= SLIC::FindNeighbors(neighbors,&slicData,contourData,use2ndNeighborsInSPMerging,selectedTag,SPMergingIncludeSpatialPars,normalizeParams,SPMergingUseRobustPars,SPMergingUseCurvDist);
 		if(status<0){
 			ERROR_LOG("Failed to find neighbors list!");
 			return -1;
@@ -679,7 +679,7 @@ int SLICSegmenter::SPHierarchicalMerger(SLICData& slicData,int mergerTag,int mer
 		
 		//## Compute similarity matrix	
 		INFO_LOG("Compute region similarity at hierarchy level "<<hierarchyLevel<<" ...");
-		SLICSimilarityData* similarityData= SLICUtils::ComputeRegionSimilarity(&slicData,neighbors,SPMergingRegularization);
+		SLICSimilarityData* similarityData= SLIC::ComputeRegionSimilarity(&slicData,neighbors,SPMergingRegularization);
 		if(!similarityData){
 			ERROR_LOG("Failed to compute region similarity matrix, cannot perform region hierarchical merging!");
 			return -1;

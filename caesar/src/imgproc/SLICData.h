@@ -311,15 +311,13 @@ class SLICData : public TObject {
 		Image* laplImg; 
 
 		//- Matrix with pixel region labels (size=image size)
-		//TMatrixD* pixelLabels;
-		std::vector< std::vector<long int> > labels;
 		std::vector<long int> pixel_labels;
 
 		//- The list of generated superpixels
 		std::vector<Region*> regions;
 
 	
-	friend class SLICUtils;
+	friend class SLIC;
 
 		ClassDef(SLICData,1)
 
@@ -613,31 +611,20 @@ class SLICSimilarityData : public TObject {
 
 	public:
 	
-		SLICSimilarityData(){
-			//DissimilarityMatrix= 0;
+		SLICSimilarityData()
+		{
 			AdjacencyMatrix= 0;
-			//AbsDissimilarityMatrix= 0;
-			//SaliencyDissimilarityMatrix= 0;
-			//NeighborMatrix= 0;
 		}
-		virtual ~SLICSimilarityData() { 
-			//if(DissimilarityMatrix) DissimilarityMatrix->Delete();
+
+		virtual ~SLICSimilarityData() 
+		{ 
+			//Clear matrix
 			if(AdjacencyMatrix) AdjacencyMatrix->Delete();
-			//if(AbsDissimilarityMatrix) AbsDissimilarityMatrix->Delete();
-			//if(SaliencyDissimilarityMatrix) SaliencyDissimilarityMatrix->Delete();
-			//if(NeighborMatrix) NeighborMatrix->Delete();
-			//cout<<"SLICUtils::~SLICSimilarityData(): Clearing vector..."<<endl;
-			//DissimilaritySortIndexMatrix.clear();
 		}
 
 	public:
-		//TMatrixD* DissimilarityMatrix;
+
 		TMatrixD* AdjacencyMatrix;
-		//TMatrixD* AbsDissimilarityMatrix;
-		//TMatrixD* SaliencyDissimilarityMatrix;
-		//TMatrixD* NeighborMatrix;
-		//std::vector< std::vector<int> > DissimilaritySortIndexMatrix;
-		//std::vector<double> saliencyList;
 		double Dmin;
 		double Dmax;
 		double Dmedian;

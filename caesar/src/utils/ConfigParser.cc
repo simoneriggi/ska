@@ -140,6 +140,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//=====================
 		REGISTER_OPTION(inputFile,std::string,"","","");
 		REGISTER_OPTION(inputImage,std::string,"img","","");
+		REGISTER_OPTION(fitsHDUId,int,1,1,1000);
 		REGISTER_OPTION(outputFile,std::string,"Output.root","","");
 		REGISTER_OPTION(ds9RegionFile,std::string,"DS9SourceRegion.reg","","");
 		REGISTER_OPTION(saveDS9Region,bool,true,false,true);
@@ -243,6 +244,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(extendedSearchMethod,int,2,0,10);		
 		REGISTER_OPTION(useResidualInExtendedSearch,bool,true,false,true);
 		REGISTER_OPTION(wtScaleExtended,int,6,1,10);
+		REGISTER_OPTION(activeContourMethod,int,2,0,3);		
 		
 		//================================
 		//==  Source selection options  ==
@@ -274,6 +276,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//===================================
 		//==  Chan-Vese algorithm options  ==
 		//===================================
+		REGISTER_OPTION(cvNIters,int,1000,0,100000);
 		REGISTER_OPTION(cvTimeStepPar,double,0.007,0,1000);
 		REGISTER_OPTION(cvWindowSizePar,double,1,0,1000);
 		REGISTER_OPTION(cvLambda1Par,double,1,0,100);
@@ -282,6 +285,13 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(cvNuPar,double,0,0,100);
 		REGISTER_OPTION(cvPPar,double,1,0,100);
 
+		//===================================================================
+		//==  Linear Region-based Active Contour (LRAC) algorithm options  ==
+		//===================================================================
+		REGISTER_OPTION(lracNIters,int,1000,0,100000);
+		REGISTER_OPTION(lracLambdaPar,double,0.1,0,1000);
+		REGISTER_OPTION(lracRadiusPar,double,10,0,1000);
+		REGISTER_OPTION(lracEpsPar,double,0.01,0,1000);//Convergence par
 
 		//===================================
 		//==  Saliency filtering options   ==

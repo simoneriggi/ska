@@ -76,7 +76,7 @@ enum ImgSmoothFilter {
 enum SegmAlgo {
 	eWaveletTransform= 1,
 	eHClust= 2,
-	eChanVese= 3,
+	eActiveContour= 3,
 	eSaliencyThr= 4,
 };
 
@@ -109,6 +109,11 @@ enum FileType{
 enum SLICEdgeModel {
 	eKirschEdge= 1,
 	eChanVeseEdge= 2
+};
+
+enum activeContourMethod {
+	eChanVeseAC= 1,
+	eLRAC= 2
 };
 
 enum DS9RegionFormat {

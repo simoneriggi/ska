@@ -397,6 +397,62 @@ int Image::WriteFITS(std::string outfilename){
 }//close WriteFITS()
 
 
+int Image::ReadFile(std::string filename,bool invert){
+
+	//## Detect file extension
+	std::string extension= filename.substr(filename.find_last_of(".") + 1);
+	if(extension!= "png" && extension!="jpg" && extension!="bmp" && extension!="gif" ) {
+		ERROR_LOG("Unknown file extension detected: ext="<<extension<<" (valid ones are png/jpg/bmp/gif)!");
+		return -1;
+	}
+	
+	//## Load image from file and set a matrix
+	cv::Mat mat = cv::imread(filename.c_str(), CV_LOAD_IMAGE_COLOR);
+
+	//## Convert to gray scale
+	cv::Mat mat_gray;
+  cvtColor( mat, mat_gray, CV_RGB2GRAY );
+	//mat.convertTo(mat_gray, CV_32FC1);
+
+	//## Fill an image
+	int Nx= mat.cols;
+	int Ny= mat.rows;
+	
+	this->SetSize(Nx,Ny);
+	
+	if(invert){
+		for(int j=0;j<mat_gray.rows;j++){
+			int rowId= Ny-1-j;
+			for(int i=0;i<mat_gray.cols;i++){
+				int colId= Nx-1-i;
+				//int colId= i;
+				unsigned int matrixElement= mat_gray.at<uchar>(j,i);	
+				//float matrixElement= mat_gray.at<float>(j,i);		
+				long int ix= colId ;
+				long int iy= rowId ;
+				this->FillPixel(ix,iy,matrixElement);
+			}
+		}
+	}//close if
+	else{
+		for(int j=0;j<mat_gray.rows;j++){
+			int rowId= Ny-1-j;
+			for(int i=0;i<mat_gray.cols;i++){
+				//int colId= Nx-1-i;
+				int colId= i;
+				unsigned int matrixElement= mat_gray.at<uchar>(j,i);	
+				//float matrixElement= mat_gray.at<float>(j,i);		
+				long int ix= colId ;
+				long int iy= rowId ;
+				this->FillPixel(ix,iy,matrixElement);
+			}
+		}
+	}
+
+	return 0;
+
+}//close ReadFile()
+
 Image* Image::GetTile(long int ix_min,long int ix_max,long int iy_min,long int iy_max,std::string imgname){
 
 	//Extract pixel rectangular selection
@@ -1611,10 +1667,10 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 
 }//close FindNestedSources()
 
-int Image::FindExtendedSource_CV(std::vector<Source*>& sources,Image* initSegmImg,ImgBkgData* bkgData,int minPixels,bool findNegativeExcess,double dt,double h,double lambda1,double lambda2,double mu,double nu,double p){
+int Image::FindExtendedSource_CV(std::vector<Source*>& sources,Image* initSegmImg,ImgBkgData* bkgData,int minPixels,bool findNegativeExcess,double dt,double h,double lambda1,double lambda2,double mu,double nu,double p,int niters){
 
 	//## Compute segmented image
-	Image* segmentedImg= ChanVeseSegmenter::FindSegmentation(this,initSegmImg,false,dt,h,lambda1,lambda2,mu,nu,p);
+	Image* segmentedImg= ChanVeseSegmenter::FindSegmentation(this,initSegmImg,false,dt,h,lambda1,lambda2,mu,nu,p,niters);
 	if(!segmentedImg){
 		ERROR_LOG("Failed to compute ChanVese image segmentation!");
 		return -1;
@@ -2561,6 +2617,12 @@ int Image::Draw(int palette,bool drawFull,bool useCurrentCanvas,std::string unit
 	//Set palette
 	Caesar::GraphicsUtils::SetPalette(palette);
 
+	//Delete existing object with name=htemp
+	TObject* obj= gROOT->FindObject("htemp");
+	if(obj){
+		obj->Delete();
+	}
+	
 	//Get temp histogram
 	TH2D* htemp= GetHisto2D("htemp");
 	if(!htemp){

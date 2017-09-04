@@ -193,6 +193,11 @@ class SysUtils : public TObject {
 		*/
 		static int GetOMPThreadId();
 
+		/**
+		* \brief Is MPI run initialized (return 0 if MPI is disabled at build)
+		*/
+		static bool IsMPIInitialized();
+
 	private:
 	
 		ClassDef(SysUtils,1)
