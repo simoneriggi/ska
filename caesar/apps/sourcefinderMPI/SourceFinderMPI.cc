@@ -39,7 +39,6 @@
 #include <Logger.h>
 #include <MathUtils.h>
 #include <SLIC.h>
-#include <SLICUtils.h>
 #include <SLICSegmenter.h>
 #include <Consts.h>
 
@@ -1437,7 +1436,7 @@ int SourceFinderMPI::FindExtendedSources(){
 	if(m_ExtendedSearchMethod==eHClust){
 		status= FindExtendedSources_HClust(inputImg);
 	}
-	else if(m_ExtendedSearchMethod==eChanVese){
+	else if(m_ExtendedSearchMethod==eActiveContour){
 		status= FindExtendedSources_ChanVese(inputImg);
 	}
 	else if(m_ExtendedSearchMethod==eWaveletTransform){
