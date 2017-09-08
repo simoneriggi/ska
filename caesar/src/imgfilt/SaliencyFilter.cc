@@ -66,7 +66,6 @@ SaliencyFilter::~SaliencyFilter(){
 //===================================================
 Image* SaliencyFilter::ComputeSaliencyMap(Image* img,int reso,double regFactor,int minRegionSize,double knnFactor,bool useRobust,double expFalloffPar,double distanceRegPar)
 {
-
 	//## Normalize image
 	double NormMin= 1;
 	double NormMax= 256;
@@ -302,8 +301,8 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 }//close ComputeSaliencyMap()
 
 
-Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,bool useRobustPars,double expFalloffPar,double distanceRegPar,double salientMultiplicityThrFactor,bool addBkgMap,bool addNoiseMap,ImgBkgData* bkgData,double saliencyThrFactor,double imgThrFactor){	
-
+Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int resoMax,int resoStep,double beta,int minRegionSize,double knnFactor,bool useRobustPars,double expFalloffPar,double distanceRegPar,double salientMultiplicityThrFactor,bool addBkgMap,bool addNoiseMap,ImgBkgData* bkgData,double saliencyThrFactor,double imgThrFactor)
+{	
 	//## Check input img
 	if(!img){
 		ERROR_LOG("Null ptr to given input image!");
@@ -364,12 +363,12 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 		salMap_norm->ComputeStats(true,false,false);
 		double salMedian= (salMap_norm->GetPixelStats())->median;
 		double medianThr= saliencyThrFactor*salMedian;
-		//double otsuThr= salMap_norm->FindOtsuThreshold(nbins);
-		//double valleyThr= salMap_norm->FindValleyThreshold(nbins,true);
-		//double salThr= std::max(medianThr,otsuThr);
-		//double salThr= std::max(std::min(otsuThr,valleyThr),medianThr);
 		double salThr= medianThr;
 		salMapsThresholds.push_back(salThr);
+
+		INFO_LOG("Saliency map norm stats @ reso "<<reso<<" (median="<<salMedian<<", salThr="<<salThr<<")");
+		salMap_norm->PrintStats();
+		
 
 	}//end loop reso
 	
@@ -395,8 +394,8 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 			double imgBinContent= img->GetBinContent(i,j);	
 			if(imgBinContent==0) continue;
 			bool isPositiveExcess= (imgBinContent>imgMedianThr);
-			double wmin= 1.e+99;
-			double wmax= -1.e+99;
+			double wmin= TMath::Infinity();//1.e+99;
+			double wmax= -TMath::Infinity();//-1.e+99;
 			int saliencyMultiplicity= 0;
 			for(size_t k=0;k<salMaps.size();k++){
 				double thisw= salMaps[k]->GetBinContent(i,j);
@@ -406,6 +405,10 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 				if(thisw>=wmax) wmax= thisw;
 			}//end loop multi reso
 			
+			if(fabs(wmin)==TMath::Infinity() || fabs(wmax)==TMath::Infinity()){
+				WARN_LOG("Saliency min/max over scales for pixel ("<<i<<","<<j<<") is inf!");
+			}
+
 			if(saliencyMultiplicity>=salientMultiplicityThr){
 				if(isPositiveExcess) saliencyImg->SetBinContent(i,j,wmax);
 				else saliencyImg->SetBinContent(i,j,minSaliency);
@@ -424,8 +427,8 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	salMaps.clear();
 	
 	//Normalize bkg and noise maps
-	if(addBkgMap){
-		INFO_LOG("Normalize bkg map ...");
+	if(addBkgMap && bkgData && bkgData->BkgMap){
+		INFO_LOG("Normalize and add bkg map to saliency estimate...");
 		Image* bkgImg= (bkgData->BkgMap)->GetNormalizedImage("LINEAR",NormMin,NormMax);
 		if(bkgImg){
 			INFO_LOG("Adding bkg map to saliency estimate...");
@@ -437,7 +440,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 		}
 	}//close if
 
-	if(addNoiseMap){
+	if(addNoiseMap && bkgData && bkgData->NoiseMap){
 		INFO_LOG("Normalize and add noise map to saliency estimate...");
 		Image* noiseImg= (bkgData->NoiseMap)->GetNormalizedImage("LINEAR",NormMin,NormMax);
 		if(noiseImg){
@@ -449,6 +452,10 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 		}
 	}//close if
 
+	//Compute saliency stats
+	INFO_LOG("Multi-reso combined saliency stats (before normalization and after bkg/noise sum)");
+	saliencyImg->ComputeStats(true,false,true);
+	saliencyImg->PrintStats();
 
 	//Normalize final map
 	DEBUG_LOG("Normalize final maps...");

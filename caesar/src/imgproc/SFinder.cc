@@ -45,6 +45,7 @@
 
 #include <TaskData.h>
 #include <Serializer.h>
+#include <Graph.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -606,7 +607,6 @@ int SFinder::RunTask(TaskData* taskData,bool storeData){
 		INFO_LOG("Searching extended sources...");
 		auto t0_extsfinder = chrono::steady_clock::now();	
 
-		bool storeData= false;
 		segmentedImg= FindExtendedSources(taskImg,bkgData,taskData,storeData);
 		if(!segmentedImg){
 			ERROR_LOG("Extended source search failed!");
@@ -1094,8 +1094,6 @@ Image* SFinder::FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<
 		ERROR_LOG("Failed to compute residual map!");
 		return nullptr;
 	}
-	//m_ResidualImg= residualImg;
-	
 	
 	return residualImg;
 
@@ -1178,42 +1176,103 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 		return nullptr;
 	}
 
-	int status= 0;
-	bool stop= false;
-	Image* residualImg= 0;
-	ImgBkgData* residualBkgData= 0;
-	Image* smoothedImg= 0;
-	Image* searchImg= 0;
-	Image* segmentedImg= 0;
+	//## Check segmentation method
+	std::vector<int> segmMethods= {eHClust,eActiveContour,eWaveletTransform,eSaliencyThr};
+	bool foundMethod= false;
+	for(size_t i=0;i<segmMethods.size();i++){
+		if(m_ExtendedSearchMethod==segmMethods[i]){
+			foundMethod= true;
+			break;
+		}
+	}
+	if(!foundMethod){
+		ERROR_LOG("Invalid extended source method selected (method="<<m_ExtendedSearchMethod<<")!");
+		return nullptr;
+	}
 
+
+	//int status= 0;
+	//bool stop= false;
+	Image* searchImg= 0;
+	
 	//****************************
 	//** Find residual map
 	//****************************
-	INFO_LOG("Computing residual image stats & bkg...");
-	residualImg= FindResidualMap(inputImg,bkgData,taskData->sources);
+	INFO_LOG("Computing residual image ...");
+	Image* residualImg= FindResidualMap(inputImg,bkgData,taskData->sources);
+	if(!residualImg){
+		ERROR_LOG("Residual map computation failed!");
+		return nullptr;
+	}
+	if(storeData) m_ResidualImg= residualImg;
+	searchImg= residualImg;
+
+	/*
 	if(residualImg){
+		if(storeData) m_ResidualImg= residualImg;
 		searchImg= residualImg;
 	}
 	else{
 		ERROR_LOG("Residual map computation failed!");
-		stop= true;
-		status= -1;
+		return nullptr;
+		//stop= true;
+		//status= -1;
 	}
+	*/
+
 
 	//Compute bkg & noise map for residual img
+	INFO_LOG("Computing residual image stats & bkg...");
+	ImgBkgData* residualBkgData= ComputeStatsAndBkg(residualImg);
+	if(!residualBkgData){
+		ERROR_LOG("Failed to compute bkg data for residual map!");
+		if(residualImg && !storeData){
+			delete residualImg;
+			residualImg= 0;
+		}
+		return nullptr;
+	}
+	if(storeData) m_ResidualBkgData= residualBkgData;
+
+	/*
 	if(!stop && residualImg){
 		INFO_LOG("Computing residual image stats & bkg...");
 	 	residualBkgData= ComputeStatsAndBkg(residualImg);
-		if(!residualBkgData){
+		if(residualBkgData){
+			if(storeData) m_ResidualBkgData= residualBkgData;
+		}
+		else{
 			ERROR_LOG("Failed to compute bkg data for residual map!");
 			stop= true;
 			status= -1;		
 		}	
 	}
-	
+	*/
+
 	//****************************
 	//** Smooth image
 	//****************************
+	Image* smoothedImg= 0;
+	if(m_UsePreSmoothing){
+		smoothedImg= ComputeSmoothedImage(residualImg,m_SmoothFilter);
+		if(!smoothedImg){
+			ERROR_LOG("Failed to compute residual smoothed image!");
+			if(residualImg && !storeData){
+				delete residualImg;
+				residualImg= 0;
+			}
+			if(residualBkgData && !storeData){
+				delete residualBkgData;
+				residualBkgData= 0;
+			}
+			return nullptr;
+		}
+
+		//Set extended source search image to smoothed residual image
+		searchImg	= smoothedImg;
+	}
+	
+	/*
 	if(!stop && residualImg && m_UsePreSmoothing){
 		smoothedImg= ComputeSmoothedImage(residualImg,m_SmoothFilter);
 		if(smoothedImg){//Set extended source search image to smoothed residual image
@@ -1225,10 +1284,43 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 			status= -1;	
 		}
 	}//close if smoothing
+	*/
 
 	//****************************
 	//** Run segmentation
 	//****************************
+	Image* segmentedImg= 0;
+	if(m_ExtendedSearchMethod==eHClust){
+		segmentedImg= FindExtendedSources_HClust(inputImg,residualBkgData,taskData,searchImg,storeData);
+	}
+	else if(m_ExtendedSearchMethod==eActiveContour){
+		segmentedImg= FindExtendedSources_AC(inputImg,residualBkgData,taskData,searchImg,storeData);
+	}
+	else if(m_ExtendedSearchMethod==eWaveletTransform){
+		segmentedImg= FindExtendedSources_WT(inputImg,taskData,searchImg);
+	}
+	else if(m_ExtendedSearchMethod==eSaliencyThr){
+		segmentedImg= FindExtendedSources_SalThr(inputImg,residualBkgData,taskData,searchImg,storeData);
+	}
+
+	//Check if segmentation succeeded
+	if(!segmentedImg){
+		ERROR_LOG("Failed to run the segmentation algorithm!");	
+		if(residualImg && !storeData){
+			delete residualImg;
+			residualImg= 0;
+		}
+		if(residualBkgData && !storeData){
+			delete residualBkgData;
+			residualBkgData= 0;
+		}
+		if(smoothedImg){
+			delete smoothedImg;
+			smoothedImg= 0;
+		}
+	}
+
+	/*
 	if(!stop){
 		if(m_ExtendedSearchMethod==eHClust){
 			segmentedImg= FindExtendedSources_HClust(inputImg,residualBkgData,taskData,searchImg,storeData);
@@ -1242,10 +1334,7 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 		else if(m_ExtendedSearchMethod==eSaliencyThr){
 			segmentedImg= FindExtendedSources_SalThr(inputImg,residualBkgData,taskData,searchImg,storeData);
 		}
-		else{
-			ERROR_LOG("Invalid extended source method selected (method="<<m_ExtendedSearchMethod<<")!");
-			return nullptr;
-		}
+		
 	
 		//Check if segmentation succeeded
 		if(!segmentedImg){
@@ -1253,7 +1342,9 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 			status= -1;	
 		}
 	}//close if
+	*/
 
+	/*
 	//Clear images?
 	if(storeData && status==0){
 		if(residualImg) m_ResidualImg= residualImg;
@@ -1278,6 +1369,22 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 	if(status<0){
 		ERROR_LOG("Failures occurred in extended source finding, returning null ptr to segmentation map!");
 		return nullptr;
+	}
+	*/
+
+
+	//Clear data
+	if(residualImg && !storeData) {
+		delete residualImg;
+		residualImg= 0;
+	}
+	if(residualBkgData && !storeData) {
+		delete residualBkgData;
+		residualBkgData= 0;
+	}
+	if(smoothedImg && !storeData) {
+		delete smoothedImg;		
+		smoothedImg= 0;
 	}
 	
 	return segmentedImg;
@@ -1423,8 +1530,10 @@ Image* SFinder::FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,T
 	INFO_LOG("#"<<nSources<<" extended sources detected in input image by thresholding the saliency map...");
 	for(size_t k=0;k<sources.size();k++) sources[k]->SetType(Source::eExtended);
 	
-	//## Add sources to extended sources
-	(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
+	//## Add sources to extended sources?
+	//## NB: Need to decide if to keep them in separate collections (for the moment put in the same collection)
+	//(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());	
+	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());		
 	
 	//## Compute segmented map
 	bool isBinary= true;
@@ -1567,7 +1676,11 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 	int pixelHistoNBins= 100;
 	double signalThr= saliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
 	double bkgThr= saliencyImg->FindMedianThreshold(m_SaliencyBkgThrFactor);
-	
+	if(TMath::IsNaN(signalThr) || fabs(signalThr)==TMath::Infinity()){
+		ERROR_LOG("Invalid numeric threshold returned as threshold computation failed!");
+		return nullptr;
+	}
+
 	INFO_LOG("Computing binarized saliency maps (signalThr="<<signalThr<<", bkgThr="<<bkgThr);
 	double fgValue= 1;
 	Image* signalMarkerImg= saliencyImg->GetBinarizedImage(signalThr,fgValue,false);
@@ -1740,7 +1853,9 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 	}	
 
 	//## Add sources to extended sources
-	(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
+	//## NB: Need to decide if to keep them in separate collections (for the moment put in the same collection)
+	//(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
+	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());		
 	
 
 	return segmentedImg;
@@ -1945,8 +2060,9 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 
 	//==========================================
 	//==    PRELIMINARY STAGES
-	//==========================================
+	//==========================================	
 	//## Compute saliency
+	INFO_LOG("Computing image saliency map...");
 	Image* saliencyImg= img->GetMultiResoSaliencyMap(
 		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
 		m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
@@ -1963,11 +2079,17 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 	}
 	
 	//## Get saliency map optimal threshold
+	INFO_LOG("Computing saliency map optimal threshold...");
 	bool smoothPixelHisto= true;
 	int pixelHistoNBins= 100;
 	double signalThr= saliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
-	
+	if(TMath::IsNaN(signalThr) || fabs(signalThr)==TMath::Infinity()){
+		ERROR_LOG("Invalid numeric threshold returned as threshold computation failed!");
+		return nullptr;
+	}	
+
 	//## Get saliency binarized image
+	INFO_LOG("Thresholding the saliency map @ thr="<<signalThr<<" and compute binarized map...");
 	double fgValue= 1;
 	Image* signalMarkerImg= saliencyImg->GetBinarizedImage(signalThr,fgValue,false);
 	if(!signalMarkerImg){
@@ -2066,7 +2188,9 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 	}	
 
 	//## Add sources to extended sources
-	(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
+	//## NB: Need to decide if to keep them in separate collections (for the moment put in the same collection)
+	//(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
+	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());		
 	
 	return segmentedImg;
 
@@ -2242,8 +2366,10 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 	}
 
 	//## Add sources to extended sources
-	(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
-
+	//## NB: Need to decide if to keep them in separate collections (for the moment put in the same collection)
+	//(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
+	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());		
+	
 
 	//## Compute segmented map
 	bool isBinary= false;
@@ -2336,14 +2462,14 @@ int SFinder::SelectSources(std::vector<Source*>& sources){
 
 		//Is bad source (i.e. line-like blob, etc...)?
 		if(!IsGoodSource(sources[i])) {
-			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!");
+			INFO_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!");
 			sources[i]->SetGoodSourceFlag(false);
 			continue;
 		}
 			
 		//Is point-like source?
 		if( IsPointLikeSource(sources[i]) ){
-			DEBUG_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as a point-like source ...");
+			INFO_LOG("Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as a point-like source ...");
 			sources[i]->SetType(Source::ePointLike);
 		}
 
@@ -2357,11 +2483,11 @@ int SFinder::SelectSources(std::vector<Source*>& sources){
 			double nestedY0= nestedSources[j]->Y0;
 
 			if(!IsGoodSource(nestedSources[j])) {
-				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as bad source, skipped!");
+				INFO_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as bad source, skipped!");
 				nestedSources[j]->SetGoodSourceFlag(false);
 			}
 			if( IsPointLikeSource(nestedSources[j]) ){
-				DEBUG_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as a point-like source ...");
+				INFO_LOG("Source no. "<<i<<": nested source no. "<<j<<" (name="<<nestedSourceName<<",id="<<nestedSourceId<<", n="<<nestedNPix<<"("<<nestedX0<<","<<nestedY0<<")) tagged as a point-like source ...");
 				nestedSources[j]->SetType(Source::ePointLike);
 			}
 		}//end loop nested sources
@@ -2398,7 +2524,7 @@ bool SFinder::IsGoodSource(Source* aSource){
 
 	double BoundingBoxMin= ((aSource->GetContours())[0])->BoundingBoxMin;
 	if(BoundingBoxMin<m_SourceMinBoundingBox) {
-		DEBUG_LOG("BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<m_SourceMinBoundingBox<<")");
+		INFO_LOG("BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<m_SourceMinBoundingBox<<")");
 		return false;
 	}
 
@@ -2983,8 +3109,10 @@ int SFinder::PrepareWorkerTasks()
 
 	for(size_t i=0;i<m_taskDataPerWorkers.size();i++){
 		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
-		workerIds.push_back(i);
 
+		//Add only processors with tasks
+		workerIds.push_back(i);
+		
 		//Loop over tasks present in this worker
 		int nTasksInWorker= static_cast<int>(m_taskDataPerWorkers[i].size()); 
 		//std::stringstream ss;	
@@ -3164,8 +3292,34 @@ int SFinder::GatherTaskDataFromWorkers()
 	//## Put a barrier and collect all sources from workers in the master processor
 	MPI_Barrier(MPI_COMM_WORLD);
 
+	//## Sum and average all the elapsed timers across workers 
+	double initTime_sum;
+	double readImageTime_sum;
+	double compactSourceTime_sum;
+	double sourceSelectionTime_sum;
+	double imgResidualTime_sum;
+	double extendedSourceTime_sum;
+	MPI_Reduce(&initTime, &initTime_sum, 1, MPI_DOUBLE, MPI_SUM, MASTER_ID, m_WorkerComm);
+	MPI_Reduce(&readImageTime, &readImageTime_sum, 1, MPI_DOUBLE, MPI_SUM, MASTER_ID, m_WorkerComm);
+	MPI_Reduce(&compactSourceTime, &compactSourceTime_sum, 1, MPI_DOUBLE, MPI_SUM, MASTER_ID, m_WorkerComm);
+	MPI_Reduce(&imgResidualTime, &imgResidualTime_sum, 1, MPI_DOUBLE, MPI_SUM, MASTER_ID, m_WorkerComm);
+	MPI_Reduce(&sourceSelectionTime, &sourceSelectionTime_sum, 1, MPI_DOUBLE, MPI_SUM, MASTER_ID, m_WorkerComm);
+	MPI_Reduce(&extendedSourceTime, &extendedSourceTime_sum, 1, MPI_DOUBLE, MPI_SUM, MASTER_ID, m_WorkerComm);
+	INFO_LOG("[PROC "<<m_procId<<"] - cpu times (ms): {init="<<initTime<<", read="<<readImageTime<<", sourcefind="<<compactSourceTime<<", residual="<<imgResidualTime<<", sourcesel="<<sourceSelectionTime<<", extsourcefind="<<extendedSourceTime);
+
+	if (m_procId == MASTER_ID) {
+		initTime= initTime_sum;
+		readImageTime= readImageTime_sum;
+		compactSourceTime= compactSourceTime_sum;
+		sourceSelectionTime= sourceSelectionTime_sum;
+		imgResidualTime= imgResidualTime_sum;
+		extendedSourceTime= extendedSourceTime_sum;
+		INFO_LOG("[PROC "<<m_procId<<"] - cumulative cpu times (ms): {init="<<initTime<<", read="<<readImageTime<<", sourcefind="<<compactSourceTime<<", residual="<<imgResidualTime<<", sourcesel="<<sourceSelectionTime<<", extsourcefind="<<extendedSourceTime);
+	}
+
+	//## Merge all sources found by workers in a unique collection
 	int MSG_TAG= 1;
-	if (m_procId == 0) {//Receive data from the workers
+	if (m_procId == MASTER_ID) {//Receive data from the workers
 
 		for (int i=1; i<m_nProc; i++) {
 			//Check if this processor has tasks assigned, otherwise skip!
@@ -3248,6 +3402,7 @@ int SFinder::GatherTaskDataFromWorkers()
 int SFinder::MergeTaskData()
 {
 	//## Update sources in list
+	//## NB: Push to collection only sources NON at edge
 	if (m_procId == 0) {
 
 		//Print task data
@@ -3299,6 +3454,175 @@ int SFinder::MergeTaskData()
 
 }//close MergeTaskData()
 
+int SFinder::MergeSourcesAtEdge()
+{
+	//## Executed only by master processor
+	if(m_procId != MASTER_ID) return 0;
+
+	//## Loop over edge sources and merge them
+	//## TBD: Merge all sources regardless of their tag (compact or extended)
+	struct MergedSourceInfo {
+		long int source_index;
+		long int worker_index;
+		long int task_index;
+		//std::vector<MergedSourceInfo> merged_sources;
+		MergedSourceInfo(long int sindex,long int windex,long int tindex)
+			: source_index(sindex), worker_index(windex), task_index(tindex)
+		{}
+		bool operator==(const MergedSourceInfo& obj) const {
+			bool areEqual= ( 
+				(obj.source_index==source_index) && 	
+				(obj.worker_index==worker_index) &&
+				(obj.task_index==task_index)
+			);
+    	return areEqual;
+    }
+	};//close MergedSourceInfo
+
+	//## Fill list of edge sources to be merged and fill corresponding Graph
+	std::vector<MergedSourceInfo> sourcesToBeMerged;
+	Graph mergedSourceGraph;
+	for(size_t i=0;i<m_taskDataPerWorkers.size();i++){
+		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
+		for(size_t j=0;j<m_taskDataPerWorkers[i].size();j++){
+			int nEdgeSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources_edge).size());
+			for(int k=0;k<nEdgeSources;k++){
+				MergedSourceInfo mergedSourceInfo= MergedSourceInfo(k,i,j);
+				sourcesToBeMerged.push_back(MergedSourceInfo(k,i,j));
+				mergedSourceGraph.AddVertex();
+			}
+		}
+	}
+
+	//## Find adjacent edge sources
+	//std::vector<MergedSourceInfo> sourcesAlreadyMerged;
+	int itemPos= -1;
+
+	for(size_t i=0;i<sourcesToBeMerged.size()-1;i++){	
+		long int sindex= sourcesToBeMerged[i].source_index;
+		long int windex= sourcesToBeMerged[i].worker_index;
+		long int tindex= sourcesToBeMerged[i].task_index; 
+		Source* source= (m_taskDataPerWorkers[windex][tindex]->sources_edge)[sindex];
+
+		//Loop neighbors
+		for(size_t j=i+1;j<sourcesToBeMerged.size();j++){	
+			long int sindex_neighbor= sourcesToBeMerged[j].source_index;
+			long int windex_neighbor= sourcesToBeMerged[j].worker_index;
+			long int tindex_neighbor= sourcesToBeMerged[j].task_index; 
+			Source* source_neighbor= (m_taskDataPerWorkers[windex_neighbor][tindex_neighbor]->sources_edge)[sindex_neighbor];
+
+			//Check if main worker tile is physically neighbor to this
+			//If not they cannot be adjacent, so skip the following check
+			int itemPos= -1;
+			
+			if(!CodeUtils::FindItem(m_taskDataPerWorkers[windex][tindex]->neighborWorkerId,windex_neighbor,itemPos)){
+				INFO_LOG("Worker id "<<windex_neighbor<<" is not physically neighbor to worker "<<windex<<", so skip the source adjacency check and go to next...");
+				continue;
+			}
+
+			//Check is sources are adjacent
+			bool areAdjacentSources= source->IsAdjacentSource(source_neighbor);
+			if(!areAdjacentSources) continue;
+
+			//If they are adjacent add linking in graph
+			INFO_LOG("Sources (i,j)=("<<i<<" {"<<sindex<<","<<windex<<","<<tindex<<"} , "<<j<<" {"<<sindex_neighbor<<","<<windex_neighbor<<","<<tindex_neighbor<<"}) are adjacent and selected for merging...");
+			mergedSourceGraph.AddEdge(i,j);
+
+		}//end loop sources
+
+	}//end loop sources
+
+
+	//## Find all connected components in graph corresponding to 
+	//## edge sources to be merged
+	std::vector<std::vector<int>> connected_source_indexes;
+	mergedSourceGraph.GetConnectedComponents(connected_source_indexes);
+	INFO_LOG("#"<<connected_source_indexes.size()<<"/"<<sourcesToBeMerged.size()<<" edge sources will be left after merging...");
+		
+	//## Now merge the sources
+	std::vector<MergedSourceInfo> sourcesToBeRemoved;
+	bool copyPixels= false;//do not create memory for new pixels
+	bool checkIfAdjacent= false;//already done before
+	bool computeStatPars= false;//do not compute stats& pars at each merging
+	bool computeMorphPars= false;
+	bool computeRobustStats= true;
+	bool forceRecomputing= false;//no need to re-compute moments (already updated in AddPixel())
+
+	for(size_t i=0;i<connected_source_indexes.size();i++){
+		if(connected_source_indexes[i].empty()) continue;
+
+		//Get source id=0 of this component
+		int index= connected_source_indexes[i][0];
+		long int sindex= sourcesToBeMerged[index].source_index;
+		long int windex= sourcesToBeMerged[index].worker_index;
+		long int tindex= sourcesToBeMerged[index].task_index; 
+		Source* source= (m_taskDataPerWorkers[windex][tindex]->sources_edge)[sindex];
+
+		//Merge other sources in the group if any 
+		int nMerged= 0;
+		for(size_t j=1;j<connected_source_indexes[i].size();j++){
+			int index_merged= connected_source_indexes[i][j];
+			long int sindex_merged= sourcesToBeMerged[index_merged].source_index;
+			long int windex_merged= sourcesToBeMerged[index_merged].worker_index;
+			long int tindex_merged= sourcesToBeMerged[index_merged].task_index; 
+			Source* source_merged= (m_taskDataPerWorkers[windex_merged][tindex_merged]->sources_edge)[sindex_merged];
+				
+			int status= source->MergeSource(source_merged,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars);
+			if(status<0){
+				WARN_LOG("Failed to merge sources (i,j)=("<<index<<" {"<<sindex<<","<<windex<<","<<tindex<<"} , "<<index_merged<<" {"<<sindex_merged<<","<<windex_merged<<","<<tindex_merged<<"}), skip to next...");
+				continue;
+			}
+
+			//Add this source to the list of edge sources to be removed
+			sourcesToBeRemoved.push_back(index_merged);
+
+		}//end loop of sources to be merged in this component
+
+		//If at least one was merged recompute stats & pars of merged source
+		if(nMerged>0) {
+			INFO_LOG("Recomputing stats & moments of merged source in merge group "<<i<<" after #"<<nMerged<<" merged source...");
+			if(source->ComputeStats(computeRobustStats,forceRecomputing)<0){
+				WARN_LOG("Failed to compute stats for merged source in merge group "<<i<<"...");
+				continue;
+			}
+			if(source->ComputeMorphologyParams()<0){
+				WARN_LOG("Failed to compute morph pars for merged source in merge group "<<i<<"...");
+				continue;
+			}
+		}//close if
+
+	}//end loop number of components
+
+	//Remove merged source from task edge source collection
+	INFO_LOG("Removing #"<<sourcesToBeRemoved.size()<<" edge sources that has been merged previously from task data collection...");
+	for(size_t i=0;i<m_taskDataPerWorkers.size();i++){
+		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
+
+		//Loop over tasks per worker
+		for(size_t j=0;j<m_taskDataPerWorkers[i].size();j++){
+	
+			//Loop over sources found
+			std::vector<Source*> sources_merged_at_edges;
+			int nSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources).size());
+
+			for(int k=0;k<nSources;k++){
+				(m_taskDataPerWorkers[i][j]->sources)[k]
+			}//end 
+
+	for(size_t i=0;i<sourcesToBeRemoved.size();i++){
+		int index= sourcesToBeRemoved[i];
+		long int sindex= sourcesToBeMerged[index].source_index;
+		long int windex= sourcesToBeMerged[index].worker_index;
+		long int tindex= sourcesToBeMerged[index].task_index;
+
+		//Delete item
+		CodeUtils::DeleteItem();
+	}//end loop sources
+	
+	return 0;
+
+}//close MergeSourcesAtEdge()
+
 
 int SFinder::FindSourcesAtEdge()
 {	
@@ -3313,9 +3637,9 @@ int SFinder::FindSourcesAtEdge()
 		//Loop over tasks per worker
 		for(size_t j=0;j<m_taskDataPerWorkers[i].size();j++){
 	
-			//Loop over compact sources found
+			//Loop over sources found
 			std::vector<Source*> sources_not_at_edges;
-			int nSources= (int)((m_taskDataPerWorkers[i][j]->sources).size());
+			int nSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources).size());
 
 			for(int k=0;k<nSources;k++){
 				//Get source coordinate range
@@ -3377,8 +3701,8 @@ int SFinder::FindSourcesAtEdge()
 				}
 			}//end loop sources	
 
-			int nEdgeSources= (int)((m_taskDataPerWorkers[i][j]->sources_edge).size());
-			INFO_LOG("[PROC "<<m_procId<<"] - #"<<nEdgeSources<<"/"<<nSources<<" compact sources are found at tile edges...");
+			int nEdgeSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources_edge).size());
+			INFO_LOG("[PROC "<<m_procId<<"] - #"<<nEdgeSources<<"/"<<nSources<<" sources are found at tile edges...");
 	
 			//Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
 			(m_taskDataPerWorkers[i][j]->sources).clear();

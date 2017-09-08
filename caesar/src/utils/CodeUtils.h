@@ -26,8 +26,8 @@
 */
 
 
-#ifndef CodeUtils_h
-#define CodeUtils_h 1
+#ifndef _CODE_UTILS_h
+#define _CODE_UTILS_h 1
 
 #include <Logger.h>
 
@@ -127,6 +127,10 @@ inline bool MatchJsonValue<char*>::operator()(const Json::Value& obj) const {
 }
 
 
+
+//===============================================
+//==          CODE UTILS CLASS
+//===============================================
 class CodeUtils : public TObject {
 
   public:
@@ -349,7 +353,6 @@ class CodeUtils : public TObject {
 	
 		ClassDef(CodeUtils,1)
 };
-
 
 
 

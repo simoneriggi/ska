@@ -146,7 +146,7 @@ void Source::Init(){
 }//close Init()
 
 
-void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int lineColor){
+void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int lineColor,int lineStyle){
 
 	//Drawing contours?
 	for(unsigned int i=0;i<m_Contours.size();i++){		
@@ -156,7 +156,7 @@ void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int line
 			thisContourGraph->SetMarkerSize(0.3);
 			thisContourGraph->SetMarkerColor(lineColor);
 			thisContourGraph->SetLineColor(lineColor);
-			thisContourGraph->SetLineStyle(kSolid);
+			thisContourGraph->SetLineStyle(lineStyle);
 			thisContourGraph->SetLineWidth(2);
 			thisContourGraph->Draw("Lsame");
 		}//close if 
@@ -187,7 +187,7 @@ void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int line
 
 	if(drawNested){
 		for(unsigned int i=0;i<m_NestedSources.size();i++){
-			if(m_NestedSources[i]) m_NestedSources[i]->Draw(drawBoundingBox,drawEllipse,drawNested,lineColor+2);
+			if(m_NestedSources[i]) m_NestedSources[i]->Draw(drawBoundingBox,drawEllipse,drawNested,lineColor+2,lineStyle);
 		}
 	}//close if nested
 
@@ -309,7 +309,7 @@ bool Source::IsAdjacentSource(Source* aSource){
   } 
 	else {
 		isAdjacent= true;
-  	DEBUG_LOG("Sources are adjacent (found a match at " << std::distance((aSource->m_Pixels).begin(), it));
+  	INFO_LOG("Sources ("<<this->Id<<","<<aSource->Id<<") are adjacent (found a match at " << std::distance((aSource->m_Pixels).begin(), it)<<")");
   }
 
 	return isAdjacent;

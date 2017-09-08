@@ -264,6 +264,11 @@ class SFinder : public TObject {
 		*/
 		int FindSourcesAtEdge();
 
+		/**
+		* \brief Merge sources at edge (for MPI run)
+		*/
+		int MergeSourcesAtEdge();
+
 	public:
 		
 		
@@ -389,7 +394,6 @@ class SFinder : public TObject {
 		double m_deblendCurvThr;
 		double m_deblendComponentMinNPix;
 		
-
 		//Saliency computation
 		Image* m_SaliencyImg;
 		double m_SaliencyThrFactor;

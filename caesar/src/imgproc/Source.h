@@ -64,12 +64,10 @@ class Source : public Blob {
 		/** 
 		\brief Parametric constructor
  		*/
-		//Source(ImgRange img_range,std::string name="");		
 		Source(std::string name);		
 		/** 
 		\brief Parametric constructor
  		*/
-		//Source(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name="");	
 		Source(std::vector<Pixel*>const& pixels,std::string name="");			
 		/**
 		* \brief Copy constructor
@@ -89,8 +87,14 @@ class Source : public Blob {
 		*/
 		void Copy(TObject& source) const;
 
+		/**
+		* \brief Source type enumeration
+		*/
+		enum SourceType {eUnknown=0,eCompact=1,ePointLike=2,eExtended=3,eCompactPlusExtended=4};
 
-		enum SourceType {eUnknown=0,eCompact=1,ePointLike=2,eExtended=3};
+		/**
+		* \brief Source flag enumeration
+		*/
 		enum SourceFlag {eReal=1,eCandidate=2,eFake=3};
 
 	public:
@@ -181,7 +185,7 @@ class Source : public Blob {
 		/**
 		* \brief Draw contours
 		*/
-		void Draw(bool drawBoundingBox=false,bool drawFittedEllipse=false,bool drawNested=false,int lineColor=kBlack);
+		void Draw(bool drawBoundingBox=false,bool drawFittedEllipse=false,bool drawNested=false,int lineColor=kBlack,int lineStyle=kSolid);
 
 		/**
 		* \brief Get DS9 region info

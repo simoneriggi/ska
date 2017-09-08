@@ -17,6 +17,7 @@ set(THIS_DICT_HEADERS ${THIS_DICT_HEADERS}
 	Logger.h
 	TaskData.h
 	Serializer.h
+	Graph.h
 )
 set(THIS_DICT_SRCS ${THIS_DICT_SRCS} 
 	${SRC_DIR}/SysUtils.cc 
@@ -30,6 +31,7 @@ set(THIS_DICT_SRCS ${THIS_DICT_SRCS}
 	${SRC_DIR}/Logger.cc
 	${SRC_DIR}/TaskData.cc
 	${SRC_DIR}/Serializer.cc
+	${SRC_DIR}/Graph.cc
 ) 
 
 set(THIS_HEADERS_WPATH "")

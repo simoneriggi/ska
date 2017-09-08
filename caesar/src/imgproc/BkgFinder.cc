@@ -183,8 +183,9 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 			blobs.clear();
 			return 0;
 		}
-		INFO_LOG("Robust bkg map min/max="<<(robustBkgData->BkgMap)->GetMinimum()<<"/"<<(robustBkgData->BkgMap)->GetMaximum()<<", rms map min/max="<<(robustBkgData->NoiseMap)->GetMinimum()<<"/"<<(robustBkgData->NoiseMap)->GetMaximum());
-
+		if( (robustBkgData->BkgMap) && (robustBkgData->NoiseMap) ) {
+			INFO_LOG("Robust bkg map min/max="<<(robustBkgData->BkgMap)->GetMinimum()<<"/"<<(robustBkgData->BkgMap)->GetMaximum()<<", rms map min/max="<<(robustBkgData->NoiseMap)->GetMinimum()<<"/"<<(robustBkgData->NoiseMap)->GetMaximum());
+		}
 
 		//Override main bkgData with robust estimates
 		for(unsigned int i=0;i<(robustBkgData->BkgSamplings).size();i++) {

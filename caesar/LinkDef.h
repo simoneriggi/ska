@@ -90,6 +90,9 @@
 #pragma link C++ function Caesar::StatsUtils::GetClippedEstimators<long int>;
 #pragma link C++ function Caesar::StatsUtils::GetClippedEstimators<float>;
 #pragma link C++ function Caesar::StatsUtils::GetClippedEstimators<double>;
+
+#pragma link C++ class Caesar::Graph+;
+#pragma link C++ class Caesar::Graph*;
 //==============
 
 //== LOGGER ==
