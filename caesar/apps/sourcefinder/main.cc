@@ -77,9 +77,9 @@ int main(int argc, char *argv[])
 	//== Run SourceFinder
 	//=======================
 	INFO_LOG("Starting source finding");
-	//SourceFinder finder;
 	SFinder finder;
-	if(finder.Run()<0){
+	//if(finder.Run()<0){
+	if(finder.RunMP()<0){
 		ERROR_LOG("Source finding failed!");
 		return -1;
 	}

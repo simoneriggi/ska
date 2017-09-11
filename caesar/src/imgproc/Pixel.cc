@@ -55,6 +55,19 @@ Pixel::Pixel() : TObject() {
 	
 }//close costructor
 
+Pixel::Pixel(long int _gbin,long int _ix,long int _iy,double _x,double _y,double _S)
+	: id(_gbin), S(_S), x(_x), y(_y), ix(_ix), iy(_iy)
+{
+	type= eNormal;
+	S_curv= 0; 
+	S_edge= 0;
+	//isOnEdge= false; 
+	//distanceToEdge= std::numeric_limits<double>::infinity();
+	bkgLevel= 0;
+	noiseLevel= 0;
+
+}//close constructor
+
 
 Pixel::~Pixel(){
 	

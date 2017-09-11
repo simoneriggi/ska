@@ -218,9 +218,10 @@ void SFinder::InitOptions()
 		
 	//Source 
 	m_Source= 0;
-	m_SourceCollection.clear();
-	m_CompactSources.clear();
-	m_ExtendedSources.clear();
+	m_SourceCollection.clear();	
+	m_SourcesMergedAtEdges.clear();
+	//m_CompactSources.clear();
+	//m_ExtendedSources.clear();
 
 	//Read options
 	m_ReadTile= false;
@@ -228,6 +229,7 @@ void SFinder::InitOptions()
 	m_TileMaxX= 0;
 	m_TileMinY= 0;
 	m_TileMaxY= 0;
+	m_mergeSourcesAtEdge= true;
 	
 	//Bkg data
 	m_BkgData= 0;
@@ -266,6 +268,7 @@ void SFinder::InitOptions()
 
 	//Check is MPI run is enabled at build & runtime
 	m_mpiEnabled= SysUtils::IsMPIInitialized();
+	INFO_LOG("MPI enabled? "<<m_mpiEnabled);
 
 }//close InitOptions()
 
@@ -379,6 +382,7 @@ int SFinder::Configure(){
 		m_TileStepSizeY= 1;	
 	}
 
+	GET_OPTION_VALUE(mergeSourcesAtEdge,m_mergeSourcesAtEdge);
 	
 
 	//Get output file options
@@ -698,17 +702,14 @@ int SFinder::RunMP(){
 	//## The updated list of task data is available in master processor
 	//## (check if it is better to replace with MPI_Gather and put it available in all workers)
 	#ifdef MPI_ENABLED
-	if(m_mpiEnabled && GatherTaskDataFromWorkers()<0){
-		ERROR_LOG("[PROC "<<m_procId<<"] - Gathering task data from workers failed!");
-		return -1;
+	if(m_mpiEnabled){
+		INFO_LOG("Gathering task data from all workers...");
+		if(GatherTaskDataFromWorkers()<0){
+			ERROR_LOG("[PROC "<<m_procId<<"] - Gathering task data from workers failed!");
+			return -1;
+		}
 	}
 	#endif
-
-	//## Merge sources found in each task in unique collection
-	if(m_procId==MASTER_ID && MergeTaskData()<0){
-		ERROR_LOG("[PROC "<<m_procId<<"] - Merging sources found in each task in unique collection failed!");
-		return -1;
-	}
 
 	
 	//## Find edge sources
@@ -716,6 +717,7 @@ int SFinder::RunMP(){
 		if(m_mpiEnabled) MPI_Barrier(MPI_COMM_WORLD);
 	#endif
 	if(m_procId==MASTER_ID) {
+		INFO_LOG("[PROC "<<m_procId<<"] - Finding sources at tile edges ...");
 		if(FindSourcesAtEdge()<0){
 			ERROR_LOG("[PROC "<<m_procId<<"] - Finding sources at tile edges failed!");
 			return -1;
@@ -723,9 +725,25 @@ int SFinder::RunMP(){
 	}
 	
 	
-	//## Merge sources at edge (IMPLEMENT ME!!!)
-	//...
-	//...
+	//## Merge sources at edge
+	if(m_mergeSourcesAtEdge){
+		#ifdef MPI_ENABLED
+			if(m_mpiEnabled) MPI_Barrier(MPI_COMM_WORLD);
+		#endif
+		if(m_procId==MASTER_ID) {
+			INFO_LOG("[PROC "<<m_procId<<"] - Merging sources find at tile edges by all workers...");
+			if(MergeSourcesAtEdge()<0){
+				ERROR_LOG("[PROC "<<m_procId<<"] - Merging sources at tile edges failed!");
+				return -1;
+			}
+		}
+	}//close if merge sources at edges
+
+	//## Merge sources found in each task in unique collection
+	if(m_procId==MASTER_ID && MergeTaskData()<0){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Merging sources found in each task in unique collection failed!");
+		return -1;
+	}
 
 
 	//============================
@@ -766,7 +784,7 @@ int SFinder::RunMP(){
 }//close RunMP()
 
 
-
+/*
 int SFinder::Run(){
 
 	//Start timer
@@ -895,6 +913,7 @@ int SFinder::Run(){
 	return 0;
 
 }//close Run()
+*/
 
 
 int SFinder::FindSources(std::vector<Source*>& sources,Image* inputImg,double seedThr,double mergeThr,Image* searchedImg){
@@ -972,8 +991,9 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 
 	//## Find sources
 	INFO_LOG("Finding compact sources...");	
+	std::vector<Source*> sources;
 	int status= inputImg->FindCompactSource(
-		taskData->sources,
+		sources,
 		significanceMap,bkgData,
 		m_SeedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
 		m_SearchNestedSources,m_NestedBlobThrFactor
@@ -986,27 +1006,39 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 		return nullptr;
 	}
 
-
+	//## Tag found sources as extended 
+	int nSources= static_cast<int>( sources.size() );
+	INFO_LOG("#"<<nSources<<" compact sources detected in input image ...");
+	for(size_t k=0;k<sources.size();k++) {
+		sources[k]->SetType(Source::eCompact);
+		sources[k]->Print();
+	}
+	
 	//## Apply source selection?
-	int nSources= static_cast<int>(taskData->sources.size());
+	//int nSources= static_cast<int>(taskData->sources.size());
 	
 	if(m_ApplySourceSelection && nSources>0){
-		if(SelectSources(taskData->sources)<0){
+		//if(SelectSources(taskData->sources)<0){
+		if(SelectSources(sources)<0){
 			ERROR_LOG("Failed to select sources!");
 			delete significanceMap;
 			significanceMap= 0;
 			return nullptr;
 		}
-		nSources= static_cast<int>(taskData->sources.size());
+		//nSources= static_cast<int>(taskData->sources.size());
+		nSources= static_cast<int>(sources.size());
 	}//close if source selection
-		
-	INFO_LOG("#"<<nSources<<" bright sources found and added to list...");
+	
+			
+	//## Add sources to task data sources
+	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());			
+	INFO_LOG("#"<<nSources<<" compact sources added to task data ...");
 
 	return significanceMap;
 
 }//close FindCompactSources()
 
-
+/*
 int SFinder::FindCompactSources(){
 
 	//## Compute stats and bkg
@@ -1057,14 +1089,14 @@ int SFinder::FindCompactSources(){
 		
 	//## Add detected sources to the list	
 	m_SourceCollection.insert(m_SourceCollection.end(),sources.begin(),sources.end());
-	m_CompactSources.insert(m_CompactSources.end(),sources.begin(),sources.end());
+	//m_CompactSources.insert(m_CompactSources.end(),sources.begin(),sources.end());
 
 	INFO_LOG("#"<<nSelSources<<" bright sources to the list...");
 
 	return 0;
 
 }//close FindCompactSources()
-
+*/
 
 Image* SFinder::FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<Source*> const & sources){
 
@@ -1099,7 +1131,7 @@ Image* SFinder::FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<
 
 }//close FindResidualMap()
 
-
+/*
 int SFinder::FindResidualMap(){
 
 	//Compute residual map
@@ -1135,7 +1167,7 @@ int SFinder::FindResidualMap(){
 	return 0;
 
 }//close FindResidualMap()
-
+*/
 
 Image* SFinder::ComputeSmoothedImage(Image* inputImg,int model){
 
@@ -1190,9 +1222,6 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 		return nullptr;
 	}
 
-
-	//int status= 0;
-	//bool stop= false;
 	Image* searchImg= 0;
 	
 	//****************************
@@ -1207,20 +1236,7 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 	if(storeData) m_ResidualImg= residualImg;
 	searchImg= residualImg;
 
-	/*
-	if(residualImg){
-		if(storeData) m_ResidualImg= residualImg;
-		searchImg= residualImg;
-	}
-	else{
-		ERROR_LOG("Residual map computation failed!");
-		return nullptr;
-		//stop= true;
-		//status= -1;
-	}
-	*/
-
-
+	
 	//Compute bkg & noise map for residual img
 	INFO_LOG("Computing residual image stats & bkg...");
 	ImgBkgData* residualBkgData= ComputeStatsAndBkg(residualImg);
@@ -1234,20 +1250,6 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 	}
 	if(storeData) m_ResidualBkgData= residualBkgData;
 
-	/*
-	if(!stop && residualImg){
-		INFO_LOG("Computing residual image stats & bkg...");
-	 	residualBkgData= ComputeStatsAndBkg(residualImg);
-		if(residualBkgData){
-			if(storeData) m_ResidualBkgData= residualBkgData;
-		}
-		else{
-			ERROR_LOG("Failed to compute bkg data for residual map!");
-			stop= true;
-			status= -1;		
-		}	
-	}
-	*/
 
 	//****************************
 	//** Smooth image
@@ -1272,19 +1274,6 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 		searchImg	= smoothedImg;
 	}
 	
-	/*
-	if(!stop && residualImg && m_UsePreSmoothing){
-		smoothedImg= ComputeSmoothedImage(residualImg,m_SmoothFilter);
-		if(smoothedImg){//Set extended source search image to smoothed residual image
-			searchImg	= smoothedImg;
-		}
-		else{
-			ERROR_LOG("Failed to compute residual smoothed image!");
-			stop= true;
-			status= -1;	
-		}
-	}//close if smoothing
-	*/
 
 	//****************************
 	//** Run segmentation
@@ -1320,58 +1309,6 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 		}
 	}
 
-	/*
-	if(!stop){
-		if(m_ExtendedSearchMethod==eHClust){
-			segmentedImg= FindExtendedSources_HClust(inputImg,residualBkgData,taskData,searchImg,storeData);
-		}
-		else if(m_ExtendedSearchMethod==eActiveContour){
-			segmentedImg= FindExtendedSources_AC(inputImg,residualBkgData,taskData,searchImg,storeData);
-		}
-		else if(m_ExtendedSearchMethod==eWaveletTransform){
-			segmentedImg= FindExtendedSources_WT(inputImg,taskData,searchImg);
-		}
-		else if(m_ExtendedSearchMethod==eSaliencyThr){
-			segmentedImg= FindExtendedSources_SalThr(inputImg,residualBkgData,taskData,searchImg,storeData);
-		}
-		
-	
-		//Check if segmentation succeeded
-		if(!segmentedImg){
-			ERROR_LOG("Failed to run the segmentation algorithm!");	
-			status= -1;	
-		}
-	}//close if
-	*/
-
-	/*
-	//Clear images?
-	if(storeData && status==0){
-		if(residualImg) m_ResidualImg= residualImg;
-		if(residualBkgData) m_ResidualBkgData= residualBkgData;
-	}
-	else{
-		if(residualImg) {
-			delete residualImg;
-			residualImg= 0;
-		}
-		if(residualBkgData){
-			delete residualBkgData;
-			residualBkgData= 0;
-		}
-		if(smoothedImg){
-			delete smoothedImg;		
-			smoothedImg= 0;
-		}
-	}
-
-	//If failed return nullptr
-	if(status<0){
-		ERROR_LOG("Failures occurred in extended source finding, returning null ptr to segmentation map!");
-		return nullptr;
-	}
-	*/
-
 
 	//Clear data
 	if(residualImg && !storeData) {
@@ -1391,7 +1328,7 @@ Image* SFinder::FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData
 
 }//close FindExtendedSources()
 
-
+/*
 int SFinder::FindExtendedSources(Image* img){
 
 	//## Check input image
@@ -1461,7 +1398,7 @@ int SFinder::FindExtendedSources(Image* img){
 	return 0;
 
 }//close FindExtendedSources()
-
+*/
 
 Image* SFinder::FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg,bool storeData){
 
@@ -1550,7 +1487,7 @@ Image* SFinder::FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,T
 
 }//close FindExtendedSources_SalThr()
 
-
+/*
 int SFinder::FindExtendedSources_SalThr(Image* inputImg){
 
 	//Check input image
@@ -1611,15 +1548,7 @@ int SFinder::FindExtendedSources_SalThr(Image* inputImg){
 	int nSelSources= nSources;
 	//...
 	//...
-	/*
-	if(m_ApplySourceSelection){
-		if(SelectSources(sources)<0){
-			ERROR_LOG("Failed to select sources!");
-			return -1;
-		}
-		nSelSources= sources.size();
-	}//close if source selection
-	*/
+	
 
 	//## Compute segmented map
 	bool isBinary= true;
@@ -1639,7 +1568,7 @@ int SFinder::FindExtendedSources_SalThr(Image* inputImg){
 	return 0;
 
 }//close FindExtendedSources_SalThr()
-
+*/
 
 Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg,bool storeData){
 
@@ -1862,7 +1791,7 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 
 }//close FindExtendedSources_HClust()
 
-
+/*
 int SFinder::FindExtendedSources_HClust(Image* inputImg){
 
 	//Check input image
@@ -1964,6 +1893,8 @@ int SFinder::FindExtendedSources_HClust(Image* inputImg){
 	return 0;
 
 }//close FindExtendedSources_HClust()
+*/
+
 
 Image* SFinder::ComputeLaplacianImage(Image* inputImg){
 
@@ -2196,7 +2127,7 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 
 }//close FindExtendedSources_AC()
 
-
+/*
 int SFinder::FindExtendedSources_AC(Image* inputImg){
 
 	//## Check input image
@@ -2316,8 +2247,7 @@ int SFinder::FindExtendedSources_AC(Image* inputImg){
 	return 0;
 
 }//close FindExtendedSources_AC()
-
-
+*/
 
 
 
@@ -2385,7 +2315,7 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 }//close FindExtendedSources_WT()
 
 
-
+/*
 int SFinder::FindExtendedSources_WT(Image* inputImg){
 
 	//## Check input image
@@ -2443,6 +2373,8 @@ int SFinder::FindExtendedSources_WT(Image* inputImg){
 	return 0;
 
 }//close FindExtendedSources_WT()
+*/
+
 
 int SFinder::SelectSources(std::vector<Source*>& sources){
 
@@ -2708,6 +2640,7 @@ Image* SFinder::ReadImage(FileInfo& info,std::string filename,std::string imgnam
 			}
 			
 			//Read tile
+			INFO_LOG("Reading image tile (file="<<filename<<", hdu="<<m_fitsHDUId<<", range[xmin,xmax]=["<<ix_min<<","<<ix_max<<"], [ymin,ymax]=["<<iy_min<<","<<iy_max<<"])");
 			img= fullImg->GetTile(ix_min,ix_max,iy_min,iy_max);	
 			if(!img){
 				ERROR_LOG("Failed to read image tile [xmin,xmax]=["<<ix_min<<","<<ix_max<<"], [ymin,ymax]=["<<iy_min<<","<<iy_max<<"]");
@@ -3248,7 +3181,7 @@ int SFinder::PrepareWorkerTasks()
 				long int iy_min= m_taskDataPerWorkers[i][j]->iy_min;
 				long int iy_max= m_taskDataPerWorkers[i][j]->iy_max;
 			
-				ss<<"Task no. "<<j<<"["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"] neighbors{";
+				ss<<"Task no. "<<j<<" ["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"] neighbors{";
 			
 				for(size_t k=0;k<m_taskDataPerWorkers[i][j]->neighborTaskId.size();k++){
 					long int neighborWorkerId= m_taskDataPerWorkers[i][j]->neighborWorkerId[k];
@@ -3434,25 +3367,53 @@ int SFinder::MergeTaskData()
 	
 		}//end loop workers
 
+		//Add sources
+		int nCompactSources= 0;
+		int nExtendedSources= 0;
+		int nPointLikeSources= 0;
+		int nUnknown= 0;
+		int nEdgeSources= 0;
+		int nSources= 0;
 		for(size_t i=0;i<m_taskDataPerWorkers.size();i++){
 			for(size_t j=0;j<m_taskDataPerWorkers[i].size();j++){
-				m_CompactSources.insert(m_CompactSources.end(),(m_taskDataPerWorkers[i][j]->sources).begin(),(m_taskDataPerWorkers[i][j]->sources).end());
-				m_CompactSources.insert(m_CompactSources.end(),(m_taskDataPerWorkers[i][j]->sources_edge).begin(),(m_taskDataPerWorkers[i][j]->sources_edge).end());
 
-				m_ExtendedSources.insert(m_ExtendedSources.end(),(m_taskDataPerWorkers[i][j]->ext_sources).begin(),(m_taskDataPerWorkers[i][j]->ext_sources).end());
-				m_ExtendedSources.insert(m_ExtendedSources.end(),(m_taskDataPerWorkers[i][j]->ext_sources_edge).begin(),(m_taskDataPerWorkers[i][j]->ext_sources_edge).end());
+				//Process sources not at edge
+				for(size_t k=0;k<(m_taskDataPerWorkers[i][j]->sources).size();k++){
+					int sourceType= (m_taskDataPerWorkers[i][j]->sources)[k]->Type;
+					if(sourceType==Source::eCompact) nCompactSources++;
+					else if(sourceType==Source::eExtended) nExtendedSources++;
+					else if(sourceType==Source::ePointLike) nPointLikeSources++;
+					else nUnknown++;
+					nSources++;
+					m_SourceCollection.push_back( (m_taskDataPerWorkers[i][j]->sources)[k] );
+				}//end loop sources per task
+
+				//Add edge sources not merged (if merging was not selected as option)
+				for(size_t k=0;k<(m_taskDataPerWorkers[i][j]->sources_edge).size();k++){
+					int sourceType= (m_taskDataPerWorkers[i][j]->sources_edge)[k]->Type;
+					if(sourceType==Source::eCompact) nCompactSources++;
+					else if(sourceType==Source::eExtended) nExtendedSources++;
+					else if(sourceType==Source::ePointLike) nPointLikeSources++;
+					else nUnknown++;
+					nSources++;
+					nEdgeSources++;
+					if(!m_mergeSourcesAtEdge) m_SourceCollection.push_back( (m_taskDataPerWorkers[i][j]->sources_edge)[k] );
+				}//end loop sources per task		
+
 			}//end loop tasks
 		}//end loop workers
-		m_SourceCollection.insert(m_SourceCollection.end(),m_CompactSources.begin(),m_CompactSources.end());
-		m_SourceCollection.insert(m_SourceCollection.end(),m_ExtendedSources.begin(),m_ExtendedSources.end());
 
-		INFO_LOG("[PROC "<<m_procId<<"] - #"<<m_SourceCollection.size()<<" sources found in total (#"<<m_CompactSources.size()<<" compact, #"<<m_ExtendedSources.size()<<" extended) ...");
+		//Add merged sources at edge	
+		m_SourceCollection.insert(m_SourceCollection.end(),m_SourcesMergedAtEdges.begin(),m_SourcesMergedAtEdges.end());
+	
+		INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" sources found in total (#"<<nCompactSources<<" compact, #"<<nPointLikeSources<<" point-like, #"<<nExtendedSources<<" extended, #"<<nUnknown<<" unknown/unclassified, #"<<nEdgeSources<<" edge sources, #"<<m_SourcesMergedAtEdges.size()<<" merged at edges), #"<<m_SourceCollection.size()<<" sources added to collection ...");
 		
 	}//close if
 
 	return 0;
 
 }//close MergeTaskData()
+
 
 int SFinder::MergeSourcesAtEdge()
 {
@@ -3465,7 +3426,6 @@ int SFinder::MergeSourcesAtEdge()
 		long int source_index;
 		long int worker_index;
 		long int task_index;
-		//std::vector<MergedSourceInfo> merged_sources;
 		MergedSourceInfo(long int sindex,long int windex,long int tindex)
 			: source_index(sindex), worker_index(windex), task_index(tindex)
 		{}
@@ -3480,29 +3440,38 @@ int SFinder::MergeSourcesAtEdge()
 	};//close MergedSourceInfo
 
 	//## Fill list of edge sources to be merged and fill corresponding Graph
+	INFO_LOG("Fill list of edge sources to be merged and fill corresponding graph data struct...");
 	std::vector<MergedSourceInfo> sourcesToBeMerged;
 	Graph mergedSourceGraph;
 	for(size_t i=0;i<m_taskDataPerWorkers.size();i++){
 		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
 		for(size_t j=0;j<m_taskDataPerWorkers[i].size();j++){
+
+			//int nSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources).size());
 			int nEdgeSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources_edge).size());
+			//for(int k=0;k<nSources;k++){
 			for(int k=0;k<nEdgeSources;k++){
+				//bool isAtEdge= (m_taskDataPerWorkers[i][j]->sources)[k]->IsAtEdge(); 
+				//if(!isAtEdge) continue;
 				MergedSourceInfo mergedSourceInfo= MergedSourceInfo(k,i,j);
 				sourcesToBeMerged.push_back(MergedSourceInfo(k,i,j));
 				mergedSourceGraph.AddVertex();
 			}
 		}
 	}
+	INFO_LOG("#"<<mergedSourceGraph.GetNVertexes()<<" vertexes edge source present in graph...");
 
 	//## Find adjacent edge sources
 	//std::vector<MergedSourceInfo> sourcesAlreadyMerged;
 	int itemPos= -1;
+	INFO_LOG("Find adjacent edge sources...");
 
 	for(size_t i=0;i<sourcesToBeMerged.size()-1;i++){	
 		long int sindex= sourcesToBeMerged[i].source_index;
 		long int windex= sourcesToBeMerged[i].worker_index;
 		long int tindex= sourcesToBeMerged[i].task_index; 
 		Source* source= (m_taskDataPerWorkers[windex][tindex]->sources_edge)[sindex];
+		//Source* source= (m_taskDataPerWorkers[windex][tindex]->sources)[sindex];
 
 		//Loop neighbors
 		for(size_t j=i+1;j<sourcesToBeMerged.size();j++){	
@@ -3510,12 +3479,11 @@ int SFinder::MergeSourcesAtEdge()
 			long int windex_neighbor= sourcesToBeMerged[j].worker_index;
 			long int tindex_neighbor= sourcesToBeMerged[j].task_index; 
 			Source* source_neighbor= (m_taskDataPerWorkers[windex_neighbor][tindex_neighbor]->sources_edge)[sindex_neighbor];
+			//Source* source_neighbor= (m_taskDataPerWorkers[windex_neighbor][tindex_neighbor]->sources)[sindex_neighbor];
 
 			//Check if main worker tile is physically neighbor to this
 			//If not they cannot be adjacent, so skip the following check
-			int itemPos= -1;
-			
-			if(!CodeUtils::FindItem(m_taskDataPerWorkers[windex][tindex]->neighborWorkerId,windex_neighbor,itemPos)){
+			if(windex!=windex_neighbor && !CodeUtils::FindItem(m_taskDataPerWorkers[windex][tindex]->neighborWorkerId,windex_neighbor,itemPos)){
 				INFO_LOG("Worker id "<<windex_neighbor<<" is not physically neighbor to worker "<<windex<<", so skip the source adjacency check and go to next...");
 				continue;
 			}
@@ -3535,19 +3503,23 @@ int SFinder::MergeSourcesAtEdge()
 
 	//## Find all connected components in graph corresponding to 
 	//## edge sources to be merged
+	INFO_LOG("Find all connected components in graph corresponding to edge sources to be merged...");
 	std::vector<std::vector<int>> connected_source_indexes;
 	mergedSourceGraph.GetConnectedComponents(connected_source_indexes);
 	INFO_LOG("#"<<connected_source_indexes.size()<<"/"<<sourcesToBeMerged.size()<<" edge sources will be left after merging...");
 		
 	//## Now merge the sources
-	std::vector<MergedSourceInfo> sourcesToBeRemoved;
-	bool copyPixels= false;//do not create memory for new pixels
+	std::vector<int> sourcesToBeRemoved;
+	bool copyPixels= true;//do not create memory for new pixels
 	bool checkIfAdjacent= false;//already done before
 	bool computeStatPars= false;//do not compute stats& pars at each merging
 	bool computeMorphPars= false;
 	bool computeRobustStats= true;
 	bool forceRecomputing= false;//no need to re-compute moments (already updated in AddPixel())
 
+	m_SourcesMergedAtEdges.clear();
+
+	INFO_LOG("Merging edge sources and adding them to collection...");
 	for(size_t i=0;i<connected_source_indexes.size();i++){
 		if(connected_source_indexes[i].empty()) continue;
 
@@ -3557,67 +3529,55 @@ int SFinder::MergeSourcesAtEdge()
 		long int windex= sourcesToBeMerged[index].worker_index;
 		long int tindex= sourcesToBeMerged[index].task_index; 
 		Source* source= (m_taskDataPerWorkers[windex][tindex]->sources_edge)[sindex];
+		//Source* source= (m_taskDataPerWorkers[windex][tindex]->sources)[sindex];
+		sourcesToBeRemoved.push_back(index);
+
+		//Create a new source which merges the two
+		Source* merged_source= new Source;
+		*merged_source= *source;
 
 		//Merge other sources in the group if any 
 		int nMerged= 0;
+		int source_type= source->Type;
 		for(size_t j=1;j<connected_source_indexes[i].size();j++){
-			int index_merged= connected_source_indexes[i][j];
-			long int sindex_merged= sourcesToBeMerged[index_merged].source_index;
-			long int windex_merged= sourcesToBeMerged[index_merged].worker_index;
-			long int tindex_merged= sourcesToBeMerged[index_merged].task_index; 
-			Source* source_merged= (m_taskDataPerWorkers[windex_merged][tindex_merged]->sources_edge)[sindex_merged];
+			int index_adj= connected_source_indexes[i][j];
+			long int sindex_adj= sourcesToBeMerged[index_adj].source_index;
+			long int windex_adj= sourcesToBeMerged[index_adj].worker_index;
+			long int tindex_adj= sourcesToBeMerged[index_adj].task_index; 
+			Source* source_adj= (m_taskDataPerWorkers[windex_adj][tindex_adj]->sources_edge)[sindex_adj];
+			//Source* source_adj= (m_taskDataPerWorkers[windex_adj][tindex_adj]->sources)[sindex_adj];
 				
-			int status= source->MergeSource(source_merged,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars);
+			int status= merged_source->MergeSource(source_adj,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars);
 			if(status<0){
-				WARN_LOG("Failed to merge sources (i,j)=("<<index<<" {"<<sindex<<","<<windex<<","<<tindex<<"} , "<<index_merged<<" {"<<sindex_merged<<","<<windex_merged<<","<<tindex_merged<<"}), skip to next...");
+				WARN_LOG("Failed to merge sources (i,j)=("<<index<<" {"<<sindex<<","<<windex<<","<<tindex<<"} , "<<index_adj<<" {"<<sindex_adj<<","<<windex_adj<<","<<tindex_adj<<"}), skip to next...");
 				continue;
 			}
+			nMerged++;
 
 			//Add this source to the list of edge sources to be removed
-			sourcesToBeRemoved.push_back(index_merged);
+			sourcesToBeRemoved.push_back(index_adj);
 
 		}//end loop of sources to be merged in this component
 
 		//If at least one was merged recompute stats & pars of merged source
 		if(nMerged>0) {
 			INFO_LOG("Recomputing stats & moments of merged source in merge group "<<i<<" after #"<<nMerged<<" merged source...");
-			if(source->ComputeStats(computeRobustStats,forceRecomputing)<0){
+			if(merged_source->ComputeStats(computeRobustStats,forceRecomputing)<0){
 				WARN_LOG("Failed to compute stats for merged source in merge group "<<i<<"...");
 				continue;
 			}
-			if(source->ComputeMorphologyParams()<0){
+			if(merged_source->ComputeMorphologyParams()<0){
 				WARN_LOG("Failed to compute morph pars for merged source in merge group "<<i<<"...");
 				continue;
 			}
 		}//close if
 
+		//Add merged source to collection
+		m_SourcesMergedAtEdges.push_back(merged_source);
+
 	}//end loop number of components
 
-	//Remove merged source from task edge source collection
-	INFO_LOG("Removing #"<<sourcesToBeRemoved.size()<<" edge sources that has been merged previously from task data collection...");
-	for(size_t i=0;i<m_taskDataPerWorkers.size();i++){
-		if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
-
-		//Loop over tasks per worker
-		for(size_t j=0;j<m_taskDataPerWorkers[i].size();j++){
-	
-			//Loop over sources found
-			std::vector<Source*> sources_merged_at_edges;
-			int nSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources).size());
-
-			for(int k=0;k<nSources;k++){
-				(m_taskDataPerWorkers[i][j]->sources)[k]
-			}//end 
-
-	for(size_t i=0;i<sourcesToBeRemoved.size();i++){
-		int index= sourcesToBeRemoved[i];
-		long int sindex= sourcesToBeMerged[index].source_index;
-		long int windex= sourcesToBeMerged[index].worker_index;
-		long int tindex= sourcesToBeMerged[index].task_index;
-
-		//Delete item
-		CodeUtils::DeleteItem();
-	}//end loop sources
+	INFO_LOG("#"<<m_SourcesMergedAtEdges.size()<<" merged sources at edge...");
 	
 	return 0;
 
@@ -3640,6 +3600,7 @@ int SFinder::FindSourcesAtEdge()
 			//Loop over sources found
 			std::vector<Source*> sources_not_at_edges;
 			int nSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources).size());
+			int nEdgeSources= 0;
 
 			for(int k=0;k<nSources;k++){
 				//Get source coordinate range
@@ -3694,6 +3655,7 @@ int SFinder::FindSourcesAtEdge()
 				if(isAtEdge) {
 					(m_taskDataPerWorkers[i][j]->sources)[k]->SetEdgeFlag(true);
 					(m_taskDataPerWorkers[i][j]->sources_edge).push_back( (m_taskDataPerWorkers[i][j]->sources)[k] );
+					nEdgeSources++;
 				}
 				else {
 					(m_taskDataPerWorkers[i][j]->sources)[k]->SetEdgeFlag(false);
@@ -3701,7 +3663,7 @@ int SFinder::FindSourcesAtEdge()
 				}
 			}//end loop sources	
 
-			int nEdgeSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources_edge).size());
+			//int nEdgeSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources_edge).size());
 			INFO_LOG("[PROC "<<m_procId<<"] - #"<<nEdgeSources<<"/"<<nSources<<" sources are found at tile edges...");
 	
 			//Clear initial vector (DO NOT CLEAR MEMORY!) and fill with selection (then reset selection)
@@ -3712,7 +3674,7 @@ int SFinder::FindSourcesAtEdge()
 				sources_not_at_edges.end()
 			);
 			sources_not_at_edges.clear();
-
+			
 		}//end loop tasks per worker
 	}//end loop workers
 

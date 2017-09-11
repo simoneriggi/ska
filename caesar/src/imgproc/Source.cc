@@ -365,6 +365,27 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 		}
 	}//end loop pixels to be merged
 	
+	//Set new source type
+	int mergedSourceType= aSource->Type;
+	if( this->Type==eCompact || this->Type==ePointLike ){
+		if(mergedSourceType==eCompact || mergedSourceType==ePointLike) this->Type= eCompact; 
+		else if(mergedSourceType==eExtended || mergedSourceType==eCompactPlusExtended) this->Type= eCompactPlusExtended; 
+		else this->Type= eUnknown; 
+	}
+	else if( this->Type==eExtended ){
+		if(mergedSourceType==eCompact || mergedSourceType==ePointLike) this->Type= eCompactPlusExtended; 
+		else if(mergedSourceType==eExtended) this->Type= eExtended;  
+		else if(mergedSourceType==eCompactPlusExtended) this->Type= eCompactPlusExtended; 
+		else this->Type= eUnknown; 
+	}
+	else if( this->Type==eCompactPlusExtended ){
+		if(mergedSourceType==eUnknown) this->Type= eUnknown; 
+		else this->Type= eCompactPlusExtended;  
+	}
+	else{
+		this->Type= eUnknown; 
+	}
+
 	//At this stage stats (mean/median/etc...) are invalid and need to be recomputed if desired
 	this->SetHasStats(false);//set stats to false to remember that current stats are not valid anymore and need to be recomputed
 	if(computeStatPars){

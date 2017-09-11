@@ -319,6 +319,7 @@ class Image : public TNamed {
 		* \brief Get bin x corresponding to global bin
 		*/
 		long int GetBinX(long int gbin){
+			if(gbin<0 || gbin>=(long int)(m_pixels.size())) WARN_LOG("Invalid bin given (id="<<gbin<<")");
 			return gbin % m_Nx;
 		}
 		/**

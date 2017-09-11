@@ -63,6 +63,12 @@ class Pixel : public TObject {
 		\brief Class constructor: initialize structures.
  		*/
 		Pixel();
+
+		/** 
+		\brief Parametric constructor
+ 		*/
+		Pixel(long int _gbin,long int _ix,long int _iy,double _x,double _y,double _S);
+
 		/**
 		* \brief Copy constructor
 		*/
@@ -139,6 +145,15 @@ class Pixel : public TObject {
 		*/
 		double GetEdge(){return S_edge;}
 		
+		/**
+		* \brief Dump pixel info
+		*/
+		void Print(){
+			cout<<"*** PIXEL ID "<<id<<" ***"<<endl;
+			cout<<"(ix,iy)=("<<ix<<","<<iy<<") (x,y)=("<<x<<","<<y<<")"<<endl;
+			cout<<"S="<<S<<", S_curv="<<S_curv<<", S_edge="<<S_edge<<endl;
+			cout<<"****************************"<<endl;
+		}
 
 	private:
 		/**

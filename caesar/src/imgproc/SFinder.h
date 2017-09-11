@@ -166,42 +166,42 @@ class SFinder : public TObject {
 		/**
 		* \brief Find compact sources
 		*/
-		int FindCompactSources();
+		//int FindCompactSources();
 		Image* FindCompactSources(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData);
 
 		/**
 		* \brief Compute residual map
 		*/
-		int FindResidualMap();
+		//int FindResidualMap();
 		Image* FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<Source*> const & sources);
 
 		/**
 		* \brief Find extended sources
 		*/
-		int FindExtendedSources(Image*);
+		//int FindExtendedSources(Image*);
 		Image* FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,bool storeData=false);
 		
 		/**
 		* \brief Find extended sources with hierarchical clustering method
 		*/
-		int FindExtendedSources_HClust(Image*);
+		//int FindExtendedSources_HClust(Image*);
 		Image* FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
 
 		/**
 		* \brief Find extended sources with Active Contour method
 		*/
-		int FindExtendedSources_AC(Image*);
+		//int FindExtendedSources_AC(Image*);
 		Image* FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
 
 		/**
 		* \brief Find extended sources with Wavelet Transform method
 		*/
-		int FindExtendedSources_WT(Image*);
+		//int FindExtendedSources_WT(Image*);
 		Image* FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image* searchedImg=0);
 		/**
 		* \brief Find extended sources with Saliency Map thresholding method
 		*/
-		int FindExtendedSources_SalThr(Image*);
+		//int FindExtendedSources_SalThr(Image*);
 		Image* FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
 
 		
@@ -317,8 +317,9 @@ class SFinder : public TObject {
 
 		//Source
 		Source* m_Source;
-		std::vector<Source*> m_CompactSources;
-		std::vector<Source*> m_ExtendedSources;
+		//std::vector<Source*> m_CompactSources;
+		//std::vector<Source*> m_ExtendedSources;	
+		std::vector<Source*> m_SourcesMergedAtEdges;
 		std::vector<Source*> m_SourceCollection;
 
 		//Read options
@@ -334,6 +335,7 @@ class SFinder : public TObject {
 		bool m_UseTileOverlap;
 		double m_TileStepSizeX;
 		double m_TileStepSizeY;
+		bool m_mergeSourcesAtEdge;
 
 		//Bkg computation
 		ImgBkgData* m_BkgData;

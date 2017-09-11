@@ -222,7 +222,7 @@ void LRACSegmenter::lrbac_chanvese(
 	int niters_performed= 0;
 
   for(int i=0;i<iter;i++){
-		INFO_LOG("Running LRAC algorithm [iter "<<i+1<<"/"<<iter<<", Q="<<Q<<", dQ="<<dQ<<"] ...");
+		if(i%100==0) INFO_LOG("Running LRAC algorithm [iter "<<i+1<<"/"<<iter<<", Q="<<Q<<", dQ="<<dQ<<"] ...");
 
     //compute force
     F = en_lrbac_compute(Lz,phi,img,dims, scale,lambda,rad);

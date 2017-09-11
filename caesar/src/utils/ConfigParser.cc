@@ -181,6 +181,8 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(useTileOverlap,bool,false,false,true);
 		REGISTER_OPTION(tileStepSizeX,double,1,0.001,1);
 		REGISTER_OPTION(tileStepSizeY,double,1,0.001,1);
+		REGISTER_OPTION(mergeSourcesAtEdge,bool,true,false,true);
+		
 
 		//======================
 		//==  Logger options  ==

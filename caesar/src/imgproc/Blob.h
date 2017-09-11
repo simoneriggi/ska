@@ -462,7 +462,7 @@ class Blob : public TNamed {
 		* \brief Dump blob info
 		*/
 		void Print(){
-			cout<<"*** REGION NO. "<<Id<<" ***"<<endl;
+			cout<<"*** BLOB NO. "<<Id<<" ***"<<endl;
 			cout<<"N= "<<NPix<<" Smin/Smax="<<m_Smin<<"/"<<m_Smax<<" Xmin/Xmax="<<m_Xmin<<"/"<<m_Xmax<<", Ymin/Ymax="<<m_Ymin<<"/"<<m_Ymax<<endl;
 			cout<<"X0="<<X0<<" Y0="<<Y0<<" Mean="<<Mean<<" RMS="<<RMS<<" Median="<<Median<<" MedianRMS="<<MedianRMS<<endl;
 			cout<<"****************************"<<endl;

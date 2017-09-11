@@ -16,7 +16,8 @@
 // * Caesar. If not, see http://www.gnu.org/licenses/.                   *
 // ***********************************************************************
 
-#include <SourceFinderMPI.h>
+//#include <SourceFinderMPI.h>
+#include <SFinder.h>
 
 //## CAESAR HEADERS
 #include <ConfigParser.h>
@@ -53,11 +54,16 @@ static const struct option options_tab[] = {
   {(char*)0, (int)0, (int*)0, (int)0}
 };
 
+//Options
 std::string configFileName= "";
+
+//Functions
+int ParseOptions(int argc, char *argv[]);
 
 
 int main(int argc, char *argv[]){
 
+	/*
 	if(argc<2){
 		cerr<<"ERROR: Invalid number of arguments...see macro usage!"<<endl;
 		Usage(argv[0]);
@@ -86,23 +92,34 @@ int main(int argc, char *argv[]){
 			}
     }//close switch
 	}//close while
+	*/
 
+	//================================
+	//== Parse command line options
+	//================================
+	if(ParseOptions(argc,argv)<0){
+		ERROR_LOG("Failed to parse command line options!");
+		return -1;
+	}
 
 	//======================
 	//== INIT MPI
 	//======================
 	char processor_name[MPI_MAX_PROCESSOR_NAME];
 	int nproc;
-	int myid;
+	int procid;
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
-	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
 	int namelen;
 	MPI_Get_processor_name(processor_name,&namelen);
 	double startTime= MPI_Wtime();
-	cout<<"[PROC "<<myid<<"] - INFO: Process "<<myid<<" running on processor "<<processor_name<<endl;
+	//cout<<"[PROC "<<procid<<"] - INFO: Process "<<procid<<" running on processor "<<processor_name<<endl;
+	INFO_LOG("[PROC "<<procid<<"] - INFO: Process "<<procid<<" running on processor "<<processor_name);
 
+
+	/*
 	//=======================
 	//== Read config options 
 	//=======================
@@ -159,14 +176,22 @@ int main(int argc, char *argv[]){
 		cerr<<"[PROC "<<myid<<"] - ERROR: Failed to initialize logger!"<<endl;
 		return -1;
 	}
+	*/
 
 	//=======================
 	//== Run SourceFinder
 	//=======================
-	INFO_LOG("[PROC "<<myid<<"] - Starting source finding");
-	SourceFinderMPI* finder= new SourceFinderMPI;
-	finder->Run();
-	INFO_LOG("[PROC "<<myid<<"] - End source finding");
+	INFO_LOG("[PROC "<<procid<<"] - Starting source finding");
+	//SourceFinderMPI* finder= new SourceFinderMPI;
+	//finder->Run();
+	
+	SFinder* finder= new SFinder;
+	if(finder->RunMP()<0){
+		ERROR_LOG("[PROC "<<procid<<"] - Source finding failed!");
+	}
+	else{
+		INFO_LOG("[PROC "<<procid<<"] - End source finding");
+	}
 
 	//=======================
 	//== Finalize MPI run
@@ -180,5 +205,114 @@ int main(int argc, char *argv[]){
 	return 0;
 
 }//close main
+
+
+int ParseOptions(int argc, char *argv[])
+{
+	
+	//## Check args
+	if(argc<2){
+		cerr<<"ERROR: Invalid number of arguments...see macro usage!"<<endl;
+		Usage(argv[0]);
+		exit(1);
+	}
+
+	//## Parse options
+	std::string configFileName= "";
+	int c = 0;
+  int option_index = 0;
+
+	while((c = getopt_long(argc, argv, "hc:",options_tab, &option_index)) != -1) {
+    
+    switch (c) {
+			case 0 : 
+			{
+				break;
+			}
+			case 'h':
+			{
+      	Usage(argv[0]);	
+				exit(0);
+			}
+    	case 'c':	
+			{
+				configFileName= std::string(optarg);	
+				break;	
+			}
+			default:
+			{
+      	Usage(argv[0]);	
+				exit(0);
+			}
+    }//close switch
+	}//close while
+ 
+	//## Read config options 
+	if(ConfigParser::Instance().Parse(configFileName)<0){
+		cerr<<"ERROR: Failed to parse config options!"<<endl;
+		return -1;
+	}
+	PRINT_OPTIONS();
+
+	//=======================
+	//== Init Logger 
+	//=======================
+	//Get main logger options
+	int loggerTarget= 0;
+	if(GET_OPTION_VALUE(loggerTarget,loggerTarget)<0){
+		cerr<<"ERROR: Failed to get loggerTarget option!"<<endl;
+		return -1;
+	}
+	std::string loggerTag= "";
+	std::string logLevel= "";
+	if(GET_OPTION_VALUE(loggerTag,loggerTag)<0){
+		cerr<<"ERROR: Failed to get loggerTag option!"<<endl;
+		return -1;
+	}
+	if(GET_OPTION_VALUE(logLevel,logLevel)<0){
+		cerr<<"ERROR: Failed to get logLevel option!"<<endl;
+		return -1;
+	}
+
+	//Init logger
+	if(loggerTarget==eCONSOLE_TARGET){
+		std::string consoleTarget= "";
+		GET_OPTION_VALUE(consoleTarget,consoleTarget);
+		LoggerManager::Instance().CreateConsoleLogger(logLevel,loggerTag,consoleTarget);
+	}
+	else if(loggerTarget==eFILE_TARGET){
+		std::string logFile= "";
+		std::string maxLogFileSize= "";
+		bool appendToLogFile= false;
+		int maxBackupLogFiles= 1;
+		GET_OPTION_VALUE(logFile,logFile);
+		GET_OPTION_VALUE(appendToLogFile,appendToLogFile);
+		GET_OPTION_VALUE(maxLogFileSize,maxLogFileSize);
+		GET_OPTION_VALUE(maxBackupLogFiles,maxBackupLogFiles);
+		LoggerManager::Instance().CreateFileLogger(logLevel,loggerTag,logFile,appendToLogFile,maxLogFileSize,maxBackupLogFiles);
+	}
+	else if(loggerTarget==eSYSLOG_TARGET){
+		std::string syslogFacility= "";
+		GET_OPTION_VALUE(syslogFacility,syslogFacility);
+		LoggerManager::Instance().CreateSysLogger(logLevel,loggerTag,syslogFacility);
+	}
+	else{
+		cerr<<"ERROR: Failed to initialize logger!"<<endl;
+		return -1;
+	}
+
+	//=======================
+	//== Init thread numbers 
+	//=======================
+	int nThreads;
+	if(GET_OPTION_VALUE(nThreads,nThreads)<0){
+		ERROR_LOG("Failed to get nThreads option!");
+		return -1;
+	}
+	if(nThreads>0) SysUtils::SetOMPThreads(nThreads);
+
+	return 0;
+
+}//close ParseOptions()
 
 
