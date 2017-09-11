@@ -496,7 +496,7 @@ int Blob::ComputeMorphologyParams(){
 	//## Reset existing pars
 	m_HasParameters= false;
 	DEBUG_LOG("Clear & reset existing contours (if any)...");
-	for(unsigned int i=0;i<m_Contours.size();i++){
+	for(size_t i=0;i<m_Contours.size();i++){
 		if(m_Contours[i]){
 			delete m_Contours[i];
 			m_Contours[i]= 0;
@@ -542,10 +542,10 @@ int Blob::ComputeMorphologyParams(){
 	DEBUG_LOG("boundingBoxIX("<<boundingBoxIX[0]<<","<<boundingBoxIX[1]<<"), boundingBoxIY("<<boundingBoxIY[0]<<","<<boundingBoxIY[1]<<")"<<"  nBoxIX="<<nBoxIX<<", nBoxIY="<<nBoxIY);
 
 	//## Fill image and binarized image
-	cv::Mat binarizedImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_8UC1);
-	cv::Mat rasterImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_64FC1);
-	//cv::Mat binarizedImg = cv::Mat::zeros(nBoxY, nBoxX, CV_8UC1);//last
-	//cv::Mat rasterImg = cv::Mat::zeros(nBoxY, nBoxX, CV_64FC1);//last
+	//cv::Mat binarizedImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_8UC1);
+	//cv::Mat rasterImg = cv::Mat::zeros(nBoxIY, nBoxIX, CV_64FC1);
+	cv::Mat binarizedImg = cv::Mat::zeros(nBoxY, nBoxX, CV_8UC1);//last
+	cv::Mat rasterImg = cv::Mat::zeros(nBoxY, nBoxX, CV_64FC1);//last
 
 	for(unsigned int k=0;k<m_Pixels.size();k++){
 		Pixel* thisPixel= m_Pixels[k];
@@ -560,10 +560,10 @@ int Blob::ComputeMorphologyParams(){
 		ix-= boundingBoxIX[0];
 		iy-= boundingBoxIY[0];
 
-		long int rowId= nBoxIY-1-iy;
-		long int colId= nBoxIX-1-ix;
-		//long int rowId= nBoxY-1-y;//TEST (LAST)
-		//long int colId= nBoxX-1-x;//TEST (LAST)
+		//long int rowId= nBoxIY-1-iy;
+		//long int colId= nBoxIX-1-ix;
+		long int rowId= nBoxY-1-y;//TEST (LAST)
+		long int colId= nBoxX-1-x;//TEST (LAST)
 		
 		binarizedImg.at<uchar>(rowId, colId, 0) = 1;
 		rasterImg.at<double>(rowId, colId, 0) = thisS;		
@@ -580,7 +580,7 @@ int Blob::ComputeMorphologyParams(){
 	
 	Contour* aContour= 0;
 
-	for(unsigned int i=0; i<contours.size(); i++){ // iterate through each contour
+	for(size_t i=0; i<contours.size(); i++){ // iterate through each contour
 		int nContourPts= (int)contours[i].size();
 		if(nContourPts<=0) continue;
 
@@ -593,23 +593,20 @@ int Blob::ComputeMorphologyParams(){
 			int contx= contours[i][j].x;
 			int conty= contours[i][j].y;
 
-				
+			/*		
 			int rowId= nBoxIY-1-conty;
 			int colId= nBoxIX-1-contx;
 			int contx_transf= colId + boundingBoxX[0];
 			int conty_transf= rowId + boundingBoxY[0];
+			*/
 			
-			/*
 			//LAST
 			long int rowId= nBoxY-1-conty;
 			long int colId= nBoxX-1-contx;
 			long int contx_transf= colId + boundingBoxX[0];
 			long int conty_transf= rowId + boundingBoxY[0];
-			*/
-
-			//aContour->AddPoint(cv::Point2f(contx_transf,conty_transf));
+			
 			aContour->AddPoint(TVector2(contx_transf,conty_transf));
-			//cout<<"("<<contx<<","<<conty<<"), ";
 			sstream<<"("<<contx_transf<<","<<conty_transf<<"), ";
 		}//end loop points in contour
 		sstream<<")";

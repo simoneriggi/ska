@@ -284,6 +284,7 @@ int BlobFinder::FloodFill(Image* img,std::vector<long int>& clusterPixelIds,long
 	}
 	
 	//Add seed to queue and loop over queue
+	DEBUG_LOG("Starting flood-fill from seed pixel "<<seedPixelId<<" (floodMinThr="<<floodMinThr<<", floodMaxThr="<<floodMaxThr<<")");
 	std::queue<long int> pixelQueue;
 	pixelQueue.push(seedPixelId);
 	
@@ -313,10 +314,13 @@ int BlobFinder::FloodFill(Image* img,std::vector<long int>& clusterPixelIds,long
     
 		bool spanUp = false;
     bool spanDown = false;
+
+		DEBUG_LOG("Start flood-fill spanning from (ix,iy)=("<<binIdX<<","<<binIdY<<")");
 		 
 		while (img->IsBinContentInRange(binIdX,binIdY,floodMinThr,floodMaxThr)) {
    		long int gBinId_cluster= img->GetBin(binIdX,binIdY);
-			if(!isAddedInCluster[gBinId_cluster] && img->HasBin(gBinId_cluster)) {
+			if(img->HasBin(binIdX,binIdY) && !isAddedInCluster[gBinId_cluster]) {
+				DEBUG_LOG("Adding pixel to blob (id="<<gBinId_cluster<<", (ix,iy)=("<<binIdX<<","<<binIdY<<")");
 				clusterPixelIds.push_back(gBinId_cluster);
 				isAddedInCluster[gBinId_cluster]= true;
 			}
@@ -325,7 +329,7 @@ int BlobFinder::FloodFill(Image* img,std::vector<long int>& clusterPixelIds,long
 			long int gBinId_up= img->GetBin(binIdX,binIdY+1);
 
 			if (!spanUp && img->IsBinContentInRange(binIdX,binIdY+1,floodMinThr,floodMaxThr)) {
-      	if(!isAddedInQueue[gBinId_up] && img->HasBin(gBinId_up) ) {
+      	if(img->HasBin(binIdX,binIdY+1) && !isAddedInQueue[gBinId_up]  ) {
 					pixelQueue.push(gBinId_up);
 					isAddedInQueue[gBinId_up]= true;
 					spanUp = true;
@@ -339,7 +343,7 @@ int BlobFinder::FloodFill(Image* img,std::vector<long int>& clusterPixelIds,long
 			long int gBinId_down= img->GetBin(binIdX,binIdY-1);
 
 			if (!spanDown && img->IsBinContentInRange(binIdX,binIdY-1,floodMinThr,floodMaxThr)) {
-     		if(!isAddedInQueue[gBinId_down] && img->HasBin(gBinId_down) ) {
+     		if(img->HasBin(binIdX,binIdY-1) && !isAddedInQueue[gBinId_down] ) {
 					pixelQueue.push(gBinId_down);
 					isAddedInQueue[gBinId_down]= true;
 					spanDown = true;

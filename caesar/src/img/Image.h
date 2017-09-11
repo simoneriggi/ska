@@ -313,6 +313,10 @@ class Image : public TNamed {
 		* \brief Get global bin corresponding to x & y bins
 		*/
 		long int GetBin(long int binx,long int biny){
+			if(!HasBin(binx,biny)) {
+				WARN_LOG("Invalid bin requested ("<<binx<<","<<biny<<")!");
+				return -1;
+			}
 			return binx + biny*m_Nx;
 		}		
 		/**
@@ -458,34 +462,67 @@ class Image : public TNamed {
 		* \brief Check if given bin id is within image range
 		*/
 		bool HasBin(long int gbin){
-			return ( gbin>=0 && gbin<(long int)(m_pixels.size()) );
+			//return ( gbin>=0 && gbin<(long int)(m_pixels.size()) );
+			long int binx= GetBinX(gbin);
+			long int biny= GetBinY(gbin);
+			bool isInRange= ( gbin>=0 && gbin<(long int)(m_pixels.size()) );
+			return HasBin(binx,biny) && isInRange;
 		}
-		bool HasBin(long int binIdX,long int binIdY){
-			long int binId= GetBin(binIdX,binIdY);
-			return HasBin(binId);
-		}
-		/*
-		bool HasBin(double x,double y){
-			int binId= this->FindBin(x,y);
-			return HasBin(binId);
-		}
-		bool HasBinX(int binIdX){
-			int Nx= this->GetNbinsX();
-			return (binIdX>=1 && binIdX<=Nx );
-		}
-		bool HasBinX(double x){
-			int binIdX= this->GetXaxis()->FindBin(x);
-			return HasBinX(binIdX);
-		}
-		bool HasBinY(int binIdY){
-			int Ny= this->GetNbinsY(); 
-			return (binIdY>=1 && binIdY<=Ny );
-		}
-		bool HasBinY(double y){
-			int binIdY= this->GetYaxis()->FindBin(y);
-			return HasBinY(binIdY);
-		}
+
+		/**
+		* \brief Check if given bin with image coordinates (ix,iy) is within image range
 		*/
+		bool HasBin(long int binIdX,long int binIdY){
+			if(binIdX<0 || binIdX>=m_Nx || binIdY<0 || binIdY>=m_Ny) {
+				return false;
+			}
+			//long int binId= GetBin(binIdX,binIdY);
+			//return HasBin(binId);	
+			return true;
+		}
+		
+		/**
+		* \brief Check if given bin with physical coordinates (x,y) is within image range
+		*/
+		bool HasBin(double x,double y){
+			long int binId= this->FindBin(x,y);
+			return HasBin(binId);
+		}
+		
+		/**
+		* \brief Check if given bin with image coordinate ix is within image range
+		*/
+		bool HasBinX(long int ix){
+			return (ix>=0 && ix<=(m_Nx-1) );
+		}
+		
+		/**
+		* \brief Check if given physical coordinate x is within image range
+		*/
+		bool HasBinX(double x){
+			double xmin= GetXmin();
+			double xmax= GetXmax();
+			long int binx= static_cast<long int>( (m_Nx-1)*(x-xmin)/(xmax-xmin) );
+			return HasBinX(binx);
+		}
+		
+		/**
+		* \brief Check if given bin with image coordinate iy is within image range
+		*/
+		bool HasBinY(long int iy){
+			return (iy>=0 && iy<=(m_Ny-1) );
+		}
+		
+		/**
+		* \brief Check if given physical coordinate y is within image range
+		*/
+		bool HasBinY(double y){		
+			double ymin= GetYmin();
+			double ymax= GetYmax();
+			long int biny= static_cast<long int>( (m_Ny-1)*(y-ymin)/(ymax-ymin) );
+			return HasBinY(biny);
+		}
+		
 
 		/**
 		* \brief Find bin corresponding to physical coordinates (x,y)

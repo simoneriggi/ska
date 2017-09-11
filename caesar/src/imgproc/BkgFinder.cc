@@ -667,6 +667,7 @@ int BkgFinder::ComputeSampleBkg(BkgSampleData& bkgSampleData,Image* img,int esti
 	bool skipNegativePixels= false;
 	int status= 0;
 	long int npix= 0;
+	DEBUG_LOG("Computing stats for tile x("<<ix_min<<","<<ix_max<<"), y("<<iy_min<<","<<iy_max<<")");
 
 	// == mean bkg ==
 	if(estimator == BkgEstimator::eMeanBkg){

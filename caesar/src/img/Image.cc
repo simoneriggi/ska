@@ -1183,7 +1183,7 @@ int Image::GetTilePixels(std::vector<float>& pixels,long int ix_min,long int ix_
 
 			std::copy_if (
 				m_pixels.begin() + gBin_min, 
-				m_pixels.begin() + gBin_max, 
+				m_pixels.begin() + gBin_max + 1, 
 				std::back_inserter(pixels), 
 				[](float w){
 					return (w>=0);
@@ -1197,10 +1197,10 @@ int Image::GetTilePixels(std::vector<float>& pixels,long int ix_min,long int ix_
 		for(long int j=iy_min;j<=iy_max;j++){
 			//Get row start/end iterators
 			long int gBin_min= GetBin(ix_min,j);		
-			long int gBin_max= GetBin(ix_max+1,j);		
+			long int gBin_max= GetBin(ix_max,j);		
 
 			//Extract row and append to vector
-			pixels.insert(pixels.end(), m_pixels.begin() + gBin_min, m_pixels.begin() + gBin_max);
+			pixels.insert(pixels.end(), m_pixels.begin() + gBin_min, m_pixels.begin() + gBin_max + 1);
 
 		}//end loop row
 	}//close else

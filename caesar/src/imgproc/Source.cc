@@ -149,7 +149,8 @@ void Source::Init(){
 void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int lineColor,int lineStyle){
 
 	//Drawing contours?
-	for(unsigned int i=0;i<m_Contours.size();i++){		
+	DEBUG_LOG("#"<<m_Contours.size()<<" contours present for source "<<Id<<"...");
+	for(size_t i=0;i<m_Contours.size();i++){		
 		TGraph* thisContourGraph= m_Contours[i]->GetGraph();
 		if(thisContourGraph) {
 			thisContourGraph->SetMarkerSize(8);

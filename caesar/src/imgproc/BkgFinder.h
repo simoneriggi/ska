@@ -54,9 +54,6 @@ class BkgFinder : public TObject {
 
 	public:
 	
-		//=========================================
-		//==  NEW IMAGE METHODS 
-		//=========================================
 		/**
 		* \brief Find image background
 		*/
@@ -65,9 +62,6 @@ class BkgFinder : public TObject {
 		
 	private:
 
-		//=========================================
-		//==  NEW IMAGE METHODS 
-		//=========================================
 		/**
 		* \brief Compute global background
 		*/
