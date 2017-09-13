@@ -314,7 +314,7 @@ class Image : public TNamed {
 		*/
 		long int GetBin(long int binx,long int biny){
 			if(!HasBin(binx,biny)) {
-				WARN_LOG("Invalid bin requested ("<<binx<<","<<biny<<")!");
+				DEBUG_LOG("Invalid bin requested ("<<binx<<","<<biny<<")!");
 				return -1;
 			}
 			return binx + biny*m_Nx;

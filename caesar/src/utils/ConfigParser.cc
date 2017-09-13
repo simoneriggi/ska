@@ -144,7 +144,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(outputFile,std::string,"Output.root","","");
 		REGISTER_OPTION(ds9RegionFile,std::string,"DS9SourceRegion.reg","","");
 		REGISTER_OPTION(saveDS9Region,bool,true,false,true);
-		REGISTER_OPTION(DS9RegionFormat,int,1,0,3);
+		REGISTER_OPTION(DS9RegionFormat,int,2,0,3);
 		REGISTER_OPTION(saveToFile,bool,true,false,true);
 		REGISTER_OPTION(saveConfig,bool,true,false,true);
 		REGISTER_OPTION(saveResidualMap,bool,true,false,true);
@@ -175,6 +175,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//=======================================
 		//==  Distributed processing options   ==
 		//=======================================
+		REGISTER_OPTION(splitInTiles,bool,false,false,true);
 		REGISTER_OPTION(nThreads,int,-1,-1,100);
 		REGISTER_OPTION(tileSizeX,long int,1000,1,10000000);
 		REGISTER_OPTION(tileSizeY,long int,1000,1,10000000);	

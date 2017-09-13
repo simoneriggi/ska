@@ -1150,9 +1150,8 @@ int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool for
 	//Stop timer
 	auto end = chrono::steady_clock::now();
 	double dt= chrono::duration <double, milli> (end-start).count();
-	INFO_LOG("Image stats recomputed in "<<dt<<" ms");
+	DEBUG_LOG("Image stats recomputed in "<<dt<<" ms");
 	
-
 	return 0;
 
 }//close ComputeStats()
@@ -1160,7 +1159,6 @@ int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool for
 
 int Image::GetTilePixels(std::vector<float>& pixels,long int ix_min,long int ix_max,long int iy_min,long int iy_max,bool skipNegativePixels)
 {
-
 	//Check range given
 	if(ix_min<0 || ix_max<0 || ix_max>=m_Nx || ix_min>=ix_max){
 		ERROR_LOG("Invalid x range given!");

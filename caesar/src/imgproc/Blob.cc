@@ -313,10 +313,10 @@ void Blob::ResetMoments(){
 	m_PixIdmax= -1; m_PixIdmin= -1;
 	
 	//Reset image ranges
-	m_Xmin= std::numeric_limits<double>::infinity();
-	m_Xmax= -std::numeric_limits<double>::infinity();
-	m_Ymin= std::numeric_limits<double>::infinity();
-	m_Ymax= -std::numeric_limits<double>::infinity();
+	m_Xmin= std::numeric_limits<float>::infinity();
+	m_Xmax= -std::numeric_limits<float>::infinity();
+	m_Ymin= std::numeric_limits<float>::infinity();
+	m_Ymax= -std::numeric_limits<float>::infinity();
 
 	m_Ix_min= LONG_MAX;
 	m_Ix_max= LONG_MIN;
@@ -441,6 +441,11 @@ int Blob::ComputeStats(bool computeRobustStats,bool forceRecomputing){
 	//## NB: Compute stats parameters only if not already done or if forced
 	//##     This was a bug in older version affecting saliency calculation (the spatial component in region distance) and eventually the extended source extraction!!!
 	//##     Need to introduce a rescaling of spatial vs color distance (a factor 100 more or less?) 
+	if((signed)(m_Pixels.size())!=NPix){
+		ERROR_LOG("Mismatch between number of pixels present in collection ("<<m_Pixels.size()<<") and NPix="<<NPix<<" (fix bug!!!)");
+		return -1;
+	}
+
 	if(!m_HasStats || forceRecomputing){
 		X0/= (double)(NPix);
 		Y0/= (double)(NPix);
@@ -470,7 +475,7 @@ int Blob::ComputeStats(bool computeRobustStats,bool forceRecomputing){
 		std::vector<double> SList;
 		std::vector<double> SCurvList;
 		
-		for(int i=0;i<NPix;i++){
+		for(size_t i=0;i<m_Pixels.size();i++){
 			double S= m_Pixels[i]->S;		
 			double S_curv= m_Pixels[i]->S_curv;
 			SList.push_back(S);
@@ -510,8 +515,8 @@ int Blob::ComputeMorphologyParams(){
 	//######################################
 	//## Find the source bounding box
 	//######################################
-	double xRange[2]= {m_Xmin,m_Xmax};
-	double yRange[2]= {m_Ymin,m_Ymax};	
+	float xRange[2]= {m_Xmin,m_Xmax};
+	float yRange[2]= {m_Ymin,m_Ymax};	
 	long int ixRange[2]= {m_Ix_min,m_Ix_max};
 	long int iyRange[2]= {m_Iy_min,m_Iy_max};
 	
@@ -756,7 +761,9 @@ Image* Blob::GetImage(ImgType mode){
 
 	return blobImg;
 
-}//close Blob::GetImage()
+}//close GetImage()
+
+
 
 
 

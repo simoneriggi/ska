@@ -79,34 +79,13 @@ class SFinder : public TObject {
 
 
 	public:
+		
 		/**
-		* \brief Run source finder
+		* \brief Run source finder 
 		*/
 		int Run();
-	
-		/**
-		* \brief Run source finder in multiprocessor 
-		*/
-		int RunMP();
 		
 		
-		/**
-		* \brief Run source finder task
-		*/
-		int RunTask(TaskData* taskData,bool storeData=false);
-		
-
-		/**
-		* \brief Set options from ConfigParser singleton
-		*/
-		int Configure();
-
-		
-		/**
-		* \brief Compute Stats and Bkg info
-		*/
-		ImgBkgData* ComputeStatsAndBkg(Image*);
-
 	public:
 		/**
 		* \brief Read only a tile from image
@@ -144,6 +123,24 @@ class SFinder : public TObject {
 		*/
 		int Save();	
 
+
+		/**
+		* \brief Run source finder task
+		*/
+		int RunTask(TaskData* taskData,bool storeData=false);
+		
+
+		/**
+		* \brief Set options from ConfigParser singleton
+		*/
+		int Configure();
+
+		
+		/**
+		* \brief Compute Stats and Bkg info
+		*/
+		ImgBkgData* ComputeStatsAndBkg(Image*);
+
 		/**
 		* \brief Read image
 		*/
@@ -166,42 +163,36 @@ class SFinder : public TObject {
 		/**
 		* \brief Find compact sources
 		*/
-		//int FindCompactSources();
 		Image* FindCompactSources(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData);
 
 		/**
 		* \brief Compute residual map
 		*/
-		//int FindResidualMap();
 		Image* FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<Source*> const & sources);
 
 		/**
 		* \brief Find extended sources
 		*/
-		//int FindExtendedSources(Image*);
 		Image* FindExtendedSources(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,bool storeData=false);
 		
 		/**
 		* \brief Find extended sources with hierarchical clustering method
 		*/
-		//int FindExtendedSources_HClust(Image*);
 		Image* FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
 
 		/**
 		* \brief Find extended sources with Active Contour method
 		*/
-		//int FindExtendedSources_AC(Image*);
 		Image* FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
 
 		/**
 		* \brief Find extended sources with Wavelet Transform method
 		*/
-		//int FindExtendedSources_WT(Image*);
 		Image* FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image* searchedImg=0);
+
 		/**
 		* \brief Find extended sources with Saliency Map thresholding method
 		*/
-		//int FindExtendedSources_SalThr(Image*);
 		Image* FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,Image* searchedImg=0,bool storeData=false);
 
 		
@@ -288,7 +279,6 @@ class SFinder : public TObject {
 		bool m_saveToFile;
 		bool m_saveConfig;
 		bool m_saveDS9Region;
-		//FILE* m_DS9CatalogFilePtr;	
 		std::string m_DS9CatalogFileName;
 		int m_DS9RegionFormat;		
 		TTree* m_SourceTree;
@@ -328,8 +318,11 @@ class SFinder : public TObject {
 		double m_TileMaxX;
 		double m_TileMinY;
 		double m_TileMaxY;
+		float m_ImgXmin;
+		float m_ImgYmin;
 
 		//Read distributed options
+		bool m_splitInTiles;
 		long int m_TileSizeX;
 		long int m_TileSizeY;
 		bool m_UseTileOverlap;

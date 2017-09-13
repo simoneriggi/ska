@@ -44,46 +44,199 @@
 
 namespace Caesar {
 
-
-
-class TaskData : public TObject {
+//=======================================
+//==    TILE CLASS                    ===
+//=======================================
+class Tile {
+	
 	public:
-		//Standard constructor
+		Tile(long int xmin,long int xmax,long int ymin,long int ymax)
+			: ix_min(xmin), ix_max(xmax), iy_min(ymin), iy_max(ymax)
+		{};
+		virtual ~Tile(){};
+
+	public:	
+	
+		/*
+		bool IsTileAdjacentX(Tile& const aTile){
+			long int ix_min_N= aTile.ix_min;
+			long int ix_max_N= aTile.ix_max;
+			bool isAdjacentInX= (ix_max==ix_min_N-1 || ix_min==ix_max_N+1 || (ix_min==ix_min_N && ix_max==ix_max_N));
+			return isAdjacentInX;
+		}
+		bool IsTileAdjacentY(Tile& const aTile){
+			long int iy_min_N= aTile.iy_min;
+			long int iy_max_N= aTile.iy_max;
+			bool isAdjacentInY= (iy_max==iy_min_N-1 || iy_min==iy_max_N+1 || (iy_min==iy_min_N && iy_max==iy_max_N));
+			return isAdjacentInY;
+		}
+		*/
+		bool IsTileAdjacent(Tile const& aTile){
+			long int ix_min_N= aTile.ix_min;
+			long int ix_max_N= aTile.ix_max;
+			long int iy_min_N= aTile.iy_min;
+			long int iy_max_N= aTile.iy_max;
+			bool isAdjacentInX= (ix_max==ix_min_N-1 || ix_min==ix_max_N+1 || (ix_min==ix_min_N && ix_max==ix_max_N));
+			bool isAdjacentInY= (iy_max==iy_min_N-1 || iy_min==iy_max_N+1 || (iy_min==iy_min_N && iy_max==iy_max_N));
+			bool isAdjacent= isAdjacentInX && isAdjacentInY;
+			return isAdjacent;
+		}
+
+		bool IsTileOverlapping(Tile const& aTile){
+			long int ix_min_N= aTile.ix_min;
+			long int ix_max_N= aTile.ix_max;
+			long int iy_min_N= aTile.iy_min;
+			long int iy_max_N= aTile.iy_max;
+			if (ix_max < ix_min_N) return false; // a is left of b
+    	if (ix_min > ix_max_N) return false; // a is right of b
+    	if (iy_max < iy_min_N) return false; // a is above b
+    	if (iy_min > iy_max_N) return false; // a is below b
+			return true;
+		}
+
+		/**
+		* \brief Check if point is inside tile
+		*/
+		bool IsInsideTile(double x,double y){
+			bool isInside= ( (x>=ix_min && x<=ix_max) && (y>=iy_min && y<=iy_max) );
+			return isInside;
+		}
+		
+	public:
+		long int ix_min;
+		long int ix_max;
+		long int iy_min;
+		long int iy_max;
+		
+};//close class Tile
+
+//=======================================
+//==    TASK DATA CLASS               ===
+//=======================================
+class TaskData : public TObject {
+	
+	public:
+		/**
+		* \brief Standard constructor
+		*/		
 		TaskData();
 				
-		//Copy constructor
+		/**
+		* \brief Copy constructor
+		*/
 		TaskData(const TaskData& data);
 
-		//Destructor
+		/**
+		* \brief Destructor
+		*/
 		virtual ~TaskData();
 
 	public:
-		// Operator =
+		/**
+		* \brief Operator =
+		*/
 		TaskData& operator=(const TaskData& data);
 
-		//Copy method
+		/**
+		* \brief Copy method
+		*/
 		void Copy(TObject &obj) const;
+
+	public:
+			
+		/**
+		* \brief Set tile
+		*/
+		int SetTile(long int xmin,long int xmax,long int ymin,long int ymax){
+			if(xmin<0 || xmax<0 || xmin>=xmax) return -1;
+			if(ymin<0 || ymax<0 || ymin>=ymax) return -1;
+			ix_min= xmin;
+			ix_max= xmax;
+			iy_min= ymin;
+			iy_max= ymax;
+			return 0;
+		}
+
+		/**
+		* \brief Add neighbor info
+		*/
+		void AddNeighborInfo(long int tid,long int wid){
+			neighborTaskId.push_back(tid);
+			neighborWorkerId.push_back(wid);
+		}
+
+		/**
+		* \brief Check if point is inside task tile
+		*/
+		bool IsInsideTaskTile(double x,double y){
+			bool isInside= ( (x>=ix_min && x<=ix_max) && (y>=iy_min && y<=iy_max) );
+			return isInside;
+		}
+
+		/**
+		* \brief Check if this task tile is adjacent to another given task
+		*/
+		bool IsTaskTileAdjacent(TaskData* aTask){
+			if(!aTask) return false;
+			long int ix_min_N= aTask->ix_min;
+			long int ix_max_N= aTask->ix_max;
+			long int iy_min_N= aTask->iy_min;
+			long int iy_max_N= aTask->iy_max;
+			bool isAdjacentInX= (ix_max==ix_min_N-1 || ix_min==ix_max_N+1 || (ix_min==ix_min_N && ix_max==ix_max_N));
+			bool isAdjacentInY= (iy_max==iy_min_N-1 || iy_min==iy_max_N+1 || (iy_min==iy_min_N && iy_max==iy_max_N));
+			bool isAdjacent= isAdjacentInX && isAdjacentInY;
+			return isAdjacent;
+		}
+
+		/**
+		* \brief Check if this task tile is overlapping with another given task
+		*/
+		bool IsTaskTileOverlapping(TaskData* aTask){
+			if(!aTask) return false;
+			long int ix_min_N= aTask->ix_min;
+			long int ix_max_N= aTask->ix_max;
+			long int iy_min_N= aTask->iy_min;
+			long int iy_max_N= aTask->iy_max;
+			if (ix_max < ix_min_N) return false; // a is left of b
+    	if (ix_min > ix_max_N) return false; // a is right of b
+    	if (iy_max < iy_min_N) return false; // a is above b
+    	if (iy_min > iy_max_N) return false; // a is below b
+			return true;
+		}
+	
+		/**
+		* \brief Check if this task tile is neighbor (adjacent or overlapping) to another given task
+		*/
+		bool IsTaskTileNeighbor(TaskData* aTask){
+			if(!aTask) return false;
+			bool isOverlapping= IsTaskTileOverlapping(aTask);
+			bool isAdjacent= IsTaskTileAdjacent(aTask);
+			bool isNeighbor= (isAdjacent || isOverlapping);
+			return isNeighbor;
+		}
 
 	public: 
 
 		//Task info		
-		std::string filename; 
-		std::string jobId;
+		//std::string filename; 
+		//std::string jobId;
 		long int workerId;
-		long int taskId;
+		//long int taskId;
 		std::vector<long int> neighborTaskId;
 		std::vector<long int> neighborWorkerId;
 	
+		//- Image coordinates
 		long int ix_min;
 		long int ix_max;
 		long int iy_min;
 		long int iy_max;
 
-		double x_min;
-		double x_max;
-		double y_min;
-		double y_max;
-		
+		//double x_min;
+		//double x_max;
+		//double y_min;
+		//double y_max;
+			
+		//- Detected sources
 		Source* source;
 		std::vector<Source*> sources;
 		std::vector<Source*> ext_sources;

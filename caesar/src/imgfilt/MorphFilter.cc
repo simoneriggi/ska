@@ -258,7 +258,7 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 	}
 
 	if(Zmax<zThr){
-		INFO_LOG("Source is below significance threshold for dilation (Z="<<Zmax<<"<"<<zThr<<"), skip it!");
+		DEBUG_LOG("Source is below significance threshold for dilation (Z="<<Zmax<<"<"<<zThr<<"), skip it!");
 		return 0;	
 	}
 	

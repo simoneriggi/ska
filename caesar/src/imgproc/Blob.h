@@ -81,13 +81,11 @@ class Blob : public TNamed {
 		/** 
 		\brief Parametric constructor
  		*/
-		//Blob(ImgRange img_range,std::string name="");			
 		Blob(std::string name);			
 		
 		/** 
 		\brief Parametric constructor
  		*/
-		//Blob(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name="");			
 		Blob(std::vector<Pixel*>const& pixels,std::string name="");			
 
 		/**
@@ -183,6 +181,11 @@ class Blob : public TNamed {
 		* \brief Get pixel collection
 		*/	
 		const PixelCollection& GetPixels() const {return m_Pixels;}
+
+		/**
+		* \brief Set pixel collection
+		*/
+		void SetPixels(PixelCollection& pixels){m_Pixels= pixels;}		
 
 		/**
 		* \brief Add a pixel to collection
@@ -401,7 +404,7 @@ class Blob : public TNamed {
 		/**
 		* \brief Get source x-y range
 		*/
-		void GetSourceRange(double& xmin,double& xmax,double& ymin,double& ymax){
+		void GetSourceRange(float& xmin,float& xmax,float& ymin,float& ymax){
 			xmin= m_Xmin; 
 			xmax= m_Xmax;
 			ymin= m_Ymin;
@@ -410,7 +413,7 @@ class Blob : public TNamed {
 		/**
 		* \brief Set source x-y range
 		*/
-		void SetSourceRange(double xmin,double xmax,double ymin,double ymax){
+		void SetSourceRange(float xmin,float xmax,float ymin,float ymax){
 			m_Xmin= xmin; 
 			m_Xmax= xmax;
 			m_Ymin= ymin;
@@ -437,25 +440,6 @@ class Blob : public TNamed {
 			m_Iy_max= iymax;
 		}
 
-		//================================================
-		//==         IMAGE SETTERS/GETTERS 
-		//================================================
-		/*
-		void SetImageSRange(double Smin,double Smax){m_ImageMinS=Smin; m_ImageMaxS=Smax;}
-		void GetImageSRange(double& Smin,double& Smax){Smin=m_ImageMinS; Smax=m_ImageMaxS;}
-
-		void SetImageRMS(double rms){m_ImageRMS=rms;}
-		double GetImageRMS(){return m_ImageRMS;}
-
-		void SetImageScurvRange(double Smin,double Smax){m_ImageMinScurv=Smin; m_ImageMaxScurv=Smax;}
-		void GetImageScurvRange(double& Smin,double& Smax){Smin=m_ImageMinScurv; Smax=m_ImageMaxScurv;}
-
-		void SetImageSedgeRange(double Smin,double Smax){m_ImageMinSedge=Smin; m_ImageMaxSedge=Smax;}
-		void GetImageSedgeRange(double& Smin,double& Smax){Smin=m_ImageMinSedge; Smax=m_ImageMaxSedge;}
-
-		void SetImageSize(long int Nx,long int Ny){m_ImageSizeX=Nx; m_ImageSizeY=Ny;}
-		void GetImageSize(long int& sizeX,long int& sizeY){sizeX=m_ImageSizeX;sizeY=m_ImageSizeY;}
-		*/
 		
 
 		/**
@@ -493,6 +477,7 @@ class Blob : public TNamed {
 			m_Contours.push_back(aContour);
 		}
 
+		
 
 	private:
 
@@ -603,10 +588,10 @@ class Blob : public TNamed {
 		double m_ImageRMS;
 		*/
 
-		double m_Xmin;
-		double m_Xmax;
-		double m_Ymin;
-		double m_Ymax;
+		float m_Xmin;
+		float m_Xmax;
+		float m_Ymin;
+		float m_Ymax;
 		long int m_Ix_min;
 		long int m_Ix_max;
 		long int m_Iy_min;

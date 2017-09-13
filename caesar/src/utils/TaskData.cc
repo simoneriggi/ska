@@ -57,18 +57,18 @@ namespace Caesar {
 TaskData::TaskData() : TObject() {	
 	
 	//Init task info
-	filename= "";
-	jobId= "";
+	//filename= "";
+	//jobId= "";
 	workerId= -1;
 	ix_min= -1;
 	ix_max= -1;
 	iy_min= -1;
 	iy_max= -1;
 
-	x_min= -1;
-	x_max= -1;
-	y_min= -1;
-	y_max= -1;
+	//x_min= -1;
+	//x_max= -1;
+	//y_min= -1;
+	//y_max= -1;
 
 	//Init sources
 	source= 0;
@@ -134,18 +134,18 @@ TaskData& TaskData::operator=(const TaskData& data) {
 void TaskData::Copy(TObject &obj) const {
 			
 	TObject::Copy((TaskData&)obj);
-	((TaskData&)obj).filename = filename;
-	((TaskData&)obj).jobId = jobId;
+	//((TaskData&)obj).filename = filename;
+	//((TaskData&)obj).jobId = jobId;
 	((TaskData&)obj).workerId = workerId;
 	((TaskData&)obj).ix_min = ix_min;	
 	((TaskData&)obj).ix_max = ix_max;		
 	((TaskData&)obj).iy_min = iy_min;	
 	((TaskData&)obj).iy_max = iy_max;
 
-	((TaskData&)obj).x_min = x_min;	
-	((TaskData&)obj).x_max = x_max;		
-	((TaskData&)obj).y_min = y_min;	
-	((TaskData&)obj).y_max = y_max;
+	//((TaskData&)obj).x_min = x_min;	
+	//((TaskData&)obj).x_max = x_max;		
+	//((TaskData&)obj).y_min = y_min;	
+	//((TaskData&)obj).y_max = y_max;
 
 	//Delete first a previously existing vector
 	for(unsigned int i=0;i<(((TaskData&)obj).sources).size();i++){

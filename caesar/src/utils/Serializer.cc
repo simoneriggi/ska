@@ -331,7 +331,7 @@ int Serializer::EncodeBlobToProtobuf(CaesarPB::Blob& blob_pb,Source* source){
 		//=================================
 		*/
 
-		double sxmin, sxmax, symin, symax;
+		float sxmin, sxmax, symin, symax;
 		source->GetSourceRange(sxmin,sxmax,symin,symax);
 		blob_pb.set_m_xmin(sxmin);
 		blob_pb.set_m_xmax(sxmax);
@@ -426,18 +426,18 @@ int Serializer::EncodeTaskDataToProtobuf(CaesarPB::TaskData& taskData_pb,TaskDat
 
 	try {
 		//Fill task info
-		taskData_pb.set_filename(taskData->filename);
-		taskData_pb.set_jobid(taskData->jobId);
+		//taskData_pb.set_filename(taskData->filename);
+		//taskData_pb.set_jobid(taskData->jobId);
 		taskData_pb.set_workerid(taskData->workerId);	
-		taskData_pb.set_taskid(taskData->taskId);
+		//taskData_pb.set_taskid(taskData->taskId);
 		taskData_pb.set_ix_min(taskData->ix_min);
 		taskData_pb.set_ix_max(taskData->ix_max);
 		taskData_pb.set_iy_min(taskData->iy_min);
 		taskData_pb.set_iy_max(taskData->iy_max);
-		taskData_pb.set_x_min(taskData->x_min);
-		taskData_pb.set_x_max(taskData->x_max);
-		taskData_pb.set_y_min(taskData->y_min);
-		taskData_pb.set_y_max(taskData->y_max);
+		//taskData_pb.set_x_min(taskData->x_min);
+		//taskData_pb.set_x_max(taskData->x_max);
+		//taskData_pb.set_y_min(taskData->y_min);
+		//taskData_pb.set_y_max(taskData->y_max);
 
 		//Fill neighbor list
 		for(unsigned int i=0;i<taskData->neighborTaskId.size();i++) {
@@ -496,7 +496,7 @@ int Serializer::EncodeTaskDataToProtobuf(CaesarPB::TaskData& taskData_pb,TaskDat
 int Serializer::EncodeTaskDataCollectionToProtobuf(CaesarPB::TaskDataCollection& taskDataCollection_pb,std::vector<TaskData*> taskDataCollection){
 
 	//Fill task collections
-	for(unsigned int i=0;i<taskDataCollection.size();i++){
+	for(size_t i=0;i<taskDataCollection.size();i++){
 		CaesarPB::TaskData* thisTaskPB = taskDataCollection_pb.add_tasks();
 		if(EncodeTaskDataToProtobuf(*thisTaskPB,taskDataCollection[i])<0){
 			std::stringstream errMsg;
@@ -819,8 +819,9 @@ int Serializer::EncodeProtobufToBlob(Source& source,const CaesarPB::Blob& blob_p
 				throw std::runtime_error(errMsg.str().c_str());
 			}
 			pixel_list.push_back(aPixel);
-			source.AddPixel(aPixel);
+			//source.AddPixel(aPixel);//NB: Do not use this otherwise NPix and all other moments will be incremented
 		}	
+		source.SetPixels(pixel_list);
 
 		//Add contour collection to blob
 		Contour* aContour= 0;
@@ -1039,6 +1040,7 @@ int Serializer::EncodeProtobufToTaskData(TaskData& taskData,const CaesarPB::Task
 
 	try {		
 		//Fill task info
+		/*
 		//--> filename
 		if(!taskData_pb.has_filename()){
 			ERROR_LOG("Missing filename field, failed to encode!");
@@ -1060,6 +1062,7 @@ int Serializer::EncodeProtobufToTaskData(TaskData& taskData,const CaesarPB::Task
 			ERROR_LOG("Empty string jobId field, failed to encode!");
 			return -1;
 		}
+		*/
 
 		//--> workerId
 		if(!taskData_pb.has_workerid()){
@@ -1112,7 +1115,7 @@ int Serializer::EncodeProtobufToTaskData(TaskData& taskData,const CaesarPB::Task
 			return -1;
 		}
 
-
+		/*
 		//--> x_min
 		if(!taskData_pb.has_x_min()){
 			ERROR_LOG("Missing x_min field, failed to encode!");
@@ -1140,7 +1143,7 @@ int Serializer::EncodeProtobufToTaskData(TaskData& taskData,const CaesarPB::Task
 			return -1;
 		}
 		taskData.y_max= taskData_pb.y_max();
-
+		*/
 
 	
 		//Encode neighbour list

@@ -367,8 +367,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 		salMapsThresholds.push_back(salThr);
 
 		INFO_LOG("Saliency map norm stats @ reso "<<reso<<" (median="<<salMedian<<", salThr="<<salThr<<")");
-		salMap_norm->PrintStats();
-		
+		//salMap_norm->PrintStats();
 
 	}//end loop reso
 	
@@ -455,7 +454,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 	//Compute saliency stats
 	INFO_LOG("Multi-reso combined saliency stats (before normalization and after bkg/noise sum)");
 	saliencyImg->ComputeStats(true,false,true);
-	saliencyImg->PrintStats();
+	//saliencyImg->PrintStats();
 
 	//Normalize final map
 	DEBUG_LOG("Normalize final maps...");

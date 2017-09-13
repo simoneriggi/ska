@@ -132,16 +132,7 @@ class Source : public Blob {
 		*/
 		int GetDepthLevel(){return m_DepthLevel;}
 
-		/**
-		* \brief Is source inside given source
-		*/
-		bool IsInsideSource(Source* aSource){
-			if(!aSource) return false;
-			bool isInsideX= (m_Xmin>=aSource->m_Xmin && m_Xmax<=aSource->m_Xmax);
-			bool isInsideY= (m_Ymin>=aSource->m_Ymin && m_Ymax<=aSource->m_Ymax);
-			bool isInside= (isInsideX && isInsideY);			
-			return isInside;
-		}	
+		
 		/**
 		* \brief Add nested sources
 		*/
@@ -196,16 +187,60 @@ class Source : public Blob {
 		*/
 		const std::string GetDS9EllipseRegion(bool dumpNestedSourceInfo=false);
 
+		
+		//================================================
+		//==         UTILS
+		//================================================
 		/**
-		* \brief Check if a given source is adjacent to this
+		* \brief Is source inside given source
+		*/
+		bool IsInsideSource(Source* aSource){
+			if(!aSource) return false;
+			bool isInsideX= (m_Xmin>=aSource->m_Xmin && m_Xmax<=aSource->m_Xmax);
+			bool isInsideY= (m_Ymin>=aSource->m_Ymin && m_Ymax<=aSource->m_Ymax);
+			bool isInside= (isInsideX && isInsideY);			
+			return isInside;
+		}	
+
+		/**
+		* \brief Check if source share boundary with given box
+		*/
+		bool IsAtBoxEdge(float xmin,float xmax,float ymin,float ymax){
+			//Check if at box edge	
+			bool isAtBoxEdgeX= (this->m_Xmin==xmin || this->m_Xmax==xmax);
+			bool isAtBoxEdgeY= (this->m_Ymin==ymin || this->m_Ymax==ymax);
+			bool isAtBoxEdge= (isAtBoxEdgeX || isAtBoxEdgeY);
+			return isAtBoxEdge;
+		}
+		
+		/**
+		* \brief Is source inside given box
+		*/
+		bool HasBoxOverlap(float xmin,float xmax,float ymin,float ymax){
+			//Check if overlapping
+			if (this->m_Xmax < xmin) return false; // A is left of B
+  		if (this->m_Xmin > xmax) return false; // A is right of B
+  		if (this->m_Ymax < ymin) return false; // A is above B
+  		if (this->m_Ymin > ymax) return false; // A is below B
+			return true;//boxes overlap
+		}
+
+		/**
+		* \brief Check if this source bounding box overlaps with another given source
+		*/
+		bool CheckBoxOverlapping(Source*);
+	
+		/**
+		* \brief Check if this source is adjacent to another given source
 		*/
 		bool IsAdjacentSource(Source* aSource);
+
 		/**
 		* \brief Merge this source with given source
 		*/
 		int MergeSource(Source* aSource,bool copyPixels=false,bool checkIfAdjacent=true,bool computeStatPars=true,bool computeMorphPars=true);
 
-		
+
 	private:
 	
 		/**

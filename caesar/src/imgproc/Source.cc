@@ -298,6 +298,7 @@ bool Source::IsAdjacentSource(Source* aSource){
 	}	
 
 	//Find if there are adjacent pixels
+	INFO_LOG("Finding if this source (pos=("<<X0<<","<<Y0<<"), #"<<m_Pixels.size()<<" pix) is adjacent to source (pos("<<aSource->X0<<","<<aSource->Y0<<"), #"<<(aSource->m_Pixels).size()<<" pix)");
 	auto it = std::find_first_of(
 		(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
 		m_Pixels.begin(), m_Pixels.end(),
@@ -405,6 +406,23 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 	
 }//close MergeSource()
 
+bool Source::CheckBoxOverlapping(Source* aSource)
+{
+	//Check input blob
+	if(!aSource){
+		ERROR_LOG("Null ptr to input source given!");
+		return false;
+	}
+	
+	//Get bounding box pars
+	float xmin= aSource->m_Xmin;
+	float xmax= aSource->m_Xmax;
+	float ymin= aSource->m_Ymin;
+	float ymax= aSource->m_Ymax;
+
+	return HasBoxOverlap(xmin,xmax,ymin,ymax);
+
+}//close CheckBoxOverlapping()
 
 
 }//close namespace
