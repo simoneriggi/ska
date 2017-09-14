@@ -16,6 +16,8 @@ progress from the SCORPIO survey", MNRAS (2016) doi: 10.1093/mnras/stw982, arXiv
 At present CAESAR is still being developed with major functionalities to be integrated in this repository. The API could be therefore subjected to significant changes. 
 
 ## **Installation**  
+
+### **Prerequisites**
 Install the project mandatory dependencies:  
 * ROOT [https://root.cern.ch/], to be built with FITSIO, PyROOT, RInterface options enabled. Make sure that the FindROOT.cmake is present in $ROOTSYS/etc/cmake directory after installation.
 * OpenCV [http://opencv.org/]
@@ -41,23 +43,36 @@ Make sure you have set the following environment variables to the external libra
 * BOOST_ROOT
 * LOG4CXX_ROOT
 * JSONCPP_ROOT
-* CFITSIO_DIR
 
 Add also the following paths to the PKG_CONFIG_PATH environment var: 
 * $LOG4CXX_ROOT/lib/pkgconfig  
+* $JSONCPP_ROOT/lib/pkgconfig
 
-CAESAR depends also on the wcstools and linterp libraries which are already provided in the external/ directory. Note that the provided wcslib was slightly modified with respect to the original release to avoid naming conflicts with the R package.
+CAESAR depends also on the wcstools and linterp libraries which are already provided in the external/ directory. 
+**NB: The provided wcslib was slightly modified with respect to the original release to avoid naming conflicts with the R package due to some #define macros used in WCS.**
 
 cmake should find all needed include dirs and libraries used to build the project.
 
+### **Build and install**
 To build and install the project:
 
 * Clone this repository into your local $SOURCE_DIR  
   ```git clone https://github.com/simoneriggi/ska-dsh_lmc.git $SOURCE_DIR```
 * Create the build and install directories: $BUILD_DIR, $INSTALL_DIR  
 * In the build directory:  
-  ```cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR $SOURCE_DIR```  
   ```cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DENABLE_TEST=ON -DBUILD_WITH_OPENMP=ON -DENABLE_MPI=ON -DBUILD_APPS=ON $SOURCE_DIR```   
   ```make```  
   ```make install```  
   
+### **Documentation generation**
+To generate the documentation you must have Doxygen installed. Enter the build directory and type:
+  ```make doc```  
+  ```make install``` 
+  
+### **Running unit tests**
+To build the unit tests you must have Google Test installed and the ENABLE_TEST option set to ON when building Caesar.
+To run the test:
+
+```make test```
+
+or alternatively run the script `runUnitTests` installed in the Caesar installation dir.
