@@ -16,20 +16,32 @@ progress from the SCORPIO survey", MNRAS (2016) doi: 10.1093/mnras/stw982, arXiv
 At present CAESAR is still being developed with major functionalities to be integrated in this repository. The API could be therefore subjected to significant changes. 
 
 ## **Installation**  
-Install the project dependencies:  
+Install the project mandatory dependencies:  
 * ROOT [https://root.cern.ch/], to be built with FITSIO, PyROOT, RInterface options enabled. Make sure that the FindROOT.cmake is present in $ROOTSYS/etc/cmake directory after installation.
 * OpenCV [http://opencv.org/]
 * R [https://www.r-project.org/], install also these additional packages: RInside, Rcpp, rrcovHD, truncnorm, FNN, akima
 * log4cxx [https://logging.apache.org/log4cxx/]
-* boost [http://www.boost.org/]
-* python (>=2.7) [https://www.python.org/], install also these additional modules: pyfits
+* boost [http://www.boost.org/] 
+* cfitsio [https://heasarc.gsfc.nasa.gov/fitsio/fitsio.html], to be built with multithread support (e.g. give --enable-reentrant option in configure)
+* protobuf [https://github.com/google/protobuf]
+* jsoncpp [https://github.com/open-source-parsers/jsoncpp]
+* python (>=2.7) [https://www.python.org/], install also these additional modules: pyfits, astropy
 * cmake (>=2.8) [https://cmake.org]  
   
+Optional dependencies are:
+* MPICH [https://www.mpich.org/], needed when the build option ENABLE_MPI=ON        
+* OpenMP [http://www.openmp.org/], needed when the build option BUILD_WITH_OPENMP=ON    
+* GoogleTest [https://github.com/google/googletest], needed for unit testing when the build option ENABLE_TEST=ON   
+* Doxygen [www.doxygen.org/], needed to generate the API documentation   
+
 Make sure you have set the following environment variables to the external library installation dirs 
 * ROOTSYS
 * OPENCV_DIR
+* R_DIR
 * BOOST_ROOT
 * LOG4CXX_ROOT
+* JSONCPP_ROOT
+* CFITSIO_DIR
 
 Add also the following paths to the PKG_CONFIG_PATH environment var: 
 * $LOG4CXX_ROOT/lib/pkgconfig  
@@ -45,6 +57,7 @@ To build and install the project:
 * Create the build and install directories: $BUILD_DIR, $INSTALL_DIR  
 * In the build directory:  
   ```cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR $SOURCE_DIR```  
+  ```cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DENABLE_TEST=ON -DBUILD_WITH_OPENMP=ON -DENABLE_MPI=ON -DBUILD_APPS=ON $SOURCE_DIR```   
   ```make```  
   ```make install```  
   
