@@ -19,8 +19,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "=========================="
 	echo "*** MANDATORY ARGS ***"
 	echo "--filelist=[FILELIST] - Ascii file with list of image files (.fits/.root, full path) to be processed" 
-	echo "--batch_queue=[BATCH_QUEUE] - Name of queue in batch system" 
-	echo "--env_file=[ENV_FILE] - File (.sh) with list of environment variables to be loaded by each processing node"
+	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
+	echo "--envfile=[ENV_FILE] - File (.sh) with list of environment variables to be loaded by each processing node"
 	echo ""
 	echo ""
 	echo "*** OPTIONAL ARGS ***"	
@@ -222,7 +222,7 @@ do
 
     *)
     # Unknown option
-    echo "ERROR: Unknown option...exit!"
+    echo "ERROR: Unknown option ($item)...exit!"
     exit 1
     ;;
 	esac
@@ -547,7 +547,7 @@ echo "INFO: Creating config file $configfile ..."
 	   
  ) > $configfile
 
-EXE="$CAESAR_DIR/scripts/RunSFinderMPI"
+EXE="$CAESAR_DIR/scripts/RunSFinderMPI.sh"
 EXE_ARGS="--nproc=$NPROC --config=$configfile"
 if [ "$HOSTFILE_GIVEN" = true ] ; then
 	EXE_ARGS="$EXE_ARGS --hostfile=$HOSTFILE"

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 
 #######################################
@@ -75,9 +75,9 @@ if [ "$HOSTFILE_GIVEN" = true ] ; then
 	CMD="$CMD -f $HOSTFILE "
 fi
 CMD="$CMD $EXE --config=$CONFIGFILE"
-echo "INFO: Running cmd: $CMD"
 
-#eval $CMD
+echo "INFO: Running cmd: $CMD"
+eval $CMD
 
 
 echo "INFO: End source finder run."
