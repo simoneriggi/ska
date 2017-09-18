@@ -67,28 +67,47 @@ class ImgMetaData : public TObject {
 		WorldCoor* GetWorldCoord(int coordSystem=-1);
 
 		/**
-		* \brief Get size of synthetic beam
+		* \brief Get pixel area in deg^2
 		*/
-		double GetBeamSize(){
+		double GetPixelArea(){
+			double pixelArea= fabs(dX*dY);
+			return pixelArea;
+		}
+
+		/**
+		* \brief Get width of synthetic beam
+		*/
+		double GetBeamWidth(){
 			return sqrt(fabs(Bmaj*Bmin));
 		}
+
 		/**
-		* \brief Get pixel scale
+		* \brief Get area of synthetic beam
 		*/
-		int GetBeamSizeInPixel(){
-			double beamSize= GetBeamSize();
-			double pixScale= sqrt(fabs(dX*dY));
-			int npixInBeam= int(ceil(beamSize/pixScale));
-			return npixInBeam;
-		}
-		/**
-		* \brief Get flux correction from beam
-		*/
-		double GetBeamFluxIntegral(){
+		double GetBeamArea(){
 			double fx= Bmaj;
 			double fy= Bmin;
 			double A= TMath::Pi()*fx*fy/(4*log(2));//2d gaussian area with FWHM=fx,fy
 			return A;
+		}
+	
+		/**
+		* \brief Get pixel scale
+		*/
+		int GetBeamWidthInPixel(){
+			double beamWidth= GetBeamWidth();
+			double pixScale= sqrt(fabs(dX*dY));
+			int beamWidthInPixel= int(ceil(beamWidth/pixScale));
+			return beamWidthInPixel;
+		}
+		/**
+		* \brief Get flux correction from beam
+		*/
+		double GetBeamFluxIntegral(){	
+			double beamArea= GetBeamArea();
+			double pixelArea= GetPixelArea();
+			double f= beamArea/pixelArea;
+			return f;
 		}
 	
 	protected:

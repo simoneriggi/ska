@@ -52,6 +52,12 @@
 #include <TMatrixD.h>
 #include <TGraph.h>
 
+//VTK
+#ifdef VTK_ENABLED
+	#include <vtkSmartPointer.h>
+	#include <vtkImageData.h>
+#endif
+
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -195,9 +201,12 @@ class Image : public TNamed {
  		*/
 		Image();
     Image(const Image& img);		
-		Image(long int nbinsx,long int nbinsy,float xlow=-1,float ylow=-1,std::string name="");	
-		Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,float xlow=-1,float ylow=-1,std::string name="");
-		Image(long int nbinsx,long int nbinsy,float w,float xlow=-1,float ylow=-1,std::string name="");
+		Image(long int nbinsx,long int nbinsy,std::string name="");	
+		Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string name="");	
+		Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,std::string name="");
+		Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,float xlow,float ylow,std::string name="");
+		Image(long int nbinsx,long int nbinsy,float w,std::string name="");
+		Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::string name="");
 		Image& operator=(const Image &img);
 		virtual void Copy(TObject &hnew) const;
 
@@ -590,15 +599,22 @@ class Image : public TNamed {
 		#endif		
 
 		/**
-		* \brief Fill pixels (to be used to compute stats at fill time)
+		* \brief Fill image from OpenCV mat object 
 		*/
 		int FillFromMat(cv::Mat&,bool useNegativePixInStats=true);
 
 		/**
-		* \brief Fill pixels (to be used to compute stats at fill time)
+		* \brief Fill image from ROOT TMatrixD object 
 		*/
 		int FillFromTMatrix(TMatrixD&,bool useNegativePixInStats=true);
 
+		
+		#ifdef VTK_ENABLED
+		/**
+		* \brief Fill image from VktImageData object
+		*/
+		int FillFromVtkImage(vtkSmartPointer<vtkImageData> imageData,bool useNegativePixInStats=true);
+		#endif
 
 		//================================
 		//==       READ/WRITE methods

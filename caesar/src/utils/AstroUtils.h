@@ -32,6 +32,7 @@
 #include <wcs.h>
 
 #include <TObject.h>
+#include <TMath.h>
 
 #include <cstdlib>
 #include <iomanip>
@@ -81,6 +82,34 @@ class AstroUtils : public TObject {
 		*/
 		static int PixelToWCSCoords(Caesar::Image* image,double ix,double iy,double& xpos, double& ypos,int coordSystem=-1);
 		
+		/**
+		* \brief Get beam area from BMAJ, BMIN 
+		*/
+		static double GetBeamArea(double Bmaj,double Bmin){
+			double A= TMath::Pi()*Bmaj*Bmin/(4*log(2));//2d gaussian area with FWHM=fx,fy
+			return A;
+		}
+
+		/**
+		* \brief Get beam area in pixels given Bmaj, Bmin and pixel sizes (dx, dy) in deg
+		*/
+		static double GetBeamAreaInPixels(double Bmaj,double Bmin,double dX,double dY){	
+			double beamArea= GetBeamArea(Bmaj,Bmin);
+			double pixelArea= fabs(dX*dY);
+			double A= beamArea/pixelArea;
+			return A;
+		}
+
+		/**
+		* \brief Get beam width in pixels given Bmaj, Bmin and pixel sizes (dx, dy) in deg
+		*/
+		static int GetBeamWidthInPixels(double Bmaj,double Bmin,double dX,double dY){	
+			double beamWidth= sqrt(fabs(Bmaj*Bmin));
+			double pixWidth= sqrt(fabs(dX*dY));
+			int beamWidthInPixel= static_cast<int>( ceil(beamWidth/pixWidth) );
+			return beamWidthInPixel;
+		}
+	
 	private:
 	
 		ClassDef(AstroUtils,1)

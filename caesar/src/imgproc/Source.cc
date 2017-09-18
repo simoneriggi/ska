@@ -55,14 +55,14 @@ ClassImp(Caesar::Source)
 namespace Caesar {
 
 
-Source::Source() : Blob() {
-
+Source::Source() 
+	: Blob() 
+{
+	//Initialize 
 	Init();
 
 }//close costructor
 
-//Source::Source(ImgRange img_range,std::string name)
-//	: Blob(img_range, name)
 Source::Source(std::string name)
 	: Blob(name)
 {
@@ -70,8 +70,6 @@ Source::Source(std::string name)
 }//close parametric constructor
 
 
-//Source::Source(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name)
-//	: Blob(pixels,img_range,name)
 Source::Source(std::vector<Pixel*>const& pixels,std::string name)
 	: Blob(pixels,name)
 {
@@ -79,7 +77,8 @@ Source::Source(std::vector<Pixel*>const& pixels,std::string name)
 }//close parametric constructor
 
 
-Source::~Source(){
+Source::~Source()
+{
 	
 }//close destructor
 
@@ -134,6 +133,7 @@ void Source::Init(){
 
 	Type= eUnknown;
 	Flag= eCandidate;
+	SimType= eUnknownSimClass;
 	m_BeamFluxIntegral= 0;
 	
 	m_IsGoodSource= true;
@@ -294,8 +294,17 @@ bool Source::IsAdjacentSource(Source* aSource){
 
 	//Check if pixel collections are empty
 	if(GetNPixels()<=0 || aSource->GetNPixels()<=0){
+		DEBUG_LOG("This or given source have no pixels, return not adjacent.");
 		return false;
 	}	
+
+	//Check if bouding boxes are overlapping
+	//NB: If not skip the adjacency check
+	bool areBoundingBoxesOverlapping= CheckBoxOverlapping(aSource);
+	if(!areBoundingBoxesOverlapping){
+		DEBUG_LOG("Sources not adjacent as their bounding boxes (S1(x["<<m_Xmin<<","<<m_Xmax<<"), y["<<m_Ymin<<","<<m_Ymax<<"]), S2(x["<<aSource->m_Xmin<<","<<aSource->m_Xmax<<"), y["<<aSource->m_Ymin<<","<<aSource->m_Ymax<<"]) do not overlap...");
+		return false;		
+	}
 
 	//Find if there are adjacent pixels
 	INFO_LOG("Finding if this source (pos=("<<X0<<","<<Y0<<"), #"<<m_Pixels.size()<<" pix) is adjacent to source (pos("<<aSource->X0<<","<<aSource->Y0<<"), #"<<(aSource->m_Pixels).size()<<" pix)");

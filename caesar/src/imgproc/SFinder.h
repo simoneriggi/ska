@@ -321,6 +321,11 @@ class SFinder : public TObject {
 		float m_ImgXmin;
 		float m_ImgYmin;
 
+		//Image beam options
+		double m_beamFWHM;
+		double m_pixSize;
+		double m_fluxCorrectionFactor;
+
 		//Read distributed options
 		bool m_splitInTiles;
 		long int m_TileSizeX;

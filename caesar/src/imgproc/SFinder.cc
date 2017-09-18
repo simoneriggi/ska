@@ -215,6 +215,11 @@ void SFinder::InitOptions()
 	m_InputFileExtension= "";
 	m_InputImg= 0;
 
+	//Beam info
+	m_beamFWHM= 6.5;
+	m_pixSize= 1;
+	m_fluxCorrectionFactor= 1;
+	
 	//Output options
 	m_OutputFile= 0;	
 	m_OutputFileName= "";
@@ -408,6 +413,11 @@ int SFinder::Configure(){
 
 	GET_OPTION_VALUE(mergeSourcesAtEdge,m_mergeSourcesAtEdge);
 	
+	//Get beam options
+	GET_OPTION_VALUE(beamFWHM,m_beamFWHM);
+	GET_OPTION_VALUE(pixSize,m_pixSize);
+	m_fluxCorrectionFactor= AstroUtils::GetBeamAreaInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
+
 
 	//Get output file options
 	GET_OPTION_VALUE(outputFile,m_OutputFileName);
@@ -1048,7 +1058,7 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 		return nullptr;
 	}
 
-	//## Tag found sources as extended 
+	//## Tag found sources as compact 
 	int nSources= static_cast<int>( sources.size() );
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" compact sources detected in input image ...");
 	for(size_t k=0;k<sources.size();k++) {
@@ -1070,6 +1080,22 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 		//nSources= static_cast<int>(taskData->sources.size());
 		nSources= static_cast<int>(sources.size());
 	}//close if source selection
+
+
+	//## Set flux correction factor
+	double fluxCorrection= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(fluxCorrection>0) hasBeamData= true;
+	}
+
+	if(!hasBeamData){
+		INFO_LOG("Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		fluxCorrection= m_fluxCorrectionFactor;
+	}
+	
+	for(size_t k=0;k<sources.size();k++) sources[k]->SetBeamFluxIntegral(fluxCorrection);
 	
 			
 	//## Add sources to task data sources
@@ -2164,7 +2190,7 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 	//## Check input img
 	if(!img){
 		ERROR_LOG("[PROC "<<m_procId<<"] - Null ptr to input image given!");
-		return 0;
+		return nullptr;
 	}
 
 	//## Compute stats
@@ -2174,18 +2200,56 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 	bool forceRecomputing= false;
 	if(img->ComputeStats(computeRobustStats,skipNegativePix,forceRecomputing)<0){
 		ERROR_LOG("[PROC "<<m_procId<<"] - Stats computing failed!");
-		return 0;
+		return nullptr;
 	}
 	img->LogStats("INFO");
 
 	//## Set local bkg grid/box
-	//## If MetaData & beam info are available, interpret grid&box options as multiple of beam
-	//## If no info is available (or use of beam info is off) interpret grid&box options as fractions wrt image size
+	//## If MetaData & beam info are available, interpret grid & box options as multiple of beam
+	//## If no info is available (or use of beam info is off) interpret grid & box options as fractions wrt image size
 	double boxSizeX= m_BoxSizeX;
 	double boxSizeY= m_BoxSizeY;
-	int nPixelsInBeam= 0;
+
+	int pixelWidthInBeam= 0;
+	if(m_UseBeamInfoInBkg){
+
+		//Retrieve info from image metadata
+		bool hasBeamData= false;
+		if(img->HasMetaData()){
+			pixelWidthInBeam= img->GetMetaData()->GetBeamWidthInPixel();	
+			if(pixelWidthInBeam>0) hasBeamData= true; 
+		}
+		
+		//If beam data are not present in metadata, use those provided in the config file
+		if(!hasBeamData){
+			WARN_LOG("[PROC "<<m_procId<<"] - Using user-provided beam info to set bkg box size (beam info are not available/valid in image)...");
+			pixelWidthInBeam= AstroUtils::GetBeamWidthInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
+		}
+
+		if(pixelWidthInBeam<=0){
+			ERROR_LOG("Invalid pixel width in beam computed from user-supplied beam info (beamFWHM,pixSize)=("<<m_beamFWHM<<","<<m_pixSize<<")!");
+			return nullptr;
+		}
+
+		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes as ("<<m_BoxSizeX<<","<<m_BoxSizeY<<") x beam (beam=#"<<pixelWidthInBeam<<" pixels) ...");
+		boxSizeX= pixelWidthInBeam*m_BoxSizeX;
+		boxSizeY= pixelWidthInBeam*m_BoxSizeY;
+
+	}//close if use beam info
+	else{
+		WARN_LOG("[PROC "<<m_procId<<"] - Using image fractions to set bkg box size (beam info option is turned off)...");
+		double Nx= static_cast<double>(img->GetNx());
+		double Ny= static_cast<double>(img->GetNy());
+		boxSizeX= m_BoxSizeX*Nx;
+		boxSizeY= m_BoxSizeY*Ny;
+		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes to ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
+	}
+
+	/*
+	int nPixelsInBeam= 0;	
+	
 	if(m_UseBeamInfoInBkg && img->HasMetaData()){
-		nPixelsInBeam= img->GetMetaData()->GetBeamSizeInPixel();	
+		nPixelsInBeam= img->GetMetaData()->GetBeamWidthInPixel();	
 	}
 	
 	if(m_UseBeamInfoInBkg && nPixelsInBeam>0){
@@ -2201,6 +2265,7 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 		boxSizeY= m_BoxSizeY*Ny;
 		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes to ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
 	}
+	*/
 
 	double gridSizeX= m_GridSizeX*boxSizeX;
 	double gridSizeY= m_GridSizeY*boxSizeY;
@@ -2216,7 +2281,7 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 
 	if(!bkgData) {
 		ERROR_LOG("[PROC "<<m_procId<<"] - Bkg computing failed!");
-		return 0;
+		return nullptr;
 	}
 		
 	return bkgData;
@@ -3042,12 +3107,14 @@ int SFinder::MergeSourcesAtEdge()
 				continue;
 			}
 
+			/*
 			//Check if bouding boxes are overlapping
 			//NB: If not skip the adjacency check
 			bool areBoundingBoxesOverlapping= source->CheckBoxOverlapping(source_neighbor);
 			if(!areBoundingBoxesOverlapping){
 				DEBUG_LOG("Sources (i,j)=("<<i<<" {"<<sindex<<","<<windex<<","<<tindex<<"} , "<<j<<" {"<<sindex_neighbor<<","<<windex_neighbor<<","<<tindex_neighbor<<"}) have NON-overlapping bounding boxes, skip the adjacency check...");
 			}
+			*/
 
 			//Check is sources are adjacent
 			//NB: This is time-consuming (N1xN2 more or less)!!!

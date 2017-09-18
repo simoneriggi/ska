@@ -63,6 +63,7 @@
 
 #include <Logger.h>
 
+//ROOT headers
 #include <TFile.h>
 #include <TH2F.h>
 #include <TMath.h>
@@ -78,12 +79,21 @@
 #include <TExec.h>
 #include <TF1.h>
 
+
+//OpenCV headers
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+//VTK headers
+#ifdef VTK_ENABLED
+	#include <vtkSmartPointer.h>
+	#include <vtkImageData.h>
+#endif
+
+//C++ headers
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -115,6 +125,29 @@ Image::Image()
   Init();
 }//close costructor
 
+Image::Image(long int nbinsx,long int nbinsy,std::string name) 
+	: TNamed(name.c_str(),name.c_str())
+{
+
+	//Check mismatch between pixels size and dimx/dimy
+	if(nbinsx<=0 || nbinsy<=0){
+		std::stringstream ss;
+		ss<<"Invalid image size (<=0) given!";
+		ERROR_LOG(ss.str());
+		throw std::out_of_range(ss.str().c_str());
+	}
+	
+	//Init pars
+  Init();
+
+	//Set image name
+	m_name= name;
+
+	//Set image size
+	SetSize(nbinsx,nbinsy,0,0);
+
+}//close constructor
+
 Image::Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string name) 
 	: TNamed(name.c_str(),name.c_str())
 {
@@ -132,16 +165,45 @@ Image::Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string n
 
 	//Set image name
 	m_name= name;
-	if(xlow==-1 || ylow==-1){
-		xlow= 0;
-		ylow= 0;
-	}
+	//if(xlow==-1 || ylow==-1){
+	//	xlow= 0;
+	//	ylow= 0;
+	//}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
 
 }//close constructor
 
+Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,std::string name)
+	: TNamed(name.c_str(),name.c_str())
+{
+	//Check mismatch between pixels size and dimx/dimy
+	long int npixels= (long int)(pixels.size());
+	if(nbinsx<=0 || nbinsy<=0 || npixels<=0 || npixels!=(nbinsx*nbinsy)){
+		std::stringstream ss;
+		ss<<"Invalid image size (<=0) or pixel size given (should be equal to Nx*Ny)!";
+		ERROR_LOG(ss.str());
+		throw std::out_of_range(ss.str().c_str());
+	}
+
+	//Init pars
+  Init();
+
+	//Set image name
+	m_name= name;
+
+	//Set image size
+	SetSize(nbinsx,nbinsy,0,0);
+
+	//Fill pixels	
+	bool useNegativePixInStats= true;
+	for(size_t i=0;i<pixels.size();i++){
+		double w= pixels[i];
+		if(FillPixel(i,w,useNegativePixInStats)<0) continue;
+	}
+
+}//close constructor
 
 Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,float xlow,float ylow,std::string name)
 	: TNamed(name.c_str(),name.c_str())
@@ -160,10 +222,10 @@ Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,flo
 
 	//Set image name
 	m_name= name;
-	if(xlow==-1 || ylow==-1){
-		xlow= 0;
-		ylow= 0;
-	}
+	//if(xlow==-1 || ylow==-1){
+	//	xlow= 0;
+	//	ylow= 0;
+	//}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -177,6 +239,35 @@ Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,flo
 
 }//close constructor
 
+Image::Image(long int nbinsx,long int nbinsy,float w,std::string name)
+	: TNamed(name.c_str(),name.c_str())
+{
+	//Check mismatch between pixels size and dimx/dimy
+	if(nbinsx<=0 || nbinsy<=0){
+		std::stringstream ss;
+		ss<<"Invalid image size (<=0) or pixel size given (should be equal to Nx*Ny)!";
+		ERROR_LOG(ss.str());
+		throw std::out_of_range(ss.str().c_str());
+	}
+	long int npixels= nbinsx*nbinsy;
+
+	//Init pars
+  Init();
+
+	//Set image name
+	m_name= name;
+
+	//Set image size
+	SetSize(nbinsx,nbinsy,0,0);
+
+	//Fill pixels	
+	bool useNegativePixInStats= true;
+	for(long int i=0;i<npixels;i++){
+		if(FillPixel(i,w,useNegativePixInStats)<0) continue;
+	}
+
+}//close constructor
+		
 Image::Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::string name)
 	: TNamed(name.c_str(),name.c_str())
 {
@@ -194,10 +285,10 @@ Image::Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::
 
 	//Set image name
 	m_name= name;
-	if(xlow==-1 || ylow==-1){
-		xlow= 0;
-		ylow= 0;
-	}
+	//if(xlow==-1 || ylow==-1){
+	//	xlow= 0;
+	//	ylow= 0;
+	//}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -209,7 +300,6 @@ Image::Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::
 	}
 
 }//close constructor
-		
 
 Image::Image(const Image &img)
 {
@@ -762,6 +852,86 @@ int Image::FillFromTMatrix(TMatrixD& mat,bool useNegativePixInStats){
 
 }//close FillFromTMatrix()
 
+#ifdef VTK_ENABLED
+int Image::FillFromVtkImage(vtkSmartPointer<vtkImageData> imageData,bool useNegativePixInStats)
+{
+	//Check image data
+	if(!imageData){
+		ERROR_LOG("Null ptr to input VTK image data given!");
+		return -1;
+	}
+
+	//Check dims
+	int* dims = imageData->GetDimensions();
+	if(dims[2]!=1){
+		ERROR_LOG("Invalid z dimension (must be =1) in VTK image data!");
+		return -1;
+	}
+
+	long int Nx= dims[1];
+	long int Ny= dims[0];
+
+	//Set image size
+	this->SetSize(Nx,Ny);
+
+	//Reset image data
+	this->Reset();	
+	
+	//Loop over pixel data and fill
+	#ifdef OPENMP_ENABLED
+		Caesar::StatMoments<double> moments_t;		
+		std::vector<Caesar::StatMoments<double>> parallel_moments;
+
+		#pragma omp parallel private(moments_t)
+		{
+			int thread_id= omp_get_thread_num();
+			int nthreads= SysUtils::GetOMPThreads();
+
+			#pragma omp single
+   		{
+     		parallel_moments.assign(nthreads,Caesar::StatMoments<double>());
+   		}
+
+			#pragma omp for
+			for(int row = 0; row < dims[0]; ++row) {
+				long int iy= Ny-1-row;
+    		for(int col = 0; col < dims[1]; ++col) {
+					long int ix= col;
+					double* pixel = static_cast<double*>(imageData->GetScalarPointer(row, col, 0));
+					double w= pixel[0];
+					this->FillPixelMT(moments_t,ix,iy,w,useNegativePixInStats);
+				}//end loop columns
+			}//end loop rows
+
+			//Fill parallel moments per thread
+			parallel_moments[thread_id]= moments_t;
+			
+		}//close parallel section
+
+		//Update moments from parallel estimates
+		Caesar::StatMoments<double> moments;
+		if(Caesar::StatsUtils::ComputeMomentsFromParallel(moments,parallel_moments)<0){
+			ERROR_LOG("Failed to compute cumulative moments from parallel estimates (NB: image will have wrong moments!)");
+			return -1;
+		}	
+		this->SetMoments(moments);
+
+	#else
+		for(int row = 0; row < dims[0]; ++row) {
+			long int iy= Ny-1-row;
+    	for(int col = 0; col < dims[1]; ++col) {
+				long int ix= col;
+				double* pixel = static_cast<double*>(imageData->GetScalarPointer(row, col, 0));
+				double w= pixel[0];
+				this->FillPixel(ix,iy,w,useNegativePixInStats);
+			}//end loop columns
+		}//end loop rows
+	#endif
+
+	return 0;
+
+}//close FillFromVtkImage()
+#endif
 
 //================================================================
 //===    STATS METHODS

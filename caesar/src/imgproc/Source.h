@@ -97,6 +97,12 @@ class Source : public Blob {
 		*/
 		enum SourceFlag {eReal=1,eCandidate=2,eFake=3};
 
+		/**
+		* \brief Simulated source type enumeration
+		*/
+		enum SimSourceType {eUnknownSimClass=0,eRingLike=1,eBubbleLike=2,eEllipseLike=3,eDiskLike=4,eBlobLike=5};
+		
+
 	public:
 		/**
 		* \brief Set source type
@@ -106,6 +112,10 @@ class Source : public Blob {
 		* \brief Set source flag
 		*/
 		void SetFlag(SourceFlag choice){Flag=choice;}
+		/**
+		* \brief Set source sim type
+		*/
+		void SetSimType(SimSourceType choice){SimType=choice;}
 		/**
 		* \brief Set beam flux integral
 		*/
@@ -252,6 +262,7 @@ class Source : public Blob {
 
 		int Type;
 		int Flag;
+		int SimType;
 
 	private:
 		double m_BeamFluxIntegral;
@@ -277,6 +288,9 @@ typedef std::vector<Source*> SourceCollection;
 #pragma link C++ class Source+;
 #pragma link C++ class vector<Source>+;
 #pragma link C++ class vector<Source*>+;
+#pragma link C++ enum SourceType+;
+#pragma link C++ enum SourceFlag+;
+#pragma link C++ enum SimSourceType+;
 #endif
 
 }//close namespace

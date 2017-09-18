@@ -65,9 +65,6 @@ BkgFinder::~BkgFinder()
 }//close destructor
 
 
-//======================================================
-//==            NEW IMAGE METHODS
-//======================================================
 ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int boxSizeX,int boxSizeY, double gridStepSizeX,double gridStepSizeY,bool use2ndPass,bool skipOutliers,double seedThr,double mergeThr,int minPixels)
 {
 	//## Check input image
@@ -188,7 +185,7 @@ ImgBkgData* BkgFinder::FindBkg(Image* img,int estimator,bool computeLocalBkg,int
 		}
 
 		//Override main bkgData with robust estimates
-		for(unsigned int i=0;i<(robustBkgData->BkgSamplings).size();i++) {
+		for(size_t i=0;i<(robustBkgData->BkgSamplings).size();i++) {
 			(bkgData->BkgSamplings)[i]= (robustBkgData->BkgSamplings)[i];
 		}
 		bkgData->CopyBkgMap(robustBkgData->BkgMap);//copy new bkg map (delete previous)
@@ -281,10 +278,19 @@ int BkgFinder::ComputeLocalGridBkg(ImgBkgData* bkgData,Image* img,int estimator,
 	//## Check options
 	long int Nx= img->GetNx();
 	long int Ny= img->GetNy();
-	if(boxSizeX<=0 || boxSizeX>=Nx || boxSizeY<=0 || boxSizeY>=Ny) {
-		ERROR_LOG("Invalid box size ("<<boxSizeX<<","<<boxSizeY<<") given (too small or larger than image size)!");
+	if(boxSizeX<=0 || boxSizeY<=0 ) {
+		ERROR_LOG("Invalid box size ("<<boxSizeX<<","<<boxSizeY<<") given!");
 		return -1;
 	}
+	if(boxSizeX>Nx) {
+		WARN_LOG("Box size X ("<<boxSizeX<<") larger wrt image size ("<<Nx<<"), setting it to image size!");
+		boxSizeX= Nx;
+	}
+	if(boxSizeY>Ny){
+		WARN_LOG("Box size Y ("<<boxSizeY<<") larger wrt image size ("<<Ny<<"), setting it to image size!");
+		boxSizeX= Ny;
+	}
+
 	if(gridStepSizeX<=0 || gridStepSizeY<=0 ){
 		ERROR_LOG("Invalid grid step size ("<<gridStepSizeX<<","<<gridStepSizeY<<") given (null or negative)!");
 		return -1;

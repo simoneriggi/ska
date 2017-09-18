@@ -569,24 +569,6 @@ class Blob : public TNamed {
 		double m_S_curv;//sum of pixel curvature
 		double m_S_edge;//sum of edge estimator
 
-		//Image ranges
-		//ImgRange m_ImgRange;
-		
-		/*
-		long int m_ImageSizeX;
-		long int m_ImageSizeY;
-		double m_ImageMinX;
-		double m_ImageMaxX;
-		double m_ImageMinY;
-		double m_ImageMaxY;
-		double m_ImageMinS;
-		double m_ImageMaxS;
-		double m_ImageMinScurv;
-		double m_ImageMaxScurv;	
-		double m_ImageMinSedge;
-		double m_ImageMaxSedge;
-		double m_ImageRMS;
-		*/
 
 		float m_Xmin;
 		float m_Xmax;

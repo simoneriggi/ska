@@ -172,6 +172,13 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(tileMinY,double,0,-1.e+6,1.e+6);
 		REGISTER_OPTION(tileMaxY,double,0,-1.e+6,1.e+6);
 
+
+		//=======================================
+		//==  Image beam options               ==
+		//=======================================
+		REGISTER_OPTION(beamFWHM,double,6.5,0,3600);//circular beam FWHM in arcsec
+		REGISTER_OPTION(pixSize,double,1,0,3600);//pixel area in arcsec
+
 		//=======================================
 		//==  Distributed processing options   ==
 		//=======================================

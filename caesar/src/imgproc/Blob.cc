@@ -62,14 +62,13 @@ ClassImp(Caesar::Blob)
 
 namespace Caesar {
 
-Blob::Blob() : TNamed() {
-
+Blob::Blob() : TNamed() 
+{
+	//Initialize
 	Init();
 	
 }//close costructor
 
-//Blob::Blob(ImgRange img_range,std::string name)
-//	: TNamed(name.c_str(),name.c_str()), m_ImgRange(img_range)
 Blob::Blob(std::string name)
 	: TNamed(name.c_str(),name.c_str())
 {
@@ -79,8 +78,6 @@ Blob::Blob(std::string name)
 }//close constructor
 
 
-//Blob::Blob(std::vector<Pixel*>const& pixels,ImgRange img_range,std::string name)
-//	: TNamed(name.c_str(),name.c_str()), m_ImgRange(img_range)
 Blob::Blob(std::vector<Pixel*>const& pixels,std::string name)
 	: TNamed(name.c_str(),name.c_str())
 {
@@ -98,8 +95,9 @@ Blob::Blob(std::vector<Pixel*>const& pixels,std::string name)
 
 }//close constructor
 
-Blob::~Blob(){
-
+Blob::~Blob()
+{
+	//Clear pixels
 	ClearPixels();
 	ClearContours();	
 
