@@ -82,6 +82,18 @@ MESSAGE(STATUS "LOG4CXX_INCLUDE_DIR: ${LOG4CXX_INCLUDE_DIRS}")
 MESSAGE(STATUS "LOG4CXX_LIBRARIES: ${LOG4CXX_LIBRARIES}")
 
 
+
+#==================================
+#==   Check for CFITSIO         ===
+#==================================
+MESSAGE(STATUS "Looking for CFITSIO")
+FIND_PACKAGE(CFITSIO REQUIRED)
+if (NOT CFITSIO_FOUND)
+	MESSAGE(SEND_ERROR "CFITSIO library not found!")
+endif()
+MESSAGE(STATUS "CFITSIO_INCLUDE_DIR: ${CFITSIO_INCLUDE_DIR}")
+MESSAGE(STATUS "CFITSIO_LIBRARIES: ${CFITSIO_LIBRARIES}")
+
 #==================================
 #==   Check for JSONCPP         ===
 #==================================
@@ -96,27 +108,15 @@ MESSAGE(STATUS "JSONCPP_ROOT: ${JSONCPP_ROOT}")
 
 FIND_PATH (JSONCPP_INCLUDE_DIR
 	NAMES json/json.h
-  HINTS
- ${JSONCPP_ROOT}/include
+ 	HINTS
+	${JSONCPP_ROOT}/include
 )
 
 FIND_LIBRARY (JSONCPP_LIBRARIES NAMES jsoncpp HINTS ${JSONCPP_ROOT}/lib)
-
 MARK_AS_ADVANCED (JSONCPP_INCLUDE_DIR JSONCPP_LIBRARIES)
-MESSAGE(STATUS "JSONCPP_INCLUDE_DIR: ${JSONCPP_INCLUDE_DIR}")
-MESSAGE(STATUS "JSONCPP_LIBRARIES: ${JSONCPP_LIBRARIES}")
+#MESSAGE(STATUS "JSONCPP_INCLUDE_DIR: ${JSONCPP_INCLUDE_DIR}")
+#MESSAGE(STATUS "JSONCPP_LIBRARIES: ${JSONCPP_LIBRARIES}")
 
-
-#==================================
-#==   Check for CFITSIO         ===
-#==================================
-MESSAGE(STATUS "Looking for CFITSIO")
-FIND_PACKAGE(CFITSIO REQUIRED)
-if (NOT CFITSIO_FOUND)
-	MESSAGE(SEND_ERROR "CFITSIO library not found!")
-endif()
-MESSAGE(STATUS "CFITSIO_INCLUDE_DIR: ${CFITSIO_INCLUDE_DIR}")
-MESSAGE(STATUS "CFITSIO_LIBRARIES: ${CFITSIO_LIBRARIES}")
 
 #=================================
 #==   Check for PROTOBUF       ===
@@ -136,8 +136,6 @@ MESSAGE(STATUS "PROTOBUF_LIBRARIES: ${PROTOBUF_LIBRARIES}")
 option(BUILD_APPS "Enable building of Caesar applications in apps dir" ON)
 if(BUILD_APPS)
 	add_definitions(-DBUILD_CAESAR_APPS)
-
-	
 endif()
 
 #==============================================
@@ -179,13 +177,14 @@ endif()
 #======================================
 #==   Check for Google Test         ===
 #======================================
+option(ENABLE_TEST "Enable unit test building" ON)
 if (ENABLE_TEST)
 	MESSAGE(STATUS "Looking for GoogleTest")
 	add_definitions(-DENABLE_TEST)
 	enable_testing()
 	FIND_PACKAGE(GTest REQUIRED)
-	MESSAGE(STATUS "GTEST_INCLUDE_DIRS: ${GTEST_INCLUDE_DIRS}")
-	MESSAGE(STATUS "GTEST_LIBRARIES: ${GTEST_BOTH_LIBRARIES}")
+	#MESSAGE(STATUS "GTEST_INCLUDE_DIRS: ${GTEST_INCLUDE_DIRS}")
+	#MESSAGE(STATUS "GTEST_LIBRARIES: ${GTEST_BOTH_LIBRARIES}")
 endif()
 
 #==================================
@@ -196,7 +195,33 @@ find_package(Doxygen)
 if (NOT DOXYGEN_FOUND)
 	MESSAGE(STATUS "Doxygen not found, cannot generate project documentation!")
 endif()
-option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation (requires Doxygen)" ${DOXYGEN_FOUND})
+option(BUILD_DOC "Create and install the HTML based API documentation (requires Doxygen)" ${DOXYGEN_FOUND})
+
+#======================================
+#==   Check for VTK                 ===
+#======================================
+option(ENABLE_VTK "Enable VTK" OFF)
+if (ENABLE_VTK)
+	MESSAGE(STATUS "Looking for VTK library")	
+	FIND_PACKAGE(VTK REQUIRED)
+	if(VTK_FOUND)
+		MESSAGE(STATUS "VTK found, defining preprocessor flag VTK_ENABLED")
+		add_definitions(-DVTK_ENABLED=1)
+		MESSAGE(STATUS "VTK_INCLUDE_DIRS= ${VTK_INCLUDE_DIRS}")
+		MESSAGE(STATUS "VTK_LIBRARY_DIRS= ${VTK_LIBRARY_DIRS}")
+		MESSAGE(STATUS "VTK_LIBRARIES= ${VTK_LIBRARIES}")
+
+		#SET(VTK_LIBRARIES ${VTK_LIBRARIES}
+		#	vtkHybrid
+  	#	vtkVolumeRendering
+  	#	vtkRendering
+  	#	QVTK
+		#)
+
+	else()
+		MESSAGE(SEND_ERROR "VTK not found!")
+	endif()	
+endif()
 
 
 #===========================================
@@ -207,16 +232,7 @@ if(ENABLE_SERVER)
 	## Define a preprocessor option
 	add_definitions(-DBUILD_CAESAR_SERVER)
 	
-	#=================================
-	#==   Check for PROTOBUF       ===
-	#=================================
-	MESSAGE(STATUS "Looking for Protobuf lib")
-	FIND_PACKAGE(Protobuf REQUIRED COMPONENTS protobuf protoc)
-	IF (NOT PROTOBUF_FOUND)
-		MESSAGE(SEND_ERROR "Protobuf not found!")
-	endif()
-	MESSAGE(STATUS "PROTOBUF_INCLUDE_DIR: ${PROTOBUF_INCLUDE_DIRS}")
-	MESSAGE(STATUS "PROTOBUF_LIBRARIES: ${PROTOBUF_LIBRARIES}")
+	
 
 	#================================
 	#==   Check for MSGPACK       ===

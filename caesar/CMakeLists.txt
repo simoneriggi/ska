@@ -170,6 +170,9 @@ if (ENABLE_MPI)
 	list (APPEND INCLUDE_DIRS ${MPI_CXX_INCLUDE_PATH})
 endif()
 
+if (ENABLE_VTK)
+	list (APPEND INCLUDE_DIRS ${VTK_INCLUDE_DIRS})
+endif()
 
 ##if(ENABLE_SERVER)
 ##	list (APPEND INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
@@ -207,6 +210,10 @@ endif()
 
 if (ENABLE_MPI)
 	list (APPEND LINKED_LIBS ${MPI_CXX_LIBRARIES})
+endif()
+
+if (ENABLE_VTK)
+	list (APPEND LINKED_LIBS ${VTK_LIBRARIES})
 endif()
 
 ##if(ENABLE_SERVER)
@@ -453,7 +460,7 @@ endif()
 #==============================================================================================
 #===                    DOCUMENTATION
 #==============================================================================================
-if(BUILD_DOCUMENTATION)
+if(BUILD_DOC)
 	if(NOT DOXYGEN_FOUND)
   	message(FATAL_ERROR "Doxygen is needed to build the documentation.")
   endif()
@@ -539,14 +546,17 @@ install(FILES ${CONFIG_FILES} DESTINATION ${CONFIG_INSTALL_DIR})
 
 # -- Install script files
 MESSAGE(STATUS SCRIPT_FILES: ${SCRIPT_FILES})
-install(FILES ${SCRIPT_FILES} DESTINATION ${SCRIPT_INSTALL_DIR})
+install(FILES ${SCRIPT_FILES} 
+	PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE OWNER_EXECUTE GROUP_READ GROUP_WRITE GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+	DESTINATION ${SCRIPT_INSTALL_DIR}
+)
 
 # -- Install data files
 MESSAGE(STATUS DATA_FILES: ${DATA_FILES})
 install(FILES ${DATA_FILES} DESTINATION ${DATA_INSTALL_DIR})
 
 # -- Install documentation files
-if(BUILD_DOCUMENTATION)
+if(BUILD_DOC)
 	install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc DESTINATION ${SHARE_INSTALL_DIR})
 endif()
 

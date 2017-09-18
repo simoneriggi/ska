@@ -8,22 +8,6 @@
 #pragma link C++ nestedclasses;
 #pragma link C++ nestedtypedef;
 
-//WCS
-/*
-#pragma link C++ function prjfwd;
-#pragma link C++ function prjrev;
-#pragma link C++ struct poly+;
-#pragma link C++ struct IRAFsurface+;
-#pragma link C++ struct Distort+;
-#pragma link C++ struct linprm+;
-#pragma link C++ struct wcsprm+;
-#pragma link C++ struct celprm+;
-#pragma link C++ struct prjprm+;
-#pragma link C++ struct WorldCoor+;
-//#pragma link C struct defined_in ../external/wcstools/v3.9.2/libwcs/wcslib.h;
-//#pragma link C struct defined_in ../external/wcstools/v3.9.2/libwcs/wcs.h;
-*/
-
 
 //== IMG CLASSES ==
 #pragma link C++ class Caesar::MetaData+;
@@ -42,7 +26,6 @@
 #pragma link C++ class Caesar::CodeUtils+;
 #pragma link C++ class Caesar::MathUtils+;
 #pragma link C++ class Caesar::GraphicsUtils+;
-//#pragma link C++ enum Caesar::ColorPaletteStyle+;
 #pragma link C++ class Caesar::StatsUtils+;
 
 #pragma link C++ class Caesar::ClippedStats<int>+;
@@ -226,6 +209,9 @@
 #pragma link C++ class Caesar::Source+;
 #pragma link C++ class Caesar::vector<Source>+;
 #pragma link C++ class Caesar::vector<Source*>+;
+#pragma link C++ enum Caesar::Source::SourceType+;
+#pragma link C++ enum Caesar::Source::SourceFlag+;
+#pragma link C++ enum Caesar::Source::SimSourceType+;
 #pragma link C++ class Caesar::Contour+;
 
 //slic generator
