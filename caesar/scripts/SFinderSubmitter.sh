@@ -453,6 +453,7 @@ echo "INFO: Creating config file $configfile ..."
 		echo "mergeThr = $MERGE_THR																| Merge/aggregation threshold in flood filling algo"
 		echo 'mergeBelowSeed = false                              | Aggregate to seed only pixels above merge threshold but below seed threshold (T/F)'
 		echo 'searchNegativeExcess = false												| Search negative excess together with positive in compact source search'
+		echo "compactSourceSearchNIters = 10                      | Number of iterations to be performed in compact source search (default=10)"
 		echo 'wtScaleFaint = 1																		| Wavelet scale to be used for faint source search'
 		echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search'
 		echo "extendedSearchMethod = $EXT_SFINDER_METHOD					| Extended source search method (1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding)"
