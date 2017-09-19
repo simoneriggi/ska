@@ -564,7 +564,7 @@ int ComputeBkg(){
 	}
 	int nPixelsInBeam= 0;
 	if(useBeamInfoInBkg && inputImg->HasMetaData()){
-		nPixelsInBeam= inputImg->GetMetaData()->GetBeamSizeInPixel();	
+		nPixelsInBeam= inputImg->GetMetaData()->GetBeamWidthInPixel();	
 	}
 		
 	//Box size

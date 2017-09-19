@@ -45,25 +45,52 @@ import pylab
 ##################################################
 
 #### GET SCRIPT ARGS ####
+def str2bool(v):
+	if v.lower() in ('yes', 'true', 't', 'y', '1'):
+		return True
+	elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+		return False
+	else:
+		raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def get_args():
 	"""This function parses and return arguments passed in"""
 	parser = argparse.ArgumentParser(description="Parse args.")
+	
+	# - GENERAL IMAGE OPTIONS
 	parser.add_argument('-nx', '--nx', dest='nx', required=True, type=int, action='store',help='Image width in pixels')
 	parser.add_argument('-ny', '--ny', dest='ny', required=True, type=int, action='store',help='Image height in pixels')
 	parser.add_argument('-pixsize', '--pixsize', dest='pixsize', required=True, type=float, action='store',help='Map pixel size in arcsec')
 	parser.add_argument('-bmaj', '--bmaj', dest='bmaj', required=True, type=float, default=5, action='store',help='Beam bmaj in arcsec (default=5)')
 	parser.add_argument('-bmin', '--bmin', dest='bmin', required=True, type=float, default=5, action='store',help='Beam bmin in arcsec (default=5)')
 	parser.add_argument('-bpa', '--bpa', dest='bpa', required=False, type=float, default=0, action='store',help='Beam bpa in deg (default=0)')
+
+	# - BKG OPTIONS
+	parser.add_argument('--bkg', dest='enable_bkg', action='store_true')	
+	parser.add_argument('--no-bkg', dest='enable_bkg', action='store_false')	
+	parser.set_defaults(enable_bkg=True)
 	parser.add_argument('-bkg_level', '--bkg_level', dest='bkg_level', required=False, type=float, default=0, action='store',help='Bkg level (default=0)')
 	parser.add_argument('-bkg_rms', '--bkg_rms', dest='bkg_rms', required=False, type=float, default=0, action='store',help='Bkg rms (default=0)')
+
+	# - COMPACT SOURCE OPTIONS
+	parser.add_argument('--compactsources', dest='enable_compactsources', action='store_true')	
+	parser.add_argument('--no-compactsources', dest='enable_compactsources', action='store_false')	
+	parser.set_defaults(enable_compactsources=True)
 	parser.add_argument('-zmin', '--zmin', dest='zmin', required=False, type=float, default=1, action='store',help='Minimum source significance level in sigmas above the bkg (default=1)')
 	parser.add_argument('-zmax', '--zmax', dest='zmax', required=False, type=float, default=30, action='store',help='Maximum source significance level in sigmas above the bkg (default=30)')
 	parser.add_argument('-source_density', '--source_density', dest='source_density', required=False, type=float, default=1000, action='store',help='Compact source density (default=1000)')
+
+	# - EXTENDED SOURCES
+	parser.add_argument('--extsources', dest='enable_extsources', action='store_true')	
+	parser.add_argument('--no-extsources', dest='enable_extsources', action='store_false')	
+	parser.set_defaults(enable_extsources=True)
 	parser.add_argument('-ext_source_density', '--ext_source_density', dest='ext_source_density', required=False, type=float, default=100, action='store',help='Extended source density (default=1000)')
 	parser.add_argument('-zmin_ext', '--zmin_ext', dest='zmin_ext', required=False, type=float, default=0.1, action='store',help='Minimum extended source significance level in sigmas above the bkg (default=0.1)')
 	parser.add_argument('-zmax_ext', '--zmax_ext', dest='zmax_ext', required=False, type=float, default=2, action='store',help='Maximum extended source significance level in sigmas above the bkg (default=2)')
 	parser.add_argument('-ext_scale_min', '--ext_scale_min', dest='ext_scale_min', required=False, type=float, default=10, action='store',help='Minimum extended source size in arcsec (default=10)')
 	parser.add_argument('-ext_scale_max', '--ext_scale_max', dest='ext_scale_max', required=False, type=float, default=3600, action='store',help='Maximum extended source size in arcsec (default=3600)')
+
+	# - SOURCE MODEL OPTIONS
 	parser.add_argument('-ring_rmin', '--ring_rmin', dest='ring_rmin', required=False, type=float, default=0.5, action='store',help='Minimum ring radius in arcsec (default=1)')
 	parser.add_argument('-ring_rmax', '--ring_rmax', dest='ring_rmax', required=False, type=float, default=10, action='store',help='Maximum ring radius in arcsec (default=10)')
 	parser.add_argument('-ring_wmin', '--ring_wmin', dest='ring_wmin', required=False, type=float, default=1, action='store',help='Minimum ring width in arcsec (default=1)')
@@ -76,6 +103,7 @@ def get_args():
 	parser.add_argument('-disk_shell_radius_ratio_min', '--disk_shell_radius_ratio_min', dest='disk_shell_radius_ratio_min', required=False, type=float, default=0.6, action='store',help='Disk/shell radius ratio min (default=0.6)')
 	parser.add_argument('-disk_shell_radius_ratio_max', '--disk_shell_radius_ratio_max', dest='disk_shell_radius_ratio_max', required=False, type=float, default=0.9, action='store',help='Disk/shell radius ratio max (default=0.8)')
 	
+	# - OUTPUT FILE OPTIONS
 	parser.add_argument('-outputfile', '--outputfile', dest='outputfile', required=True, type=str, action='store',help='Output filename')
 	parser.add_argument('-outputfile_sources', '--outputfile_sources', dest='outputfile_sources', required=True, type=str, action='store',help='Source ROOT Output filename')
 	
@@ -182,10 +210,12 @@ class SkyMapSimulator(object):
 		self.truncate_models= True
 
 		## Bkg parameters
+		self.simulate_bkg= True
 		self.bkg_level= 0 # in Jy
 		self.bkg_rms= 10.e-6 # in Jy
 
 		## Compact source parameters
+		self.simulate_compact_sources= True
 		self.source_density= 2000. # in sources/deg^2
 		self.beam_bmaj= 6.5 # in arcsec
 		self.beam_bmin= 6.5 # in arcsec
@@ -195,6 +225,7 @@ class SkyMapSimulator(object):
 		self.zmax= 30 # in sigmas
 		
 		## Extended source parameters
+		self.simulate_ext_sources= True
 		self.ext_source_density= 10 # in sources/deg^2
 		self.zmin_ext= 0.5 # in sigmas 
 		self.zmax_ext= 5	 # in sigmas 
@@ -233,6 +264,18 @@ class SkyMapSimulator(object):
 		self.outtree= ROOT.TTree('SourceInfo','SourceInfo')
 		self.cs = Caesar.Source()
 		self.outtree.Branch('Source',self.cs)		
+
+	def enable_compact_sources(self,choice):
+		""" Enable/disable compact source generation """
+		self.simulate_compact_sources= choice
+
+	def enable_extended_sources(self,choice):
+		""" Enable/disable extended source generation """
+		self.simulate_extended_sources= choice
+
+	def enable_bkg(self,choice):
+		""" Enable/disable bkg generation """
+		self.simulate_bkg= choice
 
 	def truncate_models(self,choice):
 		""" Enable/disable continuous model truncation (gaussian, airy disk, ...) """
@@ -338,7 +381,8 @@ class SkyMapSimulator(object):
 		data= Gaussian2D(ampl,x0,y0,sigmax,sigmay,theta=math.radians(theta))(self.gridx, self.gridy)
 
 		## Truncate data at minimum significance
-		ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level
+		#ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level
+		ampl_min= self.bkg_level
 		if self.truncate_models:
 			data[data<ampl_min] = 0		
 
@@ -385,7 +429,8 @@ class SkyMapSimulator(object):
 		data= AiryDisk2D(amplitude=ampl,x_0=x0,y_0=y0,radius=radius)(self.gridx, self.gridy) 
 		
 		## Truncate data at minimum significance
-		ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		#ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		ampl_min= self.bkg_level
 		if self.truncate_models:
 			data[data<ampl_min] = 0			
 
@@ -618,24 +663,36 @@ class SkyMapSimulator(object):
 		print ('INFO: Initializing simulator data...')
 		self.init()
 
+		## == GENERATE EMPTY IMAGE ==
+		data = Box2D(amplitude=0,x_0=0,y_0=0,x_width=2*self.nx, y_width=2*self.ny)(self.gridx, self.gridy)
+		mask_data = Box2D(amplitude=0,x_0=0,y_0=0,x_width=2*self.nx, y_width=2*self.ny)(self.gridx, self.gridy)
+
 		## == GENERATE BKG ==
-		print ('INFO: Generating map bkg...')
-		bkg_data= self.generate_bkg()
+		if self.simulate_bkg:
+			print ('INFO: Generating map bkg...')
+			bkg_data= self.generate_bkg()
+			data+= bkg_data
 	
 		## == GENERATE COMPACT SOURCES ==
-		print ('INFO: Generating compact sources...')
-		[compact_source_data,compact_source_mask_data] = self.generate_compact_sources()
+		if self.simulate_compact_sources:
+			print ('INFO: Generating compact sources...')
+			[compact_source_data,compact_source_mask_data] = self.generate_compact_sources()
+			data+= compact_source_data
+			mask_data+= compact_source_mask_data
 	
 		## == GENERATE EXTENDED SOURCES ==
-		print ('INFO: Generating extended sources...')
-		ext_source_data = self.generate_extended_sources()
-	
+		if self.simulate_extended_sources:
+			print ('INFO: Generating extended sources...')
+			ext_source_data = self.generate_extended_sources()
+			data+= ext_source_data
+			mask_data+= ext_source_data
+
 		## == MAKE FINAL MAP ==
-		print ('INFO: Creating final map with bkg+sources added...')
+		print ('INFO: Creating final map with bkg + sources added...')
 
 		## Sum data in cumulative map
-		data= bkg_data + compact_source_data + ext_source_data
-		mask_data= compact_source_mask_data + ext_source_data
+		#data= bkg_data + compact_source_data + ext_source_data
+		#mask_data= compact_source_mask_data + ext_source_data
 
 		## Cast data from float64 to float32 
 		data_casted = data.astype(np.float32)
@@ -782,10 +839,12 @@ def main():
 	pixsize= args.pixsize
 
 	# - Bkg info args
+	enable_bkg= args.enable_bkg
 	bkg_level= args.bkg_level
 	bkg_rms= args.bkg_rms
 
 	# - Compact source args
+	enable_compactsources= args.enable_compactsources 
 	Bmaj= args.bmaj
 	Bmin= args.bmin
 	Bpa= args.bpa
@@ -794,6 +853,7 @@ def main():
 	source_density= args.source_density
 
 	# - Extended source args
+	enable_extsources= args.enable_extsources
 	Zmin_ext= args.zmin_ext
 	Zmax_ext= args.zmax_ext
 	ext_source_density= args.ext_source_density
@@ -820,9 +880,12 @@ def main():
 	print("Ny: %s" % Ny)
 	print("pixsize: %s" % pixsize)
 	print("Beam (Bmaj/Bmin/Bpa): (%s,%s,%s)" % (Bmaj, Bmin, Bpa))
+	print("Enable bkg? %s" % str(enable_bkg) )
 	print("Bkg info (level,rms): (%s,%s)" % (bkg_level, bkg_rms))
+	print("Enable compact sources? %s" % str(enable_compactsources) )
 	print("Source significance range: (%s,%s)" % (Zmin, Zmax))
 	print("Source density (deg^-2): %s" % source_density)	
+	print("Enable extended sources? %s" % str(enable_extsources) )
 	print("Extended source significance range: (%s,%s)" % (Zmin_ext, Zmax_ext))
 	print("Extended source density (deg^-2): %s" % ext_source_density)
 	print("Extended source scale min/max: (%s,%s)" % (ext_scale_min, ext_scale_max))
@@ -836,10 +899,13 @@ def main():
 	simulator.set_map_filename(outputfile)
 	simulator.set_model_filename(mask_outputfile)
 	simulator.set_source_filename(outputfile_sources)
+	simulator.enable_bkg(enable_bkg)
 	simulator.set_bkg_pars(bkg_level,bkg_rms)
 	simulator.set_beam_info(Bmaj,Bmin,Bpa)	
+	simulator.enable_compact_sources(enable_compactsources)
 	simulator.set_source_significance_range(Zmin,Zmax)
 	simulator.set_source_density(source_density)
+	simulator.enable_extended_sources(enable_extsources)
 	simulator.set_ext_source_significance_range(Zmin_ext,Zmax_ext)
 	simulator.set_ext_source_density(ext_source_density)
 	#simulator.set_ring_pars(ring_rmin,ring_rmax,ring_wmin,ring_wmax)

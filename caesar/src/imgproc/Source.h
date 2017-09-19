@@ -250,6 +250,10 @@ class Source : public Blob {
 		*/
 		int MergeSource(Source* aSource,bool copyPixels=false,bool checkIfAdjacent=true,bool computeStatPars=true,bool computeMorphPars=true);
 
+		/**
+		* \brief Get number of matching pixels between this and another source
+		*/
+		long int GetNMatchingPixels(Source* aSource);
 
 	private:
 	

@@ -327,6 +327,49 @@ bool Source::IsAdjacentSource(Source* aSource){
 
 }//close IsAdjacentSource()
 
+long int Source::GetNMatchingPixels(Source* aSource){
+
+	//Check input sources
+	if(!aSource){
+		ERROR_LOG("Null ptr to given input Source!");
+		return 0;
+	}	
+
+	//Check if pixel collections are empty
+	if(GetNPixels()<=0 || aSource->GetNPixels()<=0){
+		DEBUG_LOG("This or given source have no pixels, return 0.");
+		return 0;
+	}	
+
+	//Check if bouding boxes are overlapping
+	//NB: If not skip the adjacency check
+	bool areBoundingBoxesOverlapping= CheckBoxOverlapping(aSource);
+	if(!areBoundingBoxesOverlapping){
+		DEBUG_LOG("Sources not overlapping as their bounding boxes (S1(x["<<m_Xmin<<","<<m_Xmax<<"), y["<<m_Ymin<<","<<m_Ymax<<"]), S2(x["<<aSource->m_Xmin<<","<<aSource->m_Xmax<<"), y["<<aSource->m_Ymin<<","<<aSource->m_Ymax<<"]) do not overlap...");
+		return 0;		
+	}
+
+	//Find differences in pixel collections
+	//Pixel found in both collections are not merged to this source
+	//First sort pixel collections (MANDATORY FOR set_difference() routine)
+	std::sort(m_Pixels.begin(), m_Pixels.end(),PixelMatcher());
+	std::sort((aSource->m_Pixels).begin(), (aSource->m_Pixels).end(),PixelMatcher());
+	
+	std::vector<Pixel*> pixelsToBeMerged;
+	std::set_difference (
+		(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
+		m_Pixels.begin(), m_Pixels.end(),
+		std::back_inserter(pixelsToBeMerged),
+		PixelMatcher()
+	);
+  	
+	//If no pixels are to be merged (e.g. all pixels overlapping) return
+	long int nMergedPixels= static_cast<long int>(pixelsToBeMerged.size());
+
+	return nMergedPixels;
+
+}//close GetNMatchingPixels()
+
 int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,bool computeStatPars,bool computeMorphPars){
 
 	//Check input sources

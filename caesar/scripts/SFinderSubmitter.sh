@@ -39,10 +39,12 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--globalbkg - Use global bkg (default=use local bkg)"
 	echo "--bkgbox=[BKG_BOXSIZE] - Box size (muliple of beam size) used to compute local bkg (default=20 x beam)"
 	echo "--bkggrid=[BKG_GRIDSIZE] - Grid size (fraction of bkg box) used to compute local bkg (default=0.2 x box)"
+	echo "--no-compactsearch - Do not search compact sources"
 	echo "--npixmin=[NPIX_MIN] - Minimum number of pixel to consider a source (default=5 pixels)"
 	echo "--seedthr=[SEED_THR] - Seed threshold (in nsigmas) used in flood-fill (default=5 sigmas)"
 	echo "--mergethr=[MERGE_THR] - Merge threshold (in nsigmas) used in flood-fill (default=2.6 sigmas)"
 	echo "--brightseedthr=[BRIGHT_SEED_THR] - Seed threshold (in nsigmas) used in flood-fill for bright source removal (default=10 sigmas)"
+	echo "--no-extendedsearch - Do not search extended sources"
 	echo "--extsfinder=[EXT_SFINDER_METHOD] - Extended source search method {1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding} (default=3)"	
 	echo "--activecontour=[AC_METHOD] - Active contour method {1=Chanvese, 2=LRAC} (default=2)"
 	echo "--selectsources - Apply selection to compact sources found (default=false)"	
@@ -97,6 +99,8 @@ SALIENCY_MIN_RESO="20"
 SALIENCY_MAX_RESO="60"
 SALIENCY_RESO_STEP="10"
 SALIENCY_NN_PAR="1"
+SEARCH_COMPACT_SOURCES="true"
+SEARCH_EXTENDED_SOURCES="true"
 
 for item in $*
 do
@@ -172,6 +176,11 @@ do
 			USE_LOCAL_BKG="true"
     ;;
 
+
+		--no-compactsearch*)
+    	SEARCH_COMPACT_SOURCES="false"
+    ;;
+
 		--npixmin=*)
     	NPIX_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -185,6 +194,11 @@ do
 		--mergethr=*)
     	MERGE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+	
+		--no-extendedsearch*)
+    	SEARCH_EXTENDED_SOURCES="false"
+    ;;
+
 		--extsfinder=*)
     	EXT_SFINDER_METHOD=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -430,11 +444,10 @@ echo "INFO: Creating config file $configfile ..."
 		echo '//===================================='
 		echo '//==  SOURCE FINDING OPTIONS        =='
 		echo '//===================================='
-		echo 'searchBrightSources = true													| Search bright sources (T/F)'
-		echo 'searchFaintSources = true														| Search faint sources after bright source search (T/F)'
-		echo 'searchExtendedSources = true												| Search extended sources after bright source removal (T/F)'
+		echo "searchCompactSources = $SEARCH_COMPACT_SOURCES			| Search compact sources (T/F)"
+		echo "searchExtendedSources = $SEARCH_EXTENDED_SOURCES		| Search extended sources after bright source removal (T/F)"
 		echo 'searchNestedSources = true													| Search for nested sources inside candidate sources (T/F)'
-		echo "minNPix = $NPIX_MIN																				  | Minimum number of pixel to consider a source"
+		echo "minNPix = $NPIX_MIN																	| Minimum number of pixel to consider a source"
 		echo "seedBrightThr = $BRIGHT_SEED_THR										| Seed threshold in flood-filling algo for bright sources"
 		echo "seedThr = $SEED_THR 																| Seed threshold in flood filling algo for faint sources"
 		echo "mergeThr = $MERGE_THR																| Merge/aggregation threshold in flood filling algo"
@@ -599,8 +612,7 @@ echo "INFO: Creating sh file $shfile ..."
       echo '  cd $JOBDIR'
 
       echo "  $EXE $EXE_ARGS"
-      #echo " $CAESAR_DIR/scripts/RunSFinderMPI --nproc=$NPROC --config=$configfile"
-
+      
       echo '  echo ""'
 
       echo " "
