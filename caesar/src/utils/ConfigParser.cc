@@ -235,8 +235,8 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//==  Source finding options  ==
 		//==============================
 		REGISTER_OPTION(searchCompactSources,bool,true,false,true);
-		REGISTER_OPTION(searchBrightSources,bool,false,false,true);
-		REGISTER_OPTION(searchFaintSources,bool,false,false,true);
+		//REGISTER_OPTION(searchBrightSources,bool,false,false,true);
+		//REGISTER_OPTION(searchFaintSources,bool,false,false,true);
 		REGISTER_OPTION(searchNestedSources,bool,true,false,true);
 		REGISTER_OPTION(minNPix,int,10,0,10000);
 		REGISTER_OPTION(seedBrightThr,double,10,0,10000);	
@@ -244,6 +244,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(mergeThr,double,2.6,0,10000);
 		REGISTER_OPTION(mergeBelowSeed,bool,false,false,true);
 		REGISTER_OPTION(searchNegativeExcess,bool,false,false,true);
+		REGISTER_OPTION(compactSourceSearchNIters,int,10,0,100);
 		REGISTER_OPTION(nestedBlobThrFactor,double,1,0,100);
 		REGISTER_OPTION(wtScaleFaint,int,1,1,10);
 		
