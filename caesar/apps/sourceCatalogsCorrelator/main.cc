@@ -43,8 +43,8 @@ void Usage(char* exeName){
 	cout<<endl;
 	cout<<"Options:"<<endl;
   cout<<"-h, --help \t Show help message and exit"<<endl;
-	cout<<"-i, --input \t Input file name containing sources to be read (only .fits/.root supported)"<<endl;
-	cout<<"-I, --input2 \t Input file name 2 containing sources to be read (only .fits/.root supported)"<<endl;
+	cout<<"-i, --input \t Input file name containing sources to be read in ROOT TTree (.root)"<<endl;
+	cout<<"-I, --input2 \t Input file name 2 containing sources to be read in ROOT TTree"<<endl;
 	cout<<"-o, --output \t Output file name "<<endl;
 	cout<<"-t, --threshold \t Fraction of matching pixels to consider sources equal "<<endl;
 	cout<<"-v, --verbosity \t Log level (<=0=OFF, 1=FATAL, 2=ERROR, 3=WARN, 4=INFO, >=5=DEBUG)"<<endl;
@@ -87,6 +87,7 @@ double Smax;
 int SourceType2;
 double S2;
 double Smax2;
+double MatchFraction;
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
@@ -300,7 +301,7 @@ int CorrelateSourceCatalogs()
 		MatchingSourceInfo(float f,size_t index)
 			: matchedPixelFraction(f), sourceIndex(index)
 		{}
-		float matchedPixelFraction;
+		double matchedPixelFraction;
 		size_t sourceIndex;
 	};
 
@@ -322,11 +323,18 @@ int CorrelateSourceCatalogs()
 		S2= -1;
 		Smax2= -1;
 		SourceType2= -1;
+		MatchFraction= 0.;
 
 		for(size_t j=0;j<sources2.size();j++){
-			long int NMatchingPixels= sources[i]->GetNMatchingPixels(sources2[j]);
-			float matchingPixelFraction= (float)(NMatchingPixels)/(float)(NPix);
+			long int NPix2= sources2[j]->GetNPixels();
+			std::string SourceName2= std::string(sources2[j]->GetName());
+			double X0_2= sources2[j]->X0;
+			double Y0_2= sources2[j]->Y0;
 
+			long int NMatchingPixels= sources[i]->GetNMatchingPixels(sources2[j]);
+			double matchingPixelFraction= (double)(NMatchingPixels)/(double)(NPix);
+			DEBUG_LOG("Source "<<SourceName<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): finding matching with source "<<SourceName2<<" (X0="<<X0_2<<", Y0="<<Y0_2<<", N="<<NPix2<<"), NMatchingPixels="<<NMatchingPixels<<" f="<<matchingPixelFraction<<" (t="<<matchingThreshold<<")");
+			
 			if(NMatchingPixels<=0 || matchingPixelFraction<matchingThreshold) continue;
 
 			matched_info.push_back(MatchingSourceInfo(matchingPixelFraction,j));
@@ -346,13 +354,17 @@ int CorrelateSourceCatalogs()
 				for(size_t k=1;k<matched_info.size();k++){
 					long int index= matched_info[k].sourceIndex;
 					float matchFraction= matched_info[k].matchedPixelFraction; 
-					if(matchFraction>matchFraction_best) index_best= index;
+					if(matchFraction>matchFraction_best) {
+						index_best= index;
+						matchFraction_best= matchFraction;
+					}
 				}//end loop matchings
 			}//close if
 
 			SourceType2= sources2[index_best]->Type;
 			S2= sources2[index_best]->GetS();
 			Smax2= sources2[index_best]->GetSmax();
+			MatchFraction= matchFraction_best;
 
 		}//close if has match
 	
@@ -384,7 +396,7 @@ void Init(){
 	matchedSourceInfo->Branch("type2",&SourceType2,"type2/I");
 	matchedSourceInfo->Branch("S2",&S2,"S2/D");
 	matchedSourceInfo->Branch("Smax2",&Smax2,"Smax2/D");
-
+	matchedSourceInfo->Branch("MatchFraction",&MatchFraction,"MatchFraction/D");
 
 }//close Init()
 
