@@ -456,7 +456,7 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(seedBrightThr,m_SeedBrightThr);	
 	GET_OPTION_VALUE(seedThr,m_SeedThr);
 	GET_OPTION_VALUE(mergeThr,m_MergeThr);
-
+	GET_OPTION_VALUE(compactSourceSearchNIters,m_compactSourceSearchNIters);
 	GET_OPTION_VALUE(mergeBelowSeed,m_MergeBelowSeed);
 	GET_OPTION_VALUE(searchNegativeExcess,m_SearchNegativeExcess);
 	GET_OPTION_VALUE(searchNestedSources,m_SearchNestedSources);
@@ -628,7 +628,8 @@ int SFinder::RunTask(TaskData* taskData,bool storeData){
 		INFO_LOG("[PROC "<<m_procId<<"] - Searching compact sources...");
 		auto t0_sfinder = chrono::steady_clock::now();	
 
-		significanceMap= FindCompactSources(taskImg,bkgData,taskData);
+		//significanceMap= FindCompactSources(taskImg,bkgData,taskData);
+		significanceMap= FindCompactSourcesRobust(taskImg,bkgData,taskData,m_compactSourceSearchNIters);
 		if(!significanceMap){
 			ERROR_LOG("[PROC "<<m_procId<<"] - Compact source search failed!");
 			//stopTask= true;
@@ -1024,6 +1025,175 @@ int SFinder::FindSources(std::vector<Source*>& sources,Image* inputImg,double se
 
 }//close FindSources()
 
+Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,int niter)
+{
+	//## Check img
+	if(!inputImg || !bkgData || !taskData){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Null ptr to input img and/or bkg/task data!");
+		return nullptr;
+	}
+
+	//## Copy input image (this will be masked with sources at each iteration)
+	bool copyMetaData= true;
+	bool resetStats= false;
+	Image* img= inputImg->GetCloned("",copyMetaData,resetStats);
+	if(!img){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to clone input image!");
+		return nullptr;
+	}
+
+	//## Iterate source finding subtracting sources found at each iteration
+	std::vector<Source*> sources;
+	Image* significanceMap= 0;
+	int iterations_done= 0;
+	
+	for(int k=0;k<niter;k++){
+	
+		//## Compute stats & bkg at current iteration
+		ImgBkgData* bkgData_iter= 0;
+		if(k==0){//Copy bkg data
+			bkgData_iter= new ImgBkgData;
+			*bkgData_iter= *bkgData;
+		}
+		else{//Compute bkg data
+			INFO_LOG("[PROC "<<m_procId<<"] - Computing image stats & bkg at iter no. "<<k+1<<" ...");
+			bkgData_iter= ComputeStatsAndBkg(img);
+			if(!bkgData_iter){
+				ERROR_LOG("[PROC "<<m_procId<<"] - Failed to compute bkg for input image at iter no. "<<k+1<<"!");
+				delete img;
+				img= 0;
+				for(size_t i=0;i<sources.size();i++) {	
+					if(sources[i]) {
+						delete sources[i];
+						sources[i]= 0;
+					}
+				}
+				sources.clear();
+				return nullptr;
+			}
+		}//close else
+
+		//## Compute significance map
+		Image* significanceMap_iter= img->GetSignificanceMap(bkgData_iter,m_UseLocalBkg);
+		if(!significanceMap_iter){
+			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to compute significance map at iter no. "<<k+1<<"!");
+			delete img;
+			img= 0;
+			delete bkgData_iter;
+			bkgData_iter= 0;
+			for(size_t i=0;i<sources.size();i++) {	
+				if(sources[i]) {
+					delete sources[i];
+					sources[i]= 0;
+				}
+			}
+			sources.clear();
+			return nullptr;
+		}
+
+		//## Find compact sources
+		INFO_LOG("[PROC "<<m_procId<<"] - Finding compact sources at iter no. "<<k+1<<" ...");
+		std::vector<Source*> sources_iter;
+		int status= img->FindCompactSource(
+			sources_iter,
+			significanceMap_iter,bkgData_iter,
+			m_SeedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
+			m_SearchNestedSources,m_NestedBlobThrFactor
+		);
+
+		if(status<0) {
+			ERROR_LOG("[PROC "<<m_procId<<"] - Compact source finding failed!");
+			delete img;
+			img= 0;
+			delete bkgData_iter;
+			bkgData_iter= 0;
+			delete significanceMap_iter;
+			significanceMap_iter= 0;
+			for(size_t i=0;i<sources.size();i++) {	
+				if(sources[i]) {
+					delete sources[i];
+					sources[i]= 0;
+				}
+			}
+			return nullptr;
+		}
+
+		//## If no sources have been found stop iteration loop
+		if(sources_iter.empty()){
+			INFO_LOG("[PROC "<<m_procId<<"] - No compact sources found at iter "<<k+1<<", stop iteration.");
+			delete bkgData_iter;
+			bkgData_iter= 0;
+			significanceMap= significanceMap_iter;
+			break;
+		}
+		INFO_LOG("[PROC "<<m_procId<<"] - #"<<sources_iter.size()<<" compact sources found at iter "<<k+1<<", appending them to list...");
+		iterations_done++;
+
+		//## Append sources found at this iteration to main collection
+		sources.insert(sources.end(),sources_iter.begin(),sources_iter.end());
+
+		//## Mask sources found (replace pixels with zeros) at this iteration
+		INFO_LOG("[PROC "<<m_procId<<"] - Masking #"<<sources_iter.size()<<" sources found at iter "<<k+1<<"...");
+		img->MaskSources(sources_iter,0.);		
+
+		//## Clear iter data
+		delete bkgData_iter;
+		bkgData_iter= 0;
+		delete significanceMap;
+		significanceMap= 0;	
+
+	}//end loop iterations
+
+	if(img){
+		delete img;
+		img= 0;
+	}
+
+	//## Tag found sources as compact 
+	int nSources= static_cast<int>( sources.size() );
+	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" compact sources detected in input image after #"<<iterations_done<<" iterations ...");
+	for(size_t k=0;k<sources.size();k++) {
+		sources[k]->SetType(Source::eCompact);
+	}
+	
+	//## Apply source selection?
+	if(m_ApplySourceSelection && nSources>0){
+		if(SelectSources(sources)<0){
+			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to select sources!");
+			delete significanceMap;
+			significanceMap= 0;
+			return nullptr;
+		}
+		nSources= static_cast<int>(sources.size());
+	}//close if source selection
+
+
+	//## Set flux correction factor
+	double fluxCorrection= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(fluxCorrection>0) hasBeamData= true;
+	}
+
+	if(!hasBeamData){
+		INFO_LOG("Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		fluxCorrection= m_fluxCorrectionFactor;
+	}
+	
+	for(size_t k=0;k<sources.size();k++) {
+		sources[k]->SetName(Form("S%d",(signed)k));
+		sources[k]->SetBeamFluxIntegral(fluxCorrection);
+		sources[k]->Print();
+	}	
+			
+	//## Add sources to task data sources
+	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());			
+	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" compact sources added to task data ...");
+
+	return significanceMap;
+
+}//close FindCompactSourcesRobust()
 
 
 Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskData* taskData){
@@ -1063,21 +1233,18 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" compact sources detected in input image ...");
 	for(size_t k=0;k<sources.size();k++) {
 		sources[k]->SetType(Source::eCompact);
-		sources[k]->Print();
 	}
 	
 	//## Apply source selection?
 	//int nSources= static_cast<int>(taskData->sources.size());
 	
 	if(m_ApplySourceSelection && nSources>0){
-		//if(SelectSources(taskData->sources)<0){
 		if(SelectSources(sources)<0){
 			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to select sources!");
 			delete significanceMap;
 			significanceMap= 0;
 			return nullptr;
 		}
-		//nSources= static_cast<int>(taskData->sources.size());
 		nSources= static_cast<int>(sources.size());
 	}//close if source selection
 
@@ -1095,8 +1262,11 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 		fluxCorrection= m_fluxCorrectionFactor;
 	}
 	
-	for(size_t k=0;k<sources.size();k++) sources[k]->SetBeamFluxIntegral(fluxCorrection);
-	
+	for(size_t k=0;k<sources.size();k++) {
+		sources[k]->SetName(Form("S%d",(signed)k));
+		sources[k]->SetBeamFluxIntegral(fluxCorrection);
+		sources[k]->Print();
+	}	
 			
 	//## Add sources to task data sources
 	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());			
@@ -1370,7 +1540,10 @@ Image* SFinder::FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,T
 	//## Tag found sources as extended 
 	int nSources= static_cast<int>( sources.size() );
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" extended sources detected in input image by thresholding the saliency map...");
-	for(size_t k=0;k<sources.size();k++) sources[k]->SetType(Source::eExtended);
+	for(size_t k=0;k<sources.size();k++) {
+		sources[k]->SetName(Form("Sext%d",(signed)k));
+		sources[k]->SetType(Source::eExtended);
+	}
 	
 	//## Add sources to extended sources?
 	//## NB: Need to decide if to keep them in separate collections (for the moment put in the same collection)
@@ -1585,8 +1758,6 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 		return nullptr;
 	}
 
-	//## Tag sources as extended
-	for(size_t k=0;k<sources.size();k++) sources[k]->SetType(Source::eExtended);
 	
 	//## Remove sources of negative excess (THIS METHOD SHOULD BE IMPROVED)
 	if(inputImg->HasStats()){
@@ -1605,6 +1776,12 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 		WARN_LOG("[PROC "<<m_procId<<"] - Input image has no stats computed (hint: you must have computed them before!), cannot remove negative excess from sources!");
 	}	
 
+	//## Tag sources as extended
+	for(size_t k=0;k<sources.size();k++) {
+		sources[k]->SetName(Form("Sext%d",(signed)k));
+		sources[k]->SetType(Source::eExtended);
+	}
+	
 	//## Add sources to extended sources
 	//## NB: Need to decide if to keep them in separate collections (for the moment put in the same collection)
 	//(taskData->ext_sources).insert( (taskData->ext_sources).end(),sources.begin(),sources.end());		
@@ -1820,8 +1997,7 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 		return nullptr;
 	}
 
-	//## Tag sources as extended
-	for(size_t k=0;k<sources.size();k++) sources[k]->SetType(Source::eExtended);
+	
 	
 	//## Remove sources of negative excess (because Chan-Vese detects them) (THIS METHOD SHOULD BE IMPROVED)
 	if(inputImg->HasStats()){
@@ -1839,6 +2015,13 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 	else {
 		WARN_LOG("[PROC "<<m_procId<<"] - Input image has no stats computed (hint: you must have computed them before!), cannot remove negative excess from sources!");
 	}	
+
+
+	//## Tag sources as extended
+	for(size_t k=0;k<sources.size();k++) {
+		sources[k]->SetName(Form("Sext%d",(signed)k));
+		sources[k]->SetType(Source::eExtended);
+	}
 
 	//## Add sources to extended sources
 	//## NB: Need to decide if to keep them in separate collections (for the moment put in the same collection)
@@ -1892,6 +2075,7 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" found...");
 
 	for(size_t i=0;i<sources.size();i++){
+		sources[i]->SetName(Form("Sext%d",(signed)(i)));	
 		sources[i]->SetType(Source::eExtended);
 	}
 

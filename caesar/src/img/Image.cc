@@ -1956,6 +1956,37 @@ Image* Image::GetMask(Image* mask,bool isBinary)
 
 }//close GetMask()
 
+
+int Image::MaskSources(std::vector<Source*>const& sources,float maskValue)
+{
+	//## Check source list
+	int nSources= static_cast<int>(sources.size());
+	if(nSources<=0) {
+		WARN_LOG("Source list is empty, nothing to be done...");
+		return 0;	
+	}
+
+	//## Mask sources 
+	#ifdef OPENMP_ENABLED
+	#pragma omp parallel for
+	#endif
+	for(int k=0;k<nSources;k++){
+		for(int l=0;l<sources[k]->GetNPixels();l++){
+			long int id= (sources[k]->GetPixel(l))->id;
+			this->SetPixelValue(id,maskValue);
+		}//end loop pixels
+	}//end loop sources		
+		
+	//Force re-computation of stats after masks
+	bool computeRobustStats= true;
+	bool skipNegativePixels= false;
+	bool forceRecomputing= true;
+	this->ComputeStats(computeRobustStats,skipNegativePixels,forceRecomputing);
+
+	return 0;
+
+}//close MaskSources()
+
 Image* Image::GetSourceMask(std::vector<Source*>const& sources,bool isBinary,bool invert){
 
 	//## Clone map

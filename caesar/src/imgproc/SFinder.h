@@ -166,6 +166,11 @@ class SFinder : public TObject {
 		Image* FindCompactSources(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData);
 
 		/**
+		* \brief Find compact sources
+		*/
+		Image* FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,TaskData* taskData,int niter=10);
+
+		/**
 		* \brief Compute residual map
 		*/
 		Image* FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<Source*> const & sources);
@@ -307,8 +312,6 @@ class SFinder : public TObject {
 
 		//Source
 		Source* m_Source;
-		//std::vector<Source*> m_CompactSources;
-		//std::vector<Source*> m_ExtendedSources;	
 		std::vector<Source*> m_SourcesMergedAtEdges;
 		std::vector<Source*> m_SourceCollection;
 
@@ -375,6 +378,7 @@ class SFinder : public TObject {
 		double m_MergeThr;
 		bool m_MergeBelowSeed;
 		bool m_SearchNegativeExcess;
+		int m_compactSourceSearchNIters;
 
 		//Nested source search
 		bool m_SearchNestedSources;

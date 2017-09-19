@@ -56,6 +56,9 @@ class BkgSampleData : public TObject{
 
 	public:
 
+		/**
+		* \brief Constructor
+		*/
 		BkgSampleData(){
 			ix_min= 0; ix_max= 0;
 			iy_min= 0; iy_max= 0;
@@ -64,22 +67,41 @@ class BkgSampleData : public TObject{
 			bkgLevel= 0;
 			bkgRMS= 0;
 		}
+
+		/**
+		* \brief Destructor
+		*/
 		virtual ~BkgSampleData(){};
 
 	public:
+		/**
+		* \brief Copy bkg data
+		*/
 		void CopyBkgData(BkgSampleData aBkgSample){
 			bkgLevel= aBkgSample.bkgLevel;
 			bkgRMS= aBkgSample.bkgRMS;
 		}
+
+		/**
+		* \brief Log info
+		*/
 		void Log(std::string level="INFO"){
 			LOG(level,GetPrintable());
 		}
+
+		/**
+		* \brief Print info to stdout
+		*/
 		void Print(){
 			cout<<"== BKG SAMPLE DATA NO. "<<id<<" =="<<endl;
 			cout<<"N="<<npix<<" xrange("<<ix_min<<","<<ix_max<<") yrange("<<iy_min<<","<<iy_max<<")"<<endl;
 			cout<<"bkgLevel="<<bkgLevel<<" bkgRMS="<<bkgRMS<<endl;
 			cout<<"=================================="<<endl;
 		}
+
+		/**
+		* \brief Get printable string
+		*/
 		std::string GetPrintable(){
 			std::stringstream ss;
 			ss<<"BkgSample no. "<<id<<": ";
@@ -102,40 +124,92 @@ class BkgSampleData : public TObject{
 	ClassDef(BkgSampleData,1)
 };
 
-//=====================================
-//==   NEW BKG DATA
-//=====================================
 
 class ImgBkgData : public TObject {
 
 	public:
+
+		/**
+		* \brief Standard constructor
+		*/
 		ImgBkgData();
+
+		/**
+		* \brief Destructor
+		*/
 		virtual ~ImgBkgData();
 
+		/**
+		* \brief Copy constructor
+		*/
+		ImgBkgData(const ImgBkgData& data);
+
+		/**
+		* \brief Assignment Operator
+		*/
+		ImgBkgData& operator=(const ImgBkgData& data);
+		/**
+		* \brief Copy method
+		*/
+		void Copy(TObject& data) const;
+
 	public:
+
+		/**
+		* \brief Clear sampling data
+		*/
 		void ClearSamplings(){
 			BkgSamplings.clear();
 		}
+
+		/**
+		* \brief Clear bkg map
+		*/
 		void ClearBkgMap(){
 			if(!BkgMap) return;
 			delete BkgMap;
 			BkgMap= 0;
 		}
+
+		/**
+		* \brief Clear noise map
+		*/
 		void ClearNoiseMap(){
 			if(!NoiseMap) return;
 			delete NoiseMap;
 			NoiseMap= 0;
 		}
 
+		/**
+		* \brief Clear data
+		*/
 		void Clear(){
 			ClearSamplings();
 			ClearBkgMap();
 			ClearNoiseMap();
 		}
+
+		/**
+		* \brief Copy bkg map
+		*/
 		void CopyBkgMap(Caesar::Image* aMap);		
+
+		/**
+		* \brief Copy noise map
+		*/
 		void CopyNoiseMap(Caesar::Image* aMap);
+
+		/**
+		* \brief Has local bkg
+		*/
 		bool HasLocalBkg(){return (BkgMap && NoiseMap);}
 		
+	private:
+		/**
+		* \brief Initialize class data
+		*/
+		void Init();
+
 	public:
 		std::vector<BkgSampleData> BkgSamplings;
 		Image* BkgMap;//the interpolated bkg map

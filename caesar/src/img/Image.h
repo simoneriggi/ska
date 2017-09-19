@@ -823,6 +823,11 @@ class Image : public TNamed {
 		Image* GetSourceMask(std::vector<Source*>const& sources,bool isBinary=false,bool invert=false);
 
 		/**
+		* \brief Mask sources
+		*/
+		int MaskSources(std::vector<Source*>const& source,float maskValue=0.);	
+
+		/**
 		* \brief Returns a residual image obtained by dilating given sources with a random background
 		*/
 		Image* GetSourceResidual(std::vector<Source*>const& sources,int KernSize=5,int dilateModel=MorphFilter::eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,ImgBkgData* bkgData=0,bool useLocalBkg=false,bool randomize=false,double zThr=20);

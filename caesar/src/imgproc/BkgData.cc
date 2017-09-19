@@ -47,21 +47,84 @@ ClassImp(Caesar::ImgBkgData)
 
 namespace Caesar {
 
-//=====================================
-//==   NEW BKG DATA
-//=====================================
 
-ImgBkgData::ImgBkgData() {
+ImgBkgData::ImgBkgData() 
+{
+	//Initialize data
+	Init();
+
+}//close costructor
+
+ImgBkgData::~ImgBkgData() 
+{
+	//Clear allocated data
+	Clear();
+
+}//close destructor
+
+
+ImgBkgData::ImgBkgData(const ImgBkgData& data) {
+  // Copy constructor
+	DEBUG_LOG("Copy constuctor called...");
+  Init();
+  ((ImgBkgData&)data).Copy(*this);
+}
+
+void ImgBkgData::Init(){
+	
 	BkgSamplings.clear();
 	BkgMap= 0;
 	NoiseMap= 0;
 	gBkg= 0;
 	gNoise= 0;
-}//close costructor
 
-ImgBkgData::~ImgBkgData() {
-	Clear();
-}//close destructor
+}//close Init()
+
+void ImgBkgData::Copy(TObject &obj) const 
+{	
+	// Copy variables
+  ((ImgBkgData&)obj).gBkg = gBkg;
+	((ImgBkgData&)obj).gNoise = gNoise;
+				
+	//Copy sample bkg data
+	//Delete first any existing collection
+	((ImgBkgData&)obj).ClearSamplings();
+
+	for(size_t i=0;i<BkgSamplings.size();i++){
+		(((ImgBkgData&)obj).BkgSamplings).push_back(BkgSamplings[i]);
+	}
+
+	
+	//Delete existing maps first
+	DEBUG_LOG("Deleting existing bkg & noise maps...");
+	if( ((ImgBkgData&)obj).BkgMap ){
+		delete ((ImgBkgData&)obj).BkgMap;
+		((ImgBkgData&)obj).BkgMap= 0;
+	}
+	if( ((ImgBkgData&)obj).NoiseMap ){
+		delete ((ImgBkgData&)obj).NoiseMap;
+		((ImgBkgData&)obj).NoiseMap= 0;
+	}
+
+	//Copy maps
+	DEBUG_LOG("Copying bkg & noise maps...");
+	if(BkgMap){
+		((ImgBkgData&)obj).BkgMap= new Image;
+		*((ImgBkgData&)obj).BkgMap = *BkgMap;
+	}
+	if(NoiseMap){
+		((ImgBkgData&)obj).NoiseMap= new Image;
+		*((ImgBkgData&)obj).NoiseMap = *NoiseMap;
+	}
+	
+}//close Copy()
+
+
+ImgBkgData& ImgBkgData::operator=(const ImgBkgData& data) { 
+	// Operator =
+  if (this != &data)  ((ImgBkgData&)data).Copy(*this);
+  return *this;
+}
 
 void ImgBkgData::CopyBkgMap(Caesar::Image* aMap){
 	if(!aMap) return;

@@ -356,7 +356,7 @@ long int Source::GetNMatchingPixels(Source* aSource){
 	std::sort((aSource->m_Pixels).begin(), (aSource->m_Pixels).end(),PixelMatcher());
 	
 	std::vector<Pixel*> pixelsToBeMerged;
-	std::set_difference (
+	std::set_intersection (
 		(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
 		m_Pixels.begin(), m_Pixels.end(),
 		std::back_inserter(pixelsToBeMerged),

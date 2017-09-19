@@ -182,7 +182,8 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 		nBlobs++;	
 		
 		DEBUG_LOG("Adding new blob (# "<<nBlobs<<") to list...");
-		TString blobName= Form("%s_blobId%d",inputImg->GetName().c_str(),nBlobs);
+		//TString blobName= Form("%s_blobId%d",inputImg->GetName().c_str(),nBlobs);
+		TString blobName= Form("S%d",nBlobs);
 		aBlob= new T();
 		aBlob->SetId(nBlobs);	
 		aBlob->SetName(std::string(blobName));
