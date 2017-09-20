@@ -731,7 +731,7 @@ class SkyMapSimulator(object):
 		fout = open(self.ds9filename, 'wb')
 	
 		## Write file header
-		fout.write('global color=red font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n')
+		fout.write('global color=white font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n')
 		fout.write('image\n')
 
 		## Write source contour region
@@ -765,6 +765,12 @@ class SkyMapSimulator(object):
 		header.set('BPA', self.beam_bpa)
 		header.set('BSCALE',1.)
 		header.set('BZERO',0.)
+		header.set('CDELT1',self.pixsize/3600.)
+		header.set('CDELT2',self.pixsize/3600.)
+		#header.set('CTYPE1','X')
+		#header.set('CTYPE2','Y')
+		#header.set('CRPIX1',1)
+		#header.set('CRPIX2',1)
 		
 		# Define HDU
 		hdu = fits.PrimaryHDU(data=data,header=header)
@@ -786,6 +792,12 @@ class SkyMapSimulator(object):
 		header.set('BPA', self.beam_bpa)
 		header.set('BSCALE',1.)
 		header.set('BZERO',0.)
+		header.set('CDELT1',self.pixsize/3600.)
+		header.set('CDELT2',self.pixsize/3600.)
+		#header.set('CTYPE1','X')
+		#header.set('CTYPE2','Y')
+		#header.set('CRPIX1',1)
+		#header.set('CRPIX2',1)
 
 		# Define HDU
 		hdu = fits.PrimaryHDU(data=data,header=header)

@@ -19,11 +19,13 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "=========================="
 	echo "*** MANDATORY ARGS ***"
 	echo "--filelist=[FILELIST] - Ascii file with list of image files (.fits/.root, full path) to be processed" 
-	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
+	echo "--inputfile=[FILENAME] - Input file name to be searched (.fits/.root). If the --filelist option is given this option is skipped."
 	echo "--envfile=[ENV_FILE] - File (.sh) with list of environment variables to be loaded by each processing node"
 	echo ""
 	echo ""
 	echo "*** OPTIONAL ARGS ***"	
+	echo "--submit - Submit the script to the batch system using queue specified"
+	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
 	echo "--loglevel=[LOG_LEVEL] - Logging level string {INFO, DEBUG, WARN, ERROR, OFF} (default=INFO)"
 	echo "--maxfiles=[NMAX_PROCESSED_FILES] - Maximum number of input files processed in filelist (default=-1=all files)"
 	echo "--outdir=[OUTPUT_DIR] - Output directory where to put run output file (default=pwd)"
@@ -63,6 +65,10 @@ fi
 #######################################
 ##         PARSE ARGS
 #######################################
+SUBMIT=false
+FILELIST_GIVEN=false
+INPUTFILE=""
+INPUTFILE_GIVEN=false
 NPROC=1
 HOSTFILE=""
 HOSTFILE_GIVEN=false
@@ -102,21 +108,34 @@ SALIENCY_NN_PAR="1"
 SEARCH_COMPACT_SOURCES="true"
 SEARCH_EXTENDED_SOURCES="true"
 
+
 for item in $*
 do
 	case $item in 
 		## MANDATORY ##	
 		--filelist=*)
     	FILELIST=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+			if [ "$FILELIST" != "" ]; then
+				FILELIST_GIVEN=true
+			fi
     ;;
-		--queue=*)
-    	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
+		--inputfile=*)
+    	INPUTFILE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+			if [ "$INPUTFILE" != "" ]; then
+				INPUTFILE_GIVEN=true
+			fi
+    ;;	
 		--envfile=*)
     	ENV_FILE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 	
 		## OPTIONAL ##	
+		--submit*)
+    	SUBMIT="true"
+    ;;
+		--queue=*)
+    	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
 		--loglevel=*)
     	LOG_LEVEL=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -244,12 +263,13 @@ done
 
 echo ""
 echo "*****  PARSED ARGUMENTS ****"
+echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE"
 echo "ENV_FILE: $ENV_FILE"
+echo "INPUTFILE: $INPUTFILE"
 echo "FILELIST: $FILELIST, NMAX_PROCESSED_FILES: $NMAX_PROCESSED_FILES"
 echo "SPLIT_IN_TILES? $SPLIT_IN_TILES, TILE_SIZE: $TILE_SIZE, TILE_STEP: $TILE_STEP"
 echo "NPROC: $NPROC, NTHREADS: $NTHREADS"
 echo "HOSTFILE_GIVEN? $HOSTFILE_GIVEN, HOSTFILE: $HOSTFILE"
-echo "BATCH_QUEUE: $BATCH_QUEUE"
 echo "LOG_LEVEL: $LOG_LEVEL"
 echo "OUTPUT_DIR: $OUTPUT_DIR"
 echo "BKG BOX: $BKG_BOXSIZE, GRID: $BKG_GRID_SIZE"
@@ -266,13 +286,13 @@ echo ""
 
 
 ## Check arguments parsed
-if [ "$FILELIST" = "" ]; then
-  echo "ERROR: Empty FILELIST arg!"
+if [ "$FILELIST_GIVEN" = false ] && [ "$INPUTFILE_GIVEN" = false ]; then
+  echo "ERROR: Missing or empty FILELIST and INPUTFILE args (hint: you should specify at least one)!"
   exit 1
 fi
 
-if [ "$BATCH_QUEUE" = "" ]; then
-  echo "ERROR: Empty BATCH_QUEUE argument!"
+if [ "$BATCH_QUEUE" = "" ] && [ "$SUBMIT" = true ]; then
+  echo "ERROR: Empty BATCH_QUEUE argument (hint: you must specify a queue if submit option is activated)!"
   exit 1
 fi
 
@@ -287,13 +307,13 @@ fi
 ##     DEFINE & LOAD ENV VARS
 #######################################
 export BASEDIR="$PWD"
-#export ENV_FILE=""
 export OUTPUT_DATADIR="$PWD"
 export DATADIR=""
 
 ## Load env file
 echo "INFO: Loading environment variables defined in file $ENV_FILE ..."
 source $ENV_FILE
+
 
 #######################################
 ##         CHECK ENVIRONMENT
@@ -305,37 +325,19 @@ if [ "$CAESAR_DIR" = "" ]; then
 fi
 
 
+
+
+
+
 #######################################
-##     LOOP OVER FILES IN LIST
+##   DEFINE GENERATE CONFIG FCN
 #######################################
-echo "INFO: Looping over input files listed in file $FILELIST ..."
-cd $BASEDIR
-file_counter=0
-index=1
+generate_config(){
 
-while read filename 
-do
+	local configfile=$1
 
-	## Extract base filename from file given in list 
-	filename_base=$(basename "$filename")
-	file_extension="${filename_base##*.}"
-	filename_base_noext="${filename_base%.*}"
-
-
-  echo "DEBUG: filename: $filename, filename_base: $filename_base, extension: $file_extension, filename_base_noext: $filename_base_noext"
-  
-  export CURRENTJOBDIR=$BASEDIR  
-
-  inputfile=$filename
-	outputfile="Out_$filename_base_noext"'.root'
- 	ds9region_file="DS9_$filename_base_noext"'.reg'
-
-  echo "INFO: Creating config & exec script for input file: $inputfile ..."
-  
-
-configfile="config_$filename_base_noext"'_'"$index.cfg"
-echo "INFO: Creating config file $configfile ..."
-(
+	echo "INFO: Creating config file $configfile ..."
+	(
   
 		echo '############################################'
 		echo '###    CAESAR CONFIG OPTIONS'
@@ -558,25 +560,28 @@ echo "INFO: Creating config file $configfile ..."
 		echo '###'
 		echo '###'
 
-	   
  ) > $configfile
 
-EXE="$CAESAR_DIR/scripts/RunSFinderMPI.sh"
-EXE_ARGS="--nproc=$NPROC --config=$configfile"
-if [ "$HOSTFILE_GIVEN" = true ] ; then
-	EXE_ARGS="$EXE_ARGS --hostfile=$HOSTFILE"
-fi
+}
+## close function
 
+#######################################
+##   DEFINE GENERATE EXE SCRIPT FCN
+#######################################
+generate_exec_script(){
 
-shfile="Run_$filename_base_noext"'_'"$index.sh"
-echo "INFO: Creating sh file $shfile ..."
-( 
+	local shfile=$1
+	local jobindex=$2
+	local exe=$3
+	local exe_args=$4
 
-      echo "#PBS -o $BASEDIR"
-      echo "#PBS -o $BASEDIR"
-      echo '#PBS -r n'
+	echo "INFO: Creating sh file $shfile (jobindex=$jobindex, exe=$exe, exe_args=$exe_args)..."
+	( 
+  		echo "#PBS -o $BASEDIR"
+    	echo "#PBS -o $BASEDIR"
+    	echo '#PBS -r n'
       echo '#PBS -S /bin/sh'
-      echo "#PBS -N SFinderJob$index"
+      echo "#PBS -N SFinderJob$jobindex"
       echo '#PBS -p 1'
 
       echo " "
@@ -612,7 +617,7 @@ echo "INFO: Creating sh file $shfile ..."
       echo 'echo ""'
       echo '  cd $JOBDIR'
 
-      echo "  $EXE $EXE_ARGS"
+      echo "  $exe $exe_args"
       
       echo '  echo ""'
 
@@ -621,24 +626,127 @@ echo "INFO: Creating sh file $shfile ..."
       
       echo 'echo "*** END RUN ***"'
 
- ) > $shfile
+ 	) > $shfile
 
-chmod +x $shfile
-
-
-# submits the job to PBS 
-##qsub -q $BATCH_QUEUE $CURRENTJOBDIR/$shfile
-
-(( file_counter= $file_counter + 1 ))
-(( index= $index + 1 ))
+	chmod +x $shfile
+}
+## close function generate_exec_script()
 
 
-## If total number of jobs exceeds the maximum stop everything!
-if [ "$NMAX_PROCESSED_FILES" != "-1" ] && [ $file_counter -ge $NMAX_PROCESSED_FILES ]; then
-  echo "INFO: Maximum number of processed files ($NMAX_PROCESSED_FILES) reached, exit loop..."
-  break;
+
+
+
+
+
+
+#######################################
+##   GENERATE AND SUBMIT SCRIPT JOBS
+#######################################
+
+
+if [ "$FILELIST_GIVEN" = true ]; then
+
+	#######################################
+	##     LOOP OVER FILES IN LIST
+	#######################################
+	echo "INFO: Looping over input files listed in file $FILELIST ..."
+	cd $BASEDIR
+	file_counter=0
+	index=1
+
+	while read filename 
+	do
+
+		## Extract base filename from file given in list 
+		filename_base=$(basename "$filename")
+		file_extension="${filename_base##*.}"
+		filename_base_noext="${filename_base%.*}"
+
+  	export CURRENTJOBDIR=$BASEDIR  
+
+		## Define input/output filenames
+  	inputfile=$filename
+		outputfile="Out_$filename_base_noext"'.root'
+ 		ds9region_file="DS9_$filename_base_noext"'.reg'
+
+		## Define and generate config file
+		configfile="config_$filename_base_noext"'_'"$index.cfg"
+  	echo "INFO: Creating config file $configfile for input file: $inputfile ..."
+		generate_config $configfile
+
+
+		## Define executable & args variables and generate script
+		shfile="Run_$filename_base_noext"'_'"$index.sh"
+		EXE="$CAESAR_DIR/scripts/RunSFinderMPI.sh"
+		EXE_ARGS="--nproc=$NPROC --config=$configfile"
+		if [ "$HOSTFILE_GIVEN" = true ] ; then
+			EXE_ARGS="$EXE_ARGS --hostfile=$HOSTFILE"
+		fi
+		
+		echo "INFO: Creating script file $shfile for input file: $inputfile ..."
+		generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS"
+
+
+		# Submits the job to batch system
+		if [ "$SUBMIT" = true ] ; then
+			echo "INFO: Submitting script $shfile to QUEUE $BATCH_QUEUE ..."
+			qsub -q $BATCH_QUEUE $CURRENTJOBDIR/$shfile
+		fi
+
+		(( file_counter= $file_counter + 1 ))
+		(( index= $index + 1 ))
+
+		## If total number of jobs exceeds the maximum stop everything!
+		if [ "$NMAX_PROCESSED_FILES" != "-1" ] && [ $file_counter -ge $NMAX_PROCESSED_FILES ]; then
+  		echo "INFO: Maximum number of processed files ($NMAX_PROCESSED_FILES) reached, exit loop..."
+  		break;
+		fi
+
+	done < "$FILELIST"
+
+else
+	
+	################################################
+	##     USE INPUT FILE PROVIDED IN SCRIPT ARGS
+	################################################
+
+	## Extract base filename from file given in list 
+	filename_base=$(basename "$INPUTFILE")
+	file_extension="${filename_base##*.}"
+	filename_base_noext="${filename_base%.*}"
+
+  export CURRENTJOBDIR=$BASEDIR  
+
+	## Define input/output filenames
+  inputfile=$INPUTFILE
+	outputfile="Out_$filename_base_noext"'.root'
+ 	ds9region_file="DS9_$filename_base_noext"'.reg'
+
+	## Define and generate config file
+	configfile="config_$filename_base_noext"'.cfg'
+  echo "INFO: Creating config file $configfile for input file: $inputfile ..."
+	generate_config $configfile
+
+
+	## Define executable & args variables and generate script
+	shfile="Run_$filename_base_noext"'.sh'
+	EXE="$CAESAR_DIR/scripts/RunSFinderMPI.sh"
+	EXE_ARGS="--nproc=$NPROC --config=$configfile"
+	if [ "$HOSTFILE_GIVEN" = true ] ; then
+		EXE_ARGS="$EXE_ARGS --hostfile=$HOSTFILE"
+	fi
+
+	echo "INFO: Creating script file $shfile for input file: $inputfile ..."
+	jobId=" "
+	generate_exec_script "$shfile" "$jobId" "$EXE" "$EXE_ARGS"
+
+	# Submits the job to batch system
+	if [ "$SUBMIT" = true ] ; then
+		echo "INFO: Submitting script $shfile to QUEUE $BATCH_QUEUE ..."
+		qsub -q $BATCH_QUEUE $CURRENTJOBDIR/$shfile
+	fi
+
 fi
 
-done < "$FILELIST"
-
 echo "*** END SUBMISSION ***"
+
