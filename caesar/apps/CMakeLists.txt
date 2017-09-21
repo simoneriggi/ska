@@ -1,4 +1,4 @@
-
+add_subdirectory(readimg)
 add_subdirectory(sourcefinder)
 add_subdirectory(bkgfinder)
 add_subdirectory(fits2root)
@@ -9,6 +9,7 @@ add_subdirectory(sourcefinderMPI)
 add_subdirectory(sourceCatalogsCorrelator)
 
 set (INCLUDE_DIRS ${INCLUDE_DIRS} PARENT_SCOPE)
+set (Task_ReadImg_SRCS ${Task_ReadImg_SRCS} PARENT_SCOPE)
 set (Task_FindSource_SRCS ${Task_FindSource_SRCS} PARENT_SCOPE)
 set (Task_FindSourceResidual_SRCS ${Task_FindSourceResidual_SRCS} PARENT_SCOPE)
 set (Task_FindSaliency_SRCS ${Task_FindSaliency_SRCS} PARENT_SCOPE)
