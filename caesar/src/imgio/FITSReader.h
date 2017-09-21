@@ -186,9 +186,14 @@ class FITSReader : public TObject {
 		* \brief Read image data
 		*/	
 		static int ReadAndFillImageData(Image& img,long int Nx,long int Ny,fitsfile* fp,int& read_data_status);
+		static int ReadAndFillImageDataFast(Image& img,long int Nx,long int Ny,fitsfile* fp,int& read_data_status);
 		
 		#ifdef OPENMP_ENABLED
+		/**
+		* \brief Read image data (multithreaded version)
+		*/	
 		static int ReadAndFillImageDataMT(Image& img,long int Nx,long int Ny,fitsfile* fp,int& read_data_status,std::vector<Caesar::StatMoments<double>>& moments);
+		static int ReadAndFillImageDataFastMT(Image& img,long int Nx,long int Ny,fitsfile* fp,int& read_data_status);
 		#endif
 
 		/**

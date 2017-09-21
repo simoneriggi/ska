@@ -461,7 +461,7 @@ int Image::ReadFITS(std::string filename,int hdu_id,int ix_min,int ix_max,int iy
 	//Stop timer and print
 	auto end = chrono::steady_clock::now();
 	double dt= chrono::duration <double, milli> (end-start).count();
-	INFO_LOG("Read FITS image "<<filename<<" in "<<dt<<" ms");	
+	DEBUG_LOG("Read FITS image "<<filename<<" in "<<dt<<" ms");	
 
 	//Check error status
 	if(status<0){
@@ -502,8 +502,7 @@ int Image::ReadFile(std::string filename,bool invert){
 	//## Convert to gray scale
 	cv::Mat mat_gray;
   cvtColor( mat, mat_gray, CV_RGB2GRAY );
-	//mat.convertTo(mat_gray, CV_32FC1);
-
+	
 	//## Fill an image
 	int Nx= mat.cols;
 	int Ny= mat.rows;
@@ -515,9 +514,7 @@ int Image::ReadFile(std::string filename,bool invert){
 			int rowId= Ny-1-j;
 			for(int i=0;i<mat_gray.cols;i++){
 				int colId= Nx-1-i;
-				//int colId= i;
 				unsigned int matrixElement= mat_gray.at<uchar>(j,i);	
-				//float matrixElement= mat_gray.at<float>(j,i);		
 				long int ix= colId ;
 				long int iy= rowId ;
 				this->FillPixel(ix,iy,matrixElement);
@@ -528,10 +525,8 @@ int Image::ReadFile(std::string filename,bool invert){
 		for(int j=0;j<mat_gray.rows;j++){
 			int rowId= Ny-1-j;
 			for(int i=0;i<mat_gray.cols;i++){
-				//int colId= Nx-1-i;
 				int colId= i;
 				unsigned int matrixElement= mat_gray.at<uchar>(j,i);	
-				//float matrixElement= mat_gray.at<float>(j,i);		
 				long int ix= colId ;
 				long int iy= rowId ;
 				this->FillPixel(ix,iy,matrixElement);
@@ -559,7 +554,7 @@ Image* Image::GetTile(long int ix_min,long int ix_max,long int iy_min,long int i
 	std::string name= imgname;
 	if(name=="") name= "tileimg";
 
-	INFO_LOG("ix min/max="<<ix_min<<"/"<<ix_max<<", iy min/max="<<iy_min<<"/"<<iy_max<<" TileSizeX="<<TileSizeX<<", TileSizeY="<<TileSizeY<<", pixels size="<<tile_pixels.size());
+	DEBUG_LOG("ix min/max="<<ix_min<<"/"<<ix_max<<", iy min/max="<<iy_min<<"/"<<iy_max<<" TileSizeX="<<TileSizeX<<", TileSizeY="<<TileSizeY<<", pixels size="<<tile_pixels.size());
 	
 	Image* tile= new Image(TileSizeX,TileSizeY,tile_pixels,xlow,ylow,name);
 	tile->CopyMetaData(this->m_MetaData);
@@ -579,8 +574,8 @@ int Image::CheckFillPixel(long int gbin,double w){
 		return -1;
 	}
 	if(TMath::IsNaN(w) || fabs(w)==TMath::Infinity()) {
-		WARN_LOG("Given value (w="<<w<<") for bin "<<gbin<<" is NaN or inf, skipping!");
-		return -1;
+		DEBUG_LOG("Given value (w="<<w<<") for bin "<<gbin<<" is NaN or inf, skipping!");
+		return 0;
 	}
 
 	//Compute binx & biny
@@ -598,11 +593,12 @@ int Image::CheckFillPixel(long int gbin,double w){
 
 }//close CheckFillPixel()
 
+
 int Image::FillPixel(long int gbin,double w,bool useNegativePixInStats){
 
 	//Check bin & value
 	if(CheckFillPixel(gbin,w)<0) {
-		WARN_LOG("Invalid bin given (gbin="<<gbin<<") or nan/inf value given (w="<<w<<") or pixel already filled!");
+		WARN_LOG("Invalid bin given (gbin="<<gbin<<") or or pixel already filled!");
 		return -1;
 	}
 
@@ -612,7 +608,6 @@ int Image::FillPixel(long int gbin,double w,bool useNegativePixInStats){
 	//Update moments
 	if(w>=0 || (w<0 && useNegativePixInStats)) {
 		Caesar::StatsUtils::UpdateMoments(m_StatMoments,w);
-		//UpdateMoments(w);
 	}
 
 	return 0;
@@ -944,15 +939,6 @@ void Image::ResetImgStats(bool resetMoments,bool clearStats){
 	//Reset moments
 	if(resetMoments){
 		m_StatMoments.Reset();
-		/*
-		m_PixelMin= +1.e+99;
-		m_PixelMax= -1.e+99;
-		m_Npix= 0;//npixels	
-  	m_M1= 0;//1st moments
-  	m_M2= 0;//2nd moment
-		m_M3= 0;//3rd moment
-		m_M4= 0;//4th moment
-		*/
 	}
 
 	//Delete current stats data
@@ -966,201 +952,19 @@ int Image::ComputeMoments(bool skipNegativePixels){
 
 	//## Recompute stat moments
 	//## NB: If OMP is enabled this is done in parallel and moments are aggregated to return the correct cumulative estimate 
-	int status= Caesar::StatsUtils::ComputeStatsMoments(m_StatMoments,m_pixels,skipNegativePixels);
+	bool maskNanInfValues= true;
+	int status= Caesar::StatsUtils::ComputeStatsMoments(m_StatMoments,m_pixels,skipNegativePixels,maskNanInfValues);
 	if(status<0){
 		ERROR_LOG("Failed to compute stat moments!");
 	}
-
-	/*
-	#ifdef OPENMP_ENABLED
-		
-		//Define variables for reduction (OMP does not allow class members in reduction operation)
-		long long int nPix= 0;
-		double pixelMin= +1.e+99; 
-		double pixelMax= -1.e+99;
-		double M1= 0;
-		double M2= 0;
-		double M3= 0;
-		double M4= 0;
-		double S= 0;
-
-		long long int nPix_t= 0;
-		double M1_t= 0;
-		double M2_t= 0;
-		double M3_t= 0;
-		double M4_t= 0;
-		double S_t= 0;
-
-		std::vector<long long int> nPix_list;
-		std::vector<double> M1_list;
-		std::vector<double> M2_list;
-		std::vector<double> M3_list;
-		std::vector<double> M4_list;
-
-		#pragma omp parallel private(nPix_t,M1_t,M2_t,M3_t,M4_t,S_t) reduction(max: pixelMax), reduction(min: pixelMin), reduction(+: nPix, S)
-		{
-
-			int thread_id= omp_get_thread_num();
-			int nthreads= SysUtils::GetOMPThreads();
-			INFO_LOG("Starting image moment computing in thread "<<thread_id<<" (nthreads="<<nthreads<<") ...");
-			
-			//Init moments
-			nPix_t= 0;
-			M1_t= 0;
-			M2_t= 0;
-			M3_t= 0;
-			M4_t= 0;
-			S_t= 0;
-
-			#pragma omp single
-   		{
-     		nPix_list.assign(nthreads,0);
-				M1_list.assign(nthreads,0);
-				M2_list.assign(nthreads,0);	
-				M3_list.assign(nthreads,0);
-				M4_list.assign(nthreads,0);
-   		}
-
-			#pragma omp for
-			for(size_t i=0;i<m_pixels.size();i++){			
-				double w= m_pixels[i];
-				if( w==0 || (skipNegativePixels && w<0) ) continue; 
-				if(w<pixelMin) pixelMin= w;
-				if(w>pixelMax) pixelMax= w;
-				nPix_t++;
-				S_t+= w;
-  			double delta = w - M1_t;
-  			double delta_n = delta/nPix_t;
-  			double delta_n2 = delta_n * delta_n;
-  			double f = delta * delta_n * (nPix_t-1);
-  			M1_t+= delta_n;
-  			M4_t+= f * delta_n2 * (nPix_t*nPix_t - 3*nPix_t + 3) + 6 * delta_n2 * M2_t - 4 * delta_n * M3_t;
-  			M3_t+= f * delta_n * (nPix_t - 2) - 3 * delta_n * M2_t;
-  			M2_t+= f;
-			}//end loop pixels
-
-			INFO_LOG("Thread id="<<omp_get_thread_num()<<": nPix_t="<<nPix_t<<", M1="<<M1_t<<", M2="<<M2_t<<", M3="<<M3_t<<", M4="<<M4_t);
-
-			nPix+= nPix_t;
-			//M1+= M1_t;
-			//M2+= M2_t;
-			//M3+= M3_t;
-			//M4+= M4_t;
-			S+= S_t;
-
-			//Fill list
-			nPix_list[thread_id]= nPix_t; 
-			M1_list[thread_id]= M1_t; 
-			M2_list[thread_id]= M2_t; 
-			M3_list[thread_id]= M3_t; 
-			M4_list[thread_id]= M4_t; 
-	
-		}//close parallel section
-
-		
-		//Compute moments
-		if(M3_list.size()==1){
-			M1= M1_list[0];
-			M2= M2_list[0];
-			M3= M3_list[0];
-			M4= M4_list[0];
-		}
-		else{
-			//Compute mean
-			M1= S/(double)(nPix);
-		
-			//Compute second moment: sum (M2_j + n_j*(mean-mean_j)^2 
-			M2= 0;
-			double mean= M1;
-			for(size_t j=0;j<M2_list.size();j++){
-				double M2_j= M2_list[j];
-				double mean_j= M1_list[j];
-				double N_j= nPix_list[j];
-				M2+= M2_j + N_j*(mean-mean_j)*(mean-mean_j);	
-			}
-	
-			//Compute 3rd & 4th moments	
-			double M1_A= M1_list[0];
-			double M2_A= M2_list[0];
-			double M3_A= M3_list[0];
-			double M4_A= M4_list[0];
-			double N_A= nPix_list[0];
-			double M1_AB= 0;
-			double M2_AB= 0;
-			double M3_AB= 0;
-			double M4_AB= 0;
-			double N_AB= 0;
-			for(size_t j=1;j<M3_list.size();j++){
-				double M1_B= M1_list[j];
-				double M2_B= M2_list[j];
-				double M3_B= M3_list[j];
-				double M4_B= M4_list[j];
-				double N_B= nPix_list[j];
-				double delta= M1_B-M1_A;
-				N_AB= N_A+N_B;
-				M1_AB= (N_A*M1_A+N_B*M1_B)/N_AB;
-				//M2_AB= M2_A + M2_B + delta*delta*N_A*N_B/N_AB;
-				M2_AB= M2_A + M2_B + N_A*(M1_AB-M1_A)*(M1_AB-M1_A) + N_B*(M1_AB-M1_B)*(M1_AB-M1_B);			
-				M3_AB= M3_A + M3_B + pow(delta,3)*N_A*N_B*(N_A-N_B)/(N_AB*N_AB) + 3*delta*(N_A*M2_B-N_B*M2_A)/N_AB;
-				M4_AB= M4_A + M4_B + pow(delta,4)*N_A*N_B*(N_A*N_A-N_A*N_B+N_B*N_B)/pow(N_AB,3) + 6*delta*delta*(N_A*N_A*M2_B+N_B*N_B*M2_A)/(N_AB*N_AB) + 4*delta*(N_A*M3_B-N_B*M3_A)/N_AB;
-
-				//Update A partition to A+B
-				N_A= N_AB;
-				M1_A= M1_AB;
-				M2_A= M2_AB;
-				M3_A= M3_AB;
-				M4_A= M4_AB;
-			}//end loop partitions
-		
-			M3= M3_AB;
-			M4= M4_AB;
-		}//close else
-
-
-		//Set reduced vars to global class var
-		m_Npix = nPix;
-		m_PixelMin= pixelMin;
-		m_PixelMax= pixelMax;
-		m_M1= M1;
-		m_M2= M2;
-		m_M3= M3;
-		m_M4= M4;
-
-	#else
-		for(size_t i=0;i<m_pixels.size();i++){			
-			double w= m_pixels[i];
-			if( w==0 || (skipNegativePixels && w<0) ) continue; 
-			UpdateMoments(w);
-			Caesar::StatsUtils::UpdateMoments(m_StatMoments,w);
-		}//end loop pixels
-	#endif
-	*/
 
 	return status;
 
 }//close ComputeMoments()
 
-/*
-void Image::UpdateMoments(double w){
 
-	//Update full image moments
-	if(w<m_PixelMin) m_PixelMin= w;
-	if(w> m_PixelMax) m_PixelMax= w;
 
-	m_Npix++;
-  double delta = w - m_M1;
-  double delta_n = delta/m_Npix;
-  double delta_n2 = delta_n * delta_n;
-  double f = delta * delta_n * (m_Npix-1);
-  m_M1+= delta_n;
-  m_M4+= f * delta_n2 * (m_Npix*m_Npix - 3*m_Npix + 3) + 6 * delta_n2 * m_M2 - 4 * delta_n * m_M3;
-  m_M3+= f * delta_n * (m_Npix - 2) - 3 * delta_n * m_M2;
-  m_M2+= f;
-	
-}//close UpdateMoments()
-*/
-
-void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
+void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels,bool useParallelVersion){
 
 	//## Reset previous stats params (Reset only Stats not moments!)
 	ResetImgStats(false);
@@ -1170,21 +974,11 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	DEBUG_LOG("Npix="<<m_StatMoments.N<<", M1="<<m_StatMoments.M1<<", M2="<<m_StatMoments.M2<<", M3="<<m_StatMoments.M3<<", M4="<<m_StatMoments.M4<<", pixel sizes="<<m_pixels.size());
 	//----
 	
-	//## Compute Stats params
-	/*
-	m_Stats->n= m_Npix;
-	m_Stats->min= m_PixelMin;
-	m_Stats->max= m_PixelMax;
-	m_Stats->mean= m_M1;
-	m_Stats->rms= 0;
-	if(m_Npix>2) m_Stats->rms= sqrt(m_M2/(m_Npix-1));
-	m_Stats->skewness= 0;
-	m_Stats->kurtosis= 0;
-	if(m_M2!=0) {
-  	m_Stats->skewness= sqrt(m_Npix)*m_M3/pow(m_M2,1.5);//need to adjust for finite population?
-		m_Stats->kurtosis= m_Npix*m_M4/(m_M2*m_M2)-3;
-	}
-	*/
+	//##########################################
+	//##  COMPUTE STANDARD STATS PARAMETERS
+	//##########################################
+	auto start_stats = chrono::steady_clock::now();
+	
 	m_Stats->n= m_StatMoments.N;
 	m_Stats->min= m_StatMoments.minVal;
 	m_Stats->max= m_StatMoments.maxVal;
@@ -1198,22 +992,7 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 		m_Stats->kurtosis= m_StatMoments.N*m_StatMoments.M4/(m_StatMoments.M2*m_StatMoments.M2)-3;
 	}
 
-
 	//## Compute stats param errors
-	/*
-	m_Stats->meanErr= 0;
-	if(m_Npix>0) m_Stats->meanErr= (m_Stats->rms)/sqrt(m_Npix);
-	double varianceErr= 0;
-	m_Stats->rmsErr= 0;
-	if(m_Npix>1) {
-		varianceErr= (m_M4-(m_Npix-3)/(m_Npix-1)*pow(m_Stats->rms,4))/m_Npix;
-		m_Stats->rmsErr= varianceErr/(2*m_Stats->rms);
-	}
-		 
-	m_Stats->skewnessErr= 0;
-	m_Stats->kurtosisErr= 0;
-	if(m_Npix>2) m_Stats->skewnessErr= sqrt(6.*m_Npix*(m_Npix-1)/((m_Npix-2)*(m_Npix+1)*(m_Npix+3)));//approximate for normal distribution
-	*/
 	m_Stats->meanErr= 0;
 	if(m_StatMoments.N>0) m_Stats->meanErr= (m_Stats->rms)/sqrt(m_StatMoments.N);
 	double varianceErr= 0;
@@ -1226,11 +1005,18 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	m_Stats->kurtosisErr= 0;
 	if(m_StatMoments.N>2) m_Stats->skewnessErr= sqrt(6.*m_StatMoments.N*(m_StatMoments.N-1)/((m_StatMoments.N-2)*(m_StatMoments.N+1)*(m_StatMoments.N+3)));//approximate for normal distribution
 	
-
+	auto end_stats = chrono::steady_clock::now();
+	double dt_stats= chrono::duration <double, milli> (end_stats-start_stats).count();
+	INFO_LOG("Image standard stats computed in "<<dt_stats<<" ms");
   
 	//## End if no robust stats are to be computed
 	if(!computeRobustStats) return;
-	
+
+	//##########################################
+	//##  COMPUTE ROBUST STATS PARAMETERS
+	//##########################################
+	auto start_robuststats = chrono::steady_clock::now();
+
 	//## Remove negative values? 
 	//## NB: Copy vector otherwise it is modified by sorting operation inside median and other robust estimators
 	std::vector<float> pixels;
@@ -1242,41 +1028,57 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels){
 	
 	//## Compute robust stats (median, MAD, ...)	
 	//Sort and compute median for all image	
-	float median= Caesar::StatsUtils::GetMedianFast<float>(pixels);
+	auto start_median = chrono::steady_clock::now();
+	
+	float median= Caesar::StatsUtils::GetMedianFast<float>(pixels,useParallelVersion);
 	m_Stats->median= median;
 
 	//Compute MAD = median(|x_i-median|)
 	float medianMAD= Caesar::StatsUtils::GetMADFast(pixels,median);	
 	double medianRMS= medianMAD*1.4826;//0.6744888;
 	m_Stats->medianRMS= medianRMS;
-
-	
-	//## Compute biweight robust estimators
+	auto end_median = chrono::steady_clock::now();
+	double dt_median= chrono::duration <double, milli> (end_median-start_median).count();
+	INFO_LOG("Image median pars computed in "<<dt_median<<" ms");
+  
+	//## Compute biweight robust estimators	
+	/*
+	auto start_biweights = chrono::steady_clock::now();
 	double C= 6.;
 	double tol= 0.0001;
 	double nmaxIter= 10;
 	std::pair<float,float> biweightEstimators= Caesar::StatsUtils::GetBiWeightEstimators<float>(pixels,median,medianRMS,C,tol,nmaxIter);
 	m_Stats->bwLocation= biweightEstimators.first;
 	m_Stats->bwScale= biweightEstimators.second;
+	auto end_biweights = chrono::steady_clock::now();
+	double dt_biweights= chrono::duration <double, milli> (end_biweights-start_biweights).count();
+	INFO_LOG("Image biweight pars computed in "<<dt_biweights<<" ms");
+  */
 
 	//## Compute clipped estimators
+	auto start_clipped = chrono::steady_clock::now();
 	double clipSigma= 3;
 	int clipMaxIter= 100;
 	double clipTolerance= 0.1;
-	bool useParallelVersion= false;
 	float mean= m_Stats->mean;
 	float rms= m_Stats->rms;
 	ClippedStats<float> clipped_stats;
 	Caesar::StatsUtils::GetClippedEstimators(clipped_stats,pixels,median,mean,rms,clipSigma,clipMaxIter,clipTolerance,useParallelVersion);
 	m_Stats->clippedMedian= clipped_stats.median;
 	m_Stats->clippedRMS= clipped_stats.stddev;
-	
+	auto end_clipped = chrono::steady_clock::now();
+	double dt_clipped= chrono::duration <double, milli> (end_clipped-start_clipped).count();
+	INFO_LOG("Image clipped stats pars computed in "<<dt_clipped<<" ms");
+
+	auto end_robuststats = chrono::steady_clock::now();
+	double dt_robuststats= chrono::duration <double, milli> (end_robuststats-start_robuststats).count();
+	INFO_LOG("Image robust stats computed in "<<dt_robuststats<<" ms");	
 	
 }//close ComputeStatsParams()
 
 
 
-int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool forceRecomputing){
+int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool forceRecomputing,bool useParallelVersion){
 
 	
 	//## Start timer
@@ -1293,7 +1095,7 @@ int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool for
 
 	//## If recomputing is not requested (i.e. some pixels has been reset by the user, just set the stats params!
 	if(!forceRecomputing){
-		ComputeStatsParams(computeRobustStats,skipNegativePixels);
+		ComputeStatsParams(computeRobustStats,skipNegativePixels,useParallelVersion);
 		m_HasStats= true;
 		
 		auto stop = chrono::steady_clock::now();
@@ -1313,7 +1115,7 @@ int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool for
 	ComputeMoments(skipNegativePixels);
 
 	//--> Recompute stats params
-	ComputeStatsParams(computeRobustStats,skipNegativePixels);
+	ComputeStatsParams(computeRobustStats,skipNegativePixels,useParallelVersion);
 
 	m_HasStats= true;
 

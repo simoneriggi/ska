@@ -245,6 +245,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(mergeBelowSeed,bool,false,false,true);
 		REGISTER_OPTION(searchNegativeExcess,bool,false,false,true);
 		REGISTER_OPTION(compactSourceSearchNIters,int,10,0,100);
+		REGISTER_OPTION(seedThrStep,double,1,0,10);
 		REGISTER_OPTION(nestedBlobThrFactor,double,1,0,100);
 		REGISTER_OPTION(wtScaleFaint,int,1,1,10);
 		

@@ -52,6 +52,7 @@
 #include <time.h>
 #include <ctime>
 #include <complex>
+#include <cmath> 
 
 //OpenMP headers
 #ifdef OPENMP_ENABLED
@@ -355,7 +356,7 @@ class StatsUtils : public TObject {
 			vec_clipped.clear();	
 			for(auto x : vec) {
 				T diff= fabs(x-median);
-				if(diff<clipsig*stddev) vec_clipped.push_back(diff);
+				if(diff<clipsig*stddev && !isnan(x) && !isinf(x)) vec_clipped.push_back(x);
 			}
 
 			//Check if there are still data
@@ -409,7 +410,8 @@ class StatsUtils : public TObject {
 
 			//Init stats & vector
 			ClippedStats<T> stats_pre(median,mean,stddev);	
-			std::vector<T> data_pre= vec;
+			//std::vector<T> data_pre= vec;
+			std::vector<T> data_pre;
 
 			//Start iteration
 			int iter = 0; 
@@ -420,11 +422,21 @@ class StatsUtils : public TObject {
 
 				//Update clipped stats
 				std::vector<T> data;
-				if(UpdateClippedStats(stats,data,data_pre,stats_pre,clipsig,useParallelVersion)<0){
-					DEBUG_LOG("Stop clipping iteration as clipped vector has no more data!");
-					stats= stats_pre;	
-					data= data_pre;				
-					break;
+				if(iter==0){
+					if(UpdateClippedStats(stats,data,vec,stats_pre,clipsig,useParallelVersion)<0){
+						DEBUG_LOG("Stop clipping iteration as clipped vector has no more data!");
+						stats= stats_pre;	
+						//data= data_pre;				
+						break;
+					}
+				}
+				else{
+					if(UpdateClippedStats(stats,data,data_pre,stats_pre,clipsig,useParallelVersion)<0){
+						DEBUG_LOG("Stop clipping iteration as clipped vector has no more data!");
+						stats= stats_pre;	
+						//data= data_pre;				
+						break;
+					}
 				}
 
 				//Update tolerance
@@ -678,7 +690,7 @@ class StatsUtils : public TObject {
 
 
 		template<typename T,typename K> 
-		static int ComputeStatsMoments(StatMoments<T>& moments,std::vector<K>const& data,bool skipNegativeValues=false)
+		static int ComputeStatsMoments(StatMoments<T>& moments,std::vector<K>& data,bool skipNegativeValues=false,bool maskNanInfValues=true)
 		{
 			if(data.empty()) return 0;
 		
@@ -713,22 +725,53 @@ class StatsUtils : public TObject {
 						moments_parallel.assign(nthreads,StatMoments<T>());
    				}
 
-					#pragma omp for
-					for(size_t i=0;i<data.size();i++){			
-						T w= static_cast<T>(data[i]);
-						if( w==0 || (skipNegativeValues && w<0) ) continue; 
-						if(w<minVal_t) minVal_t= w;
-						if(w>maxVal_t) maxVal_t= w;
-						N_t++;
-  					T delta = w - M1_t;
-  					T delta_n = delta/N_t;
-  					T delta_n2 = delta_n * delta_n;
-  					T f = delta * delta_n * (N_t-1);
-  					M1_t+= delta_n;
-  					M4_t+= f * delta_n2 * (N_t*N_t - 3*N_t + 3) + 6 * delta_n2 * M2_t - 4 * delta_n * M3_t;
-  					M3_t+= f * delta_n * (N_t - 2) - 3 * delta_n * M2_t;
-  					M2_t+= f;
-					}//end loop vector
+					//Compute moments
+					if(skipNegativeValues){
+						#pragma omp for
+						for(size_t i=0;i<data.size();i++){			
+							T w= static_cast<T>(data[i]);
+							if( isnormal(w) ){
+								if(w>0) { 
+									if(w<minVal_t) minVal_t= w;
+									if(w>maxVal_t) maxVal_t= w;
+									N_t++;
+  								T delta = w - M1_t;
+  								T delta_n = delta/N_t;
+  								T delta_n2 = delta_n * delta_n;
+  								T f = delta * delta_n * (N_t-1);
+  								M1_t+= delta_n;
+  								M4_t+= f * delta_n2 * (N_t*N_t - 3*N_t + 3) + 6 * delta_n2 * M2_t - 4 * delta_n * M3_t;
+  								M3_t+= f * delta_n * (N_t - 2) - 3 * delta_n * M2_t;
+  								M2_t+= f;
+								}//close w>0
+							}//close if normal
+							else{//modify unnormal value
+								data[i]= 0;
+							}
+						}//end loop vector
+					}//close if
+					else{
+						#pragma omp for
+						for(size_t i=0;i<data.size();i++){			
+							T w= static_cast<T>(data[i]);
+							if( isnormal(w) ){
+								if(w<minVal_t) minVal_t= w;
+								if(w>maxVal_t) maxVal_t= w;
+								N_t++;
+  							T delta = w - M1_t;
+  							T delta_n = delta/N_t;
+  							T delta_n2 = delta_n * delta_n;
+  							T f = delta * delta_n * (N_t-1);
+  							M1_t+= delta_n;
+  							M4_t+= f * delta_n2 * (N_t*N_t - 3*N_t + 3) + 6 * delta_n2 * M2_t - 4 * delta_n * M3_t;
+  							M3_t+= f * delta_n * (N_t - 2) - 3 * delta_n * M2_t;
+  							M2_t+= f;
+							}//close is normal
+							else{//modify unnormal value
+								data[i]= 0;
+							}
+						}//end loop vector
+					}//close else 
 
 					DEBUG_LOG("Thread id="<<omp_get_thread_num()<<": N="<<N_t<<", M1="<<M1_t<<", M2="<<M2_t<<", M3="<<M3_t<<", M4="<<M4_t);
 
@@ -758,22 +801,51 @@ class StatsUtils : public TObject {
 				T minVal= std::numeric_limits<T>::max();
 				T maxVal= -std::numeric_limits<T>::max();
 
-				for(size_t i=0;i<data.size();i++){			
-					T w= static_cast<T>(data[i]);
-					if( w==0 || (skipNegativeValues && w<0) ) continue; 
-					if(w<minVal) minVal= w;
-					if(w>maxVal) maxVal= w;
-
-					N++;
-  				T delta = w - M1;
-  				T delta_n = delta/N;
-  				T delta_n2 = delta_n * delta_n;
-  				T f = delta * delta_n * (N-1);
-  				M1+= delta_n;
-  				M4+= f * delta_n2 * (N*N - 3*N + 3) + 6 * delta_n2 * M2 - 4 * delta_n * M3;
-  				M3+= f * delta_n * (N - 2) - 3 * delta_n * M2;
-  				M2+= f;
-				}//end loop pixels
+				//Compute moments
+				if(skipNegativeValues){
+					for(size_t i=0;i<data.size();i++){			
+						T w= static_cast<T>(data[i]);
+						if( isnormal(w) ){
+							if(w>0){
+								if(w<minVal) minVal= w;
+								if(w>maxVal) maxVal= w;
+								N++;
+  							T delta = w - M1;
+  							T delta_n = delta/N;
+  							T delta_n2 = delta_n * delta_n;
+  							T f = delta * delta_n * (N-1);
+  							M1+= delta_n;
+  							M4+= f * delta_n2 * (N*N - 3*N + 3) + 6 * delta_n2 * M2 - 4 * delta_n * M3;
+  							M3+= f * delta_n * (N - 2) - 3 * delta_n * M2;
+  							M2+= f;
+							}//close if w>0
+						}//close if isnormal
+						else{//modify unnormal value
+							data[i]= 0;
+						}
+					}//end loop pixels
+				}//close if skip negative pixels
+				else{
+					for(size_t i=0;i<data.size();i++){			
+						T w= static_cast<T>(data[i]);
+						if( isnormal(w) ){
+							if(w<minVal) minVal= w;
+							if(w>maxVal) maxVal= w;
+							N++;
+  						T delta = w - M1;
+  						T delta_n = delta/N;
+  						T delta_n2 = delta_n * delta_n;
+  						T f = delta * delta_n * (N-1);
+  						M1+= delta_n;
+  						M4+= f * delta_n2 * (N*N - 3*N + 3) + 6 * delta_n2 * M2 - 4 * delta_n * M3;
+  						M3+= f * delta_n * (N - 2) - 3 * delta_n * M2;
+  						M2+= f;
+						}//close if isnormal
+						else{//modify unnormal value
+							data[i]= 0;
+						}
+					}//end loop pixels
+				}//close else
 
 				moments.N= N;
 				moments.M1= M1;

@@ -686,7 +686,7 @@ class Image : public TNamed {
 		/**
 		* \brief Compute stats information 
 		*/
-		int ComputeStats(bool computeRobustStats,bool skipNegativePixels=false,bool forceRecomputing=false);
+		int ComputeStats(bool computeRobustStats,bool skipNegativePixels=false,bool forceRecomputing=false,bool useParallelVersion=false);
 		/**
 		* \brief Print stats information 
 		*/
@@ -970,7 +970,7 @@ class Image : public TNamed {
 		/**
 		* \brief Compute image stats parameters from moments 
 		*/
-		void ComputeStatsParams(bool computeRobustStats=true,bool skipNegativePixels=false);
+		void ComputeStatsParams(bool computeRobustStats=true,bool skipNegativePixels=false,bool useParallelVersion=false);
 		/**
 		* \brief Clear stats
 		*/
@@ -1011,15 +1011,8 @@ class Image : public TNamed {
 		ImgStats* m_Stats;
 		StatMoments<double> m_StatMoments;//stat moments & min/max
 
-		/*
-		long long int m_Npix;//npixels	
-		double m_M1;//1st moments
-		double m_M2;//2nd moment
-		double m_M3;//3rd moment
-		double m_M4;//4th moment
-		double m_PixelMin;
-		double m_PixelMax;
-		*/
+		
+	friend class FITSReader;
 
 		ClassDef(Image,1)
 
@@ -1027,8 +1020,6 @@ class Image : public TNamed {
 
 #ifdef __MAKECINT__
 #pragma link C++ enum Image::ImageType+;
-//#pragma link C++ class StatsData+;
-//#pragma link C++ class MetaData+;
 #pragma link C++ class Image+;
 #pragma link C++ class vector<Image>+;
 #pragma link C++ class vector<Image*>+;
