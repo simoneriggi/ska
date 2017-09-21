@@ -106,7 +106,7 @@ def main():
 	end_read = time.time()
 	elapsed_read = end_read - start_read
 
-	## Get pixel list
+	## Get pixel list without zeros & nan
 	#print ('Getting pixel list ...')
 	#x= np.ravel(img_data)
 	#print(x)
@@ -114,7 +114,8 @@ def main():
 	## Compute stats
 	print ('INFO: Computing stats...')
 	start_stats = time.time()
-	compute_stats(img_data)
+	x = img_data[np.logical_and(np.isfinite(img_data),img_data!=0)]
+	compute_stats(x)
 	end_stats = time.time()
 	elapsed_stats = end_stats - start_stats
 
