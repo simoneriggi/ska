@@ -71,12 +71,15 @@ include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 if(COMPILER_SUPPORTS_CXX11)
+		message(STATUS "Found C++11 support in ${CMAKE_CXX_COMPILER} compiler.")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_REENTRANT -Dlinux -g -std=c++11 -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64") 
 elseif(COMPILER_SUPPORTS_CXX0X)
+		message(STATUS "Found C++0X support in ${CMAKE_CXX_COMPILER} compiler.")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_REENTRANT -Dlinux -g -std=c++0x -O2 -Wall -Wunused -Wuninitialized -fPIC -pthread -m64")
 else()
     message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
+message(STATUS "${CMAKE_CXX_COMPILER} compiler flags: ${CMAKE_CXX_FLAGS}")
 
 #-----------------------------------------------------------------------------------------------
 #---Here we look for installed software and switch on and of the different build options--------
@@ -367,6 +370,10 @@ if(BUILD_APPS)
 	target_link_libraries(FindSaliencyExe Caesar ${LINKED_LIBS})
 	set_target_properties(FindSaliencyExe PROPERTIES OUTPUT_NAME FindSaliency)
 
+	add_executable(ReadImgExe ${Task_ReadImg_SRCS})
+	target_link_libraries(ReadImgExe Caesar ${LINKED_LIBS})
+	set_target_properties(ReadImgExe PROPERTIES OUTPUT_NAME ReadImg)
+
 	add_executable(FindBkgExe ${Task_FindBkg_SRCS})
 	target_link_libraries(FindBkgExe Caesar ${LINKED_LIBS})
 	set_target_properties(FindBkgExe PROPERTIES OUTPUT_NAME FindBkg)
@@ -379,6 +386,9 @@ if(BUILD_APPS)
 	target_link_libraries(ROOT2FITSExe Caesar ${LINKED_LIBS})
 	set_target_properties(ROOT2FITSExe PROPERTIES OUTPUT_NAME ROOT2FITS)
 
+	add_executable(CorrelateSourceCatalogsExe ${Task_CorrelateSourceCatalogs_SRCS})
+	target_link_libraries(CorrelateSourceCatalogsExe Caesar ${LINKED_LIBS})
+	set_target_properties(CorrelateSourceCatalogsExe PROPERTIES OUTPUT_NAME CorrelateSourceCatalogs)
 	
 	include_directories(${MPI_CXX_INCLUDE_PATH})
 	add_executable(FindSourceMPIExe ${Task_FindSourceMPI_SRCS})
@@ -493,33 +503,26 @@ if(BUILD_APPS)
 		FindSource
 		FindSourceResidual
 		FindSaliency
-		FindBkg
+		FindBkg	
+		ReadImg
 		FITS2ROOT
 		ROOT2FITS
 		FindSourceMPI
+		CorrelateSourceCatalogs
 	)
 	foreach (_exeFile ${EXE_FILES})
 		install(TARGETS ${_exeFile}Exe DESTINATION ${BINARY_INSTALL_DIR})
 	endforeach()
 	
-	#install(TARGETS FindSourceExe DESTINATION ${BINARY_INSTALL_DIR})
-	#install(TARGETS FindSourceResidualExe DESTINATION ${BINARY_INSTALL_DIR})
-	#install(TARGETS FindSaliencyExe DESTINATION ${BINARY_INSTALL_DIR})
-	#install(TARGETS FindBkgExe DESTINATION ${BINARY_INSTALL_DIR})
-	#install(TARGETS FITS2ROOTExe DESTINATION ${BINARY_INSTALL_DIR})
-	#install(TARGETS ROOT2FITSExe DESTINATION ${BINARY_INSTALL_DIR})
-	#install(TARGETS FindSourceMPIExe DESTINATION ${BINARY_INSTALL_DIR})
 endif()
 
 # -- Install library dict map
-##install(FILES ${PROJECT_BINARY_DIR}/CaesarDict_rdict.pcm DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 install(FILES ${PROJECT_BINARY_DIR}/CaesarDict_rdict.pcm DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # -- Install libraries
 install(TARGETS Caesar DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 #-- Install project headers
-#file(COPY ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 #-- Install test executable
@@ -570,7 +573,6 @@ set(CLEANED_LIBS "")
 set(CLEANED_EXE "")
 
 #--- Set external WCTOOLS lib & headers to be removed by clean command
-##set(ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${WCSTOOL_LIB})
 list(APPEND CLEANED_LIBS ${WCSTOOL_LIBRARIES})
 foreach (_headerFile ${WCSTOOL_HEADERS})
 	get_filename_component(_basefilename ${_headerFile} NAME)
@@ -588,8 +590,6 @@ endforeach()
 #--- Set CAESAR headers & libs & exe to be removed by clean command
 list(APPEND CLEANED_LIBS ${CMAKE_INSTALL_LIBDIR}/CaesarDict_rdict.pcm)
 list(APPEND CLEANED_LIBS ${CMAKE_INSTALL_LIBDIR}/libCaesar.so)
-##list(APPEND ADDITIONAL_CLEAN_TARGETS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/CaesarDict_rdict.pcm)
-##list(APPEND ADDITIONAL_CLEAN_TARGETS ${CMAKE_INSTALL_LIBDIR}/CaesarDict_rdict.pcm)
 
 foreach (_headerFile ${HEADERS_WPATH})
 	set(_cleanedHeader ${CMAKE_INSTALL_INCLUDEDIR}/${_headerFile})

@@ -1,7 +1,8 @@
+#!/usr/bin/python
+
 ##################################################
 ###          MODULE IMPORT
 ##################################################
-
 
 ## STANDARD MODULES
 import os
@@ -42,36 +43,9 @@ def get_args():
 
 	return args
 
-##############
-##   MAIN   ##
-##############
-def main():
-	"""Main function"""
-
-	## Get script args
-	print('Get script args')
-	try:
-		args= get_args()
-	except Exception as ex:
-		print("Failed to get and parse options (err=%s)",str(ex))
-		return 1
-
-	filename= args.filename
-
-	print("*** ARGS ***")
-	print("filename: %s" % filename)
-	print("************")
-		
-
-	## Read FITS	
-	hdu= fits.open(filename, memmap=False)
-	img = hdu[0].data
-
-	## Get pixel list
-	print("Getting pixel list ...")
-	x= np.ravel(img)
-	print(x)
-
+def compute_stats(x):
+	""" Compute stats """
+	
 	## Compute stats
 	npixels= np.size(x)
 	pixel_min= np.min(x)
@@ -82,6 +56,13 @@ def main():
 	mad= mad_std(x)
 	skewness= stats.skew(x)
 	kurtosis= stats.kurtosis(x)
+	
+	## Compute robust stats
+	niter= 1
+	sigmaclip= 3
+	[mean_clipped, median_clipped, stddev_clipped] = sigma_clipped_stats(x, sigma=sigmaclip, iters=niter, std_ddof=1)
+
+	print '*** IMG STATS ***'	
 	print 'n=',npixels
 	print 'min/max=',pixel_min,'/',pixel_max
 	print 'mean=',mean
@@ -90,21 +71,62 @@ def main():
 	print 'mad=',mad
 	print 'skew=',skewness
 	print 'kurtosis=',kurtosis
-
-	## Compute robust stats
-	niter= 1
-	sigmaclip= 3
-	[mean_clipped, median_clipped, stddev_clipped] = sigma_clipped_stats(x, sigma=sigmaclip, iters=niter, std_ddof=1)
-
 	print 'mean_clipped=',mean_clipped
 	print 'median_clipped=',median_clipped
 	print 'stddev_clipped=',stddev_clipped
-
+	print '*****************'
 	
+	
+##############
+##   MAIN   ##
+##############
+def main():
+	"""Main function"""
+
+	## Get script args
+	print('INFO: Get script args')
+	try:
+		args= get_args()
+	except Exception as ex:
+		print("ERROR: Failed to get and parse options (err=%s)",str(ex))
+		return 1
+
+	filename= args.filename
+
+	print("*** ARGS ***")
+	print("filename: %s" % filename)
+	print("************")
+		
+
+	## Read FITS	
+	print ('Reading FITS image %s ...' % filename)
+	start_read = time.time()
+	hdu= fits.open(filename, memmap=False)
+	img_data = hdu[0].data
+	end_read = time.time()
+	elapsed_read = end_read - start_read
+
+	## Get pixel list
+	#print ('Getting pixel list ...')
+	#x= np.ravel(img_data)
+	#print(x)
+
+	## Compute stats
+	print ('INFO: Computing stats...')
+	start_stats = time.time()
+	compute_stats(img_data)
+	end_stats = time.time()
+	elapsed_stats = end_stats - start_stats
+
+	## Print performance info
+	print ('*** PERFORMANCE INFO***')
+	print ('t_read (s): %s' % str(elapsed_read))
+	print ('t_stats (s): %s' % str(elapsed_stats))
+
 			
 ###################
 ##   MAIN EXEC   ##
 ###################
 if __name__ == "__main__":
-	#main()
 	sys.exit(main())
+
