@@ -155,14 +155,33 @@ int FITSReader::Read(Caesar::Image& img,Caesar::FITSFileInfo& fits_info,std::str
 		return -1;
 	}
 
+	
   //## Read HDU's image data
 	INFO_LOG("Reading HDU image data ...");
+	#ifdef OPENMP_ENABLED
+		//Multi-thread reading
+		if(ReadImageMT(img,fits_info,fp,filename,ix_min,ix_max,iy_min,iy_max)<0){
+			ERROR_LOG("Failed to read image data of FITS file "<<filename<<"!");
+			if (fp) fits_close_file(fp, &status);
+			return -1;
+		}
+	#else
+		//Single-thread reading
+		if(ReadImage(img,fits_info,fp,filename,ix_min,ix_max,iy_min,iy_max)<0){
+			ERROR_LOG("Failed to read image data of FITS file "<<filename<<"!");
+			if (fp) fits_close_file(fp, &status);
+			return -1;
+		}
+	#endif
+	
+	/*
+	//Single-thread reading
 	if(ReadImage(img,fits_info,fp,filename,ix_min,ix_max,iy_min,iy_max)<0){
 		ERROR_LOG("Failed to read image data of FITS file "<<filename<<"!");
 		if (fp) fits_close_file(fp, &status);
 		return -1;
 	}
-
+	*/
 	//## Close FITS file
 	if (fp) fits_close_file(fp, &status);
 
@@ -198,7 +217,6 @@ int FITSReader::ReadImage(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile* f
 		xlow= ix_min;
 		ylow= iy_min;
 		std::stringstream ss;
-		//ss<<filename<<"["<<ix_min<<":"<<ix_max<<","<<iy_min<<":"<<iy_max<<"]";	
 		ss<<filename<<"["<<ix_min+1<<":"<<ix_max+1<<","<<iy_min+1<<":"<<iy_max+1<<"]";
 		filename_wfilter= ss.str();
 	}
@@ -272,7 +290,8 @@ int FITSReader::ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile*
 		xlow= ix_min;
 		ylow= iy_min;
 		std::stringstream ss;
-		ss<<filename<<"["<<ix_min<<":"<<ix_max<<","<<iy_min<<":"<<iy_max<<"]";
+		//ss<<filename<<"["<<ix_min<<":"<<ix_max<<","<<iy_min<<":"<<iy_max<<"]";
+		ss<<filename<<"["<<ix_min+1<<":"<<ix_max+1<<","<<iy_min+1<<":"<<iy_max+1<<"]";
 		filename_wfilter= ss.str();
 	}
 	INFO_LOG("Reading image data (Nx x Ny)=("<<ImgSizeX<<","<<ImgSizeY<<")");
