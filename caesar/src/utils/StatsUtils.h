@@ -352,10 +352,14 @@ class StatsUtils : public TObject {
 			T median= stats.median;
 
 			//Fill vector of truncated items	
+			T sum= T(0);
 			vec_clipped.clear();	
 			for(auto x : vec) {
 				T diff= fabs(x-median);
-				if(diff<clipsig*stddev && std::isfinite(x)) vec_clipped.push_back(x);
+				if(diff<clipsig*stddev && std::isfinite(x)) {
+					vec_clipped.push_back(x);
+					sum+= x;
+				}
 			}
 
 			//Check if there are still data
@@ -364,10 +368,26 @@ class StatsUtils : public TObject {
 				return -1;
 			}
 
+
 			//Compute mean/stddev of clipped data
-			T mean_clipped= T(0);
-			T stddev_clipped= T(0);
-			ComputeMeanAndRMS(mean_clipped,stddev_clipped,vec_clipped);
+			T n_clipped= static_cast<T>(vec_clipped.size());
+			T mean_clipped= sum/n_clipped;	
+			T s2= T(0);
+			T stddev_clipped= T(0); 
+
+			#ifdef OPENMP_ENABLED
+				#pragma omp parallel for reduction(+: s2)
+				for(size_t i=0;i<vec_clipped.size();i++) s2 += (vec_clipped[i] - mean_clipped) * (vec_clipped[i] - mean_clipped);
+    		stddev_clipped= sqrt(s2/(n_clipped-1));
+
+			#else 
+    		for(auto x : vec_clipped) s2 += (x - mean_clipped) * (x - mean_clipped);
+    		stddev_clipped= sqrt(s2/(n_clipped-1));
+			#endif
+
+			//T mean_clipped= T(0);
+			//T stddev_clipped= T(0);
+			//ComputeMeanAndRMS(mean_clipped,stddev_clipped,vec_clipped);
 			
 			//Compute median of clipped data
 			T median_clipped= GetMedianFast(vec_clipped,useParallelVersion);	
