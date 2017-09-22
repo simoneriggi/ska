@@ -99,7 +99,7 @@ double dt_stats= 0;
 double dt_read= 0;
 double nx= 0;
 double ny= 0;
-
+double NThreads= 0;
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
@@ -301,13 +301,14 @@ int ParseOptions(int argc, char *argv[])
 
 	//## Set number of threads
 	if(nthreads>0) SysUtils::SetOMPThreads(nthreads);
+	NThreads= SysUtils::GetOMPMaxThreads();
 
 	//## Print options
 	INFO_LOG("========= OPTIONS ============");
 	INFO_LOG("input file: "<<inputFileName);
 	if(!readFullImage) INFO_LOG("x["<<minx<<","<<maxx<<"] y["<<miny<<","<<maxy<<"]");
 	INFO_LOG("image name: "<<imageName);
-	INFO_LOG("nthreads: "<<nthreads);
+	INFO_LOG("nthreads: "<<nthreads<<" (NThreads="<<NThreads<<")");
 	INFO_LOG("useParallelAlgo? "<<useParallelVersion);
 	INFO_LOG("output file: "<<outputFileName);
 	INFO_LOG("===============================");
@@ -460,7 +461,8 @@ int OpenOutputFile(){
 	else{//create the TTree as not existing in file
 		PerfInfo= new TTree("PerfInfo","PerfInfo");
 		PerfInfo->Branch("Nx",&nx,"Nx/D");	
-		PerfInfo->Branch("Ny",&ny,"Ny/D");	
+		PerfInfo->Branch("Ny",&ny,"Ny/D");
+		PerfInfo->Branch("NThreads",&NThreads,"NThreads/D");	
 		PerfInfo->Branch("dt",&dt,"dt/D");	
 		PerfInfo->Branch("dt_init",&dt_init,"dt_init/D");
 		PerfInfo->Branch("dt_read",&dt_read,"dt_read/D");

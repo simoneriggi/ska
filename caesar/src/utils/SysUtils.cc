@@ -195,13 +195,26 @@ void SysUtils::SetOMPThreads(int nthreads){
 }//close SetOMPThreads()
 
 int SysUtils::GetOMPThreads(){
+	
+	int nthreads= 0;
 
 	#ifdef OPENMP_ENABLED
-		//return omp_get_thread_num();//WRONG (this is the thread id)
-		return omp_get_num_threads();
+		nthreads= omp_get_num_threads();
 	#endif
 
-	return 0;
+	return nthreads;
+
+}//close GetOMPThreads()
+
+int SysUtils::GetOMPMaxThreads(){
+	
+	int nthreads_max= 1;
+
+	#ifdef OPENMP_ENABLED
+		nthreads_max= omp_get_max_threads();
+	#endif
+
+	return nthreads_max;
 
 }//close GetOMPThreads()
 

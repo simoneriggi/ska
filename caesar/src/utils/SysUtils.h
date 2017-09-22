@@ -185,6 +185,11 @@ class SysUtils : public TObject {
 		*/
 		static int GetOMPThreads();
 		/**
+		* \brief Get the maximum number of threads that can be used by OpenMP (return 0 if OMP is disabled at build)
+		*/
+		static int GetOMPMaxThreads();
+
+		/**
 		* \brief Get the number of cores currently used by OpenMP (return 0 if OMP is disabled at build)
 		*/
 		static int GetOMPCores();	
