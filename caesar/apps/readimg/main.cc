@@ -80,7 +80,7 @@ int verbosity= 4;//INFO level
 int nthreads= -1;
 bool useParallelVersion= false;
 bool saveToFile= false;
-std::string outputFileName= "";
+std::string outputFileName= "Output.root";
 bool readFullImage= true;
 long int minx= -1;
 long int maxx= -1;
@@ -97,6 +97,8 @@ double dt= 0;
 double dt_init= 0;
 double dt_stats= 0;
 double dt_read= 0;
+double nx= 0;
+double ny= 0;
 
 
 //Functions
@@ -403,6 +405,9 @@ int ReadImage(){
 		return -1;
 	}
 
+	nx= inputImg->GetNx();
+	ny= inputImg->GetNy();
+
 	return 0;
 
 }//close ReadImage()
@@ -430,7 +435,7 @@ void Clear(){
 
 	//Clear input image
 	if(inputImg) inputImg->Delete();
-	if(PerfInfo) PerfInfo->Delete();
+	
 	
 }//close Clear()
 
@@ -440,9 +445,22 @@ int OpenOutputFile(){
 	//Open output file
 	if(!outputFile) outputFile= new TFile(outputFileName.c_str(),"UPDATE");
 
+	//Try to retrieve the TTree from the file
+	PerfInfo= (TTree*)outputFile->Get("PerfInfo");
+
 	//Create perf tree
-	if(!PerfInfo){
+	if(PerfInfo){
+		PerfInfo->SetBranchAddress("Nx",&nx);	
+		PerfInfo->SetBranchAddress("Ny",&ny);	
+		PerfInfo->SetBranchAddress("dt",&dt);	
+		PerfInfo->SetBranchAddress("dt_init",&dt_init);
+		PerfInfo->SetBranchAddress("dt_read",&dt_read);
+		PerfInfo->SetBranchAddress("dt_stats",&dt_stats);
+	}
+	else{//create the TTree as not existing in file
 		PerfInfo= new TTree("PerfInfo","PerfInfo");
+		PerfInfo->Branch("Nx",&nx,"Nx/D");	
+		PerfInfo->Branch("Ny",&ny,"Ny/D");	
 		PerfInfo->Branch("dt",&dt,"dt/D");	
 		PerfInfo->Branch("dt_init",&dt_init,"dt_init/D");
 		PerfInfo->Branch("dt_read",&dt_read,"dt_read/D");
@@ -458,7 +476,7 @@ void Save(){
 	//Save to file
 	if(outputFile && outputFile->IsOpen()){
 		outputFile->cd();
-		if(PerfInfo) PerfInfo->Write();			
+		if(PerfInfo) PerfInfo->Write("PerfInfo");			
 		outputFile->Close();
 	}
 
