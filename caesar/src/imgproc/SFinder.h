@@ -379,6 +379,7 @@ class SFinder : public TObject {
 		bool m_MergeBelowSeed;
 		bool m_SearchNegativeExcess;
 		int m_compactSourceSearchNIters;
+		double m_seedThrStep;
 
 		//Nested source search
 		bool m_SearchNestedSources;

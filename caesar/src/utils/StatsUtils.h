@@ -348,7 +348,6 @@ class StatsUtils : public TObject {
 			if(vec.empty()) return -1;
 			
 			//Compute mean & standard deviation
-			//T mean= stats.mean;
 			T stddev= stats.stddev;
 			T median= stats.median;
 
@@ -356,7 +355,7 @@ class StatsUtils : public TObject {
 			vec_clipped.clear();	
 			for(auto x : vec) {
 				T diff= fabs(x-median);
-				if(diff<clipsig*stddev && !isnan(x) && !isinf(x)) vec_clipped.push_back(x);
+				if(diff<clipsig*stddev && std::isfinite(x)) vec_clipped.push_back(x);
 			}
 
 			//Check if there are still data
@@ -364,23 +363,6 @@ class StatsUtils : public TObject {
 				INFO_LOG("Clipped data is empty, return.");
 				return -1;
 			}
-
-			/*
-			#ifdef OPENMP_ENABLED
-				#pragma omp declare reduction (merge : std::vector<T> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
-				#pragma omp parallel for reduction(merge: vec_clipped)
-				for(size_t i=0;i<vec.size();i++) {
-					T diff= fabs(vec[i]-median);
-					if(diff<clipsig*stddev) vec_clipped.push_back(diff);
-				}
-				
-			#else
-				for(auto x : vec) {
-					T diff= fabs(x-median);
-					if(diff<clipsig*stddev) vec_clipped.push_back(diff);
-				}
-			#endif
-			*/
 
 			//Compute mean/stddev of clipped data
 			T mean_clipped= T(0);

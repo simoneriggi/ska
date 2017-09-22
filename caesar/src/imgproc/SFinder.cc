@@ -457,6 +457,7 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(seedThr,m_SeedThr);
 	GET_OPTION_VALUE(mergeThr,m_MergeThr);
 	GET_OPTION_VALUE(compactSourceSearchNIters,m_compactSourceSearchNIters);
+	GET_OPTION_VALUE(seedThrStep,m_seedThrStep);
 	GET_OPTION_VALUE(mergeBelowSeed,m_MergeBelowSeed);
 	GET_OPTION_VALUE(searchNegativeExcess,m_SearchNegativeExcess);
 	GET_OPTION_VALUE(searchNestedSources,m_SearchNestedSources);
@@ -726,7 +727,8 @@ int SFinder::Run(){
 	//## Start loop on tasks per worker
 	int status= 0;
 	bool storeData= true;
-	if(m_mpiEnabled) storeData= false;
+	//if(m_mpiEnabled) storeData= false;
+	if(m_taskDataPerWorkers.size()>1) storeData= false;
 	size_t nTasks= m_taskDataPerWorkers[m_procId].size(); 
 	INFO_LOG("[PROC "<<m_procId<<"] - Start processing of #"<<nTasks<<" tasks...");
 	
@@ -1046,16 +1048,22 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 	std::vector<Source*> sources;
 	Image* significanceMap= 0;
 	int iterations_done= 0;
+	double seedThr= m_SeedThr;
 	
 	for(int k=0;k<niter;k++){
 	
 		//## Compute stats & bkg at current iteration
 		ImgBkgData* bkgData_iter= 0;
 		if(k==0){//Copy bkg data
+			seedThr= m_SeedThr;
+
 			bkgData_iter= new ImgBkgData;
 			*bkgData_iter= *bkgData;
 		}
 		else{//Compute bkg data
+			double seedThr_iter= seedThr-m_seedThrStep;//reduce seedThr by step after the first iteration
+			if(seedThr_iter>m_MergeThr) seedThr= seedThr_iter;//do not allow seed thr equal or smaller than mergeThr (if so stop seedThr adaptive decrease)
+
 			INFO_LOG("[PROC "<<m_procId<<"] - Computing image stats & bkg at iter no. "<<k+1<<" ...");
 			bkgData_iter= ComputeStatsAndBkg(img);
 			if(!bkgData_iter){
@@ -1097,7 +1105,7 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 		int status= img->FindCompactSource(
 			sources_iter,
 			significanceMap_iter,bkgData_iter,
-			m_SeedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
+			seedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
 			m_SearchNestedSources,m_NestedBlobThrFactor
 		);
 
@@ -2564,24 +2572,28 @@ int SFinder::Save(){
 
 	//Save input image to file?
 	if(m_saveInputMap && m_InputImg){
+		INFO_LOG("Saving input map to file...");
 		m_InputImg->SetNameTitle("img","img");
 		m_InputImg->Write();
 	}
 	
 	//Save residual map?
 	if(m_saveResidualMap && m_ResidualImg){
+		INFO_LOG("Saving residual map to file...");
 		m_ResidualImg->SetNameTitle("img_residual","img_residual");
 		m_ResidualImg->Write();
 	}
 	
 	//Save significance map?
 	if(m_saveSignificanceMap && m_SignificanceMap){
+		INFO_LOG("Saving significance map to file...");
 		m_SignificanceMap->SetNameTitle("img_significance","img_significance");
 		m_SignificanceMap->Write();
 	}
 
 	//Save bkg & noise maps
 	if(m_saveBkgMap && m_BkgData && m_BkgData->BkgMap){
+		INFO_LOG("Saving bkg map to file...");
 		(m_BkgData->BkgMap)->SetNameTitle("img_bkg","img_bkg");
 		(m_BkgData->BkgMap)->Write();
 	}
@@ -3254,7 +3266,6 @@ int SFinder::MergeSourcesAtEdge()
 		for(size_t j=0;j<m_taskDataPerWorkers[i].size();j++){
 			int nEdgeSources= static_cast<int>((m_taskDataPerWorkers[i][j]->sources_edge).size());
 			for(int k=0;k<nEdgeSources;k++){
-				MergedSourceInfo mergedSourceInfo= MergedSourceInfo(k,i,j);
 				sourcesToBeMerged.push_back(MergedSourceInfo(k,i,j));
 				mergedSourceGraph.AddVertex();
 			}
