@@ -47,12 +47,37 @@ message (STATUS "OPENCV2 HEADERS: ${OpenCV2_INCLUDE_DIRS}, LIBS: ${OpenCV2_LIBRA
 #=================================
 #==   Check for R PROJECT      ===
 #=================================
-message (STATUS "Looking for R")
-find_package (R REQUIRED COMPONENTS base RInside Rcpp rrcovHD truncnorm FNN akima)
-message (STATUS "R_INCLUDE_DIR: ${R_INCLUDE_DIR}")
-message (STATUS "R_LIBRARIES: ${R_LIBRARIES}")
+
+option(ENABLE_R "Enable building of R components" OFF)
+if(ENABLE_R)
+	MESSAGE(STATUS "Looking for R")
+	##find_package (R REQUIRED COMPONENTS base RInside Rcpp rrcovHD truncnorm FNN akima)
+	find_package (R REQUIRED COMPONENTS base RInside Rcpp)	
+	if(R_FOUND)
+		MESSAGE(STATUS "R found, defining preprocessor flag R_ENABLED")
+		add_definitions(-DR_ENABLED=1)
+		message (STATUS "R_INCLUDE_DIR: ${R_INCLUDE_DIR}")
+		message (STATUS "R_LIBRARIES: ${R_LIBRARIES}")
+	else()
+		MESSAGE(SEND_ERROR "R not found!")
+	endif()
+endif()
+
+
+#message (STATUS "Looking for R")
+#find_package (R REQUIRED COMPONENTS base RInside Rcpp rrcovHD truncnorm FNN akima)
+#message (STATUS "R_INCLUDE_DIR: ${R_INCLUDE_DIR}")
+#message (STATUS "R_LIBRARIES: ${R_LIBRARIES}")
 #-------------------------
 
+#==================================
+#==    Check for GSL library    ===
+#==================================
+message (STATUS "Looking for GSL library...")
+include(FindGSL REQUIRED)
+#find_package (GLS REQUIRED)
+message (STATUS "GSL_INCLUDE_DIRS: ${GSL_INCLUDE_DIRS}")
+message (STATUS "GSL_LIBRARIES: ${GSL_LIBRARIES}")
 
 #==================================
 #==    Check for Python         ===

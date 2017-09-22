@@ -1,5 +1,6 @@
 add_subdirectory(linterp)
 add_subdirectory(wcstools)
+add_subdirectory(rtnorm)
 
 set (SRCS ${SRCS} PARENT_SCOPE)
 set (HEADERS ${HEADERS} PARENT_SCOPE)
