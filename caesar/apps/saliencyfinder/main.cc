@@ -25,7 +25,6 @@
 #include <Consts.h>
 #include <Logger.h>
 
-#include <RInside.h>
 
 #include <TFile.h>
 

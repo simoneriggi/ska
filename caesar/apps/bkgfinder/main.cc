@@ -24,9 +24,6 @@
 #include <BkgData.h>
 #include <BkgFinder.h>
 
-//R headers
-#include <RInside.h>
-
 //ROOT headers
 #include <TFile.h>
 

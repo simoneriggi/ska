@@ -454,6 +454,7 @@ int OpenOutputFile(){
 		PerfInfo->SetBranchAddress("Nx",&nx);	
 		PerfInfo->SetBranchAddress("Ny",&ny);	
 		PerfInfo->SetBranchAddress("dt",&dt);	
+		PerfInfo->SetBranchAddress("NThreads",&NThreads);	
 		PerfInfo->SetBranchAddress("dt_init",&dt_init);
 		PerfInfo->SetBranchAddress("dt_read",&dt_read);
 		PerfInfo->SetBranchAddress("dt_stats",&dt_stats);

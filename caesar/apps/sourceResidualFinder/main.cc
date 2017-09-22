@@ -25,7 +25,6 @@
 #include <Source.h>
 #include <Logger.h>
 
-#include <RInside.h>
 
 #include <TFile.h>
 
@@ -305,11 +304,6 @@ int ParseOptions(int argc, char *argv[])
 	}
 	PRINT_OPTIONS();
 
-	//=======================
-	//== Init R 
-	//=======================
-	cout<<"INFO: Create Rinstance..."<<endl;
-	RInside::instancePtr();
 	
 	//=======================
 	//== Init Logger 
