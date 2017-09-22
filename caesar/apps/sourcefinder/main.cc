@@ -23,8 +23,6 @@
 #include <Logger.h>
 #include <CodeUtils.h>
 
-#include <RInside.h>
-
 #include <iostream>
 #include <vector>
 #include <unistd.h>
