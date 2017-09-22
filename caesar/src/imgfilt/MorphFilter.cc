@@ -34,8 +34,10 @@
 #include <BkgData.h>
 #include <Logger.h>
 
+#include <rtnorm.h>
+
 #include <TObject.h>
-#include <TRInterface.h>
+//#include <TRInterface.h>
 
 #include <iomanip>
 #include <iostream>
@@ -265,6 +267,7 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 	//## Check R interface
 	double sigmaTrunc= 1;//trunc random gaussian to +-sigmaTrunc	
 
+	/*
 	DEBUG_LOG("Retrieve RInterface instance...");
 	ROOT::R::TRInterface& fR= ROOT::R::TRInterface::Instance();
 	std::string randomGenCmd= std::string("rtruncnorm(1, a=-sigmaTrunc, b=sigmaTrunc, mean = 0, sd = 1)");
@@ -280,6 +283,13 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 		ERROR_LOG("Unknown exception catched while loading R library truncnorm!");
 		return -1;
   }	
+	*/
+
+	//## Initialize GSL random init
+	DEBUG_LOG("Initialize GSL random engine...");
+  gsl_rng_env_setup();                          // Read variable environnement
+  const gsl_rng_type* type = gsl_rng_default;   // Default algorithm 'twister'
+  gsl_rng* rand_generator = gsl_rng_alloc (type); 
 
 
 	//## Find pixels to be dilated
@@ -312,9 +322,10 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 			#endif
 			for(size_t l=0;l<pixelsToBeDilated.size();l++){
 				long int id= pixelsToBeDilated[l];			
-				double r= fR.Eval(randomGenCmd.c_str());
+				//double r= fR.Eval(randomGenCmd.c_str());
+				double r= 0;
+				RtNorm_ns::RtNorm::get_random(r,rand_generator,-sigmaTrunc,sigmaTrunc,0.,1.);
 				double bkg= BkgRealization + r*BkgRMS;
-				//BkgRealization+= r*BkgRMS;
 				img->SetPixelValue(id,bkg);
 			}//end loop pixels 	
 		}
@@ -338,8 +349,9 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 					long int id= pixelsToBeDilated[l];			
 					double BkgRealization= (bkgData->BkgMap)->GetPixelValue(id);
 					double BkgRMS= (bkgData->NoiseMap)->GetPixelValue(id);
-					double r= fR.Eval(randomGenCmd.c_str());
-					//BkgRealization+= r*BkgRMS;
+					double r= 0;
+					RtNorm_ns::RtNorm::get_random(r,rand_generator,-sigmaTrunc,sigmaTrunc,0.,1.);
+					//double r= fR.Eval(randomGenCmd.c_str());
 					double bkg= BkgRealization + r*BkgRMS;
 					img->SetPixelValue(id,bkg);
 				}//end loop pixels
@@ -364,9 +376,10 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 				#endif
 				for(size_t l=0;l<pixelsToBeDilated.size();l++){
 					long int id= pixelsToBeDilated[l];			
-					double r= fR.Eval(randomGenCmd.c_str());
+					//double r= fR.Eval(randomGenCmd.c_str());
+					double r= 0;
+					RtNorm_ns::RtNorm::get_random(r,rand_generator,-sigmaTrunc,sigmaTrunc,0.,1.);
 					double bkg= BkgRealization + r*BkgRMS;
-					//BkgRealization+= r*BkgRMS;
 					img->SetPixelValue(id,bkg);
 				}//end loop pixels
 			}
@@ -381,6 +394,9 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 			}
 		}//close else
 	}//close else if
+
+	//## GSL rand generator deallocation
+	gsl_rng_free(rand_generator); 
 
 	//Force recomputation of stats if present, otherwise recompute only moments
 	bool skipNegativePixels= false;
