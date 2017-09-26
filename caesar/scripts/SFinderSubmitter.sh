@@ -49,7 +49,9 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--no-extendedsearch - Do not search extended sources"
 	echo "--extsfinder=[EXT_SFINDER_METHOD] - Extended source search method {1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding} (default=3)"	
 	echo "--activecontour=[AC_METHOD] - Active contour method {1=Chanvese, 2=LRAC} (default=2)"
-	echo "--selectsources - Apply selection to compact sources found (default=false)"	
+	echo "--no-nestedsearch - Do not search nested sources (default=search)"		
+	echo "--selectsources - Apply selection to compact sources found (default=false)"
+	echo "--fitsources - Fit compact point-like sources found (default=false)"	
   echo "--spsize - Superpixel size (in pixels) used in hierarchical clustering (default=20)"	
 	echo "--spbeta - Superpixel regularization par (beta) used in hierarchical clustering (default=1)"	
 	echo "--spminarea - Superpixel min area (in pixels) used in hierarchical clustering (default=10)"	
@@ -96,6 +98,7 @@ BRIGHT_SEED_THR="10"
 MERGE_THR="2.6"
 EXT_SFINDER_METHOD="3"
 AC_METHOD="2"
+SEARCH_NESTED_SOURCES="true"
 SELECT_SOURCES="false"
 SP_SIZE="20"
 SP_BETA="1"
@@ -107,7 +110,7 @@ SALIENCY_RESO_STEP="10"
 SALIENCY_NN_PAR="1"
 SEARCH_COMPACT_SOURCES="true"
 SEARCH_EXTENDED_SOURCES="true"
-
+FIT_SOURCES="false"
 
 for item in $*
 do
@@ -199,6 +202,9 @@ do
 		--no-compactsearch*)
     	SEARCH_COMPACT_SOURCES="false"
     ;;
+		--no-nestedsearch*)
+    	SEARCH_NESTED_SOURCES="false"
+    ;;
 
 		--npixmin=*)
     	NPIX_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
@@ -226,6 +232,9 @@ do
     ;;
 		--selectsources*)
     	SELECT_SOURCES="true"
+    ;;
+		--fitsources*)
+    	FIT_SOURCES="true"
     ;;
 
 		--saliencythr*)
@@ -276,7 +285,9 @@ echo "BKG BOX: $BKG_BOXSIZE, GRID: $BKG_GRID_SIZE"
 echo "NPIX_MIN: $NPIX_MIN, SEED_THR: $SEED_THR, BRIGHT_SEED_THR: $BRIGHT_SEED_THR, MERGE_THR: $MERGE_THR"
 echo "EXT_SFINDER_METHOD: $EXT_SFINDER_METHOD"
 echo "AC_METHOD: $AC_METHOD"
+echo "SEARCH_NESTED_SOURCES: $SEARCH_NESTED_SOURCES"
 echo "SELECT_SOURCES: $SELECT_SOURCES"
+echo "FIT_SOURCES: $FIT_SOURCES"
 echo "SP PARS: ($SP_SIZE, $SP_BETA, $SP_MINAREA)"
 echo "SALIENCY_THR: $SALIENCY_THR"
 echo "SALIENCY_RESO: ($SALIENCY_MIN_RESO, $SALIENCY_MAX_RESO, $SALIENCY_RESO_STEP)"
@@ -360,6 +371,7 @@ generate_config(){
 		echo '//============================'
 		echo 'beamFWHM = 6.5                          | User-supplied circular beam FWHM in arcsec (beamFWHM=BMAJ=BMIN, default=6.5 arcsec)'
 		echo 'pixSize = 1.0   												| User-supplied map pixel area in arcsec (pixSize=CDELT, default=1 arcsec)'
+		echo 'beamTheta = 0.0                         | User-supplied beam theta in deg (default=0)'
 		echo '###'
 		echo '###'
 		echo '//============================================='
@@ -423,7 +435,7 @@ generate_config(){
     echo "useLocalBkg = $USE_LOCAL_BKG							| Use local background calculation instead of global bkg (T/F)"
     echo 'localBkgMethod = 1												| Local background method (1=Grid, 2=Superpixel)'
     echo 'use2ndPassInLocalBkg = true								| Use 2nd pass to refine noise calculation in local bkg (T/F)'
-		echo 'skipOutliersInLocalBkg = true						  | Skip outliers (e.g. bright point sources) in local bkg computation (T/F)'
+		echo 'skipOutliersInLocalBkg = false						| Skip outliers (e.g. bright point sources) in local bkg computation (T/F)'
 		echo 'bkgEstimator = 2													| Background estimator (1=Mean,2=Median,3=BiWeight,4=ClippedMedian)'
     echo 'useBeamInfoInBkg = true                   | Use beam information in bkg box definition (if available) (T/F)'
 		echo "boxSizeX = $BKG_BOXSIZE										| X Size of local background box in #pixels"
@@ -447,8 +459,6 @@ generate_config(){
 		echo '//==  SOURCE FINDING OPTIONS        =='
 		echo '//===================================='
 		echo "searchCompactSources = $SEARCH_COMPACT_SOURCES			| Search compact sources (T/F)"
-		echo "searchExtendedSources = $SEARCH_EXTENDED_SOURCES		| Search extended sources after bright source removal (T/F)"
-		echo 'searchNestedSources = true													| Search for nested sources inside candidate sources (T/F)'
 		echo "minNPix = $NPIX_MIN																	| Minimum number of pixel to consider a source"
 		echo "seedBrightThr = $BRIGHT_SEED_THR										| Seed threshold in flood-filling algo for bright sources"
 		echo "seedThr = $SEED_THR 																| Seed threshold in flood filling algo for faint sources"
@@ -456,22 +466,48 @@ generate_config(){
 		echo 'mergeBelowSeed = false                              | Aggregate to seed only pixels above merge threshold but below seed threshold (T/F)'
 		echo 'searchNegativeExcess = false												| Search negative excess together with positive in compact source search'
 		echo "compactSourceSearchNIters = 10                      | Number of iterations to be performed in compact source search (default=10)"
-		echo 'wtScaleFaint = 1																		| Wavelet scale to be used for faint source search'
-		echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search'
+		echo '###'
+		echo '###'
+		echo '//==========================================='
+		echo '//==  NESTED SOURCE FINDING OPTIONS        =='
+		echo '//==========================================='
+		echo "searchNestedSources = $SEARCH_NESTED_SOURCES 			  | Search for nested sources inside candidate sources (T/F)"
+		echo 'nestedBlobThrFactor = 1                             | Threshold (multiple of curvature rms) used for nested blob finding'
+		echo 'minNestedMotherDist = 2                             | Minimum distance in pixels (in x or y) between nested and parent blob below which nested is skipped'
+		echo 'maxMatchingPixFraction = 0.5                        | Maximum fraction of matching pixels between nested and parent blob above which nested is skipped'
+		echo '###'
+		echo '###'
+		echo '//=================================='
+		echo '//==  Source fitting options   =='
+		echo '//=================================='
+		echo "fitSources = $FIT_SOURCES                      | Deblend point-like sources with multi-component gaus fit (T/F)"
+		echo 'fitMaxNComponents = 3                          | Maximum number of components fitted in a blob (T/F)'
+		echo '###'
+		echo '###'
+		echo '//============================================='
+		echo '//==  EXTENDED SOURCE FINDING OPTIONS        =='
+		echo '//============================================='
+		echo "searchExtendedSources = $SEARCH_EXTENDED_SOURCES		| Search extended sources after bright source removal (T/F)"
 		echo "extendedSearchMethod = $EXT_SFINDER_METHOD					| Extended source search method (1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding)"
-		echo "activeContourMethod = $AC_METHOD										| Active contour method (1=Chanvese, 2=LRAC)"
 		echo 'useResidualInExtendedSearch = true									| Use residual image (with selected sources dilated) as input for extended source search'
+		echo "activeContourMethod = $AC_METHOD										| Active contour method (1=Chanvese, 2=LRAC)"
+		echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search'
 		echo '###'
 		echo '###'
 		echo '//================================'
 		echo '//==  SOURCE SELECTION OPTIONS  =='
 		echo '//================================'
 		echo "applySourceSelection = $SELECT_SOURCES  						| Apply selection cuts to sources (T/F)"
+		echo 'useMinBoundingBoxCut = true													| Use bounding box cut (T(F)'
 		echo 'sourceMinBoundingBox = 2														| Minimum bounding box cut (source tagged as bad if below this threshold)'
+		echo 'useCircRatioCut = false															| Use circularity ratio cut (T/F)'
 		echo 'psCircRatioThr = 0.4																| Circular ratio threshold (source passes point-like cut if above this threshold)'
+		echo 'useElongCut = false																	| Use elongation cut (T/F)'
 		echo 'psElongThr = 0.7																		| Elongation threshold (source passes point-like cut if below this threshold'
+		echo 'useEllipseAreaRatioCut = false											| Use Ellipse area ratio cut (T/F)'
 		echo 'psEllipseAreaRatioMinThr = 0.6											| Ellipse area ratio min threshold'
 		echo 'psEllipseAreaRatioMaxThr = 1.4											| Ellipse area ratio max threshold'
+		echo 'useMaxNPixCut = true																| Use max npixels cut (T/F)'
 		echo 'psMaxNPix = 1000																		| Max number of pixels for point-like sources (source passes point-like cut if below this threshold)'
 		echo '###'
 		echo '###'

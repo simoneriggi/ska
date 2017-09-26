@@ -17,7 +17,7 @@ import random
 import math
 
 ## ASTRO
-#import astropy
+from scipy import ndimage
 import pyfits
 from astropy.io import fits
 from astropy.units import Quantity
@@ -436,7 +436,7 @@ class SkyMapSimulator(object):
 
 		return data
 
-	def make_caesar_source(self,source_data,source_name,source_id,source_type,source_sim_type):
+	def make_caesar_source(self,source_data,source_name,source_id,source_type,source_sim_type,ampl=None,x0=None,y0=None):
 		""" Create Caesar source from source data array """
 		# Create Caesar source
 		source= Caesar.Source()
@@ -456,12 +456,25 @@ class SkyMapSimulator(object):
 			pixel= Caesar.Pixel(gbin,ix,iy,ix,iy,S)
 			source.AddPixel(pixel)
 
+		# If true info are not given compute them
+		#    - S= count integral
+		#    - baricenter of binary map
+		if x0 is None or y0 is None:
+			print ('No source true pos given, computing it from data...')
+			data_binary= np.where(source_data!=0,1,0)
+			[y0,x0]= ndimage.measurements.center_of_mass(data_binary)
+
+		if ampl is None:
+			print ('No source true flux given, computing integral from data...')
+			ampl= np.sum(source_data,axis=None)
+
 		# Set some flags
 		source.SetName(source_name)
 		source.SetId(source_id)
 		source.SetType(source_type)
 		source.SetFlag(Caesar.Source.eFake)
 		source.SetSimType(source_sim_type)
+		source.SetTrueInfo(ampl,x0,y0)
 
 		# Compute stats & morph pars
 		source.ComputeStats();
@@ -540,7 +553,7 @@ class SkyMapSimulator(object):
 			source_name= 'S' + str(index+1)
 			source_id= index+1
 			source_type= Caesar.Source.ePointLike
-			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike)
+			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0)
 			self.caesar_sources.append(caesar_source)
 
 
