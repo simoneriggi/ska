@@ -24,10 +24,11 @@
 * @author S. Riggi
 * @date 20/01/2015
 */
-#ifndef Serializer_H
-#define Serializer_H
+#ifndef _SERIALIZER_H
+#define _SERIALIZER_H
 
 #include <Source.h>
+#include <SourceFitter.h>
 #include <TaskData.h>
 #include <Contour.h>
 
@@ -83,7 +84,9 @@ class Serializer : public TObject {
 			static int EncodeBlobToProtobuf(CaesarPB::Blob& blob_pb,Source* source);
 			static int EncodeSourceToProtobuf(CaesarPB::Source& source_pb,Source* source);		
 			static int SourceToBuffer(SBuffer& buffer,Source* source);
-			
+			static int EncodeSourceComponentParsToProtobuf(CaesarPB::SourceComponentPars* sourceCompPars_pb,SourceComponentPars& sourceCompPars);
+			static int EncodeSourceFitParsToProtobuf(CaesarPB::SourceFitPars& sourceFitPars_pb,SourceFitPars& sourceFitPars);
+
 			//Buffer --> Source
 			static int EncodeProtobufToPoint(TVector2& point,const CaesarPB::Point& point_pb);
 			static int EncodeProtobufToContour(Contour& contour,const CaesarPB::Contour& contour_pb);
@@ -91,6 +94,9 @@ class Serializer : public TObject {
 			static int EncodeProtobufToBlob(Source& source,const CaesarPB::Blob& blob_pb);
 			static int EncodeProtobufToSource(Source& source,const CaesarPB::Source& source_pb);			
 			static int BufferToSource(Source& source,SBuffer& buffer);
+
+			static int EncodeProtobufToSourceComponentPars(SourceComponentPars& sourceComponentPars,const CaesarPB::SourceComponentPars& sourceComponentPars_pb);
+			static int EncodeProtobufToSourceFitPars(SourceFitPars& sourceFitPars,CaesarPB::SourceFitPars& sourceFitPars_pb);
 
 			//## WORKER DATA SERIALIZATION ###
 			//TaskData --> Buffer

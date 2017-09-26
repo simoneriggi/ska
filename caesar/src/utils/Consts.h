@@ -29,6 +29,8 @@
 #ifndef _CONSTS_h
 #define _CONSTS_h 1
 
+#include <math.h>
+
 namespace Caesar {
 
 //====================================
@@ -137,7 +139,7 @@ enum DS9RegionFormat {
 //====================================
 //===          CONSTANTS         =====
 //====================================
-//...
+static const double GausSigma2FWHM= 2.*sqrt(2*log(2.));
 
 
 

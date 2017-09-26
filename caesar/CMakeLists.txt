@@ -311,8 +311,8 @@ message (STATUS "LINTERP_HEADERS: ${LINTERP_HEADERS}")
 	add_custom_command(
   	OUTPUT proto_generation
     COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTO_DIR} --cpp_out=${CMAKE_BINARY_DIR} ${PROTO_FILES}
-    ##DEPENDS always_rebuild  ### Decomment this to always generate protobuf files
-		DEPENDS ${PROTO_FILES}
+    DEPENDS always_rebuild  ### Decomment this to always generate protobuf files
+		#DEPENDS ${PROTO_FILES}
   )
 
 	add_custom_target(ProtobufSchema ALL 

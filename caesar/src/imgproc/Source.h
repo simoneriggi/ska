@@ -28,6 +28,7 @@
 #ifndef _SOURCE_h
 #define _SOURCE_h 1
 
+#include <SourceFitter.h>
 #include <Blob.h>
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -255,6 +256,56 @@ class Source : public Blob {
 		*/
 		long int GetNMatchingPixels(Source* aSource);
 
+		/**
+		* \brief Get distance in pixels between source centroids
+		*/
+		float GetCentroidDistance(Source* aSource);
+
+		/**
+		* \brief Fit source with a multi-component gaussian model
+		*/
+		int Fit(BlobPars blobPars,int nMaxComponents=3);
+		/**
+		* \brief Set true source info
+		*/
+		void SetTrueInfo(double S_true,double X0_true,double Y0_true){
+			m_S_true= S_true;
+			m_X0_true= X0_true;
+			m_Y0_true= Y0_true;
+			m_HasTrueInfo= true;	
+		}
+
+		/**
+		* \brief Has true source info
+		*/
+		bool HasTrueInfo(){return m_HasTrueInfo;}
+		/**
+		* \brief Get true source flux
+		*/
+		double GetTrueFlux(){return m_S_true;}
+		/**
+		* \brief Get true source position
+		*/
+		void GetTruePos(double& x,double& y){x= m_X0_true; y=m_Y0_true;}
+
+		/**
+		* \brief Has fit info
+		*/
+		bool HasFitInfo(){return m_HasFitInfo;}
+
+		/**
+		* \brief Get fit pars
+		*/
+		SourceFitPars& GetFitPars(){return m_fitPars;}
+	
+		/**
+		* \brief Get number of fit components
+		*/
+		int GetNFitComponents(){
+			if(!m_HasFitInfo) return 0;
+			return m_fitPars.GetNComponents();
+		}
+
 	private:
 	
 		/**
@@ -264,6 +315,7 @@ class Source : public Blob {
 
 	public:
 
+		//Source flags
 		int Type;
 		int Flag;
 		int SimType;
@@ -279,6 +331,16 @@ class Source : public Blob {
 		bool m_HasNestedSources;
 		Source* m_NestedSource;
 		std::vector<Source*> m_NestedSources;	
+
+		//True source info
+		bool m_HasTrueInfo;
+		double m_S_true;
+		double m_X0_true;
+		double m_Y0_true;
+
+		//Fit info
+		bool m_HasFitInfo;
+		SourceFitPars m_fitPars;
 
 		ClassDef(Source,1)
 

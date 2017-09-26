@@ -792,11 +792,11 @@ class Image : public TNamed {
 		/**
 		* \brief Find compact sources
 		*/
-		int FindCompactSource(std::vector<Source*>&,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,bool findNestedSources=false,double nestedBlobThrFactor=1);
+		int FindCompactSource(std::vector<Source*>&,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,bool findNestedSources=false,double nestedBlobThrFactor=1,double minNestedMotherDist=2,double maxMatchingPixFraction=0.5,Image* curvMap=0);
 		/**
 		* \brief Find nested sources
 		*/
-		int	FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData=0,int minPixels=5,double nestedBlobThreshold=1);
+		int	FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData=0,int minPixels=5,double nestedBlobThreshold=1,double minNestedMotherDist=2,double maxMatchingPixFraction=0.5);
 
 		/**
 		* \brief Find extended sources with ChanVese method
@@ -831,6 +831,16 @@ class Image : public TNamed {
 		* \brief Returns a residual image obtained by dilating given sources with a random background
 		*/
 		Image* GetSourceResidual(std::vector<Source*>const& sources,int KernSize=5,int dilateModel=MorphFilter::eDilateWithBkg,int dilateSourceType=-1,bool skipToNested=false,ImgBkgData* bkgData=0,bool useLocalBkg=false,bool randomize=false,double zThr=20);
+
+		/**
+		* \brief Find image peaks
+		*/
+		int FindPeaks(std::vector<TVector2>& peakPoints,int peakShiftTolerance=1,bool skipBorders=true);
+
+		/**
+		* \brief Find graph with image peaks
+		*/
+		TGraph* ComputePeakGraph(int peakShiftTolerance=1,bool skipBorders=true);
 
 
 		/**

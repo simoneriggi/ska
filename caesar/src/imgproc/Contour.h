@@ -40,6 +40,8 @@
 #include <TVector2.h>
 #include <TMath.h>
 
+#include <opencv2/core/core.hpp>
+
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
@@ -147,10 +149,8 @@ class Contour : public TObject {
 		* \brief Return a polyline object with bounding box
 		*/	
 		TPolyLine* GetBoundingBoxLine();
-		/**
-		* \brief Return an ellipse object fitted to contour
-		*/
-		TEllipse* GetFittedEllipse();
+
+		
 		/**
 		* \brief Return a info box with parameter values
 		*/
@@ -162,7 +162,38 @@ class Contour : public TObject {
 		/**
 		* \brief Compute shape parameters
 		*/
-		void ComputeShapeParams();
+		//void ComputeShapeParams();
+		void ComputeShapeParams(std::vector<cv::Point2f>const & points);
+
+		/**
+		* \brief Compute moments pars
+		*/
+		void ComputeMomentParams(std::vector<cv::Point2f>const & points);
+
+		/**
+		* \brief Compute fitted ellipse
+		*/
+		int ComputeFittedEllipse();
+
+		/**
+		* \brief Return an ellipse object fitted to contour
+		*/
+		TEllipse* GetFittedEllipse();
+
+
+		/**
+		* \brief Compute Fourier descriptors
+		*/
+		void ComputeFourierDescriptors();
+		/**
+		* \brief Compute centroid distance FD
+		*/
+		void ComputeCentroidDistanceFD();
+		/**
+		* \brief Compute bending energy
+		*/
+		void ComputeBendingEnergy();
+
 		/**
 		* \brief Dump
 		*/
@@ -200,22 +231,28 @@ class Contour : public TObject {
 		}
 
 	private:
-		void Init();
-		void ComputeArea();
-		void ComputePerymeter();
-		void ComputeCircularityRatio();
-		void ComputeBoundingBox();
-		void ComputeElongation();
-		void ComputeRectangularity();
-		void ComputeRoundness();
-		void ComputeMoments();
-		void ComputeEccentricity();
 
 		/**
-		* \brief Compute fitted ellipse
+		* \brief Init
 		*/
-		int ComputeFittedEllipse();
+		void Init();
 
+	protected:	
+		/**
+		* \brief Compute moments
+		*/
+		//void ComputeMoments();
+		void ComputeMoments(std::vector<cv::Point2f>const & points);
+		/**
+		* \brief Compute eccentricity
+		*/
+		void ComputeEccentricity();
+		
+		
+
+		/**
+		* \brief Get complex contour point representation
+		*/
 		std::vector< std::complex<double> > GetComplexPointRepresentation(bool translateToCentroid=false){
 			std::vector< std::complex<double> > U;
 			if(translateToCentroid) {
@@ -229,23 +266,22 @@ class Contour : public TObject {
 			return U;
 		}
 
-		void ComputeFourierDescriptors();
-		void ComputeCentroidDistanceFD();
-		void ComputeBendingEnergy();
+		
+
 
 		/**
 		* \brief Ellipse fitter
 		*/
-		//TVectorD EllipseFitter(TGraph*);
 		int EllipseFitter(TVectorD&,TGraph*);		
 
 		/**
 		* \brief Ellipse fitter
 		*/
-		//TVectorD ConicToParametric(const TVectorD &conic);
 		int ConicToParametric(TVectorD& ellipse,const TVectorD &conic);
 
-
+		/**
+		* \brief Ellipse fit function
+		*/
 		double EllipseFcn(double x, double y, TVectorD params) {
   		double v = 9999.9;
 			double x0= params[0];
@@ -270,6 +306,10 @@ class Contour : public TObject {
   		v = sqrt(v);
   		return v;
 		}
+
+		/**
+		* \brief Ellipse fit chi2 function
+		*/
 		double EllipseFitChi2(TGraph* contourGraph,TVectorD params)	{
   		if (!contourGraph) return 0; // just a precaution
 			double v = 0.;
@@ -286,6 +326,8 @@ class Contour : public TObject {
 
 	public:	
 		bool HasParameters;
+
+		//- Shape parameters
 		double Area;
 		double Perymeter;
 		bool IsConvexContour;
@@ -297,8 +339,9 @@ class Contour : public TObject {
 		double Elongation;
 		double Rectangularity;
 		double Roundness;
-		double Eccentricity;
-		double TiltAngle;
+
+		
+		//- Ellipse fit parameters
 		bool HasEllipseFit;
 		TVector2 EllipseCenter;
 		double EllipseMajAxis;
@@ -306,6 +349,10 @@ class Contour : public TObject {
 		double EllipseRotAngle;
 		double EllipseFitRedChi2;
 		double EllipseAreaRatio;
+
+		//- Moments parameters
+		double Eccentricity;
+		double TiltAngle;
 
 		// spatial moments: m00, m10, m01, m20, m11, m02, m30, m21, m12, m03
 		double m00;
@@ -335,23 +382,29 @@ class Contour : public TObject {
 		double nu12;
 		double nu03;
 
-		//double HuMoments[7];
 		std::vector<double> HuMoments;
-		//TVector2 BoundingBoxVertex[4];	
 		std::vector<TVector2> BoundingBoxVertex;
 		TVector2 Centroid;
 		
+		//- Fourier descriptors
 		//std::vector< std::complex<double> > FDs;
+		bool HasFDPars;
 		std::vector<double> RealFDs;
 		std::vector<double> ImagFDs;
 		std::vector<double> ModFDs;//module of complex Fourier descriptors
+
+		//- Bending energy pars
+		bool HasBEPars;
 		std::vector<double> BendingEnergies;
+		
+		//- Centroid-distance FD pars
+		bool HasCentroidDistanceFDPars;
 		std::vector<double> CentroidDistanceModFDs;//module of complex Fourier descriptors
 
 	private:
 		Points m_Points;	
 		
-	ClassDef(Contour,1)
+	ClassDef(Contour,2)
 
 	public:	
 		

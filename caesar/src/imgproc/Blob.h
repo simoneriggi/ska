@@ -219,6 +219,7 @@ class Blob : public TNamed {
 			}//end loop
 			return seedPixelIndexes;
 		}//close GetSeedPixelIndexes()
+
 		
 		//================================================
 		//==         BLOB PARAMETERS 
@@ -242,6 +243,11 @@ class Blob : public TNamed {
 		* \brief Compute morphology parameters
 		*/
 		int ComputeMorphologyParams();
+
+		/**
+		* \brief Compute Zernike moments
+		*/
+		int ComputeZernikeMoments(int order=6);
 
 		/**
 		* \brief Has morphology parameters computed
@@ -454,7 +460,7 @@ class Blob : public TNamed {
 		/**
 		* \brief Generate an image from source pixel
 		*/
-		Image* GetImage(ImgType mode);
+		Image* GetImage(ImgType mode,int pixMargin=1);
 
 		//================================================
 		//==         CONTOURS

@@ -30,6 +30,7 @@
 
 //ROOT
 #include <TObject.h>
+#include <TVector2.h>
 
 #include <cstdlib>
 #include <iomanip>
@@ -75,14 +76,17 @@ class MorphFilter : public TObject {
 		enum DilationModel {eDilateWithBkg=1,eDilateWithSourceMedian=2};
 
 	public:
-	
-		//================================================
-		//==      NEW IMAGE METHODS
-		//================================================
+			
+		/**
+		* \brief Find peaks in image by combining local peaks found with 3 different dilation kernel sizes
+		*/
+		static int FindPeaks(std::vector<TVector2>& peakPoints,Image* img,int peakShiftTolerance=1,bool skipBorders=true);
+
 		/**
 		* \brief Dilate image with specified kernel
 		*/
-		//static Image* Dilate(Image* img,int KernSize,bool returnPeakImg=false);
+		static Image* Dilate(std::vector<long int>& peakPixelIds,Image* img,int KernSize,bool skipBorders=true);
+
 		/**
 		* \brief Dilate image around specified sources position
 		*/
@@ -91,9 +95,6 @@ class MorphFilter : public TObject {
 		
 	private:
 
-		//================================================
-		//==      NEW IMAGE METHODS
-		//================================================
 		/**
 		* \brief Dilate image around a specified source position
 		*/

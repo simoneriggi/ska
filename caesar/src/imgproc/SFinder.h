@@ -229,9 +229,9 @@ class SFinder : public TObject {
 		int DrawSources(Image* image,std::vector<Source*>& sources);
 
 		/**
-		* \brief Deblend sources
+		* \brief Fit sources
 		*/
-		int DeblendSources(std::vector<Source*>& sources);
+		int FitSources(std::vector<Source*>& sources);
 
 		/**
 		* \brief Print performance stats
@@ -307,7 +307,7 @@ class SFinder : public TObject {
 		double sourceSelectionTime;
 		double imgResidualTime;
 		double extendedSourceTime;
-		double sourceDeblendTime;
+		double sourceFitTime;
 		double saveTime;
 
 		//Source
@@ -325,8 +325,14 @@ class SFinder : public TObject {
 		float m_ImgYmin;
 
 		//Image beam options
+		double m_beamBmaj;
+		double m_beamBmin;
+		double m_beamBpa;
+		double m_pixSizeX;
+		double m_pixSizeY;
 		double m_beamFWHM;
 		double m_pixSize;
+		double m_beamTheta;
 		double m_fluxCorrectionFactor;
 
 		//Read distributed options
@@ -384,20 +390,28 @@ class SFinder : public TObject {
 		//Nested source search
 		bool m_SearchNestedSources;
 		double m_NestedBlobThrFactor;
+		double m_minNestedMotherDist;
+		double m_maxMatchingPixFraction;
 		
 		//Source selection
 		bool m_ApplySourceSelection;
+		bool m_useMinBoundingBoxCut;
 		double m_SourceMinBoundingBox;
+		bool m_useCircRatioCut;
 		double m_psCircRatioThr;
+		bool m_useElongCut;
 		double m_psElongThr;
+		bool m_useEllipseAreaRatioCut;
 		double m_psEllipseAreaRatioMinThr;
 		double m_psEllipseAreaRatioMaxThr;
+		bool m_useMaxNPixCut;
 		double m_psMaxNPix;
 
-		//Source deblending
-		bool m_deblendSources;
-		double m_deblendCurvThr;
-		double m_deblendComponentMinNPix;
+		//Source fitting
+		bool m_fitSources;
+		int m_fitMaxNComponents;
+		//double m_deblendCurvThr;
+		//double m_deblendComponentMinNPix;
 		
 		//Saliency computation
 		Image* m_SaliencyImg;

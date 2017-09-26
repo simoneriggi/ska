@@ -165,10 +165,6 @@ Image::Image(long int nbinsx,long int nbinsy,float xlow,float ylow,std::string n
 
 	//Set image name
 	m_name= name;
-	//if(xlow==-1 || ylow==-1){
-	//	xlow= 0;
-	//	ylow= 0;
-	//}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -222,10 +218,6 @@ Image::Image(long int nbinsx,long int nbinsy,std::vector<float>const& pixels,flo
 
 	//Set image name
 	m_name= name;
-	//if(xlow==-1 || ylow==-1){
-	//	xlow= 0;
-	//	ylow= 0;
-	//}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -285,10 +277,6 @@ Image::Image(long int nbinsx,long int nbinsy,float w,float xlow,float ylow,std::
 
 	//Set image name
 	m_name= name;
-	//if(xlow==-1 || ylow==-1){
-	//	xlow= 0;
-	//	ylow= 0;
-	//}
 
 	//Set image size
 	SetSize(nbinsx,nbinsy,xlow,ylow);
@@ -411,18 +399,15 @@ int Image::SetSize(long int Nx,long int Ny,float xlow,float ylow){
 	}
 
 	//Check range
-	bool hasValidOffset= (xlow>=0 && ylow>=0); 
-	if(!hasValidOffset){
-		ERROR_LOG("Invalid xlow/ylow given (should be >=0)!");
-		return -1;
-	}
+	//bool hasValidOffset= (xlow>=0 && ylow>=0); 
+	//if(!hasValidOffset){
+	//	ERROR_LOG("Invalid xlow/ylow given (should be >=0)!");
+	//	return -1;
+	//}
 
 	//Reset & delete stats, reset moments
 	ResetImgStats(true,true);
-
-	//Clear existing vector (not needed)
-	//m_pixels.clear();
-		
+	
 	//Allocate new space
 	long int N= Nx*Ny;
 	try {
@@ -1463,11 +1448,11 @@ int Image::FindCompactSource(std::vector<Source*>& sources,double thr,int minPix
 }//close FindCompactSource()
 
 
-int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,bool findNestedSources,double nestedBlobThreshold)
+int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,bool findNestedSources,double nestedBlobThreshold,double minNestedMotherDist,double maxMatchingPixFraction,Image* curvMap)
 {
 
 	//Find sources
-	int status= BlobFinder::FindBlobs(this,sources,floodImg,bkgData,seedThr,mergeThr,minPixels,findNegativeExcess,mergeBelowSeed);
+	int status= BlobFinder::FindBlobs(this,sources,floodImg,bkgData,seedThr,mergeThr,minPixels,findNegativeExcess,mergeBelowSeed,curvMap);
 	if(status<0){
 		ERROR_LOG("Blob finder failed!");
 		for(unsigned int k=0;k<sources.size();k++){
@@ -1482,7 +1467,7 @@ int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBk
 
 	//Find nested sources?
 	if(findNestedSources && sources.size()>0){
-		int status= FindNestedSource(sources,bkgData,minPixels,nestedBlobThreshold);
+		int status= FindNestedSource(sources,bkgData,minPixels,nestedBlobThreshold,minNestedMotherDist,maxMatchingPixFraction);
 		if(status<0){
 			WARN_LOG("Nested source search failed!");
 		}
@@ -1493,7 +1478,7 @@ int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBk
 }//close FindCompactSource()
 
 
-int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,int minPixels,double nestedBlobThreshold){
+int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,int minPixels,double nestedBlobThreshold,double minNestedMotherDist,double maxMatchingPixFraction){
 
 	//Check if given mother source list is empty
 	int nSources= static_cast<int>(sources.size());
@@ -1509,29 +1494,35 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 		return -1;
 	}
 
+	//Find curvature map
 	Image* curvMap= this->GetLaplacianImage(true);
 	if(!curvMap){
-		ERROR_LOG("Null ptr to computed curvature mask!");
-		if(sourceMask) {
-			delete sourceMask;
-			sourceMask= 0;
-		}
+		ERROR_LOG("Failed to compute curvature map!");
+		delete sourceMask;
+		sourceMask= 0;
 		return -1;
 	}
-	curvMap->ComputeStats(true,false,false);
+
+	//Compute curvature map stats
+	if(curvMap->ComputeStats(true,false,false)<0){
+		ERROR_LOG("Failed to compute curvature map stats!");
+		delete sourceMask;
+		sourceMask= 0;
+		delete curvMap;
+		curvMap= 0;
+		return -1;
+	}
+
+	//Thresholding the curvature map
 	double curvMapRMS= curvMap->GetPixelStats()->medianRMS;
 	double curvMapThr= curvMapRMS*nestedBlobThreshold;
 	Image* blobMask= curvMap->GetBinarizedImage(curvMapThr);
 	if(!blobMask){
-		ERROR_LOG("Failed to compute blob mask!");
-		if(sourceMask) {
-			delete sourceMask;
-			sourceMask= 0;
-		}
-		if(curvMap) {
-			delete curvMap;
-			curvMap= 0;
-		}
+		ERROR_LOG("Failed to compute curvature blob mask!");
+		delete sourceMask;
+		sourceMask= 0;
+		delete curvMap;
+		curvMap= 0;
 		return -1;
 	}
 
@@ -1539,18 +1530,12 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 	Image* sourcePlusBlobMask= sourceMask->GetMask(blobMask,true);
 	if(!sourcePlusBlobMask){
 		ERROR_LOG("Failed to compute (source+blob) mask!");
-		if(sourceMask) {
-			delete sourceMask;
-			sourceMask= 0;
-		}
-		if(curvMap) {
-			delete curvMap;
-			curvMap= 0;
-		}
-		if(blobMask) {
-			delete blobMask;
-			blobMask= 0;
-		}
+		delete sourceMask;
+		sourceMask= 0;
+		delete curvMap;
+		curvMap= 0;
+		delete blobMask;
+		blobMask= 0;
 		return -1;
 	}
 
@@ -1560,23 +1545,15 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 	int status= BlobFinder::FindBlobs(this,NestedSources,sourcePlusBlobMask,bkgData,fgValue,fgValue,minPixels,false,false);
 	if(status<0){
 		ERROR_LOG("Nested blob finder failed!");
-		if(sourceMask) {
-			delete sourceMask;
-			sourceMask= 0;
-		}
-		if(curvMap) {
-			delete curvMap;
-			curvMap= 0;
-		}
-		if(blobMask) {
-			delete blobMask;
-			blobMask= 0;
-		}
-		if(sourcePlusBlobMask) {
-			delete sourcePlusBlobMask;
-			sourcePlusBlobMask= 0;
-		}
-		for(unsigned int k=0;k<NestedSources.size();k++){
+		delete sourceMask;
+		sourceMask= 0;
+		delete curvMap;
+		curvMap= 0;
+		delete blobMask;
+		blobMask= 0;
+		delete sourcePlusBlobMask;
+		sourcePlusBlobMask= 0;
+		for(size_t k=0;k<NestedSources.size();k++){
 			if(NestedSources[k]){
 				delete NestedSources[k];
 				NestedSources[k]= 0;
@@ -1587,9 +1564,16 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 	}//close if
 
 	//Add nested sources to mother source
-	int nNestedSources= (int)NestedSources.size();
+	int nNestedSources= static_cast<int>(NestedSources.size());
+	
+	
 	if(nNestedSources>=0){
-		INFO_LOG("#"<<nNestedSources<<" nested sources found!");
+		INFO_LOG("#"<<nNestedSources<<" blobs found in curvature map!");
+
+		//## Init mother-nested association list
+		std::vector<int> nestedSourcesToBeRemoved;
+		std::vector< std::vector<int> > MotherNestedAssociationList;
+		for(int i=0;i<nSources;i++) MotherNestedAssociationList.push_back( std::vector<int>() );
 
 		//## Find matching between mother and nested sources
 		for(int j=0;j<nNestedSources;j++){
@@ -1599,20 +1583,86 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 			for(int i=0;i<nSources;i++){
 				int sourceId= sources[i]->Id;
 				bool isInside= NestedSources[j]->IsInsideSource(sources[i]);
+				
 				if(isInside){
 					DEBUG_LOG("Nested source no. "<<j<<" added to source id="<<sourceId<<" ...");
-					NestedSources[j]->ComputeStats();
-					NestedSources[j]->ComputeMorphologyParams();
-					sources[i]->AddNestedSource(NestedSources[j]);
+					MotherNestedAssociationList[i].push_back(j);
+					//NestedSources[j]->ComputeStats();
+					//NestedSources[j]->ComputeMorphologyParams();
+					//sources[i]->AddNestedSource(NestedSources[j]);
 					isMotherFound= true;
 					break;
 				}
+				
 			}//end loop mother sources
+
+			//If nested is not associated to any mother source, mark for removal
 			if(!isMotherFound){
-				WARN_LOG("Cannot find mother source for nested source no. "<<j<<"!");
-				NestedSources[j]->Print();
+				WARN_LOG("Cannot find mother source for nested source no. "<<j<<", will remove it from the list of nested sources...");
+				nestedSourcesToBeRemoved.push_back(j);
 			}			
-		}//end loop nested sources							
+
+		}//end loop nested sources	
+
+		//## Select nested
+		int nSelNestedSources= 0;
+		for(size_t i=0;i<MotherNestedAssociationList.size();i++){
+			long int NPix= sources[i]->GetNPixels(); 
+			int nComponents= static_cast<int>(MotherNestedAssociationList[i].size());
+			if(nComponents<=0) continue;
+
+			//If only one component is present select it if:
+			//  1) mother and nested distance is > thr (e.g. 
+			//  2) mother and nested pix superposition is <thr (e.g. 50%)
+			for(int j=0;j<nComponents;j++){
+				int nestedIndex= MotherNestedAssociationList[i][j];
+
+				//Compute nested source stats & pars
+				NestedSources[nestedIndex]->ComputeStats();
+				NestedSources[nestedIndex]->ComputeMorphologyParams();
+		
+				if(nComponents==1){
+					//Compute centroid distances
+					float centroidDistX= fabs(sources[i]->X0-NestedSources[nestedIndex]->X0);
+					float centroidDistY= fabs(sources[i]->Y0-NestedSources[nestedIndex]->Y0);
+					
+					//Compute nmatching pixels
+					long int nMatchingPixels= sources[i]->GetNMatchingPixels(NestedSources[nestedIndex]);
+					float matchingPixFraction= (float)(nMatchingPixels)/(float)(NPix);
+
+					//Select nested?
+					bool areOffset= (centroidDistX>minNestedMotherDist || centroidDistY>minNestedMotherDist);
+					bool isNestedSmaller= (matchingPixFraction<maxMatchingPixFraction);
+					INFO_LOG("areOffset? "<<areOffset<<" (dist_x="<<centroidDistX<<", dist_y="<<centroidDistY<<"), isNestedSmaller?"<<isNestedSmaller<<" (matchingPixFraction="<<matchingPixFraction<<", maxMatchingPixFraction="<<maxMatchingPixFraction<<")");					
+
+					if( areOffset || isNestedSmaller){//Add nested to mother source
+						sources[i]->AddNestedSource(NestedSources[nestedIndex]);
+						nSelNestedSources++;
+					}
+					else{//do not select nested!
+						nestedSourcesToBeRemoved.push_back(nestedIndex);
+					}
+				}//close if
+				else{
+					//Add nested to mother source
+					sources[i]->AddNestedSource(NestedSources[nestedIndex]);
+					nSelNestedSources++;
+				}
+			}//end loop nested components
+		}//end loop mother sources
+
+		INFO_LOG("#"<<nSelNestedSources<<" nested sources found and added to mother sources...");
+
+		//Delete nested source selected for removal
+		for(size_t k=0;k<nestedSourcesToBeRemoved.size();k++){
+			int nestedSourceIndex= nestedSourcesToBeRemoved[k];
+			if(NestedSources[nestedSourceIndex]){
+				delete NestedSources[nestedSourceIndex];
+				NestedSources[nestedSourceIndex]= 0;
+			}
+		}
+		NestedSources.clear();
+						
 	}//close nNestedBlobs>0
 
 	//Clear
@@ -2133,6 +2183,31 @@ Image* Image::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,doubl
 }//close GetMultiResoSaliencyMap()
 
 
+int Image::FindPeaks(std::vector<TVector2>& peakPoints,int peakShiftTolerance,bool skipBorders)
+{
+	return MorphFilter::FindPeaks(peakPoints,this,peakShiftTolerance,skipBorders);
+
+}//close FindPeaks()
+
+TGraph* Image::ComputePeakGraph(int peakShiftTolerance,bool skipBorders)
+{
+	//Find peaks in image
+	std::vector<TVector2> peakPoints;
+	if(this->FindPeaks(peakPoints,skipBorders)<0){
+		ERROR_LOG("Failed to find peaks in image!");
+		return nullptr;
+	}
+
+	//Fill peak graph
+	TGraph* peakGraph= new TGraph(peakPoints.size());
+	for(size_t i=0;i<peakPoints.size();i++){
+		peakGraph->SetPoint(i,peakPoints[i].X(),peakPoints[i].Y());
+	}
+
+	return peakGraph;
+
+}//close ComputePeakGraph()
+
 
 int Image::Add(Image* img,double c,bool computeStats)
 {
@@ -2535,17 +2610,20 @@ TH2D* Image::GetHisto2D(std::string histoname){
 	std::string hname= m_name;
 	if(histoname!="") hname= histoname;
 	TH2D* histo= new TH2D(hname.c_str(),hname.c_str(),m_Nx,xmin,xmax,m_Ny,ymin,ymax);
-	histo->Sumw2();
-
+	histo->Sumw2();	
+	
 	//Fill histo
 	for(long int j=0;j<m_Ny;j++){
 		for(long int i=0;i<m_Nx;i++){
-			long int gBin= GetBin(i,j);	
+			long int gBin= this->GetBin(i,j);	
+			double x= this->GetX(i); 
+			double y= this->GetY(j); 
 			double w= m_pixels[gBin];
-			histo->SetBinContent(i+1,j+1,w);
+			//histo->SetBinContent(i+1,j+1,w);
+			histo->Fill(x,y,w);
 		}
 	}
-
+	
 	return histo;
 
 }//close GetHisto2D()

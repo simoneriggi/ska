@@ -316,7 +316,9 @@ class CodeUtils : public TObject {
   			reorder(unsorted,index_map,sorted);
 			}
 
-
+		/**
+		* \brief String find and replace
+		*/
 		static void StringFindAndReplace(std::string& str, const std::string& oldstr, const std::string& newstr){
   		size_t pos = 0;
   		while((pos = str.find(oldstr, pos)) != std::string::npos){
@@ -324,6 +326,16 @@ class CodeUtils : public TObject {
      		pos += newstr.length();
   		}	
 		}//close StringFindAndReplace()
+
+		/**
+		* \brief Remove substring
+		*/
+		static std::string ExtractSubString(const std::string& s, const std::string& pattern, bool extractleft=true){
+			size_t pos = s.find(pattern);
+			if(pos==std::string::npos) return s;
+			if(extractleft) return s.substr(0,pos);
+			else return s.substr(pos+1,s.length()-pos);
+		}
 
 		// return an evenly spaced 1-d grid of doubles.
 		template <typename T>
@@ -348,6 +360,15 @@ class CodeUtils : public TObject {
     	}
     	return f;
     };
+
+		/** 
+		\brief Check if map has key
+ 		*/
+		template <typename T,typename K>
+		static bool HasMapKey(std::map<T,K> const& m, T key){
+			if(m.empty() || m.find(key)==m.end()) return false;
+			return true;
+		}
 
 	private:
 	

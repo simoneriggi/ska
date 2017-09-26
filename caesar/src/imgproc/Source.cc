@@ -104,6 +104,14 @@ void Source::Copy(TObject &obj) const {
 	((Source&)obj).m_IsGoodSource = m_IsGoodSource;	
 	((Source&)obj).m_DepthLevel = m_DepthLevel;
 	((Source&)obj).m_HasNestedSources = m_HasNestedSources;
+
+	((Source&)obj).m_S_true= m_S_true;
+	((Source&)obj).m_X0_true= m_X0_true;
+	((Source&)obj).m_Y0_true= m_Y0_true;
+	((Source&)obj).m_HasTrueInfo= m_HasTrueInfo;
+
+	((Source&)obj).m_HasFitInfo= m_HasFitInfo;
+	((Source&)obj).m_fitPars= m_fitPars;
 	
 	//Delete first a previously existing vector
 	for(unsigned int i=0;i<(((Source&)obj).m_NestedSources).size();i++){
@@ -121,6 +129,7 @@ void Source::Copy(TObject &obj) const {
 		(((Source&)obj).m_NestedSources).push_back( ((Source&)obj).m_NestedSource );
 	}
 
+
 }//close Copy()
 
 Source& Source::operator=(const Source& source) { 
@@ -129,8 +138,10 @@ Source& Source::operator=(const Source& source) {
   return *this;
 }
 
+
 void Source::Init(){
 
+	//Init source flags
 	Type= eUnknown;
 	Flag= eCandidate;
 	SimType= eUnknownSimClass;
@@ -138,10 +149,20 @@ void Source::Init(){
 	
 	m_IsGoodSource= true;
 
+	//Init nested source info
 	m_DepthLevel= 0;
 	m_HasNestedSources= false;
 	m_NestedSource= 0;
 	m_NestedSources.clear();
+
+	//Init source true info
+	m_HasTrueInfo= false;
+	m_S_true= -1;
+	m_X0_true= -1;
+	m_Y0_true= -1;
+
+	//Init fit info
+	m_HasFitInfo= false;
 
 }//close Init()
 
@@ -341,6 +362,7 @@ long int Source::GetNMatchingPixels(Source* aSource){
 		return 0;
 	}	
 
+	
 	//Check if bouding boxes are overlapping
 	//NB: If not skip the adjacency check
 	bool areBoundingBoxesOverlapping= CheckBoxOverlapping(aSource);
@@ -475,6 +497,55 @@ bool Source::CheckBoxOverlapping(Source* aSource)
 	return HasBoxOverlap(xmin,xmax,ymin,ymax);
 
 }//close CheckBoxOverlapping()
+
+
+float Source::GetCentroidDistance(Source* aSource)
+{
+	//Check given source
+	if(!aSource){
+		ERROR_LOG("Null ptr to input source given, returning inf!");
+		return std::numeric_limits<float>::infinity();
+	}
+
+	//If one or both sources has no pars computed return inf
+	if(!this->HasStats() || aSource->HasStats()){
+		WARN_LOG("One or both sources has no stats computed (you must compute pars before getting distance, returning inf)");
+		return std::numeric_limits<float>::infinity();
+	}
+
+	//Compute distance
+	float dist2_x= pow(this->X0 - aSource->X0,2);
+	float dist2_y= pow(this->Y0 - aSource->Y0,2);
+	float dist= sqrt(dist2_x + dist2_y); 
+
+	return dist;
+
+}//close GetCentroidDistance()
+
+
+int Source::Fit(BlobPars blobPars,int nMaxComponents){
+
+	//Create source fitter
+	SourceFitter fitter;
+	if(fitter.FitSource(this,blobPars,nMaxComponents)<0){
+		WARN_LOG("Failed to fit source "<<this->GetName()<<" ...");
+		return -1;
+	}
+	
+	//Get fit results
+	SourceFitPars fitPars= fitter.GetFitPars();
+	fitPars.Print();
+
+	int fitStatus= fitter.GetFitStatus();
+	if(fitStatus==SourceFitter::eFitConverged || fitStatus==SourceFitter::eFitConvergedWithWarns){
+		INFO_LOG("Fit of source "<<this->GetName()<<" converged (status="<<fitStatus<<"), storing fit parameters...");	
+		m_fitPars= fitPars;
+		m_HasFitInfo= true;
+	}
+
+	return 0;
+
+}//close Fit()
 
 
 }//close namespace

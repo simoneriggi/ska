@@ -31,10 +31,12 @@
 
 #include <SysUtils.h>
 #include <Logger.h>
+#include <Consts.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
 #include <TMath.h>
+#include <TEllipse.h>
 
 #include <cstdlib>
 #include <iomanip>
@@ -935,6 +937,38 @@ class StatsUtils : public TObject {
    			[&NormMin,&NormMax,&xmin,&xmax](T x) -> T { return GetNormValue(x,xmin,xmax,NormMin,NormMax); }
 			);
 		}
+
+		/** 
+		\brief Get gaus CL ellipse
+ 		*/
+		static TEllipse* GetFitEllipse(double x0,double y0,double sigmaX,double sigmaY,double theta,bool useFWHM=false){
+
+			//Convert sigmas to FWHM
+			sigmaX*= GausSigma2FWHM; 
+			sigmaY*= GausSigma2FWHM;
+
+			//Convert to radians
+			double t= theta*TMath::DegToRad();
+			double sigmaX_sqr= sigmaX*sigmaX;
+			double sigmaY_sqr= sigmaY*sigmaY;
+
+			//Compute covariance & correlation coefficient
+			double covXY= 0.5*tan(2.*t)*(sigmaX_sqr-sigmaY_sqr);
+			double rho= covXY/(sigmaX*sigmaY);
+
+			//Compute ellipse pars
+			double a= sqrt(sigmaX_sqr*sigmaY_sqr*(1-rho*rho)/(pow(sigmaY*cos(t),2)-2*covXY*cos(t)*sin(t)+pow(sigmaX*sin(t),2)));
+			double b= sqrt(sigmaX_sqr*sigmaY_sqr*(1-rho*rho)/(pow(sigmaY*sin(t),2)+2*covXY*cos(t)*sin(t)+pow(sigmaX*cos(t),2)));
+			
+			//Compute ellipse
+			TEllipse* ellipse= new TEllipse(x0,y0,a,b,0.,360.,theta);
+			ellipse->SetLineWidth(2);
+			ellipse->SetFillColor(0);
+			ellipse->SetFillStyle(0);
+
+			return ellipse;
+
+		}//close GetFitEllipse()
 		
 
 	private:

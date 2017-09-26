@@ -70,14 +70,11 @@ class BlobFinder : public TObject {
 
 	public:
 
-		//=========================================
-		//==  NEW IMAGE METHODS 
-		//=========================================
 		/**
 		* \brief Find blobs
 		*/
 		template <class T>
-		static int FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false);
+		static int FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,Image* curvMap=0);
 		/**
 		* \brief Flood fill algorithm
 		*/

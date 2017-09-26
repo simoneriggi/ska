@@ -177,6 +177,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//==  Image beam options               ==
 		//=======================================
 		REGISTER_OPTION(beamFWHM,double,6.5,0,3600);//circular beam FWHM in arcsec
+		REGISTER_OPTION(beamTheta,double,0,-0.0001,180);//circular beam rot in degrees
 		REGISTER_OPTION(pixSize,double,1,0,3600);//pixel area in arcsec
 
 		//=======================================
@@ -246,8 +247,14 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(searchNegativeExcess,bool,false,false,true);
 		REGISTER_OPTION(compactSourceSearchNIters,int,10,0,100);
 		REGISTER_OPTION(seedThrStep,double,1,0,10);
+		//REGISTER_OPTION(wtScaleFaint,int,1,1,10);
+
+		//=====================================
+		//==  Nested Source finding options  ==
+		//=====================================
 		REGISTER_OPTION(nestedBlobThrFactor,double,1,0,100);
-		REGISTER_OPTION(wtScaleFaint,int,1,1,10);
+		REGISTER_OPTION(minNestedMotherDist,double,2,0,100);
+		REGISTER_OPTION(maxMatchingPixFraction,double,0.5,0,1);
 		
 		//=======================================
 		//==  Extended Source finding options  ==
@@ -262,11 +269,16 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//==  Source selection options  ==
 		//================================
 		REGISTER_OPTION(applySourceSelection,bool,true,false,true);
-		REGISTER_OPTION(sourceMinBoundingBox,double,2,0,1000000);
+		REGISTER_OPTION(sourceMinBoundingBox,double,2,0,1000000);	
+		REGISTER_OPTION(useMinBoundingBoxCut,bool,false,false,true);
+		REGISTER_OPTION(useCircRatioCut,bool,false,false,true);
 		REGISTER_OPTION(psCircRatioThr,double,0.4,0,1);
+		REGISTER_OPTION(useElongCut,bool,false,false,true);
 		REGISTER_OPTION(psElongThr,double,0.7,0,1);
+		REGISTER_OPTION(useEllipseAreaRatioCut,bool,false,false,true);
 		REGISTER_OPTION(psEllipseAreaRatioMinThr,double,0.6,0,10);
 		REGISTER_OPTION(psEllipseAreaRatioMaxThr,double,1.4,0,10);
+		REGISTER_OPTION(useMaxNPixCut,bool,false,false,true);
 		REGISTER_OPTION(psMaxNPix,double,1000,0,1.e+7);
 				
 		//================================
@@ -281,9 +293,11 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//==================================
 		//==  Source deblending options   ==
 		//==================================
-		REGISTER_OPTION(deblendSources,bool,false,false,true);
-		REGISTER_OPTION(deblendCurvThr,double,0,-0.0001,1.00001);	
-		REGISTER_OPTION(deblendComponentMinNPix,double,5,0,100000);				
+		REGISTER_OPTION(fitSources,bool,false,false,true);
+		REGISTER_OPTION(fitMaxNComponents,int,3,0,100);			
+		//REGISTER_OPTION(deblendCurvThr,double,0,-0.0001,1.00001);	
+		//REGISTER_OPTION(deblendComponentMinNPix,double,5,0,100000);			
+			
 		
 		//===================================
 		//==  Chan-Vese algorithm options  ==

@@ -67,7 +67,7 @@ BlobFinder::~BlobFinder(){
 
 
 template <class T>
-int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed){
+int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,Image* curvMap){
 
 	//## Check input img
 	if(!inputImg){
@@ -97,6 +97,12 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 	if(bkgData){
 		hasBkgData= true;
 		hasLocalBkg= bkgData->HasLocalBkg();
+	}
+
+	//## Check curvature data 
+	if(curvMap && !curvMap->HasSameBinning(inputImg)){
+		ERROR_LOG("Given curvature map has different bnnning wrt input map!");
+		return -1;
 	}
 
 	//## Set flood threshold
@@ -229,6 +235,12 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 				}
 				aPixel->SetBkg(bkgLevel,noiseLevel);
 			}//close if
+
+			//Set curvature data if available
+			if(curvMap) {
+				double Scurv= curvMap->GetPixelValue(clusterPixelId);
+				aPixel->SetCurv(Scurv);
+			}
 	
 			aBlob->AddPixel(aPixel);
 		}//end loop cluster pixels
@@ -258,8 +270,8 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 	return 0;
 
 }//close BlobFinder::FindBlobs()
-template int BlobFinder::FindBlobs<Blob>(Image* img,std::vector<Blob*>& blobs,Image*,ImgBkgData*,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed);
-template int BlobFinder::FindBlobs<Source>(Image* img,std::vector<Source*>& blobs,Image*,ImgBkgData*,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed);
+template int BlobFinder::FindBlobs<Blob>(Image* img,std::vector<Blob*>& blobs,Image*,ImgBkgData*,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,Image*);
+template int BlobFinder::FindBlobs<Source>(Image* img,std::vector<Source*>& blobs,Image*,ImgBkgData*,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,Image*);
 
 
 int BlobFinder::FloodFill(Image* img,std::vector<long int>& clusterPixelIds,long int seedPixelId,double floodMinThr,double floodMaxThr){

@@ -234,8 +234,11 @@
 #pragma link C++ class Caesar::LRACSegmenter+;
 //======================
 
-//ChanVese segmenter
-//#pragma link C++ class Caesar::SourceFinder+;
+//Source fitter
+#pragma link C++ class Caesar::SourceComponentPars+;
+#pragma link C++ class Caesar::SourceFitPars+;
+#pragma link C++ class Caesar::SourceFitter+;
+#pragma link C++ enum Caesar::FitStatusFlag;
 //======================
 
 

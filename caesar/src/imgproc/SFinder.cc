@@ -273,7 +273,7 @@ void SFinder::InitOptions()
 	sourceSelectionTime= 0;
 	imgResidualTime= 0;
 	extendedSourceTime= 0;
-	sourceDeblendTime= 0;	
+	sourceFitTime= 0;	
 	saveTime= 0;
 
 	//Extended source finder
@@ -346,7 +346,7 @@ int SFinder::Init(){
 		m_PerfTree->Branch("sselector",&sourceSelectionTime,"sselector/D");
 		m_PerfTree->Branch("imgres",&imgResidualTime,"imgres/D");
 		m_PerfTree->Branch("extsfinder",&extendedSourceTime,"extsfinder/D");
-		m_PerfTree->Branch("sdeblend",&sourceDeblendTime,"sdeblend/D");
+		m_PerfTree->Branch("sfit",&sourceFitTime,"sfit/D");
 		//m_PerfTree->Branch("save",&saveTime,"save/D");
 
 	}//close if saveToFile
@@ -416,8 +416,9 @@ int SFinder::Configure(){
 	//Get beam options
 	GET_OPTION_VALUE(beamFWHM,m_beamFWHM);
 	GET_OPTION_VALUE(pixSize,m_pixSize);
+	GET_OPTION_VALUE(beamTheta,m_beamTheta);
 	m_fluxCorrectionFactor= AstroUtils::GetBeamAreaInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
-
+	INFO_LOG("[PROC "<<m_procId<<"] - User-supplied beam info (fwhm="<<m_beamFWHM<<", dx="<<m_pixSize<<", theta="<<m_beamTheta<<", fluxCorrFactor="<<m_fluxCorrectionFactor<<")");
 
 	//Get output file options
 	GET_OPTION_VALUE(outputFile,m_OutputFileName);
@@ -460,19 +461,27 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(seedThrStep,m_seedThrStep);
 	GET_OPTION_VALUE(mergeBelowSeed,m_MergeBelowSeed);
 	GET_OPTION_VALUE(searchNegativeExcess,m_SearchNegativeExcess);
+	
+	//Get nested source search options
 	GET_OPTION_VALUE(searchNestedSources,m_SearchNestedSources);
 	GET_OPTION_VALUE(nestedBlobThrFactor,m_NestedBlobThrFactor);
-	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
-
+	GET_OPTION_VALUE(minNestedMotherDist,m_minNestedMotherDist);
+	GET_OPTION_VALUE(maxMatchingPixFraction,m_maxMatchingPixFraction);
 	
+
 	//Get source selection options
 	GET_OPTION_VALUE(applySourceSelection,m_ApplySourceSelection);
-	GET_OPTION_VALUE(sourceMinBoundingBox,m_SourceMinBoundingBox);
+	GET_OPTION_VALUE(sourceMinBoundingBox,m_SourceMinBoundingBox);	
+	GET_OPTION_VALUE(useMinBoundingBoxCut,m_useMinBoundingBoxCut);
 	GET_OPTION_VALUE(psCircRatioThr,m_psCircRatioThr);
+	GET_OPTION_VALUE(useCircRatioCut,m_useCircRatioCut);
 	GET_OPTION_VALUE(psElongThr,m_psElongThr);
+	GET_OPTION_VALUE(useElongCut,m_useElongCut);
 	GET_OPTION_VALUE(psEllipseAreaRatioMinThr,m_psEllipseAreaRatioMinThr);
 	GET_OPTION_VALUE(psEllipseAreaRatioMaxThr,m_psEllipseAreaRatioMaxThr);
+	GET_OPTION_VALUE(useEllipseAreaRatioCut,m_useEllipseAreaRatioCut);
 	GET_OPTION_VALUE(psMaxNPix,m_psMaxNPix);
+	GET_OPTION_VALUE(useMaxNPixCut,m_useMaxNPixCut);
 	
 	//Get source residual options
 	GET_OPTION_VALUE(dilateNestedSources,m_DilateNestedSources);
@@ -481,12 +490,12 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(dilateSourceModel,m_DilateSourceModel);
 	GET_OPTION_VALUE(dilateRandomize,m_DilateRandomize);
 	
-	//Get source deblending options
-	GET_OPTION_VALUE(deblendSources,m_deblendSources);
-	GET_OPTION_VALUE(deblendCurvThr,m_deblendCurvThr);
-	GET_OPTION_VALUE(deblendComponentMinNPix,m_deblendComponentMinNPix);
+	//Get source fitting options
+	GET_OPTION_VALUE(fitSources,m_fitSources);
+	GET_OPTION_VALUE(fitMaxNComponents,m_fitMaxNComponents);
+	//GET_OPTION_VALUE(deblendCurvThr,m_deblendCurvThr);
+	//GET_OPTION_VALUE(deblendComponentMinNPix,m_deblendComponentMinNPix);
 	
-
 	//Get smoothing options
 	GET_OPTION_VALUE(usePreSmoothing,m_UsePreSmoothing);
 	GET_OPTION_VALUE(smoothFilter,m_SmoothFilter);
@@ -798,16 +807,16 @@ int SFinder::Run(){
 
 
 	//============================
-	//== Deblend sources
+	//== Fit sources
 	//============================
-	if(m_deblendSources && m_procId==MASTER_ID) {
-		auto t0_sdeblend = chrono::steady_clock::now();	
-		if(DeblendSources(m_SourceCollection)<0){
-			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to deblend sources!");
+	if(m_fitSources && m_procId==MASTER_ID) {
+		auto t0_sfit = chrono::steady_clock::now();	
+		if(FitSources(m_SourceCollection)<0){
+			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to fit sources!");
 			return -1;
 		}
-		auto t1_sdeblend = chrono::steady_clock::now();	
-		sourceDeblendTime= chrono::duration <double, milli> (t1_sdeblend-t0_sdeblend).count();
+		auto t1_sfit = chrono::steady_clock::now();	
+		sourceFitTime= chrono::duration <double, milli> (t1_sfit-t0_sfit).count();
 	}
 
 	//Stop timer
@@ -920,16 +929,16 @@ int SFinder::Run(){
 
 	
 	//============================
-	//== Deblend sources
+	//== Fit sources
 	//============================
-	if(m_deblendSources) {
-		auto t0_sdeblend = chrono::steady_clock::now();	
-		if(DeblendSources(m_SourceCollection)<0){
-			ERROR_LOG("Failed to deblend sources!");
+	if(m_fitSources) {
+		auto t0_sfit = chrono::steady_clock::now();	
+		if(FitSources(m_SourceCollection)<0){
+			ERROR_LOG("Failed to fit sources!");
 			return -1;
 		}
-		auto t1_sdeblend = chrono::steady_clock::now();	
-		sourceDeblendTime= chrono::duration <double, milli> (t1_sdeblend-t0_sdeblend).count();
+		auto t1_sfit = chrono::steady_clock::now();	
+		sourceFitTime= chrono::duration <double, milli> (t1_sfit-t0_sfit).count();
 	}
 
 	//============================
@@ -1002,7 +1011,7 @@ int SFinder::FindSources(std::vector<Source*>& sources,Image* inputImg,double se
 		sources,
 		significanceMap,bkgData,
 		seedThr,mergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
-		m_SearchNestedSources,m_NestedBlobThrFactor
+		m_SearchNestedSources,m_NestedBlobThrFactor, m_minNestedMotherDist, m_maxMatchingPixFraction
 	);
 
 	//## Clear data
@@ -1041,6 +1050,13 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 	Image* img= inputImg->GetCloned("",copyMetaData,resetStats);
 	if(!img){
 		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to clone input image!");
+		return nullptr;
+	}
+
+	//## Compute curvature map to be added to sources
+	Image* curvMap= ComputeLaplacianImage(inputImg);
+	if(!curvMap){
+		WARN_LOG("[PROC "<<m_procId<<"] - Failed to compute curvature map!");
 		return nullptr;
 	}
 
@@ -1096,6 +1112,8 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 				}
 			}
 			sources.clear();
+			delete curvMap;
+			curvMap= 0;
 			return nullptr;
 		}
 
@@ -1106,7 +1124,8 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 			sources_iter,
 			significanceMap_iter,bkgData_iter,
 			seedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
-			m_SearchNestedSources,m_NestedBlobThrFactor
+			m_SearchNestedSources,m_NestedBlobThrFactor, m_minNestedMotherDist, m_maxMatchingPixFraction,
+			curvMap
 		);
 
 		if(status<0) {
@@ -1123,6 +1142,8 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 					sources[i]= 0;
 				}
 			}
+			delete curvMap;
+			curvMap= 0;
 			return nullptr;
 		}
 
@@ -1152,9 +1173,14 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 
 	}//end loop iterations
 
+	//Clearup data
 	if(img){
 		delete img;
 		img= 0;
+	}
+	if(curvMap){
+		delete curvMap;
+		curvMap= 0;
 	}
 
 	//## Tag found sources as compact 
@@ -1181,11 +1207,11 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 	bool hasBeamData= false;
 	if(inputImg->HasMetaData()){
 		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
-		if(fluxCorrection>0) hasBeamData= true;
+		if(fluxCorrection>0 && std::isnormal(fluxCorrection)) hasBeamData= true;
 	}
 
 	if(!hasBeamData){
-		INFO_LOG("Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
 		fluxCorrection= m_fluxCorrectionFactor;
 	}
 	
@@ -1193,7 +1219,7 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 		sources[k]->SetName(Form("S%d",(signed)k));
 		sources[k]->SetBeamFluxIntegral(fluxCorrection);
 		sources[k]->Print();
-	}	
+	}//end loop sources
 			
 	//## Add sources to task data sources
 	(taskData->sources).insert( (taskData->sources).end(),sources.begin(),sources.end());			
@@ -1226,7 +1252,7 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 		sources,
 		significanceMap,bkgData,
 		m_SeedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
-		m_SearchNestedSources,m_NestedBlobThrFactor
+		m_SearchNestedSources,m_NestedBlobThrFactor,m_minNestedMotherDist,m_maxMatchingPixFraction
 	);
 
 	if(status<0) {
@@ -2187,7 +2213,7 @@ bool SFinder::IsGoodSource(Source* aSource){
 	}
 
 	double BoundingBoxMin= ((aSource->GetContours())[0])->BoundingBoxMin;
-	if(BoundingBoxMin<m_SourceMinBoundingBox) {
+	if(m_useMinBoundingBoxCut && BoundingBoxMin<m_SourceMinBoundingBox) {
 		INFO_LOG("[PROC "<<m_procId<<"] - BoundingBox cut not passed (BoundingBoxMin="<<BoundingBoxMin<<"<"<<m_SourceMinBoundingBox<<")");
 		return false;
 	}
@@ -2218,24 +2244,25 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 	for(unsigned int i=0;i<contours.size();i++){
 		Contour* thisContour= contours[i];
 
-		/*
 		//Test circularity ratio: 1= circle
-		if(thisContour->CircularityRatio<m_psCircRatioThr) {
-			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass CircularityRatio cut (CR="<<thisContour->CircularityRatio<<"<"<<psCircRatioThr<<")");
+		if(m_useCircRatioCut && thisContour->CircularityRatio<m_psCircRatioThr) {
+			DEBUG_LOG("Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass CircularityRatio cut (CR="<<thisContour->CircularityRatio<<"<"<<m_psCircRatioThr<<")");
 			isPointLike= false;
 			break;
 		}
-		*/
 
 		//Test elongation (how symmetrical is the shape): 0=circle,square
-		if(thisContour->Elongation>m_psElongThr) {
+		if(m_useElongCut && thisContour->Elongation>m_psElongThr) {
 			DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass Elongation cut (ELONG="<<thisContour->CircularityRatio<<">"<<m_psElongThr<<")");
 			isPointLike= false;
 			break;	
 		}
 
 		//Test ellipse fit
-		if(thisContour->EllipseAreaRatio<m_psEllipseAreaRatioMinThr || thisContour->EllipseAreaRatio>m_psEllipseAreaRatioMaxThr) {
+		if( m_useEllipseAreaRatioCut && thisContour->HasEllipseFit && 
+				(thisContour->EllipseAreaRatio<m_psEllipseAreaRatioMinThr || thisContour->EllipseAreaRatio>m_psEllipseAreaRatioMaxThr) 
+		) 
+		{
 			DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass EllipseAreaRatio cut (EAR="<<thisContour->EllipseAreaRatio<<" outside range ["<<m_psEllipseAreaRatioMinThr<<","<<m_psEllipseAreaRatioMaxThr<<"])");
 			isPointLike= false;
 			break;	
@@ -2245,7 +2272,7 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 	
 	//Check number of pixels
 	DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") (NPix="<<aSource->NPix<<">"<<m_psMaxNPix<<")");
-	if(aSource->NPix>m_psMaxNPix){
+	if(m_useMaxNPixCut && aSource->NPix>m_psMaxNPix){
 		DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nMaxPix cut (NPix="<<aSource->NPix<<">"<<m_psMaxNPix<<")");
 		isPointLike= false;
 	}
@@ -2256,38 +2283,47 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 
 }//close IsPointLikeSource()
 
-int SFinder::DeblendSources(std::vector<Source*>& sources){
+int SFinder::FitSources(std::vector<Source*>& sources){
 
 	//Check given source list
 	if(sources.empty()){
-		WARN_LOG("[PROC "<<m_procId<<"] - Empty source list, nothing to be deblended!");
+		WARN_LOG("[PROC "<<m_procId<<"] - Empty source list, nothing to be fitted!");
 		return 0;
 	}
 
-	//## Loop over image sources and perform deblending stage for non-extended sources
+	//## Loop over image sources and perform fitting stage for non-extended sources
+	INFO_LOG("[PROC "<<m_procId<<"] - Loop over image sources and perform fitting stage for non-extended sources...");
+		
+	BlobPars blobPars;
+	blobPars.bmaj= static_cast<int>( ceil(m_beamBmaj/m_pixSizeX) );//converted in pixels
+	blobPars.bmin= static_cast<int>( ceil(m_beamBmin/m_pixSizeY) );//converted in pixels
+	blobPars.bpa= m_beamBpa;
+
 	for(size_t i=0;i<sources.size();i++){
 
 		//Skip non point-like sources
 		int sourceType= sources[i]->Type;
 		if(sourceType!=Source::ePointLike) continue;
 	
-		//Deblend mother source
-		//if(sources[i]->Deblend(m_deblendCurvThr,deblendComponentMinNPix)<0) {//TO BE IMPLEMENTED!!!
-		//	WARN_LOG("Failed to deblend source no. "<<i<<"!");
-		//}
+		//Fit mother source
+		if(sources[i]->Fit(blobPars,m_fitMaxNComponents)<0) {
+			WARN_LOG("[PROC "<<m_procId<<"] - Failed to fit source no. "<<i<<"!");
+			continue;
+		}
 
-		//Deblend nested sources
-		std::vector<Source*> nestedSources= sources[i]->GetNestedSources();	
-		for(size_t j=0;j<nestedSources.size();j++){
+		//Fit nested sources
+		//std::vector<Source*> nestedSources= sources[i]->GetNestedSources();	
+		//for(size_t j=0;j<nestedSources.size();j++){
 			//if(nestedSources[j] && nestedSources[j]->Deblend(m_deblendCurvThr,deblendComponentMinNPix)<0){//TO BE IMPLEMENTED!!!
 			//	WARN_LOG("Failed to deblend nested source no. "<<j<<" of source no. "<<i<<"...");
 			//}
-		}//end loop nested sources
+		//}//end loop nested sources
+
 	}//end loop sources
 	
 	return 0;
 
-}//close DeblendSources()
+}//close FitSources()
 
 
 
@@ -2409,13 +2445,25 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 		bool hasBeamData= false;
 		if(img->HasMetaData()){
 			pixelWidthInBeam= img->GetMetaData()->GetBeamWidthInPixel();	
-			if(pixelWidthInBeam>0) hasBeamData= true; 
+			if(pixelWidthInBeam>0) {
+				hasBeamData= true; 
+				m_beamBmaj= img->GetMetaData()->Bmaj;
+				m_beamBmin= img->GetMetaData()->Bmin;
+				m_beamBpa= img->GetMetaData()->Bpa;
+				m_pixSizeX= img->GetMetaData()->dX; 
+				m_pixSizeY= img->GetMetaData()->dY; 
+			}
 		}
 		
 		//If beam data are not present in metadata, use those provided in the config file
 		if(!hasBeamData){
 			WARN_LOG("[PROC "<<m_procId<<"] - Using user-provided beam info to set bkg box size (beam info are not available/valid in image)...");
 			pixelWidthInBeam= AstroUtils::GetBeamWidthInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
+			m_beamBmaj= m_beamFWHM;
+			m_beamBmin= m_beamFWHM;
+			m_beamBpa= m_beamTheta;
+			m_pixSizeX= m_pixSize;
+			m_pixSizeY= m_pixSize;	
 		}
 
 		if(pixelWidthInBeam<=0){
@@ -2436,28 +2484,6 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 		boxSizeY= m_BoxSizeY*Ny;
 		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes to ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
 	}
-
-	/*
-	int nPixelsInBeam= 0;	
-	
-	if(m_UseBeamInfoInBkg && img->HasMetaData()){
-		nPixelsInBeam= img->GetMetaData()->GetBeamWidthInPixel();	
-	}
-	
-	if(m_UseBeamInfoInBkg && nPixelsInBeam>0){
-		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes as ("<<m_BoxSizeX<<","<<m_BoxSizeY<<") x beam (beam="<<nPixelsInBeam<<" pixels) ...");
-		boxSizeX= nPixelsInBeam*m_BoxSizeX;
-		boxSizeY= nPixelsInBeam*m_BoxSizeY;
-	}
-	else{
-		WARN_LOG("[PROC "<<m_procId<<"] - Beam information is not available or its usage has been turned off, using image fractions...");
-		double Nx= static_cast<double>(img->GetNx());
-		double Ny= static_cast<double>(img->GetNy());
-		boxSizeX= m_BoxSizeX*Nx;
-		boxSizeY= m_BoxSizeY*Ny;
-		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes to ("<<boxSizeX<<","<<boxSizeY<<") pixels ...");	
-	}
-	*/
 
 	double gridSizeX= m_GridSizeX*boxSizeX;
 	double gridSizeY= m_GridSizeY*boxSizeY;
@@ -2649,7 +2675,7 @@ void SFinder::PrintPerformanceStats()
 	INFO_LOG("source selection (ms)= "<<sourceSelectionTime<<" ["<<sourceSelectionTime/totTime*100.<<"%]");
 	INFO_LOG("img residual (ms)= "<<imgResidualTime<<" ["<<imgResidualTime/totTime*100.<<"%]");
 	INFO_LOG("ext source finding (ms)= "<<extendedSourceTime<<" ["<<extendedSourceTime/totTime*100.<<"%]");
-	INFO_LOG("source deblending (ms)= "<<sourceDeblendTime<<" ["<<sourceDeblendTime/totTime*100.<<"%]");
+	INFO_LOG("source fitting (ms)= "<<sourceFitTime<<" ["<<sourceFitTime/totTime*100.<<"%]");
 	INFO_LOG("save (ms)= "<<saveTime<<" ["<<saveTime/totTime*100.<<"%]");
 	INFO_LOG("===========================");
 
@@ -3115,8 +3141,8 @@ int SFinder::GatherTaskDataFromWorkers()
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	//## Print sources
+	/*
 	if (m_procId == 0) {
-
 		INFO_LOG("[PROC "<<m_procId<<"] - Printing aggregated sources...");
 		for(size_t i=0;i<m_taskDataPerWorkers.size();i++){
 			if(m_taskDataPerWorkers[i].size()==0) continue;//no tasks present
@@ -3136,6 +3162,7 @@ int SFinder::GatherTaskDataFromWorkers()
 			}//end loop tasks in worker
 		}//end process loop
 	}//close if
+	*/
 
 	return 0;
 

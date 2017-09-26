@@ -80,7 +80,7 @@ void Contour::Copy(TObject &obj) const {
 	// Copy this contour to contour
   TObject::Copy((Contour&)obj);
   ((Contour&)obj).HasParameters = HasParameters;
-  ((Contour&)obj).Area = Area;
+	((Contour&)obj).Area = Area;
   ((Contour&)obj).Perymeter = Perymeter;
   ((Contour&)obj).IsConvexContour = IsConvexContour;
 	((Contour&)obj).CircularityRatio = CircularityRatio;
@@ -137,6 +137,10 @@ void Contour::Copy(TObject &obj) const {
 	((Contour&)obj).BendingEnergies = BendingEnergies;
 	((Contour&)obj).CentroidDistanceModFDs = CentroidDistanceModFDs;
 
+	((Contour&)obj).HasBEPars= HasBEPars;	
+	((Contour&)obj).HasCentroidDistanceFDPars= HasCentroidDistanceFDPars;		
+	((Contour&)obj).HasFDPars= HasFDPars;	
+
 	((Contour&)obj).m_Points = m_Points;
 
 }//close Copy()
@@ -152,6 +156,7 @@ void Contour::Init(){
 
 	m_Points.clear();	
 	HasParameters= false;	
+	HasFDPars= false;
 	HasEllipseFit= false;
 	EllipseMajAxis= 0;
 	EllipseMinAxis= 0;
@@ -179,6 +184,10 @@ void Contour::Init(){
 	RealFDs.clear();
 	ImagFDs.clear();
 	ModFDs.clear();
+		
+	HasFDPars= false;
+	HasBEPars= false;
+	HasCentroidDistanceFDPars= false;
 
 }//close Init()
 
@@ -187,7 +196,7 @@ TGraph* Contour::GetGraph(){
 	//Check number of contour pts
 	int nContourPts= m_Points.size();
 	if(nContourPts<=0) {
-		cerr<<"Contour::GetGraph(): WARN: No contour points available (did you fill the contour?), returning null ptr graph!"<<endl;
+		WARN_LOG("No contour points available (did you fill the contour?), returning null ptr graph!");
 		return 0;
 	}
 	//Fill contour graph
@@ -249,22 +258,30 @@ int Contour::ComputeParameters(){
 		return -1;
 	}
 
+	//## Copy points to cv::Point list
+	DEBUG_LOG("Copying contour points in cv::Point list...");
+	std::vector<cv::Point2f> points;
+	for(unsigned int i=0;i<m_Points.size();i++){
+		double x= m_Points[i].X();
+		double y= m_Points[i].Y();
+		points.push_back( cv::Point2f(x,y) );	
+	}
+
 	int status= 0;
+
+
 	try{
 		//## Compute Shape Parameters
-		ComputeShapeParams();
+		ComputeShapeParams(points);
 	
 		//## Compute fitted ellipse
-		if(ComputeFittedEllipse()<0){
-			WARN_LOG("Failed to fit an ellipse to the contour!");
-			status= -1;
-		}
+		//if(ComputeFittedEllipse()<0){
+		//	WARN_LOG("Failed to fit an ellipse to the contour!");
+		//	status= -1;
+		//}
 
-		//## Compute moments and HuMoments
-		ComputeMoments();
-		
-		//## Compute Eccentricity 
-		ComputeEccentricity();//require moments!
+		//## Compute moment params (moments, HuMoment, eccentricity)
+		ComputeMomentParams(points);
 
 		//## Compute Fourier descriptor
 		//ComputeFourierDescriptors();
@@ -272,8 +289,6 @@ int Contour::ComputeParameters(){
 
 		//## Compute average bending energy
 		//ComputeBendingEnergy();		
-
-		HasParameters= true;
 
 	}//close try block
 	catch(cv::Exception ex){//something goes wrong!
@@ -287,12 +302,16 @@ int Contour::ComputeParameters(){
 		return -1;
   }
 
+	HasParameters= true;
+
 	return 0;
 
-}//close Contour::ComputeParameters()
+}//close ComputeParameters()
 
-void Contour::ComputeShapeParams(){
+//void Contour::ComputeShapeParams(){
+void Contour::ComputeShapeParams(std::vector<cv::Point2f>const & points){
 
+	/*
 	//Copy points to cv::Point list
 	std::vector<cv::Point2f> points;
 	for(unsigned int i=0;i<m_Points.size();i++){
@@ -300,6 +319,7 @@ void Contour::ComputeShapeParams(){
 		double y= m_Points[i].Y();
 		points.push_back( cv::Point2f(x,y) );	
 	}
+	*/
 
 	//Compute Area
 	Area= cv::contourArea(points,false);
@@ -343,6 +363,92 @@ void Contour::ComputeShapeParams(){
 }//close ComputeShapeParams()
 
 
+void Contour::ComputeMomentParams(std::vector<cv::Point2f>const & points){
+
+	//Compute moments & HuMoments
+	ComputeMoments(points);
+
+	//Compute eccentricity
+	ComputeEccentricity();
+
+}//close ComputeMomentParams()
+
+
+//void Contour::ComputeMoments(){
+void Contour::ComputeMoments(std::vector<cv::Point2f>const & points){
+	
+	//Copy points to cv::Point list
+	/*
+	std::vector<cv::Point2f> points;
+	for(size_t i=0;i<m_Points.size();i++){
+		double x= m_Points[i].X();
+		double y= m_Points[i].Y();
+		points.push_back( cv::Point2f(x,y) );	
+	}
+	*/
+
+	//====================================
+	//==   COMPUTE MOMENTS
+	//====================================
+	// - spatial moments: m00, m10, m01, m20, m11, m02, m30, m21, m12, m03
+  // - central moments: mu20, mu11, mu02, mu30, mu21, mu12, mu03
+  // - central normalized moments: nu20, nu11, nu02, nu30, nu21, nu12, nu03
+	cv::Moments moments = cv::moments(points);
+	
+	
+	//====================================
+	//==   COMPUTE HU MOMENTS
+	//====================================
+	double humoments_array[7];
+	cv::HuMoments(moments, humoments_array);
+	for(int i=0;i<7;i++) HuMoments[i]= humoments_array[i]; 
+	
+	m00= moments.m00;
+	m10= moments.m10;
+	m01= moments.m01;
+	m20= moments.m20;
+	m11= moments.m11;
+	m02= moments.m02;
+	m30= moments.m30;
+	m21= moments.m21;
+	m12= moments.m12;
+	m03= moments.m03;
+	Centroid= TVector2(m10/m00,m01/m00);
+		
+	mu20= moments.mu20;
+	mu11= moments.mu11;
+	mu02= moments.mu02;
+	mu30= moments.mu30;
+	mu21= moments.mu21;
+	mu12= moments.mu12;
+  mu03= moments.mu03;
+	
+	nu20= moments.nu20;
+	nu11= moments.nu11;
+	nu02= moments.nu02;
+	nu30= moments.nu30;
+	nu21= moments.nu21;
+	nu12= moments.nu12;
+	nu03= moments.nu03;
+
+}//close ComputeMoments()
+
+
+void Contour::ComputeEccentricity(){
+
+	//Compute covariance matrix and its eigenvectors
+	double Cxx= mu20/m00;
+	double Cyy= mu02/m00;
+	double Cxy= mu11/m00;
+	double delta= sqrt(4*Cxy*Cxy+(Cxx-Cyy)*(Cxx-Cyy));
+	double lambda1= ((Cxx+Cyy) + delta)/2.; 
+	double lambda2= ((Cxx+Cyy) - delta)/2.;	
+	Eccentricity= sqrt(1-lambda2/lambda1);
+	TiltAngle= 0.5*atan(2.*Cxy/(Cxx-Cyy))*TMath::RadToDeg();
+
+}//close ComputeEccentricity()
+
+
 TEllipse* Contour::GetFittedEllipse(){
 
 	//Check if ellipse fit succeeded
@@ -352,7 +458,6 @@ TEllipse* Contour::GetFittedEllipse(){
 	TEllipse* ellipse= new TEllipse;
 	ellipse->SetX1(EllipseCenter.X());
 	ellipse->SetY1(EllipseCenter.Y());
-	//ellipse->SetTheta(-EllipseRotAngle);
 	ellipse->SetTheta(EllipseRotAngle);
 	ellipse->SetR1(EllipseMajAxis/2.);
 	ellipse->SetR2(EllipseMinAxis/2.);	
@@ -382,7 +487,6 @@ int Contour::ComputeFittedEllipse(){
 	}
 
 	//Convert to parametric representation
-  //TVectorD conic = EllipseFitter(contourGraph);
   TVectorD ellipseParams;
 	if(ConicToParametric(ellipseParams,conic)<0){
 		WARN_LOG("Failed to convert ellipse from conic to parametric representation!");
@@ -454,14 +558,12 @@ int Contour::ComputeFittedEllipse(){
 }//close ComputeFittedEllipse()
 
  
-//TVectorD Contour::EllipseFitter(TGraph* contourGraph){
 int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
 
   //TVectorD ellipse;
   if (!contourGraph) {
 		ERROR_LOG("Null ptr to input contour graph, no ellipse fit will be performed!");
 		HasEllipseFit= false;
-		//return ellipse; // just a precaution
 		return -1;
 	}
 
@@ -470,7 +572,6 @@ int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
   if(N<6) {
 		WARN_LOG("Contour has less then 6 points, cannot fit ellipse!");
 		HasEllipseFit= false;
-		//return ellipse;
 		return -1;
 	}
   
@@ -513,8 +614,7 @@ int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
   if (tmp == 0.0) {
     WARN_LOG("Linear part of the scatter matrix is singular!");
 		HasEllipseFit= false;
-    //return ellipse;
-		return -1;
+    return -1;
   }
   // For getting a2 from a1
   TMatrixD T(S3, TMatrixD::kMultTranspose, S2);
@@ -533,12 +633,10 @@ int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
   // Solve eigensystem
   TMatrixDEigen eig(M); // note: eigenvectors are not normalized
   const TMatrixD &evec = eig.GetEigenVectors();
-  // const TVectorD &eval = eig.GetEigenValuesRe();
   if ((eig.GetEigenValuesIm()).Norm2Sqr() != 0.0) {
     WARN_LOG("Eigenvalues have nonzero imaginary parts!");
 		HasEllipseFit= false;
-    //return ellipse;
-		return -1;
+    return -1;
   }
 
   // Evaluate a’Ca (in order to find the eigenvector for min. pos. eigenvalue)
@@ -550,8 +648,7 @@ int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
     WARN_LOG("No min. pos. eigenvalue found!");
     // i = 2;
 		HasEllipseFit= false;
-    //return ellipse;
-		return -1;
+    return -1;
   }
 
   // Eigenvector for min. pos. eigenvalue
@@ -563,8 +660,7 @@ int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
 	else {
     WARN_LOG("Eigenvector for min. pos. eigenvalue is NULL!");
 		HasEllipseFit= false;
-    //return ellipse;
-		return -1;
+    return -1;
   }
   TVectorD a2(T*a1);
   
@@ -584,7 +680,7 @@ int Contour::EllipseFitter(TVectorD& ellipse,TGraph* contourGraph){
 
 }//close EllipseFitter()
 
-//TVectorD Contour::ConicToParametric(const TVectorD &conic) {
+
 int Contour::ConicToParametric(TVectorD& ellipse,const TVectorD &conic) {
   
 	//TVectorD ellipse;  
@@ -656,72 +752,6 @@ int Contour::ConicToParametric(TVectorD& ellipse,const TVectorD &conic) {
 
 
 
-
-void Contour::ComputeMoments(){
-	
-	//Copy points to cv::Point list
-	std::vector<cv::Point2f> points;
-	for(unsigned int i=0;i<m_Points.size();i++){
-		double x= m_Points[i].X();
-		double y= m_Points[i].Y();
-		points.push_back( cv::Point2f(x,y) );	
-	}
-
-	// spatial moments: m00, m10, m01, m20, m11, m02, m30, m21, m12, m03
-  // central moments: mu20, mu11, mu02, mu30, mu21, mu12, mu03
-  // central normalized moments: nu20, nu11, nu02, nu30, nu21, nu12, nu03
-	cv::Moments moments = cv::moments(points);
-	
-	//cv::HuMoments(moments, HuMoments);
-
-	double humoments_array[7];
-	cv::HuMoments(moments, humoments_array);
-	for(unsigned int i=0;i<7;i++) HuMoments[i]= humoments_array[i]; 
-	
-	m00= moments.m00;
-	m10= moments.m10;
-	m01= moments.m01;
-	m20= moments.m20;
-	m11= moments.m11;
-	m02= moments.m02;
-	m30= moments.m30;
-	m21= moments.m21;
-	m12= moments.m12;
-	m03= moments.m03;
-	Centroid= TVector2(m10/m00,m01/m00);
-		
-	mu20= moments.mu20;
-	mu11= moments.mu11;
-	mu02= moments.mu02;
-	mu30= moments.mu30;
-	mu21= moments.mu21;
-	mu12= moments.mu12;
-  mu03= moments.mu03;
-	
-	nu20= moments.nu20;
-	nu11= moments.nu11;
-	nu02= moments.nu02;
-	nu30= moments.nu30;
-	nu21= moments.nu21;
-	nu12= moments.nu12;
-	nu03= moments.nu03;
-
-}//close ComputeMoments()
-
-
-void Contour::ComputeEccentricity(){
-	//Compute covariance matrix and its eigenvectors
-	double Cxx= mu20/m00;
-	double Cyy= mu02/m00;
-	double Cxy= mu11/m00;
-	double delta= sqrt(4*Cxy*Cxy+(Cxx-Cyy)*(Cxx-Cyy));
-	double lambda1= ((Cxx+Cyy) + delta)/2.; 
-	double lambda2= ((Cxx+Cyy) - delta)/2.;	
-	Eccentricity= sqrt(1-lambda2/lambda1);
-	TiltAngle= 0.5*atan(2.*Cxy/(Cxx-Cyy))*TMath::RadToDeg();
-}
-
-
 void Contour::ComputeCentroidDistanceFD(){
 
 	//Reset lists
@@ -765,6 +795,8 @@ void Contour::ComputeCentroidDistanceFD(){
 		CentroidDistanceModFDs.push_back(FDMod);
 	}//end loop n
 		
+	HasCentroidDistanceFDPars= true;
+
 }//close Contour::ComputeCentroidDistanceFD()
 
 
@@ -820,6 +852,8 @@ void Contour::ComputeFourierDescriptors(){
 		DEBUG_LOG("FD no. "<<k<<" scale="<<index<<" FD="<<std::real(Fn[k])<<" + i "<<std::imag(Fn[k])<<" |FD|="<<FDMod);
 	}//end loop fourier coeff
 
+	HasFDPars= true;
+
 }//close ComputeFourierDescriptors()
 
 
@@ -870,6 +904,8 @@ void Contour::ComputeBendingEnergy(){
 		BendingEnergies.push_back(BendingEnergy);
 		DEBUG_LOG("Scale no. "<<k<<"="<<smoothPar<<" BE="<<BendingEnergy);
 	}//end loop scales
+
+	HasBEPars= true;
 
 }//close ComputeBendingEnergy()
 

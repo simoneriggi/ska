@@ -32,6 +32,7 @@
 #include <Contour.h>
 #include <StatsUtils.h>
 #include <Logger.h>
+#include <ZernikeMoments.h>
 
 #include <TObject.h>
 #include <TMatrixD.h>
@@ -619,8 +620,6 @@ int Blob::ComputeMorphologyParams(){
 		//Compute contour parameters
 		if(aContour->ComputeParameters()<0){
 			WARN_LOG("One/more failures occurred while computing contour no. "<<i<<" parameters for blob id "<<Id<<"!");
-			//delete fContour;
-			//continue;
 		}
 		
 		//Add contour to the list
@@ -673,14 +672,14 @@ int Blob::ComputeMorphologyParams(){
 
 }//close ComputeMorphologyParams()
 
-Image* Blob::GetImage(ImgType mode){
+Image* Blob::GetImage(ImgType mode,int pixMargin){
 
 	//Bounding box in (x,y) coordinates
 	double xRange[2]= {m_Xmin,m_Xmax};
 	double yRange[2]= {m_Ymin,m_Ymax};	
 	int boundingBoxX[2];
 	int boundingBoxY[2];
-	int deltaPix= 50;
+	int deltaPix= pixMargin;//50;
 	boundingBoxX[0]= xRange[0]-deltaPix;
 	boundingBoxX[1]= xRange[1]+deltaPix;
 	boundingBoxY[0]= yRange[0]-deltaPix;
@@ -757,13 +756,50 @@ Image* Blob::GetImage(ImgType mode){
 		}//end loop pixels
 	}
 
+	else if(mode==eBkgMap){
+		for(size_t k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			double thisBkg= thisPixel->bkgLevel;
+			blobImg->Fill(thisX,thisY,thisBkg);
+		}//end loop pixels
+	}
+
+	else if(mode==eNoiseMap){
+		for(size_t k=0;k<m_Pixels.size();k++){
+			Pixel* thisPixel= m_Pixels[k];
+			double thisX= thisPixel->x;
+			double thisY= thisPixel->y;
+			double thisNoise= thisPixel->noiseLevel;
+			blobImg->Fill(thisX,thisY,thisNoise);
+		}//end loop pixels
+	}
+
 	return blobImg;
 
 }//close GetImage()
 
 
 
+int Blob::ComputeZernikeMoments(int order){
 
+	//## Get source image
+	Image* fluxMap= GetImage(eFluxMap);
+	if(!fluxMap) return -1;
+	
+	//## Compute Zernike moments
+	double radius= -1;
+	ZMMoments.clear();
+	ZMMoments= ZernikeMoments::GetZernike2D_Direct(fluxMap, order,radius);
+	//ZMMoments= ZernikeMoments::GetZernike2D(fluxMap, order,radius);
+
+	delete fluxMap;
+	fluxMap= 0;
+
+	return 0;
+
+}//close ComputeZernikeMoments()
 
 
 }//close namespace

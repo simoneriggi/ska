@@ -37,6 +37,7 @@
 #include <rtnorm.h>
 
 #include <TObject.h>
+#include <TVector2.h>
 //#include <TRInterface.h>
 
 #include <iomanip>
@@ -47,6 +48,8 @@
 #include <stdexcept>
 #include <algorithm>
 #include <math.h>
+#include <cmath>
+#include <cfloat>
 
 using namespace std;
 
@@ -63,18 +66,114 @@ MorphFilter::~MorphFilter(){
 
 }//close destructor
 
-//================================================
-//==      NEW IMAGE METHODS
-//================================================
-/*
-Image* MorphFilter::Dilate(Image* img,int KernSize,bool returnPeakImg){
+
+int MorphFilter::FindPeaks(std::vector<TVector2>& peakPoints,Image* img,int peakShiftTolerance,bool skipBorders){
+
+	//Check input image
+	if(!img){
+		ERROR_LOG("Null ptr to input image given!");
+		return -1;
+	}
+
+	//Init data
+	peakPoints.clear();
+	int nKernels= 3;
+	//int kernelSizes[]= {3,5,7};
+	int kernelSizes[]= {5,7,9};
+	std::vector< std::vector<TVector2> > points;  
+	for(int k=0;k<nKernels;k++) points.push_back( std::vector<TVector2>() );
+
+	//## Find peaks with different kernel sizes
+	bool hasPeaks= true;
+	for(int k=0;k<nKernels;k++){
+
+		//Find peaks for this kernel
+		std::vector<long int> peakPixelIds;
+		Image* dilatedImg= MorphFilter::Dilate(peakPixelIds,img,kernelSizes[k],skipBorders);
+		if(!dilatedImg){
+			ERROR_LOG("Failed to compute dilated image for kernel no. "<<k<<" (size="<<kernelSizes[k]<<")!");
+			return -1;
+		}
+		delete dilatedImg;
+		dilatedImg= 0;		
 		
+		//Stop if no peaks are detected
+		if(peakPixelIds.empty()){
+			hasPeaks= false;
+			break;
+		}
+		INFO_LOG("#"<<peakPixelIds.size()<<" peak pixels found with kernel no. "<<k<<" (size="<<kernelSizes[k]<<")!");
+
+		//Store peak points for current kernel
+		for(size_t j=0;j<peakPixelIds.size();j++){
+			long int gBin= peakPixelIds[j];
+			long int binX= img->GetBinX(gBin); 
+			long int binY= img->GetBinY(gBin); 
+			double x= img->GetX(binX);
+			double y= img->GetY(binY);
+			points[k].push_back(TVector2(x,y));
+		}//end loop peak points
+
+	}//end loop kernels
+
+	if(!hasPeaks) {
+		DEBUG_LOG("No peaks detected in one or all dilated kernel runs.");
+		return 0;
+	}
+
+	//## Match peaks found with different kernels (given a tolerance)
+	//TGraph* peaks= new TGraph;
+	int npeaks= 0;
+	for (size_t i=0;i<points[0].size();i++) {
+  	for (size_t j=0; j<points[1].size(); j++) {
+    	for (size_t k=0; k<points[2].size(); k++) {
+				TVector2 P1= points[0][i];				
+				TVector2 P2= points[1][j];     		
+				TVector2 P3= points[2][k];
+				double dist12_x= fabs(P1.X()-P2.X());
+				double dist12_y= fabs(P1.Y()-P2.Y());
+				double dist13_x= fabs(P1.X()-P3.X());
+				double dist13_y= fabs(P1.Y()-P3.Y());
+				double dist23_x= fabs(P2.X()-P3.X());
+				double dist23_y= fabs(P2.Y()-P3.Y());
+
+				if( dist12_x<=peakShiftTolerance && dist13_x<=peakShiftTolerance && dist23_x<=peakShiftTolerance &&
+						dist12_y<=peakShiftTolerance && dist13_y<=peakShiftTolerance && dist23_y<=peakShiftTolerance
+				){
+					TVector2 PMean= (P1+P2+P3)*1/3.;
+					peakPoints.push_back(PMean);
+					//peaks->SetPoint(npeaks,PMean.X(),PMean.Y());
+					INFO_LOG("Peak no. "<<npeaks+1<<" C("<<PMean.X()<<","<<PMean.Y()<<")");
+					npeaks++;			
+				}   	
+      }//end loop k
+    }//end loop j
+  }//end loop i
+
+	if(npeaks<=0){
+		WARN_LOG("No matching peaks across the three dilate kernels detected!");
+		//if(peaks) peaks->Delete();
+		return 0;
+	}
+	INFO_LOG("#"<<npeaks<<" peaks detected!");
+
+	return 0;
+
+}//close FindPeaks()
+
+
+
+
+Image* MorphFilter::Dilate(std::vector<long int>& peakPixelIds,Image* img,int KernSize,bool skipBorders)
+{
+	//## Check input image		
 	if(!img){
 		ERROR_LOG("Null ptr to given image!");
 		return nullptr;
 	}
 	long int Nx= img->GetNx();
 	long int Ny= img->GetNy();
+	peakPixelIds.clear();
 
 	//## Convert image to OpenCV format
 	cv::Mat mat= img->GetOpenCVMat("64");
@@ -93,68 +192,58 @@ Image* MorphFilter::Dilate(Image* img,int KernSize,bool returnPeakImg){
 	cv::compare(mat, mat_dilated, mat_cmp, cv::CMP_EQ);
 	
 	//## Convert back dilated image 
-	TString imgName= Form("%s_Dilated_kernSize%d",img->GetName().c_str(),KernSize);	
-	Img* DilatedImg= img->GetCloned(std::string(imgName),true,true);
+	Image* DilatedImg= img->GetCloned("",true,true);
 	DilatedImg->Reset();
-	
-	imgName= Form("%s_DilatePeak_kernSize%d",img->GetName().c_str(),KernSize);	
-	Img* peakImg= img->GetCloned(std::string(imgName),true,true);
-	peakImg->Reset();
 	
 	int npeaks= 0;
 	
 	for(long int j=0;j<Ny;j++){
 		int rowId= Ny-1-j;
-		double y= img->GetYaxis()->GetBinCenter(j+1);
-
+		
 		for(long int i=0;i<Nx;i++){
 			int colId= i;
-			double x= img->GetXaxis()->GetBinCenter(i+1);
-			
-			double binContent= img->GetBinContent(i+1,j+1);
-			if(binContent==0) continue;
+			double binContent= img->GetPixelValue(i,j);
 			double matrixElement= mat_dilated.at<double>(rowId,colId);
 				
-			DilatedImg->FillPixel(x,y,matrixElement);
+			DilatedImg->FillPixel(i,j,matrixElement);
 
 			float mat_comparison= (float)mat_cmp.at<unsigned char>(rowId,colId);
-			if(mat_comparison==255){
+			bool borderCheck= (!skipBorders || (skipBorders && i>0 && j>0 && i<Nx-1 && j<Ny-1) );
+
+			if( mat_comparison==255 && borderCheck && std::isnormal(binContent) ){
+				//INFO_LOG("Found local maximum pixel ("<<i<<","<<j<<"), check surrounding pixel to confirm...");
+
 				//## Check surrounding pixels (do not tag as peak if the surrounding 3x3 is flat)
 				bool isFlatArea= true;
 				for(int ix=i-1;ix<i+1;ix++){
 					for(int iy=j-1;iy<j+1;iy++){
-						if(ix==i && iy==j) continue;
-						double w= img->GetBinContent(ix+1,iy+1);
-						if(w!=binContent) {
-							isFlatArea= false;
-							break;
+						if(ix!=i && iy!=j && ix>=0 && ix<Nx && iy>=0 && iy<Ny){
+							double w= img->GetPixelValue(ix,iy);
+							if(w!=binContent) {
+								isFlatArea= false;
+								break;
+							}
 						}
 					}//end loop kernel y
 				}//end loop kernel x
 
 				if(!isFlatArea){
-					peakImg->FillPixel(x,y,1);
-					npeaks++;
-					DEBUG_LOG("Peaks #"<<npeaks<<" detected @ ("<<x<<","<<y<<")");
+					INFO_LOG("Peaks #"<<npeaks<<" detected @ ("<<i<<","<<j<<")");
+					long int gBin= img->GetBin(i,j);
+					peakPixelIds.push_back(gBin);
+					npeaks++;			
 				}
-			}
+				//else{
+				//	INFO_LOG("Local maximum pixel found ("<<i<<","<<j<<") not confirmed (flat surrounding)...");
+				//}
+			}//close if check local maximum
 		}//end loop x
 	}//end loop y
 	
-	Img* returnImg= 0;
-	if(returnPeakImg){
-		DilatedImg->Delete();
-		returnImg= peakImg;
-	}
-	else{
-		peakImg->Delete();
-		returnImg= DilatedImg;
-	}
-
-	return returnImg;
+	return DilatedImg;
 
 }//close Dilate()
-*/
+
 
 int MorphFilter::FindDilatedSourcePixels(Image* img,Source* source,int KernSize,std::vector<long int>& pixelsToBeDilated){
 

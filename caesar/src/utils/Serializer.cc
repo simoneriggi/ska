@@ -56,14 +56,83 @@ ClassImp(Caesar::SBuffer)
 
 namespace Caesar {
 
-Serializer::Serializer() {	
+Serializer::Serializer() 
+{	
 	
-}   
+}//close constructor
 
 
-Serializer::~Serializer(){
+Serializer::~Serializer()
+{
 
-}
+}//close destructor
+
+int Serializer::EncodeSourceComponentParsToProtobuf(CaesarPB::SourceComponentPars* sourceCompPars_pb,SourceComponentPars& sourceCompPars)
+{
+	//Check pointer
+	if(!sourceCompPars_pb){
+		ERROR_LOG("Null ptr given to source fit pars protobuf object!");
+		return -1;
+	}
+
+	//Loop over fit parameters and add to protobuf object
+	try {
+		std::map<std::string,double> FitPars= sourceCompPars.GetFitPars();
+		std::map<std::string,double> FitParsErr= sourceCompPars.GetFitParErrors();
+
+		std::map<std::string,double>::iterator it = FitPars.begin();
+		for (it=FitPars.begin(); it!=FitPars.end(); ++it){
+			std::string parName= it->first;
+			double parValue= it->second;
+			CaesarPB::Dict* fitPar_pb = sourceCompPars_pb->add_fitpars();
+			fitPar_pb->set_key(parName);
+			fitPar_pb->set_val(parValue);
+		}//end loop pars
+
+		for (it=FitParsErr.begin(); it!=FitParsErr.end(); ++it){
+			std::string parName= it->first;
+			double parErr= it->second;
+			CaesarPB::Dict* fitParErr_pb = sourceCompPars_pb->add_fitparserr();
+			fitParErr_pb->set_key(parName);
+			fitParErr_pb->set_val(parErr);
+		}//end loop par errors
+
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Source component pars encoding to protobuf failed with status "<<e.what());
+		return -1;
+	}
+
+	return 0;
+
+}//close EncodeSourceComponentParsToProtobuf()
+
+int Serializer::EncodeSourceFitParsToProtobuf(CaesarPB::SourceFitPars& sourceFitPars_pb,SourceFitPars& sourceFitPars)
+{
+	//Add main pars
+	sourceFitPars_pb.set_ncomponents(sourceFitPars.GetNComponents());
+	sourceFitPars_pb.set_chi2(sourceFitPars.GetChi2());
+	sourceFitPars_pb.set_ndof(sourceFitPars.GetNDF());
+	sourceFitPars_pb.set_npars_free(sourceFitPars.GetNFreePars());
+	sourceFitPars_pb.set_nfit_points(sourceFitPars.GetNFitPoints());
+	sourceFitPars_pb.set_status(sourceFitPars.GetStatus());
+	sourceFitPars_pb.set_minimizer_status(sourceFitPars.GetMinimizerStatus());
+	sourceFitPars_pb.set_offset(sourceFitPars.GetOffsetPar());
+	sourceFitPars_pb.set_offset_err(sourceFitPars.GetOffsetParErr());
+
+	//Add component fit pars
+	std::vector<SourceComponentPars> pars= sourceFitPars.GetPars();
+	for(size_t i=0;i<pars.size();i++){
+		CaesarPB::SourceComponentPars* compFitPars_pb= sourceFitPars_pb.add_pars();
+		if(EncodeSourceComponentParsToProtobuf(compFitPars_pb,pars[i])<0){
+			ERROR_LOG("Failed to encode fit pars for component "<<i+1<<" in protobuf!");
+			return -1;
+		}
+	}//end loop component fit pars
+
+	return 0;
+
+}//close EncodeSourceFitParsToProtobuf()
 
 
 int Serializer::EncodePointToProtobuf(CaesarPB::Point& point_pb,TVector2& point){
@@ -168,19 +237,24 @@ int Serializer::EncodeContourToProtobuf(CaesarPB::Contour& contour_pb,Contour* c
 		}
 		contour_pb.set_allocated_centroid(Centroid);
 
-		for(unsigned int i=0;i<contour->RealFDs.size();i++){		
+		contour_pb.set_hasfdpars(contour->HasFDPars);
+		for(size_t i=0;i<contour->RealFDs.size();i++){		
  			contour_pb.add_realfds(contour->RealFDs[i]);
 		}
-		for(unsigned int i=0;i<contour->ImagFDs.size();i++){		
+		for(size_t i=0;i<contour->ImagFDs.size();i++){		
  			contour_pb.add_imagfds(contour->ImagFDs[i]);
 		}
-		for(unsigned int i=0;i<contour->ModFDs.size();i++){		
+		for(size_t i=0;i<contour->ModFDs.size();i++){		
  			contour_pb.add_modfds(contour->ModFDs[i]);
 		}
-		for(unsigned int i=0;i<contour->BendingEnergies.size();i++){		
+
+		contour_pb.set_hasbepars(contour->HasBEPars);
+		for(size_t i=0;i<contour->BendingEnergies.size();i++){		
  			contour_pb.add_bendingenergies(contour->BendingEnergies[i]);
 		}	
-		for(unsigned int i=0;i<contour->CentroidDistanceModFDs.size();i++){		
+
+		contour_pb.set_hascentroiddistancefdpars(contour->HasCentroidDistanceFDPars);
+		for(size_t i=0;i<contour->CentroidDistanceModFDs.size();i++){		
  			contour_pb.add_centroiddistancemodfds(contour->CentroidDistanceModFDs[i]);
 		}
 
@@ -390,6 +464,22 @@ int Serializer::EncodeSourceToProtobuf(CaesarPB::Source& source_pb,Source* sourc
 		source_pb.set_m_isgoodsource(source->IsGoodSource());
 		source_pb.set_m_depthlevel(source->GetDepthLevel());
 		source_pb.set_m_hasnestedsources(source->HasNestedSources());
+
+		//Set true info	
+		source_pb.set_m_hastrueinfo(source->HasTrueInfo());
+		source_pb.set_m_s_true(source->GetTrueFlux());
+		double x0_true, y0_true;
+		source->GetTruePos(x0_true,y0_true);	
+		source_pb.set_m_x0_true(x0_true);
+		source_pb.set_m_y0_true(y0_true);
+
+		//Set fit pars
+		SourceFitPars fitPars= source->GetFitPars();
+		CaesarPB::SourceFitPars* fitPars_pb= new CaesarPB::SourceFitPars;
+		if(EncodeSourceFitParsToProtobuf(*fitPars_pb,fitPars)<0){
+			throw std::runtime_error("Failed to encode source fit pars!");
+		}
+		
 		
 		//Set blob field
 		CaesarPB::Blob* blob= new CaesarPB::Blob;
@@ -645,6 +735,66 @@ char* Serializer::TaskDataCollectionToCharArray(long int& buffer_size,std::vecto
 
 }//close TaskDataCollectionToCharArray()
 
+
+int Serializer::EncodeProtobufToSourceComponentPars(SourceComponentPars& sourceComponentPars,const CaesarPB::SourceComponentPars& sourceComponentPars_pb)
+{
+
+	try {
+		for(int i=0;i<sourceComponentPars_pb.fitpars_size();i++){
+			const CaesarPB::Dict& par_pb = sourceComponentPars_pb.fitpars(i);
+			const CaesarPB::Dict& parErr_pb = sourceComponentPars_pb.fitparserr(i);
+
+			std::string parName= par_pb.key();
+			float parVal= par_pb.val();
+			float parErr= parErr_pb.val();
+			sourceComponentPars.SetParValueAndError(parName,parVal,parErr);
+		}//end loop fit pars
+
+	}//close try blocl
+	catch(std::exception const & e) {
+		ERROR_LOG("Encoding protobuf to source component pars failed with status "<<e.what());
+		return -1;
+	}
+	
+	return 0;
+
+}//close EncodeProtobufToSourceComponentPars()
+
+int Serializer::EncodeProtobufToSourceFitPars(SourceFitPars& sourceFitPars,CaesarPB::SourceFitPars& sourceFitPars_pb)
+{
+	try {	
+		if(sourceFitPars_pb.has_ncomponents()) sourceFitPars.SetNComponents(sourceFitPars_pb.ncomponents());	
+		if(sourceFitPars_pb.has_chi2()) sourceFitPars.SetChi2(sourceFitPars_pb.chi2());	
+		if(sourceFitPars_pb.has_ndof()) sourceFitPars.SetNDF(sourceFitPars_pb.ndof());	
+		if(sourceFitPars_pb.has_npars_free()) sourceFitPars.SetNFreePars(sourceFitPars_pb.npars_free());	
+		if(sourceFitPars_pb.has_nfit_points()) sourceFitPars.SetNFitPoints(sourceFitPars_pb.nfit_points());	
+		if(sourceFitPars_pb.has_status()) sourceFitPars.SetStatus(sourceFitPars_pb.status());	
+		if(sourceFitPars_pb.has_minimizer_status()) sourceFitPars.SetMinimizerStatus(sourceFitPars_pb.minimizer_status());	
+		if(sourceFitPars_pb.has_offset()) sourceFitPars.SetOffsetPar(sourceFitPars_pb.offset());	
+		if(sourceFitPars_pb.has_offset_err()) sourceFitPars.SetOffsetParErr(sourceFitPars_pb.offset_err());	
+		
+		//Set fit component pars	
+		for(int i=0;i<sourceFitPars_pb.pars_size();i++){
+			const CaesarPB::SourceComponentPars& componentPars_pb = sourceFitPars_pb.pars(i);
+			SourceComponentPars componentPars;
+			if(EncodeProtobufToSourceComponentPars(componentPars,componentPars_pb)<0){
+				throw std::runtime_error("Failed to encode component fit pars!");
+			}
+			sourceFitPars.SetComponentPars(i,componentPars);
+
+		}//end loop fit component pars
+	
+	}//close try block
+	catch(std::exception const & e) {
+		ERROR_LOG("Encoding protobuf to source fit pars failed with status "<<e.what());
+		return -1;
+	}
+	return 0;
+
+}//close EncodeProtobufToSourceFitPars()
+
+
+
 int Serializer::EncodeProtobufToSource(Source& source,const CaesarPB::Source& source_pb){
 
 	try {
@@ -657,6 +807,11 @@ int Serializer::EncodeProtobufToSource(Source& source,const CaesarPB::Source& so
 		if(source_pb.has_m_isgoodsource()) source.SetGoodSourceFlag(source_pb.m_isgoodsource());
 		if(source_pb.has_m_depthlevel()) source.SetDepthLevel(source_pb.m_depthlevel());
 		if(source_pb.has_m_hasnestedsources()) source.SetHasNestedSources(source_pb.m_hasnestedsources());
+
+		if(source_pb.has_m_hastrueinfo()) {
+			source.SetTrueInfo(source_pb.m_s_true(),source_pb.m_x0_true(),source_pb.m_y0_true());
+		}
+		
 		
 		//Set blob fields
 		if(source_pb.has_blob()){
@@ -694,7 +849,7 @@ int Serializer::EncodeProtobufToSource(Source& source,const CaesarPB::Source& so
 	}//close try block
 	catch(std::exception const & e) {
 		ERROR_LOG("Encoding protobuf to source failed with status "<<e.what());
-		return false;
+		return -1;
 	}
 
 
@@ -985,6 +1140,7 @@ int Serializer::EncodeProtobufToContour(Contour& contour,const CaesarPB::Contour
 			}
 		}
 	
+		if(contour_pb.has_hasfdpars()) contour.HasFDPars= contour_pb.hasfdpars(); 
 		for(int i=0;i<contour_pb.realfds_size();i++){		
 			(contour.RealFDs).push_back(contour_pb.realfds(i));
 		}
@@ -994,9 +1150,13 @@ int Serializer::EncodeProtobufToContour(Contour& contour,const CaesarPB::Contour
 		for(int i=0;i<contour_pb.modfds_size();i++){		
 			(contour.ModFDs).push_back(contour_pb.modfds(i));
 		}
+	
+		if(contour_pb.has_hasbepars()) contour.HasBEPars= contour_pb.hasbepars(); 
 		for(int i=0;i<contour_pb.bendingenergies_size();i++){		
 			(contour.BendingEnergies).push_back(contour_pb.bendingenergies(i));
 		}
+
+		if(contour_pb.has_hascentroiddistancefdpars()) contour.HasCentroidDistanceFDPars= contour_pb.hascentroiddistancefdpars(); 
 		for(int i=0;i<contour_pb.centroiddistancemodfds_size();i++){		
 			(contour.CentroidDistanceModFDs).push_back(contour_pb.centroiddistancemodfds(i));
 		}
