@@ -74,8 +74,8 @@ endif()
 #==    Check for GSL library    ===
 #==================================
 message (STATUS "Looking for GSL library...")
-include(FindGSL REQUIRED)
-#find_package (GLS REQUIRED)
+#include(FindGSL REQUIRED)
+find_package (GSL REQUIRED)
 message (STATUS "GSL_INCLUDE_DIRS: ${GSL_INCLUDE_DIRS}")
 message (STATUS "GSL_LIBRARIES: ${GSL_LIBRARIES}")
 
