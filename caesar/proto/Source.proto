@@ -102,7 +102,11 @@ message Contour {
 	repeated float BendingEnergies= 52;
 	repeated float CentroidDistanceModFDs= 53;//module of complex Fourier descriptors
 
-	repeated Point m_Points= 54;	
+	repeated Point m_Points= 54;
+
+	optional bool HasFDPars= 55;	
+	optional bool HasBEPars= 56;
+	optional bool HasCentroidDistanceFDPars= 57;	
 
 }//close Contour schema
 
@@ -191,6 +195,31 @@ message Blob {
 
 }//close Blob schema
 
+message Dict {
+	optional string key= 1;
+	optional float val= 2; 
+}
+
+message SourceComponentPars {
+	repeated Dict FitPars= 1;
+	repeated Dict FitParsErr= 2;
+}//close SourceComponentPars()
+
+message SourceFitPars {
+	
+	optional int32 nComponents= 1;
+	optional float chi2= 2;
+	optional float ndof= 3;
+	optional float npars_free= 4;	
+	optional float nfit_points= 5;
+	optional int32 status= 6;
+	optional int32 minimizer_status= 7;
+	optional float offset= 8;
+	optional float offset_err= 9;
+	repeated SourceComponentPars pars= 10;
+
+}//close SourceFitPars()
+
 message Source {
 	optional Blob blob= 1;
 	optional int32 Type= 2;
@@ -203,6 +232,16 @@ message Source {
 	optional bool m_HasNestedSources= 7;
 	repeated Source m_NestedSources= 8;
 
+	//True source info
+	optional bool m_HasTrueInfo= 9;
+	optional float m_S_true= 10;
+	optional float m_X0_true= 11;
+	optional float m_Y0_true= 12;
+
+	//Fit pars
+	optional bool m_HasFitInfo= 13;
+	optional SourceFitPars m_fitPars= 14;
+	
 }//close Source schema
 
 
