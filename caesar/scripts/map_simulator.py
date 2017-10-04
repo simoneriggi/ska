@@ -456,6 +456,10 @@ class SkyMapSimulator(object):
 			pixel= Caesar.Pixel(gbin,ix,iy,ix,iy,S)
 			source.AddPixel(pixel)
 
+			# Is at edge
+			if (ix==0) or (ix==nCols-1) or (iy==0) or (iy==nRows-1):
+				source.SetEdgeFlag(True)
+				
 		# If true info are not given compute them
 		#    - S= count integral
 		#    - baricenter of binary map
