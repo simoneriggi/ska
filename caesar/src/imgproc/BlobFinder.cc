@@ -220,9 +220,9 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 			aPixel->SetCoords(ix,iy);
 			
 			
-			//if( inputImg->IsEdgeBin(clusterPixelIdX,clusterPixelIdY) ) {
-			//	aBlob->SetEdgeFlag(true);
-			//}
+			if( inputImg->IsEdgeBin(clusterPixelIdX,clusterPixelIdY) ) {
+				aBlob->SetEdgeFlag(true);
+			}
 			
 
 			//Set bkg data if available
