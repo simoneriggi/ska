@@ -44,7 +44,7 @@ void Usage(char* exeName){
 	cout<<"Options:"<<endl;
   cout<<"-h, --help \t Show help message and exit"<<endl;
 	cout<<"-i, --input \t Input file name containing sources to be read in ROOT TTree (.root)"<<endl;
-	cout<<"-I, --input2 \t Input file name 2 containing sources to be read in ROOT TTree"<<endl;
+	cout<<"-I, --input_rec \t Input file name containing reconstructed/detected sources to be read in ROOT TTree (.root)"<<endl;
 	cout<<"-o, --output \t Output file name "<<endl;
 	cout<<"-t, --threshold \t Fraction of matching pixels to consider sources equal "<<endl;
 	cout<<"-v, --verbosity \t Log level (<=0=OFF, 1=FATAL, 2=ERROR, 3=WARN, 4=INFO, >=5=DEBUG)"<<endl;
@@ -56,7 +56,7 @@ static const struct option options_tab[] = {
   /* name, has_arg, &flag, val */
   { "help", no_argument, 0, 'h' },
 	{ "input", required_argument, 0, 'i' },
-	{ "input2", required_argument, 0, 'I' },
+	{ "input_rec", required_argument, 0, 'I' },
 	{ "verbosity", required_argument, 0, 'v'},
 	{ "output", optional_argument, 0, 'o' },
 	{ "threshold", required_argument, 0, 't'},	
@@ -66,7 +66,7 @@ static const struct option options_tab[] = {
 
 //Options
 std::string fileName= "";
-std::string fileName2= "";
+std::string fileName_rec= "";
 int verbosity= 4;//INFO level
 float matchingThreshold= 0.9;
 
@@ -75,7 +75,7 @@ TFile* outputFile= 0;
 std::string outputFileName= "MatchOutput.root";
 TTree* matchedSourceInfo;
 std::vector<Source*> sources;
-std::vector<Source*> sources2;
+std::vector<Source*> sources_rec;
 int SourceFoundFlag;
 std::string SourceName;
 int SourceType;
@@ -84,10 +84,20 @@ double X0;
 double Y0;
 double S;
 double Smax;
-int SourceType2;
-double S2;
-double Smax2;
+double S_true;
+double X0_true;
+double Y0_true;
+int SourceType_rec;
+double S_rec;
+double X0_rec;
+double Y0_rec;
+double Smax_rec;
 double MatchFraction;
+int HasFitInfo;
+double S_fit;
+double X0_fit;
+double Y0_fit;
+
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
@@ -178,7 +188,7 @@ int ParseOptions(int argc, char *argv[])
 			}
 			case 'I':	
 			{
-				fileName2= std::string(optarg);	
+				fileName_rec= std::string(optarg);	
 				break;	
 			}
 			case 'o':	
@@ -243,9 +253,9 @@ int ReadSourceData()
 		return -1;
 	}
 	
-	TFile* f2= new TFile(fileName2.c_str(),"READ");
-	if(!f2){
-		ERROR_LOG("Failed to open file "<<fileName2<<"!");
+	TFile* f_rec= new TFile(fileName_rec.c_str(),"READ");
+	if(!f_rec){
+		ERROR_LOG("Failed to open file "<<fileName_rec<<"!");
 		return -1;
 	}
 
@@ -259,12 +269,12 @@ int ReadSourceData()
 	}
 	sourceTree->SetBranchAddress("Source",&aSource);
 
-	TTree* sourceTree2= (TTree*)f2->Get("SourceInfo");
-	if(!sourceTree2 || sourceTree2->IsZombie()){
-		ERROR_LOG("Failed to get access to source tree in file "<<fileName2<<"!");	
+	TTree* sourceTree_rec= (TTree*)f_rec->Get("SourceInfo");
+	if(!sourceTree_rec || sourceTree_rec->IsZombie()){
+		ERROR_LOG("Failed to get access to source tree in file "<<fileName_rec<<"!");	
 		return -1;
 	}
-	sourceTree2->SetBranchAddress("Source",&aSource);
+	sourceTree_rec->SetBranchAddress("Source",&aSource);
 
 	//Read sources
 	INFO_LOG("Reading #"<<sourceTree->GetEntries()<<" sources in file "<<fileName<<"...");
@@ -276,13 +286,13 @@ int ReadSourceData()
 		sources.push_back(source);
 	}//end loop sources
 
-	INFO_LOG("Reading #"<<sourceTree2->GetEntries()<<" sources in file "<<fileName2<<"...");
-	for(int i=0;i<sourceTree2->GetEntries();i++){
-		sourceTree2->GetEntry(i);
+	INFO_LOG("Reading #"<<sourceTree_rec->GetEntries()<<" sources in file "<<fileName_rec<<"...");
+	for(int i=0;i<sourceTree_rec->GetEntries();i++){
+		sourceTree_rec->GetEntry(i);
 
 		Source* source= new Source;
 		*source= *aSource;
-		sources2.push_back(source);
+		sources_rec.push_back(source);
 	}//end loop sources
 
 	return 0;
@@ -292,7 +302,7 @@ int ReadSourceData()
 int CorrelateSourceCatalogs()
 {
 	//Check source sizes
-	if(sources.empty() || sources2.empty()){
+	if(sources.empty() || sources_rec.empty()){
 		WARN_LOG("One or both source collections are empty, nothing to correlate...");
 		return 0;
 	}
@@ -305,13 +315,14 @@ int CorrelateSourceCatalogs()
 		size_t sourceIndex;
 	};
 
-	INFO_LOG("Correlating ("<<sources.size()<<","<<sources2.size()<<") sources...");
+	INFO_LOG("Correlating ("<<sources.size()<<","<<sources_rec.size()<<") sources...");
 	long int nFoundSources= 0;
 
+	//Loop over first catalogue (e.g. simulated/true sources)
 	for(size_t i=0;i<sources.size();i++){
+		//Init 1st collection pars
 		long int NPix= sources[i]->GetNPixels();
 		std::vector<MatchingSourceInfo> matched_info;	
-
 		SourceFoundFlag= 0;
 		SourceName= std::string(sources[i]->GetName());
 		SourceType= sources[i]->Type;
@@ -320,20 +331,37 @@ int CorrelateSourceCatalogs()
 		Y0= sources[i]->Y0;
 		S= sources[i]->GetS();
 		Smax= sources[i]->GetSmax();
-		S2= -1;
-		Smax2= -1;
-		SourceType2= -1;
+		S_true= S;
+		X0_true= X0;
+		Y0_true= Y0;
+		bool hasTrueInfo= sources[i]->HasTrueInfo();
+		if(hasTrueInfo){
+			S_true= sources[i]->GetTrueFlux();
+			sources[i]->GetTruePos(X0_true,Y0_true);
+		}	
+
+		//Init rec collection pars
+		S_rec= -1;
+		Smax_rec= -1;
+		X0_rec= -1;
+		Y0_rec= -1;
+		SourceType_rec= -1;
 		MatchFraction= 0.;
+		HasFitInfo= 0;
+		S_fit= -1;
+		X0_fit= -1;
+		Y0_fit= -1;
 
-		for(size_t j=0;j<sources2.size();j++){
-			long int NPix2= sources2[j]->GetNPixels();
-			std::string SourceName2= std::string(sources2[j]->GetName());
-			double X0_2= sources2[j]->X0;
-			double Y0_2= sources2[j]->Y0;
+		//Loop over second catalogue (e.g. detected/reconstructed sources)
+		for(size_t j=0;j<sources_rec.size();j++){
+			long int NPix_rec= sources_rec[j]->GetNPixels();
+			std::string SourceName_rec= std::string(sources_rec[j]->GetName());
+			X0_rec= sources_rec[j]->X0;
+			Y0_rec= sources_rec[j]->Y0;
 
-			long int NMatchingPixels= sources[i]->GetNMatchingPixels(sources2[j]);
+			long int NMatchingPixels= sources[i]->GetNMatchingPixels(sources_rec[j]);
 			double matchingPixelFraction= (double)(NMatchingPixels)/(double)(NPix);
-			DEBUG_LOG("Source "<<SourceName<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): finding matching with source "<<SourceName2<<" (X0="<<X0_2<<", Y0="<<Y0_2<<", N="<<NPix2<<"), NMatchingPixels="<<NMatchingPixels<<" f="<<matchingPixelFraction<<" (t="<<matchingThreshold<<")");
+			DEBUG_LOG("Source "<<SourceName<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): finding matching with source "<<SourceName_rec<<" (X0="<<X0_rec<<", Y0="<<Y0_rec<<", N="<<NPix_rec<<"), NMatchingPixels="<<NMatchingPixels<<" f="<<matchingPixelFraction<<" (t="<<matchingThreshold<<")");
 			
 			if(NMatchingPixels<=0 || matchingPixelFraction<matchingThreshold) continue;
 
@@ -361,10 +389,32 @@ int CorrelateSourceCatalogs()
 				}//end loop matchings
 			}//close if
 
-			SourceType2= sources2[index_best]->Type;
-			S2= sources2[index_best]->GetS();
-			Smax2= sources2[index_best]->GetSmax();
+			SourceType_rec= sources_rec[index_best]->Type;
+			S_rec= sources_rec[index_best]->GetS();
+			Smax_rec= sources_rec[index_best]->GetSmax();
 			MatchFraction= matchFraction_best;
+
+			//If source has fit info loop over fitted components to find best match
+			//NB: If fit is good this should increase the positional & flux accuracy
+			HasFitInfo= sources_rec[index_best]->HasFitInfo();
+			if(HasFitInfo){
+				SourceFitPars fitPars= sources_rec[index_best]->GetFitPars();
+				double dist_best= 1.e+99;
+				for(int i=0;i<fitPars.GetNComponents();i++){
+					double X0_fitcomp= fitPars.GetParValue(i,"x0");	
+					double Y0_fitcomp= fitPars.GetParValue(i,"y0");
+					double S_fitcomp= fitPars.GetParValue(i,"A");
+					double dx= X0_fitcomp-X0_true;
+					double dy= Y0_fitcomp-Y0_true;
+					double dist= sqrt(dx*dx+dy*dy);
+					if(dist<dist_best){
+						dist_best= dist;
+						S_fit= S_fitcomp;
+						X0_fit= X0_fitcomp;
+						Y0_fit= Y0_fitcomp;
+					}
+				}//end loop fitted components
+			}//close has fit info
 
 		}//close if has match
 	
@@ -393,10 +443,19 @@ void Init(){
 	matchedSourceInfo->Branch("Smax",&Smax,"Smax/D");	
 	matchedSourceInfo->Branch("X0",&X0,"X0/D");
 	matchedSourceInfo->Branch("Y0",&Y0,"Y0/D");
-	matchedSourceInfo->Branch("type2",&SourceType2,"type2/I");
-	matchedSourceInfo->Branch("S2",&S2,"S2/D");
-	matchedSourceInfo->Branch("Smax2",&Smax2,"Smax2/D");
+	matchedSourceInfo->Branch("S_true",&S_true,"S_true/D");
+	matchedSourceInfo->Branch("X0_true",&X0_true,"X0_true/D");
+	matchedSourceInfo->Branch("Y0_true",&Y0_true,"Y0_true/D");
+	matchedSourceInfo->Branch("type_rec",&SourceType_rec,"type_rec/I");
+	matchedSourceInfo->Branch("S_rec",&S_rec,"S_rec/D");
+	matchedSourceInfo->Branch("Smax_rec",&Smax_rec,"Smax_rec/D");
+	matchedSourceInfo->Branch("X0_rec",&X0_rec,"X0_rec/D");
+	matchedSourceInfo->Branch("Y0_rec",&Y0_rec,"Y0_rec/D");
 	matchedSourceInfo->Branch("MatchFraction",&MatchFraction,"MatchFraction/D");
+	matchedSourceInfo->Branch("HasFitInfo",&HasFitInfo,"HasFitInfo/I");
+	matchedSourceInfo->Branch("S_fit",&S_fit,"S_fit/D");
+	matchedSourceInfo->Branch("X0_fit",&X0_fit,"X0_fit/D");
+	matchedSourceInfo->Branch("Y0_fit",&Y0_fit,"Y0_fit/D");
 
 }//close Init()
 
