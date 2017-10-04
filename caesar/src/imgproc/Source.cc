@@ -278,8 +278,8 @@ const std::string Source::GetDS9FittedEllipseRegion(bool useFWHM)
 		double R2= ellipses[i]->GetR2();
 		double theta= ellipses[i]->GetTheta();
 		//theta-= 90;//DS9 format
-		sstream<<"ellipse "<<x0+1<<" "<<y0+1<<" "<<R1<<" "<<R2<<" "<<theta<<" # text={S"<<Id<<"_"<<i+1<<"}"<<endl;
-		
+		sstream<<"ellipse "<<x0+1<<" "<<y0+1<<" "<<R1<<" "<<R2<<" "<<theta<<" # text={S"<<Id<<"_"<<i+1<<"}";
+		if(i!=ellipses.size()-1) sstream<<endl;
 	}//end loop ellipses
 	
 	return sstream.str();
