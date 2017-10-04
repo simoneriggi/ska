@@ -337,9 +337,6 @@ fi
 
 
 
-
-
-
 #######################################
 ##   DEFINE GENERATE CONFIG FCN
 #######################################
@@ -406,7 +403,8 @@ generate_config(){
     echo '//============================='
     echo 'isInteractiveRun = false                          | Is interactive run (graph plots enabled) (T/F)'
     echo "outputFile = $outputfile                         | Output filename (.root)"
-    echo "ds9RegionFile = $ds9region_file					          | DS9 region file (.reg) where to store source catalog"
+    echo "ds9RegionFile = $ds9region_file					          | DS9 region file (.reg) where to store source catalog"	
+		echo "ds9FitRegionFile = $ds9fitregion_file					    | DS9 region file (.reg) where to store fitted source catalog"
     echo 'DS9RegionFormat = 2                               | DS9 region format (1=ellipse, 2=polygon)'
     echo 'inputMapFITSFile = 	input_map.fits				        | Output filename where to store input map in FITS format (.fits)'
     echo 'residualMapFITSFile = residual_map.fits		        | Output filename where to store residual map in FITS format (.fits)'
@@ -704,6 +702,7 @@ if [ "$FILELIST_GIVEN" = true ]; then
   	inputfile=$filename
 		outputfile="Out_$filename_base_noext"'.root'
  		ds9region_file="DS9_$filename_base_noext"'.reg'
+		ds9fitregion_file="DS9_FittedSources_$filename_base_noext"'.reg'
 
 		## Define and generate config file
 		configfile="config_$filename_base_noext"'_'"$index.cfg"
@@ -757,6 +756,7 @@ else
   inputfile=$INPUTFILE
 	outputfile="Out_$filename_base_noext"'.root'
  	ds9region_file="DS9_$filename_base_noext"'.reg'
+	ds9fitregion_file="DS9_FittedSources_$filename_base_noext"'.reg'
 
 	## Define and generate config file
 	configfile="config_$filename_base_noext"'.cfg'

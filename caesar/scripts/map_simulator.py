@@ -381,8 +381,8 @@ class SkyMapSimulator(object):
 		data= Gaussian2D(ampl,x0,y0,sigmax,sigmay,theta=math.radians(theta))(self.gridx, self.gridy)
 
 		## Truncate data at minimum significance
-		#ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level
-		ampl_min= self.bkg_level
+		ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level
+		#ampl_min= self.bkg_level
 		if self.truncate_models:
 			data[data<ampl_min] = 0		
 
@@ -429,8 +429,8 @@ class SkyMapSimulator(object):
 		data= AiryDisk2D(amplitude=ampl,x_0=x0,y_0=y0,radius=radius)(self.gridx, self.gridy) 
 		
 		## Truncate data at minimum significance
-		#ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
-		ampl_min= self.bkg_level
+		ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		#ampl_min= self.bkg_level
 		if self.truncate_models:
 			data[data<ampl_min] = 0			
 
