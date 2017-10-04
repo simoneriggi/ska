@@ -1218,7 +1218,8 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 	}
 	
 	for(size_t k=0;k<sources.size();k++) {
-		sources[k]->SetName(Form("S%d",(signed)k));
+		sources[k]->SetId(k+1);
+		sources[k]->SetName(Form("S%d",(signed)(k+1)));
 		sources[k]->SetBeamFluxIntegral(fluxCorrection);
 		sources[k]->Print();
 	}//end loop sources
@@ -1299,7 +1300,8 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 	}
 	
 	for(size_t k=0;k<sources.size();k++) {
-		sources[k]->SetName(Form("S%d",(signed)k));
+		sources[k]->SetId(k+1);
+		sources[k]->SetName(Form("S%d",(signed)(k+1)));
 		sources[k]->SetBeamFluxIntegral(fluxCorrection);
 		sources[k]->Print();
 	}	
@@ -1577,7 +1579,8 @@ Image* SFinder::FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,T
 	int nSources= static_cast<int>( sources.size() );
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" extended sources detected in input image by thresholding the saliency map...");
 	for(size_t k=0;k<sources.size();k++) {
-		sources[k]->SetName(Form("Sext%d",(signed)k));
+		sources[k]->SetId(k+1);
+		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));
 		sources[k]->SetType(Source::eExtended);
 	}
 	
@@ -1814,7 +1817,8 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 
 	//## Tag sources as extended
 	for(size_t k=0;k<sources.size();k++) {
-		sources[k]->SetName(Form("Sext%d",(signed)k));
+		sources[k]->SetId(k+1);
+		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));
 		sources[k]->SetType(Source::eExtended);
 	}
 	
@@ -2055,7 +2059,8 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 
 	//## Tag sources as extended
 	for(size_t k=0;k<sources.size();k++) {
-		sources[k]->SetName(Form("Sext%d",(signed)k));
+		sources[k]->SetId(k+1);
+		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));
 		sources[k]->SetType(Source::eExtended);
 	}
 
@@ -2110,9 +2115,10 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 	int nSources= static_cast<int>( sources.size() );		
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" found...");
 
-	for(size_t i=0;i<sources.size();i++){
-		sources[i]->SetName(Form("Sext%d",(signed)(i)));	
-		sources[i]->SetType(Source::eExtended);
+	for(size_t k=0;k<sources.size();k++){
+		sources[k]->SetId(k+1);
+		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));	
+		sources[k]->SetType(Source::eExtended);
 	}
 
 	//## Add sources to extended sources
