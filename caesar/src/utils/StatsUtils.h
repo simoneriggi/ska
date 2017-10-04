@@ -37,6 +37,8 @@
 #include <TMatrixD.h>
 #include <TMath.h>
 #include <TEllipse.h>
+#include <TMatrixDEigen.h>
+#include <Math/SpecFuncMathCore.h>
 
 #include <cstdlib>
 #include <iomanip>
@@ -939,13 +941,105 @@ class StatsUtils : public TObject {
 		}
 
 		/** 
-		\brief Get gaus CL ellipse
+		\brief Multiply gaussian 2D ellipse axis by this factor to get the nsigma ellipse contour 
  		*/
+		static double GetEllipseAxisSigmaContourScaleFactor(double nsigma){
+			double scaleFactor= sqrt(-2*log(ROOT::Math::erfc(nsigma/sqrt(2))));	
+			return scaleFactor;
+		}
+
+		/** 
+		\brief Multiply gaussian 2D ellipse axis by this factor to get the CL ellipse contour 
+ 		*/
+		static double GetEllipseAxisCLContourScaleFactor(double CL){
+			double scaleFactor= sqrt(-2. * log(1 - CL));
+			return scaleFactor;
+		}
+
+		/** 
+		\brief Get 2D gaussian confidence ellipse
+ 		*/
+		static TEllipse* GetFitCLEllipse(double x0,double y0,double sigmaX,double sigmaY,double covXY,double CL){
+			
+			/*
+			//Compute eigenvectors of covariance matrix
+			TMatrixD C(2,2);
+			C(0,0)= sigmaX*sigmaX;
+			C(1,1)= sigmaY*sigmaY;
+			C(0,1)= covXY;
+			C(1,0)= C(0,1);
+			TMatrixDEigen E(C);
+			TMatrixD eigenvect= E.GetEigenVectors();
+			TMatrixD eigenvals= E.GetEigenValues();
+			double lambda1= eigenvals(0,0);
+			double lambda2= eigenvals(1,1);
+			double a= sqrt(lambda1);	
+			double b= sqrt(lambda2);
+			double theta= atan2(eigenvect(1,0),eigenvect(0,0))*TMath::RadToDeg();
+
+			TEllipse* ellipse= new TEllipse(x0,y0,a,b,0.,360.,theta);
+			ellipse->SetLineWidth(2);
+			ellipse->SetFillColor(0);
+			ellipse->SetFillStyle(0);
+			*/
+			
+			//Compute ellipse
+			TEllipse* ellipse= GetFitEllipse(x0,y0,sigmaX,sigmaY,covXY,false);	
+			if(!ellipse) return nullptr;		
+
+			//Rescale ellipse axis to get CL contours
+			double scaleFactor= GetEllipseAxisCLContourScaleFactor(CL);
+			double a=	ellipse->GetR1()*scaleFactor;
+			double b=	ellipse->GetR2()*scaleFactor;
+			ellipse->SetR1(a);
+			ellipse->SetR2(b);
+	
+			return ellipse;
+
+		}//close GetFitCLEllipse()
+		
+
+		/** 
+		\brief Get ellipse corresponding to 2D gaussian
+ 		*/
+		static TEllipse* GetFitEllipse(double x0,double y0,double sigmaX,double sigmaY,double covXY,bool useFWHM=false){
+			
+			//Compute ellipse axis & orientation
+			double sx2= sigmaX*sigmaX;
+			double sy2= sigmaY*sigmaY;
+			//double cxy2= covXY*covXY;
+			double rho= covXY/(sigmaX*sigmaY);
+			double t= 0.5*atan2(2*covXY, sx2 - sy2);//in rad
+			double theta= t*TMath::DegToRad();//in deg
+			double a= sqrt(sx2*sy2*(1-rho*rho)/(pow(sigmaY*cos(t),2)-2*covXY*cos(t)*sin(t)+pow(sigmaX*sin(t),2)));
+			double b= sqrt(sx2*sy2*(1-rho*rho)/(pow(sigmaY*sin(t),2)+2*covXY*cos(t)*sin(t)+pow(sigmaX*cos(t),2)));
+			
+			//Scale axis to get ellipse at FWHM
+			if(useFWHM){
+				double scaleFactor= GetEllipseAxisSigmaContourScaleFactor(GausSigma2FWHM);
+				a*= scaleFactor; 
+				b*= scaleFactor;
+			}
+			INFO_LOG("sigmaX="<<sigmaX<<", sigmaY="<<sigmaY<<", covXY="<<covXY<<", theta="<<theta<<", a="<<a<<", b="<<b);
+
+			//Compute ellipse
+			TEllipse* ellipse= new TEllipse(x0,y0,a,b,0.,360.,theta);
+			ellipse->SetLineWidth(2);
+			ellipse->SetFillColor(0);
+			ellipse->SetFillStyle(0);
+
+			return ellipse;
+
+		}//close GetFitEllipse()
+
+		/*
 		static TEllipse* GetFitEllipse(double x0,double y0,double sigmaX,double sigmaY,double theta,bool useFWHM=false){
 
 			//Convert sigmas to FWHM
-			sigmaX*= GausSigma2FWHM; 
-			sigmaY*= GausSigma2FWHM;
+			if(useFWHM){
+				sigmaX*= GausSigma2FWHM; 
+				sigmaY*= GausSigma2FWHM;
+			}
 
 			//Convert to radians
 			double t= theta*TMath::DegToRad();
@@ -969,7 +1063,7 @@ class StatsUtils : public TObject {
 			return ellipse;
 
 		}//close GetFitEllipse()
-		
+		*/
 
 	private:
 	

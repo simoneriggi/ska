@@ -226,8 +226,8 @@ const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 		for(int j=0;j<nPoints;j++){
 			TVector2* contPnt= m_Contours[i]->GetPoint(j);
 			if(!contPnt) continue;
-			//sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
-			sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
+			sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
+			//sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
 		}
 	}
 	sstream<<"# text={S"<<Id<<"}";
@@ -242,8 +242,8 @@ const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 				for(int j=0;j<nPoints;j++){
 					TVector2* contPnt= nestedContours[i]->GetPoint(j);
 					if(!contPnt) continue;
-					//sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
-					sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
+					sstream<<(int)contPnt->X()+1<<" "<<(int)contPnt->Y()+1<<" ";
+					//sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
 				}
 			}//end loop contours
 			sstream<<"# text={S"<<Id<<"_Nest"<<k<<"}";
@@ -255,6 +255,36 @@ const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 	return dsregions;
 
 }//close GetDS9Region()
+
+const std::string Source::GetDS9FittedEllipseRegion(bool useFWHM)
+{
+	//Check if source has fit info
+	const std::string dsregions= "";
+	if(!m_HasFitInfo) return dsregions;
+
+	//Loop over fitted components and get their ellipses
+	std::vector<TEllipse*> ellipses= m_fitPars.GetFittedEllipses();
+
+	//ellipse x y radius radius angle
+	std::stringstream sstream;
+	
+	for(size_t i=0;i<ellipses.size();i++){
+		if(!ellipses[i]) continue;
+
+		//Get ellipse pars
+		double x0= ellipses[i]->GetX1();
+		double y0= ellipses[i]->GetY1();
+		double R1= ellipses[i]->GetR1();
+		double R2= ellipses[i]->GetR2();
+		double theta= ellipses[i]->GetTheta();
+		//theta-= 90;//DS9 format
+		sstream<<"ellipse "<<x0+1<<" "<<y0+1<<" "<<R1<<" "<<R2<<" "<<theta<<" # text={S"<<Id<<"_"<<i+1<<"}"<<endl;
+		
+	}//end loop ellipses
+	
+	return sstream.str();
+
+}//close GetDS9FittedEllipseRegion()
 
 
 const std::string Source::GetDS9EllipseRegion(bool dumpNestedSourceInfo){

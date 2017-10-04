@@ -3,8 +3,6 @@ set(INC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ## GET SOURCES and HEADERS
-#file(GLOB_RECURSE THIS_SRCS ${SRC_DIR}/*.cc)
-#file(GLOB_RECURSE THIS_HEADERS ${INC_DIR}/*.h)
 file(GLOB THIS_SRCS ${SRC_DIR}/*.cc)
 file(GLOB THIS_HEADERS ${INC_DIR}/*.h)
 set(
@@ -24,6 +22,7 @@ set(
 	ChanVeseSegmenter.h
 	SLICSegmenter.h
 	LRACSegmenter.h
+	SourceFitter.h
 )
 set(
 	THIS_DICT_SRCS 
@@ -42,6 +41,7 @@ set(
 	${SRC_DIR}/ChanVeseSegmenter.cc
 	${SRC_DIR}/SLICSegmenter.cc
 	${SRC_DIR}/LRACSegmenter.cc
+	${SRC_DIR}/SourceFitter.cc
 )
 
 set(THIS_HEADERS_WPATH "")

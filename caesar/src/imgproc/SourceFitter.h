@@ -133,6 +133,33 @@ class SourceComponentPars : public TObject {
  		*/
 		std::map<std::string,double>const& GetFitParErrors() const {return FitParsErr;}		
 
+		/** 
+		\brief Get fit ellipse
+ 		*/
+		TEllipse* GetFitEllipse(bool useFWHM=true)
+		{	
+			//Check if has fit pars
+			if(FitPars.empty()) {
+				WARN_LOG("No fitted pars stored, returning nullptr ellipse!");
+				return nullptr;
+			}
+		
+			//Compute fit ellipse from pars
+			double x0= FitPars["x0"];
+			double y0= FitPars["y0"];
+			double sigmaX= FitPars["sigmaX"];
+			double sigmaY= FitPars["sigmaY"];
+			double theta= FitPars["theta"];			
+			//return StatsUtils::GetFitEllipse(x0,y0,sigmaX,sigmaY,theta,useFWHM);
+
+			TEllipse* ellipse= new TEllipse(x0,y0,sigmaX,sigmaY,0.,360.,theta);
+			ellipse->SetLineWidth(2);
+			ellipse->SetFillColor(0);
+			ellipse->SetFillStyle(0);
+
+			return ellipse;
+		}//close GetFitEllipse()
+
 	private:
 		
 
@@ -190,6 +217,17 @@ class SourceFitPars : public TObject {
 		*/
 		double GetOffsetParErr(){return offset_err;}
 
+		/**
+		* \brief Get fitted ellipses
+		*/
+		std::vector<TEllipse*> GetFittedEllipses(bool useFWHM=true){
+			std::vector<TEllipse*> ellipses;
+			for(size_t i=0;i<pars.size();i++){
+				TEllipse* ellipse= pars[i].GetFitEllipse(useFWHM);
+				ellipses.push_back(ellipse);
+			}
+			return ellipses;
+		}
 
 		/**
 		* \brief Get pars

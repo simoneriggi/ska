@@ -197,7 +197,10 @@ class Source : public Blob {
 		* \brief Get DS9 ellipse info
 		*/
 		const std::string GetDS9EllipseRegion(bool dumpNestedSourceInfo=false);
-
+		/**
+		* \brief Get DS9 fitted ellipse info
+		*/
+		const std::string GetDS9FittedEllipseRegion(bool useFWHM=true);
 		
 		//================================================
 		//==         UTILS

@@ -25,7 +25,6 @@
 * @date 01/09/2017
 */
 
-
 #include <SourceFitter.h>
 
 #include <Image.h>
@@ -163,7 +162,8 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 		double bkg= bkgData.first;
 		double rms= bkgData.second;
 		fluxMapHisto->Fill(x,y,S);
-		curvMap->Fill(x,y,Scurv);	
+		//curvMap->Fill(x,y,Scurv);	
+		curvMap->Fill(x,y,S);	
 		bkgMean+= bkg;
 		rmsMean+= rms;
 	}//end loop pixels
@@ -431,14 +431,9 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 }//close FitSource()
 
 
-//bool SourceFitter::HasFitParsAtLimit(TFitResultPtr fitRes){
-bool SourceFitter::HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes){
-
-	//if(!fitRes){
-	//	WARN_LOG("Null ptr to fit results given, returning false!");
-	//	return false;
-	//}
-
+bool SourceFitter::HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes)
+{
+	//Loop over parameters and check if they converged at bounds
 	bool hasParAtLimits= false;
 	
 	for(int i=0;i<fitRes.NPar();i++){

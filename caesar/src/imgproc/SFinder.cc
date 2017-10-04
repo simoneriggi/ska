@@ -237,6 +237,7 @@ void SFinder::InitOptions()
 	m_SourceTree= 0;
 	m_saveDS9Region= true;
 	m_DS9CatalogFileName= "";
+	m_DS9FitCatalogFileName= "";	
 	m_DS9RegionFormat= 1;
 	m_PerfTree= 0;
 		
@@ -426,6 +427,7 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(saveConfig,m_saveConfig);
 	GET_OPTION_VALUE(saveDS9Region,m_saveDS9Region);
 	GET_OPTION_VALUE(ds9RegionFile,m_DS9CatalogFileName);
+	GET_OPTION_VALUE(ds9FitRegionFile,m_DS9FitCatalogFileName);
 	GET_OPTION_VALUE(DS9RegionFormat,m_DS9RegionFormat);
 	GET_OPTION_VALUE(saveSources,m_saveSources);
 	GET_OPTION_VALUE(isInteractiveRun,m_IsInteractiveRun);
@@ -2525,6 +2527,9 @@ int SFinder::DrawSources(Image* image,std::vector<Source*>& sources){
 
 int SFinder::SaveDS9RegionFile(){
 
+	//========================================
+	//==  SAVE SOURCES
+	//========================================
 	//## Open file
 	FILE* fout= fopen(m_DS9CatalogFileName.c_str(),"w");
 
@@ -2551,6 +2556,32 @@ int SFinder::SaveDS9RegionFile(){
 		
 	DEBUG_LOG("[PROC "<<m_procId<<"] - Closing DS9 file region...");
 	fclose(fout);
+
+	//========================================
+	//==  SAVE FITTED SOURCES
+	//========================================
+	if(m_fitSources){
+		//## Open file
+		FILE* fout_fit= fopen(m_DS9FitCatalogFileName.c_str(),"w");
+
+		//## Saving DS9 file region
+		DEBUG_LOG("[PROC "<<m_procId<<"] - Saving DS9 region header for fitted source catalog...");
+		fprintf(fout_fit,"global color=blue font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n");
+		fprintf(fout_fit,"image\n");
+
+		DEBUG_LOG("[PROC "<<m_procId<<"] - Saving "<<m_SourceCollection.size()<<" sources to file...");
+		bool useFWHM= false;
+
+		for(unsigned int k=0;k<m_SourceCollection.size();k++){
+			DEBUG_LOG("[PROC "<<m_procId<<"] - Dumping DS9 region fitting info for source no. "<<k<<" ...");
+			std::string regionInfo= m_SourceCollection[k]->GetDS9FittedEllipseRegion(useFWHM);
+			fprintf(fout_fit,"%s\n",regionInfo.c_str());
+	  	
+		}//end loop sources
+		
+		DEBUG_LOG("[PROC "<<m_procId<<"] - Closing DS9 file region for fitted sources...");
+		fclose(fout_fit);
+	}//close if fit sources
 
 	return 0;
 

@@ -285,7 +285,8 @@ class SFinder : public TObject {
 		bool m_saveConfig;
 		bool m_saveDS9Region;
 		std::string m_DS9CatalogFileName;
-		int m_DS9RegionFormat;		
+		int m_DS9RegionFormat;
+		std::string m_DS9FitCatalogFileName;			
 		TTree* m_SourceTree;
 		bool m_saveSources;
 		bool m_saveResidualMap;
