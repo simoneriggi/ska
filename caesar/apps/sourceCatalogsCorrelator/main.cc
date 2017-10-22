@@ -320,6 +320,9 @@ int CorrelateSourceCatalogs()
 
 	//Loop over first catalogue (e.g. simulated/true sources)
 	for(size_t i=0;i<sources.size();i++){
+		
+		if(i%100==0) INFO_LOG("Find cross-match for source no. "<<i<<"/"<<sources.size()<<"...");
+
 		//Init 1st collection pars
 		long int NPix= sources[i]->GetNPixels();
 		std::vector<MatchingSourceInfo> matched_info;	
@@ -390,6 +393,8 @@ int CorrelateSourceCatalogs()
 			}//close if
 
 			SourceType_rec= sources_rec[index_best]->Type;
+			X0_rec= sources_rec[index_best]->X0;
+			Y0_rec= sources_rec[index_best]->Y0;
 			S_rec= sources_rec[index_best]->GetS();
 			Smax_rec= sources_rec[index_best]->GetSmax();
 			MatchFraction= matchFraction_best;
