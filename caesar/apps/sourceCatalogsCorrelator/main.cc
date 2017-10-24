@@ -59,7 +59,8 @@ static const struct option options_tab[] = {
 	{ "input_rec", required_argument, 0, 'I' },
 	{ "verbosity", required_argument, 0, 'v'},
 	{ "output", optional_argument, 0, 'o' },
-	{ "threshold", required_argument, 0, 't'},	
+	{ "threshold", required_argument, 0, 't'},
+	{ "correctFlux", no_argument, 0, 'c'},	
   {(char*)0, (int)0, (int*)0, (int)0}
 };
 
@@ -69,6 +70,7 @@ std::string fileName= "";
 std::string fileName_rec= "";
 int verbosity= 4;//INFO level
 float matchingThreshold= 0.9;
+bool correctFlux= false;
 
 //Globar vars
 TFile* outputFile= 0;
@@ -87,6 +89,7 @@ double Smax;
 double S_true;
 double X0_true;
 double Y0_true;
+std::string SourceName_rec;
 int SourceType_rec;
 double S_rec;
 double X0_rec;
@@ -97,7 +100,6 @@ int HasFitInfo;
 double S_fit;
 double X0_fit;
 double Y0_fit;
-
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
@@ -169,7 +171,7 @@ int ParseOptions(int argc, char *argv[])
 	int c = 0;
   int option_index = 0;
 
-	while((c = getopt_long(argc, argv, "hi:I:o:v:t:",options_tab, &option_index)) != -1) {
+	while((c = getopt_long(argc, argv, "hi:I:o:v:t:c",options_tab, &option_index)) != -1) {
     
     switch (c) {
 			case 0 : 
@@ -206,7 +208,11 @@ int ParseOptions(int argc, char *argv[])
 				matchingThreshold= atof(optarg);
 				break;
 			}
-
+			case 'c':
+			{
+				correctFlux= true;
+				break;
+			}
 			default:
 			{
       	Usage(argv[0]);	
@@ -344,6 +350,7 @@ int CorrelateSourceCatalogs()
 		}	
 
 		//Init rec collection pars
+		SourceName_rec= "";
 		S_rec= -1;
 		Smax_rec= -1;
 		X0_rec= -1;
@@ -358,7 +365,7 @@ int CorrelateSourceCatalogs()
 		//Loop over second catalogue (e.g. detected/reconstructed sources)
 		for(size_t j=0;j<sources_rec.size();j++){
 			long int NPix_rec= sources_rec[j]->GetNPixels();
-			std::string SourceName_rec= std::string(sources_rec[j]->GetName());
+			SourceName_rec= std::string(sources_rec[j]->GetName());
 			X0_rec= sources_rec[j]->X0;
 			Y0_rec= sources_rec[j]->Y0;
 
@@ -392,12 +399,21 @@ int CorrelateSourceCatalogs()
 				}//end loop matchings
 			}//close if
 
+
+			double fluxCorrectionFactor= sources_rec[index_best]->GetBeamFluxIntegral();
+			SourceName_rec= std::string(sources_rec[index_best]->GetName());
 			SourceType_rec= sources_rec[index_best]->Type;
 			X0_rec= sources_rec[index_best]->X0;
 			Y0_rec= sources_rec[index_best]->Y0;
 			S_rec= sources_rec[index_best]->GetS();
 			Smax_rec= sources_rec[index_best]->GetSmax();
 			MatchFraction= matchFraction_best;
+	
+			//Correct flux from Jy/beam to Jy
+			if(correctFlux){
+				S_rec/= fluxCorrectionFactor;
+				Smax_rec/= fluxCorrectionFactor;
+			}
 
 			//If source has fit info loop over fitted components to find best match
 			//NB: If fit is good this should increase the positional & flux accuracy
@@ -419,8 +435,13 @@ int CorrelateSourceCatalogs()
 						Y0_fit= Y0_fitcomp;
 					}
 				}//end loop fitted components
-			}//close has fit info
 
+				//Correct flux from Jy/beam to Jy
+				if(correctFlux){
+					S_fit/= fluxCorrectionFactor;
+				}
+
+			}//close has fit info
 		}//close if has match
 	
 		matchedSourceInfo->Fill();
@@ -451,6 +472,7 @@ void Init(){
 	matchedSourceInfo->Branch("S_true",&S_true,"S_true/D");
 	matchedSourceInfo->Branch("X0_true",&X0_true,"X0_true/D");
 	matchedSourceInfo->Branch("Y0_true",&Y0_true,"Y0_true/D");
+	matchedSourceInfo->Branch("name_rec",&SourceName_rec);	
 	matchedSourceInfo->Branch("type_rec",&SourceType_rec,"type_rec/I");
 	matchedSourceInfo->Branch("S_rec",&S_rec,"S_rec/D");
 	matchedSourceInfo->Branch("Smax_rec",&Smax_rec,"Smax_rec/D");
