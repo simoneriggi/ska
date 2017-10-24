@@ -239,6 +239,7 @@
 #pragma link C++ class Caesar::SourceFitPars+;
 #pragma link C++ class Caesar::SourceFitter+;
 #pragma link C++ enum Caesar::FitStatusFlag;
+#pragma link C++ struct SourceFitOptions+;
 //======================
 
 
