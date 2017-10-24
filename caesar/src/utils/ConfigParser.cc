@@ -178,6 +178,8 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//==  Image beam options               ==
 		//=======================================
 		REGISTER_OPTION(beamFWHM,double,6.5,0,3600);//circular beam FWHM in arcsec
+		REGISTER_OPTION(beamBmaj,double,10,0,3600);//elliptical beam maj FWHM in arcsec
+		REGISTER_OPTION(beamBmin,double,5,0,3600);//elliptical beam min FWHM in arcsec
 		REGISTER_OPTION(beamTheta,double,0,-0.0001,180);//circular beam rot in degrees
 		REGISTER_OPTION(pixSize,double,1,0,3600);//pixel area in arcsec
 
@@ -292,10 +294,22 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(dilateRandomize,bool,false,false,true);
 
 		//==================================
-		//==  Source deblending options   ==
+		//==  Source fitting options   ==
 		//==================================
 		REGISTER_OPTION(fitSources,bool,false,false,true);
-		REGISTER_OPTION(fitMaxNComponents,int,3,0,100);			
+		REGISTER_OPTION(fitMaxNComponents,int,3,0,100);		
+		REGISTER_OPTION(fitWithFixedBkg,bool,true,false,true);
+		REGISTER_OPTION(fitUseEstimatedBkgLevel,bool,true,false,true);
+		REGISTER_OPTION(fitBkgLevel,double,0.,-1.e+6,1.e+6);
+		REGISTER_OPTION(fitAmplLimit,double,0.3,0,2);
+		REGISTER_OPTION(fixSigmaInPreFit,bool,true,false,true);
+		REGISTER_OPTION(fitSigmaLimit,double,0.3,0,2);
+		REGISTER_OPTION(fitWithFixedSigma,bool,false,false,true);
+		REGISTER_OPTION(fitWithFixedTheta,bool,false,false,true);
+		REGISTER_OPTION(fitThetaLimit,double,5,0,360);
+		REGISTER_OPTION(useFluxZCutInFit,bool,false,false,true);
+		REGISTER_OPTION(fitZCutMin,double,2.5,0,1000);
+		
 		//REGISTER_OPTION(deblendCurvThr,double,0,-0.0001,1.00001);	
 		//REGISTER_OPTION(deblendComponentMinNPix,double,5,0,100000);			
 			
