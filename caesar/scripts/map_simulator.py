@@ -354,9 +354,9 @@ class SkyMapSimulator(object):
 		
 	def compute_beam_area(self,Bmaj,Bmin):
 		""" Compute beam area """
-		A= np.pi*Bmaj*Bmin/(4*np.log(2));#2d gaussian area with FWHM=fx,fy (in arcsec^2)
-		pixelArea= np.fabs(self.pixsize*self.pixsize);# in arcsec^2
-		beam_area= A/pixelArea;# in pixels
+		A= np.pi*Bmaj*Bmin/(4*np.log(2)) #2d gaussian area with FWHM=fx,fy (in arcsec^2)
+		pixelArea= np.fabs(self.pixsize*self.pixsize) # in arcsec^2
+		beam_area= A/pixelArea # in pixels
 		return beam_area
 
 	def compute_beam_sigma(self,fwhm):
@@ -544,7 +544,7 @@ class SkyMapSimulator(object):
 			S= (z*self.bkg_rms) + self.bkg_level
 	
 			## Generate blob
-			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax,sigmay=sigmay,theta=theta)
+			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta)
 			sources_data+= blob_data
 
 			## Set model map
@@ -559,7 +559,6 @@ class SkyMapSimulator(object):
 			source_type= Caesar.Source.ePointLike
 			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0)
 			self.caesar_sources.append(caesar_source)
-
 
 		return [sources_data,mask_data]
 
