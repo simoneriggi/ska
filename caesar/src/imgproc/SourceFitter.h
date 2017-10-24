@@ -68,6 +68,58 @@ struct BlobPars {
 	double bpa;//in deg
 };
 
+struct SourceFitOptions {
+	//- Blob start fit pars
+	double bmaj;//in pixels
+	double bmin;//in pixels
+	double bpa;//in degrees
+
+	//- Max number of components to be fitted
+	int nMaxComponents;
+
+	//- Bkg options
+	bool fixBkg;
+	bool useEstimatedBkgLevel;
+	double fixedBkgLevel;
+		
+	//- Amplitude fit par range (example +-20% around source peak)
+	double amplLimit;
+
+	//- Sigma fit par range (example +-20% around source peak)
+	bool fixSigmaInPreFit;
+	bool fixSigma;
+	double sigmaLimit;
+
+	//- Theta 
+	bool fixTheta;
+	double thetaLimit;//in deg
+
+	//- Flux significance min threshold (in nsigmas above the bkg)
+	bool useFluxZCut;
+	double fluxZThrMin;
+
+	//Default constructor
+	SourceFitOptions() 
+	{
+    bmaj= 5;//pix
+    bmin= 5;//pix
+		bpa= 0;
+		nMaxComponents= 3;
+		fixBkg= true;
+		useEstimatedBkgLevel= true;
+		fixedBkgLevel= 0;
+		amplLimit= 0.2;
+		sigmaLimit= 0.2;
+		fixSigmaInPreFit= false;
+		fixSigma= false;
+		fixTheta= false;
+		thetaLimit= 5;//deg
+		useFluxZCut= false;
+		fluxZThrMin= 2.5;//in nsigmas
+	}//close constructor
+};//close SourceFitOptions
+
+
 //========================================
 //==         SOURCE COMPONENT PARS
 //========================================
@@ -401,6 +453,13 @@ class SourceFitPars : public TObject {
 //========================================
 //==         SOURCE FITTER
 //========================================
+/*
+struct FitData {
+	double x;
+	double y;
+	double S;
+};
+*/
 
 class SourceFitter : public TObject {
 
@@ -430,7 +489,7 @@ class SourceFitter : public TObject {
 		/**
 		* \brief Fit source
 		*/
-		int FitSource(Source* source,BlobPars blobPars,int nMaxComponents=3);
+		int FitSource(Source* source,SourceFitOptions& fitOptions);
 		
 		/**
 		* \brief Get fit pars
@@ -451,12 +510,16 @@ class SourceFitter : public TObject {
 		* \brief 2D Gaussian model used for the fit
 		*/
 		static double Gaus2DFcn(double* x, double* p);
+
+		/**
+		* \brief Residual fit function
+		*/
+		//static double ResidualFitFcn(double* x, double* p);
 		
 	protected:
 		/**
 		* \brief Check if fit has parameters converged at bounds
 		*/
-		//bool HasFitParsAtLimit(TFitResultPtr fitRes);
 		bool HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes);
 
 	private:
@@ -464,8 +527,8 @@ class SourceFitter : public TObject {
 		static int m_NFitComponents;
 		static int m_fitStatus;
 		static SourceFitPars m_sourceFitPars;
-		//static std::vector<TEllipse> m_fitEllipses;
-
+		//static std::vector<FitData> m_fitData;
+		
 	ClassDef(SourceFitter,1)
 
 };//close SourceFitter class
@@ -475,6 +538,7 @@ class SourceFitter : public TObject {
 #pragma link C++ class SourceFitPars+;
 #pragma link C++ class SourceFitter+;
 #pragma link C++ enum FitStatusFlag;
+#pragma link C++ struct SourceFitOptions+;
 #endif
 
 }//close namespace

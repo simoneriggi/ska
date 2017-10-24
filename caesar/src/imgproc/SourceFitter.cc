@@ -101,7 +101,6 @@ namespace Caesar {
 //Static variables
 int SourceFitter::m_NFitComponents= 0;
 SourceFitPars SourceFitter::m_sourceFitPars;
-//std::vector<TEllipse> SourceFitter::m_fitEllipses;
 int SourceFitter::m_fitStatus= eFitUnknownStatus;
 
 //Constructor
@@ -118,7 +117,7 @@ SourceFitter::~SourceFitter()
 }//close destructor
 
 
-int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents)
+int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 {
 	//## Check input source
 	if(!aSource){
@@ -126,7 +125,11 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 		m_fitStatus= eFitAborted;
 		return -1;
 	}
-	INFO_LOG("Fitting source (id="<<aSource->Id<<", name="<<aSource->GetName()<<") assuming these blob pars: {Bmaj(pix)="<<blobPars.bmaj<<", Bmin(pix)="<<blobPars.bmin<<", Bpa(deg)="<<blobPars.bpa<<"}");
+
+	//## Set fit options
+	//fitOptions
+
+	INFO_LOG("Fitting source (id="<<aSource->Id<<", name="<<aSource->GetName()<<") assuming these blob pars: {Bmaj(pix)="<<fitOptions.bmaj<<", Bmin(pix)="<<fitOptions.bmin<<", Bpa(deg)="<<fitOptions.bpa<<"}");
 
 	//## Check if stats has been computed, otherwise compute them
 	if(!aSource->HasStats()){
@@ -153,23 +156,59 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 	std::vector<Pixel*> pixels= aSource->GetPixels();
 	double bkgMean= 0.;
 	double rmsMean= 0.;
-	for(size_t k=0;k<pixels.size();k++){
-		double x= pixels[k]->x;
-		double y= pixels[k]->y;
-		double S= pixels[k]->S;
-		double Scurv= pixels[k]->GetCurv();	
-		std::pair<double,double> bkgData= pixels[k]->GetBkg();	
-		double bkg= bkgData.first;
-		double rms= bkgData.second;
-		fluxMapHisto->Fill(x,y,S);
-		//curvMap->Fill(x,y,Scurv);	
-		curvMap->Fill(x,y,S);	
-		bkgMean+= bkg;
-		rmsMean+= rms;
-	}//end loop pixels
+	long int ndata= 0;
+	if(fitOptions.useFluxZCut){
+		for(size_t k=0;k<pixels.size();k++){
+			double x= pixels[k]->x;
+			double y= pixels[k]->y;
+			double S= pixels[k]->S;
+			double Scurv= pixels[k]->GetCurv();	
+			std::pair<double,double> bkgData= pixels[k]->GetBkg();	
+			double bkg= bkgData.first;
+			double rms= bkgData.second;
+			if(rms>0) {
+				double Z= (S-bkg)/rms;		
+				if(Z>fitOptions.fluxZThrMin) {
+					fluxMapHisto->Fill(x,y,S);
+					bkgMean+= bkg;
+					rmsMean+= rms;
+					ndata++;
+				}
+			}
+			else{		
+				fluxMapHisto->Fill(x,y,S);
+				bkgMean+= bkg;
+				rmsMean+= rms;
+				ndata++;
+			}
+			//curvMap->Fill(x,y,Scurv);	
+			curvMap->Fill(x,y,S);	
+		}//end loop pixels
+
+		bkgMean/= (double)(ndata);
+		rmsMean/= (double)(ndata);
+	}//close if
+	else{
+		for(size_t k=0;k<pixels.size();k++){
+			double x= pixels[k]->x;
+			double y= pixels[k]->y;
+			double S= pixels[k]->S;
+			double Scurv= pixels[k]->GetCurv();	
+			std::pair<double,double> bkgData= pixels[k]->GetBkg();	
+			double bkg= bkgData.first;
+			double rms= bkgData.second;
+			 
+			fluxMapHisto->Fill(x,y,S);
+			//curvMap->Fill(x,y,Scurv);	
+			curvMap->Fill(x,y,S);	
+			bkgMean+= bkg;
+			rmsMean+= rms;
+		}//end loop pixels
 	
-	bkgMean/= (double)(pixels.size());
-	rmsMean/= (double)(pixels.size());
+		bkgMean/= (double)(pixels.size());
+		rmsMean/= (double)(pixels.size());
+	}//close else
+	
 	INFO_LOG("source (id="<<aSource->Id<<", name="<<aSource->GetName()<<") bkg info: <bkg>="<<bkgMean<<", <rms>="<<rmsMean);
 
 	//Check if histo has entries
@@ -210,7 +249,7 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 		return -1;
 	}
 
-	INFO_LOG("#"<<nComponents<<" components found in source (id="<<aSource->Id<<", name="<<aSource->GetName()<<"), #"<<nMaxComponents<<" components will be fitted at maximum...");
+	INFO_LOG("#"<<nComponents<<" components found in source (id="<<aSource->Id<<", name="<<aSource->GetName()<<"), #"<<fitOptions.nMaxComponents<<" components will be fitted at maximum...");
 	
 	//## Sort peak fluxes and get sort indexes 
 	//## NB: If maximum number of components is exceeded, limit fit to brightest components
@@ -237,10 +276,8 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 	std::vector<double> componentPeakFluxes_sorted;
 	CodeUtils::sort_descending(componentPeakFluxes,componentPeakFluxes_sorted,sort_index);
 
-	
-
 	//## Initialize fit function with start parameters
-	m_NFitComponents= std::min(nComponents,nMaxComponents);
+	m_NFitComponents= std::min(nComponents,fitOptions.nMaxComponents);
 	int nComponentPars= 6;
 	int nFitPars= nComponentPars*m_NFitComponents + 1;//fit components + constant offset
 	double fitRangeXmin= fluxMapHisto->GetXaxis()->GetXmin();
@@ -260,7 +297,30 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 	sourceFitFcn->SetNpy(1000);	
 	INFO_LOG("Created source fit function (nPars="<<nFitPars<<") with range: X["<<fitRangeXmin<<","<<fitRangeXmax<<"], Y["<<fitRangeYmin<<","<<fitRangeYmax<<"]");
 
+	//## Set start fit pars
 	int par_counter= 0;
+
+	//- Offset
+	double offset= 0.;
+	if(fitOptions.fixBkg){//fix bkg level fit par
+		if(fitOptions.useEstimatedBkgLevel) offset= bkgMean;//use estimated avg bkg
+		else offset= fitOptions.fixedBkgLevel;//use user-supplied bkg level
+		sourceFitFcn->SetParameter(nFitPars-1,offset);
+		sourceFitFcn->FixParameter(nFitPars-1,offset);	
+	}
+	else{
+		if(fitOptions.useEstimatedBkgLevel) offset= bkgMean;//use estimated avg bkg
+		else offset= fitOptions.fixedBkgLevel;//use user-supplied bkg level
+		if(bkgMean<Smin || bkgMean>Smax) offset= Smin;
+		double offset_min= std::min(Smin,offset-fabs(rmsMean));
+		double offset_max= std::min(Smax,offset+fabs(rmsMean));
+		sourceFitFcn->SetParameter(nFitPars-1,offset);
+		sourceFitFcn->SetParLimits(nFitPars-1,offset_min,offset_max);
+		INFO_LOG("offset="<<offset<<" ["<<offset_min<<","<<offset_max<<"]");
+	}
+	sourceFitFcn->SetParName(nFitPars-1,"offset");
+	
+
 	for(int i=0;i<m_NFitComponents;i++){
 		size_t index= sort_index[i];
 
@@ -268,18 +328,21 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 		double y= peakPoints[index].Y();
 		long int gbin= fluxMapHisto->FindBin(x,y);
 		double Speak= fluxMapHisto->GetBinContent(gbin);
+
+		//Subtract offset from peak
+		Speak-= offset;
 		
 		//## Set i-th component parameters
 		//- Amplitude
-		double Speak_min= std::max(Smin, Speak*0.90);
-		double Speak_max= std::min(Smax, Speak*1.10);
+		double Speak_min= std::max(Smin, Speak*(1 - fitOptions.amplLimit) );//0.9
+		double Speak_max= std::min(Smax, Speak*(1 + fitOptions.amplLimit) );//1.10
 		sourceFitFcn->SetParName(par_counter,Form("%s_%d",parNamePrefix[0].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter,Speak);
 		sourceFitFcn->SetParLimits(par_counter,Speak_min,Speak_max);
 		INFO_LOG("Speak="<<Speak<<" ["<<Speak_min<<","<<Speak_max<<"]");
 
 		//- Centroids
-		double centroidLimit= 0.5 * sqrt(pow(blobPars.bmaj,2) + pow(blobPars.bmin,2));
+		double centroidLimit= 0.5 * sqrt(pow(fitOptions.bmaj,2) + pow(fitOptions.bmin,2));
 		double x0_min= x - centroidLimit;
 		double x0_max= x + centroidLimit;
 		double y0_min= y - centroidLimit;
@@ -294,14 +357,14 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 		INFO_LOG("(x,y)=("<<x<<","<<y<<")"<<" bounds x("<<x0_min<<","<<x0_max<<") y("<<y0_min<<","<<y0_max<<")");
 
 		//- Sigmas
-		double sigmaX= blobPars.bmaj/GausSigma2FWHM;
-		double sigmaY= blobPars.bmin/GausSigma2FWHM;
+		double sigmaX= fitOptions.bmaj/GausSigma2FWHM;
+		double sigmaY= fitOptions.bmin/GausSigma2FWHM;
 		double sourceSigmaMax_x= fabs(Xmax-Xmin)*sqrt(2.)/GausSigma2FWHM;
 		double sourceSigmaMax_y= fabs(Ymax-Ymin)*sqrt(2.)/GausSigma2FWHM;
-		double sigmaX_min= 0.8*sigmaX;
-		double sigmaY_min= 0.8*sigmaY;
-		double sigmaX_max= std::max(sourceSigmaMax_x,sigmaX*1.1);
-		double sigmaY_max= std::max(sourceSigmaMax_y,sigmaY*1.1);
+		double sigmaX_min= sigmaX*(1-fitOptions.sigmaLimit);
+		double sigmaY_min= sigmaY*(1-fitOptions.sigmaLimit);
+		double sigmaX_max= std::max(sourceSigmaMax_x,sigmaX*(1+fitOptions.sigmaLimit));
+		double sigmaY_max= std::max(sourceSigmaMax_y,sigmaY*(1+fitOptions.sigmaLimit));
 		sourceFitFcn->SetParName(par_counter+3,Form("%s_%d",parNamePrefix[3].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter+3,sigmaX);
 		sourceFitFcn->SetParLimits(par_counter+3,sigmaX_min,sigmaX_max);
@@ -311,33 +374,53 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 		INFO_LOG("(sigmaX,sigmaY)=("<<sigmaX<<","<<sigmaY<<")"<<" bounds sigmaX("<<sigmaX_min<<","<<sigmaX_max<<") y("<<sigmaY_min<<","<<sigmaY_max<<")");
 
 		//- Theta		
-		double theta= blobPars.bpa;
+		double theta= fitOptions.bpa;
+		double theta_min= theta - fitOptions.thetaLimit;
+		double theta_max= theta + fitOptions.thetaLimit;
 		sourceFitFcn->SetParName(par_counter+5,Form("%s_%d",parNamePrefix[5].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter+5,theta);
-		INFO_LOG("theta="<<theta);
+		sourceFitFcn->SetParLimits(par_counter+5,theta_min,theta_max);
+		INFO_LOG("theta="<<theta<<" bounds ("<<theta_min<<","<<theta_max<<")");
 
 		//Update par counter
 		par_counter+= nComponentPars;
 	
 	}//end loop components
 
-	//- Offset
-	double offset= bkgMean;
-	if(bkgMean<Smin || bkgMean>Smax) offset= Smin;
-	double offset_min= std::min(Smin,offset-fabs(rmsMean));
-	double offset_max= std::min(Smax,offset+fabs(rmsMean));
-	sourceFitFcn->SetParName(nFitPars-1,"offset");
-	sourceFitFcn->SetParameter(nFitPars-1,offset);
-	sourceFitFcn->SetParLimits(nFitPars-1,offset_min,offset_max);
+	
+	//==============================================
+	//==             PRE-FIT
+	//==============================================
+	//## Fix sigmas to blob size?
+	if(fitOptions.fixSigmaInPreFit){
+		for(int i=0;i<m_NFitComponents;i++){
+			//Sigma X
+			TString parName= Form("%s_%d",parNamePrefix[3].c_str(),i+1);
+			int parNumber= sourceFitFcn->GetParNumber(parName);
+			double parValue= sourceFitFcn->GetParameter(parName);
+			sourceFitFcn->FixParameter(parNumber,parValue);
 
-	//## Pre-fit with theta fixed to beam bpa
+			//Sigma Y
+			parName= Form("%s_%d",parNamePrefix[4].c_str(),i+1);
+			parNumber= sourceFitFcn->GetParNumber(parName);
+			parValue= sourceFitFcn->GetParameter(parName);
+			sourceFitFcn->FixParameter(parNumber,parValue);
+		}
+	}//close if fix sigma
+
+	//## Fix theta to beam bpa 
 	for(int i=0;i<m_NFitComponents;i++){
 		TString parName= Form("%s_%d",parNamePrefix[nComponentPars-1].c_str(),i+1);
 		int parNumber= sourceFitFcn->GetParNumber(parName);
-		double theta= blobPars.bpa;
+		double theta= fitOptions.bpa;
 		sourceFitFcn->FixParameter(parNumber,theta);
 	}
-	int prefitStatus= fluxMapHisto->Fit(sourceFitFcn,"R");
+	
+	//## Fix offset 
+	sourceFitFcn->FixParameter(nFitPars-1,offset);
+
+	//## Perform pre-fit
+	int prefitStatus= fluxMapHisto->Fit(sourceFitFcn,"RWN");
 	if(prefitStatus!=0){
 		WARN_LOG("Source pre-fit failed or did not converge.");
 		m_fitStatus= eFitNotConverged;
@@ -350,14 +433,64 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 		return 0;
 	}
 
-	//## Release theta and fit again
-	for(int i=0;i<m_NFitComponents;i++){
-		TString parName= Form("%s_%d",parNamePrefix[nComponentPars-1].c_str(),i+1);
-		int parNumber= sourceFitFcn->GetParNumber(parName);
-		sourceFitFcn->ReleaseParameter(parNumber);
+	//==============================================
+	//==             FIT
+	//==============================================
+	//## Fix sigmas?
+	if(fitOptions.fixSigma){
+		for(int i=0;i<m_NFitComponents;i++){
+			//Sigma X
+			TString parName= Form("%s_%d",parNamePrefix[3].c_str(),i+1);
+			int parNumber= sourceFitFcn->GetParNumber(parName);
+			double parValue= sourceFitFcn->GetParameter(parName);
+			sourceFitFcn->FixParameter(parNumber,parValue);
+
+			//Sigma Y
+			parName= Form("%s_%d",parNamePrefix[4].c_str(),i+1);
+			parNumber= sourceFitFcn->GetParNumber(parName);
+			parValue= sourceFitFcn->GetParameter(parName);
+			sourceFitFcn->FixParameter(parNumber,parValue);
+		}
+	}//close if fix sigma
+	else{
+		for(int i=0;i<m_NFitComponents;i++){
+			//Sigma X
+			TString parName= Form("%s_%d",parNamePrefix[3].c_str(),i+1);
+			int parNumber= sourceFitFcn->GetParNumber(parName);
+			sourceFitFcn->ReleaseParameter(parNumber);
+
+			//Sigma Y
+			parName= Form("%s_%d",parNamePrefix[4].c_str(),i+1);
+			parNumber= sourceFitFcn->GetParNumber(parName);
+			sourceFitFcn->ReleaseParameter(parNumber);
+		}
+	}//close else
+
+	//## Fix theta?
+	if(fitOptions.fixTheta){
+		for(int i=0;i<m_NFitComponents;i++){
+			TString parName= Form("%s_%d",parNamePrefix[nComponentPars-1].c_str(),i+1);
+			int parNumber= sourceFitFcn->GetParNumber(parName);
+			double parValue= sourceFitFcn->GetParameter(parName);
+			sourceFitFcn->FixParameter(parNumber,parValue);
+		}
+	}//close if fix theta
+	else { 
+		for(int i=0;i<m_NFitComponents;i++){
+			TString parName= Form("%s_%d",parNamePrefix[nComponentPars-1].c_str(),i+1);
+			int parNumber= sourceFitFcn->GetParNumber(parName);
+			sourceFitFcn->ReleaseParameter(parNumber);
+		}
+	}//close else
+	
+	//## Release offset?
+	if(!fitOptions.fixBkg){
+		sourceFitFcn->ReleaseParameter(nFitPars-1);
 	}
+
+	//## Fit again
 	//TFitResultPtr fitRes= fluxMapHisto->Fit(sourceFitFcn,"S");
-	fluxMapHisto->Fit(sourceFitFcn,"S");
+	fluxMapHisto->Fit(sourceFitFcn,"SRWN");
 	TBackCompFitter* fitter = (TBackCompFitter *) TVirtualFitter::GetFitter();
 	const ROOT::Fit::FitResult& fitRes = fitter->GetFitResult();
 	
@@ -366,22 +499,19 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 	int fitMinimizerStatus= -1;
 	int fitStatus= -1;
 	bool hasParsAtLimits= false;
-	//if(fitRes) {
-		if(fitRes.IsValid()) {
-			fitStatus= 0;
-			m_fitStatus= eFitConverged;
-		}
 	
-		//NB: Minuit fit status = migradResult + 10*minosResult + 100*hesseResult + 1000*improveResult (4: MIGRAD error, 40: MINOS error, 400: HESSE error, 4000: IMPROVE error)
-		fitMinimizerStatus= fitRes.Status();
+	if(fitRes.IsValid()) {
+		fitStatus= 0;
+		m_fitStatus= eFitConverged;
+	}
+	
+	//NB: Minuit fit status = migradResult + 10*minosResult + 100*hesseResult + 1000*improveResult (4: MIGRAD error, 40: MINOS error, 400: HESSE error, 4000: IMPROVE error)
+	fitMinimizerStatus= fitRes.Status();
 
-		//Check if has parameters at bounds
-		hasParsAtLimits= HasFitParsAtLimit(fitRes);
-		if(hasParsAtLimits) m_fitStatus= eFitConvergedWithWarns;
-	//}
-	//else{
-	//	WARN_LOG("Null ptr to fit result pointer!");
-	//}
+	//Check if has parameters at bounds
+	hasParsAtLimits= HasFitParsAtLimit(fitRes);
+	if(hasParsAtLimits) m_fitStatus= eFitConvergedWithWarns;
+	
 
 	double Chi2= sourceFitFcn->GetChisquare();//fitRes->Chi2();
 	double NDF= sourceFitFcn->GetNDF();//fitRes->Ndf();
@@ -416,7 +546,24 @@ int SourceFitter::FitSource(Source* aSource,BlobPars blobPars,int nMaxComponents
 	double fittedOffsetErr= sourceFitFcn->GetParError(par_counter);
 	m_sourceFitPars.SetOffsetPar(fittedOffset);
 	m_sourceFitPars.SetOffsetParErr(fittedOffsetErr);
-	
+
+	//Compute fit residuals	
+	double residualMean= 0;
+	double nres= 0;
+	for (int i=0;i<fluxMapHisto->GetNbinsX();i++) {
+		double x= fluxMapHisto->GetXaxis()->GetBinCenter(i+1);
+		for (int j=0;j<fluxMapHisto->GetNbinsY();j++) {
+			double y= fluxMapHisto->GetYaxis()->GetBinCenter(j+1);
+			double data= fluxMapHisto->GetBinContent(i+1,j+1);
+			if(!std::isnormal(data) || data==0) continue;
+			double model= sourceFitFcn->Eval(x,y);
+  		double res = data - model;
+			residualMean+= res;
+			nres++;
+		}
+  }
+	if(nres>0) residualMean/= nres;
+	INFO_LOG("Fit residual mean="<<residualMean);
 	
 	//Clear up data
 	delete curvMap;
@@ -454,6 +601,8 @@ bool SourceFitter::HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes)
 	return hasParAtLimits;
 
 }//close HasFitParsAtLimit()
+
+
 
 
 double SourceFitter::Gaus2DMixtureFcn(double* x, double* p)

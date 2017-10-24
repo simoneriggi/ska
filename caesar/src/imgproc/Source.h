@@ -267,7 +267,8 @@ class Source : public Blob {
 		/**
 		* \brief Fit source with a multi-component gaussian model
 		*/
-		int Fit(BlobPars blobPars,int nMaxComponents=3);
+		int Fit(SourceFitOptions& fitOptions);
+
 		/**
 		* \brief Set true source info
 		*/

@@ -217,6 +217,8 @@ void SFinder::InitOptions()
 
 	//Beam info
 	m_beamFWHM= 6.5;
+	m_beamFWHMMax= 10;
+	m_beamFWHMMin= 5;
 	m_pixSize= 1;
 	m_fluxCorrectionFactor= 1;
 	
@@ -414,12 +416,15 @@ int SFinder::Configure(){
 
 	GET_OPTION_VALUE(mergeSourcesAtEdge,m_mergeSourcesAtEdge);
 	
-	//Get beam options
-	GET_OPTION_VALUE(beamFWHM,m_beamFWHM);
+	//Get user-supplied map & beam options
 	GET_OPTION_VALUE(pixSize,m_pixSize);
+	GET_OPTION_VALUE(beamFWHM,m_beamFWHM);
+	GET_OPTION_VALUE(beamBmaj,m_beamFWHMMax);
+	GET_OPTION_VALUE(beamBmin,m_beamFWHMMin);
 	GET_OPTION_VALUE(beamTheta,m_beamTheta);
-	m_fluxCorrectionFactor= AstroUtils::GetBeamAreaInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
-	INFO_LOG("[PROC "<<m_procId<<"] - User-supplied beam info (fwhm="<<m_beamFWHM<<", dx="<<m_pixSize<<", theta="<<m_beamTheta<<", fluxCorrFactor="<<m_fluxCorrectionFactor<<")");
+	//m_fluxCorrectionFactor= AstroUtils::GetBeamAreaInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
+	m_fluxCorrectionFactor= AstroUtils::GetBeamAreaInPixels(m_beamFWHMMax,m_beamFWHMMin,m_pixSize,m_pixSize);
+	INFO_LOG("[PROC "<<m_procId<<"] - User-supplied beam info (bmaj="<<m_beamFWHMMax<<", bmin="<<m_beamFWHMMin<<", theta="<<m_beamTheta<<", dx="<<m_pixSize<<", fluxCorrFactor="<<m_fluxCorrectionFactor<<")");
 
 	//Get output file options
 	GET_OPTION_VALUE(outputFile,m_OutputFileName);
@@ -495,6 +500,17 @@ int SFinder::Configure(){
 	//Get source fitting options
 	GET_OPTION_VALUE(fitSources,m_fitSources);
 	GET_OPTION_VALUE(fitMaxNComponents,m_fitMaxNComponents);
+	GET_OPTION_VALUE(fitWithFixedBkg,m_fitWithFixedBkg);
+	GET_OPTION_VALUE(fitUseEstimatedBkgLevel,m_fitUseEstimatedBkgLevel);
+	GET_OPTION_VALUE(fitBkgLevel,m_fitBkgLevel);
+	GET_OPTION_VALUE(fitAmplLimit,m_fitAmplLimit);
+	GET_OPTION_VALUE(fixSigmaInPreFit,m_fixSigmaInPreFit);
+	GET_OPTION_VALUE(fitSigmaLimit,m_fitSigmaLimit);
+	GET_OPTION_VALUE(fitWithFixedSigma,m_fitWithFixedSigma);
+	GET_OPTION_VALUE(fitWithFixedTheta,m_fitWithFixedTheta);
+	GET_OPTION_VALUE(fitThetaLimit,m_fitThetaLimit);
+	GET_OPTION_VALUE(useFluxZCutInFit,m_useFluxZCutInFit);
+	GET_OPTION_VALUE(fitZCutMin,m_fitZCutMin);
 	//GET_OPTION_VALUE(deblendCurvThr,m_deblendCurvThr);
 	//GET_OPTION_VALUE(deblendComponentMinNPix,m_deblendComponentMinNPix);
 	
@@ -2307,6 +2323,24 @@ int SFinder::FitSources(std::vector<Source*>& sources){
 	blobPars.bmin= static_cast<int>( ceil(m_beamBmin/m_pixSizeY) );//converted in pixels
 	blobPars.bpa= m_beamBpa;
 
+	//Set fit options
+	SourceFitOptions fitOptions;	
+	fitOptions.bmaj= m_beamBmaj/m_pixSizeX;//converted in pixels
+	fitOptions.bmin= m_beamBmin/m_pixSizeY;//converted in pixels
+	fitOptions.bpa= m_beamBpa;
+	fitOptions.nMaxComponents= m_fitMaxNComponents;
+	fitOptions.fixBkg= m_fitWithFixedBkg;
+	fitOptions.useEstimatedBkgLevel= m_fitUseEstimatedBkgLevel;
+	fitOptions.fixedBkgLevel= m_fitBkgLevel;
+	fitOptions.amplLimit= m_fitAmplLimit;
+	fitOptions.fixSigmaInPreFit= m_fixSigmaInPreFit;
+	fitOptions.sigmaLimit= m_fitSigmaLimit;
+	fitOptions.fixSigma= m_fitWithFixedSigma;
+	fitOptions.fixTheta= m_fitWithFixedTheta;
+	fitOptions.thetaLimit= m_fitThetaLimit;
+	fitOptions.useFluxZCut= m_useFluxZCutInFit;
+	fitOptions.fluxZThrMin= m_fitZCutMin;
+
 	for(size_t i=0;i<sources.size();i++){
 
 		//Skip non point-like sources
@@ -2314,7 +2348,7 @@ int SFinder::FitSources(std::vector<Source*>& sources){
 		if(sourceType!=Source::ePointLike) continue;
 	
 		//Fit mother source
-		if(sources[i]->Fit(blobPars,m_fitMaxNComponents)<0) {
+		if(sources[i]->Fit(fitOptions)<0) {
 			WARN_LOG("[PROC "<<m_procId<<"] - Failed to fit source no. "<<i<<"!");
 			continue;
 		}
@@ -2466,16 +2500,19 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 		//If beam data are not present in metadata, use those provided in the config file
 		if(!hasBeamData){
 			WARN_LOG("[PROC "<<m_procId<<"] - Using user-provided beam info to set bkg box size (beam info are not available/valid in image)...");
-			pixelWidthInBeam= AstroUtils::GetBeamWidthInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
-			m_beamBmaj= m_beamFWHM;
-			m_beamBmin= m_beamFWHM;
+			//pixelWidthInBeam= AstroUtils::GetBeamWidthInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
+			//m_beamBmaj= m_beamFWHM;
+			//m_beamBmin= m_beamFWHM;
+			pixelWidthInBeam= AstroUtils::GetBeamWidthInPixels(m_beamFWHMMax,m_beamFWHMMin,m_pixSize,m_pixSize);
+			m_beamBmaj= m_beamFWHMMax;
+			m_beamBmin= m_beamFWHMMin;
 			m_beamBpa= m_beamTheta;
 			m_pixSizeX= m_pixSize;
 			m_pixSizeY= m_pixSize;	
 		}
 
 		if(pixelWidthInBeam<=0){
-			ERROR_LOG("Invalid pixel width in beam computed from user-supplied beam info (beamFWHM,pixSize)=("<<m_beamFWHM<<","<<m_pixSize<<")!");
+			ERROR_LOG("Invalid pixel width in beam computed from user-supplied beam info (Bmaj,Bmin,Bpa,pixSize)=("<<m_beamBmaj<<", "<<m_beamBmin<<", "<<m_beamBpa<<","<<m_pixSize<<")!");
 			return nullptr;
 		}
 

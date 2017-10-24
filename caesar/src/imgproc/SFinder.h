@@ -332,6 +332,8 @@ class SFinder : public TObject {
 		double m_pixSizeX;
 		double m_pixSizeY;
 		double m_beamFWHM;
+		double m_beamFWHMMin;
+		double m_beamFWHMMax;
 		double m_pixSize;
 		double m_beamTheta;
 		double m_fluxCorrectionFactor;
@@ -411,6 +413,17 @@ class SFinder : public TObject {
 		//Source fitting
 		bool m_fitSources;
 		int m_fitMaxNComponents;
+		bool m_fitWithFixedBkg;
+		double m_fitBkgLevel;	
+		bool m_fitUseEstimatedBkgLevel;
+		double m_fitAmplLimit;
+		bool m_fixSigmaInPreFit;
+		double m_fitSigmaLimit;
+		bool m_fitWithFixedSigma;
+		bool m_fitWithFixedTheta;
+		double m_fitThetaLimit;
+		bool m_useFluxZCutInFit;
+		double m_fitZCutMin;
 		//double m_deblendCurvThr;
 		//double m_deblendComponentMinNPix;
 		

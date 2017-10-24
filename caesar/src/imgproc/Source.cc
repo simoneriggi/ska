@@ -218,6 +218,9 @@ void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int line
 
 const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 
+	//Check if has pixels
+	if(NPix<=0) return std::string("");
+
 	//global color=red dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1 image
 	std::stringstream sstream;
 	sstream<<"polygon ";
@@ -553,11 +556,12 @@ float Source::GetCentroidDistance(Source* aSource)
 }//close GetCentroidDistance()
 
 
-int Source::Fit(BlobPars blobPars,int nMaxComponents){
-
+int Source::Fit(SourceFitOptions& fitOptions)
+{
 	//Create source fitter
 	SourceFitter fitter;
-	if(fitter.FitSource(this,blobPars,nMaxComponents)<0){
+	//if(fitter.FitSource(this,blobPars,nMaxComponents)<0){
+	if(fitter.FitSource(this,fitOptions)<0){	
 		WARN_LOG("Failed to fit source "<<this->GetName()<<" ...");
 		return -1;
 	}
