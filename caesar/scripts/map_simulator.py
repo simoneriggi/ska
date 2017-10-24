@@ -64,6 +64,12 @@ def get_args():
 	parser.add_argument('-bmaj', '--bmaj', dest='bmaj', required=True, type=float, default=5, action='store',help='Beam bmaj in arcsec (default=5)')
 	parser.add_argument('-bmin', '--bmin', dest='bmin', required=True, type=float, default=5, action='store',help='Beam bmin in arcsec (default=5)')
 	parser.add_argument('-bpa', '--bpa', dest='bpa', required=False, type=float, default=0, action='store',help='Beam bpa in deg (default=0)')
+	parser.add_argument('-crpix1', '--crpix1', dest='crpix1', required=False, type=float, default=1, action='store',help='CRPIX1 fits keyword (default=1)')
+	parser.add_argument('-crpix2', '--crpix2', dest='crpix2', required=False, type=float, default=1, action='store',help='CRPIX2 fits keyword (default=1)')
+	parser.add_argument('-crval1', '--crval1', dest='crval1', required=False, type=float, default=254.851041667, action='store',help='CRVAL1 fits keyword (default=1)')
+	parser.add_argument('-crval2', '--crval2', dest='crval2', required=False, type=float, default=-41.4765888889, action='store',help='CRVAL2 fits keyword (default=1)')
+	parser.add_argument('-ctype1', '--ctype1', dest='ctype1', required=False, type=str, default='RA---NCP', action='store',help='CTYPE1 fits keyword (default=1)')
+	parser.add_argument('-ctype2', '--ctype2', dest='ctype2', required=False, type=str, default='DEC--NCP', action='store',help='CTYPE2 fits keyword (default=1)')
 
 	# - BKG OPTIONS
 	parser.add_argument('--bkg', dest='enable_bkg', action='store_true')	
@@ -205,6 +211,12 @@ class SkyMapSimulator(object):
 		self.ny = ny # in pixels
 		self.pixsize= pixsize # in arcsec
 		self.gridy, self.gridx = np.mgrid[0:ny, 0:nx]
+		self.crpix1= 1
+		self.crpix2= 1
+		self.crval1= 254.851041667
+		self.crval2= -41.4765888889
+		self.ctype1= 'RA---NCP'
+		self.ctype2= 'DEC--NCP'
 
 		## Source model
 		self.truncate_models= True
@@ -265,6 +277,21 @@ class SkyMapSimulator(object):
 		self.cs = Caesar.Source()
 		self.outtree.Branch('Source',self.cs)		
 
+	def set_ref_pix(self,x,y):
+		""" Set reference pixel (CRPIX1,CRPIX2) in FITS output """
+		self.crpix1= x
+		self.crpix2= y
+
+	def set_ref_pix_coords(self,x,y):
+		""" Set reference pixel coords (CRPIX1,CRPIX2) in FITS output """
+		self.crval1= x
+		self.crval2= y
+
+	def set_coord_system_type(self,x,y):
+		""" Set coord system type (CTYPE1,CTYPE2) in FITS output """
+		self.ctype1= x
+		self.ctype2= y
+	
 	def enable_compact_sources(self,choice):
 		""" Enable/disable compact source generation """
 		self.simulate_compact_sources= choice
@@ -783,11 +810,13 @@ class SkyMapSimulator(object):
 		header.set('BZERO',0.)
 		header.set('CDELT1',self.pixsize/3600.)
 		header.set('CDELT2',self.pixsize/3600.)
-		#header.set('CTYPE1','X')
-		#header.set('CTYPE2','Y')
-		#header.set('CRPIX1',1)
-		#header.set('CRPIX2',1)
-		
+		header.set('CTYPE1',self.ctype1)
+		header.set('CTYPE2',self.ctype2)
+		header.set('CRPIX1',self.crpix1)
+		header.set('CRPIX2',self.crpix2)
+		header.set('CRVAL1',self.crval1)
+		header.set('CRVAL2',self.crval2)
+
 		# Define HDU
 		hdu = fits.PrimaryHDU(data=data,header=header)
 		hdulist = fits.HDUList([hdu])
@@ -810,10 +839,12 @@ class SkyMapSimulator(object):
 		header.set('BZERO',0.)
 		header.set('CDELT1',self.pixsize/3600.)
 		header.set('CDELT2',self.pixsize/3600.)
-		#header.set('CTYPE1','X')
-		#header.set('CTYPE2','Y')
-		#header.set('CRPIX1',1)
-		#header.set('CRPIX2',1)
+		header.set('CTYPE1',self.ctype1)
+		header.set('CTYPE2',self.ctype2)
+		header.set('CRPIX1',self.crpix1)
+		header.set('CRPIX2',self.crpix2)
+		header.set('CRVAL1',self.crval1)
+		header.set('CRVAL2',self.crval2)
 
 		# Define HDU
 		hdu = fits.PrimaryHDU(data=data,header=header)
@@ -865,6 +896,13 @@ def main():
 	Nx= args.nx
 	Ny= args.ny
 	pixsize= args.pixsize
+	ctype1= args.ctype1
+	ctype2= args.ctype2
+	crpix1= args.crpix1
+	crpix2= args.crpix2
+	crval1= args.crval1
+	crval2= args.crval2
+
 
 	# - Bkg info args
 	enable_bkg= args.enable_bkg
@@ -907,6 +945,9 @@ def main():
 	print("Nx: %s" % Nx)
 	print("Ny: %s" % Ny)
 	print("pixsize: %s" % pixsize)
+	print("ctype: (%s %s)" % (ctype1,ctype2))
+	print("crpix: (%s %s)" % (crpix1,crpix2))
+	print("crval: (%s %s)" % (crval1,crval2))
 	print("Beam (Bmaj/Bmin/Bpa): (%s,%s,%s)" % (Bmaj, Bmin, Bpa))
 	print("Enable bkg? %s" % str(enable_bkg) )
 	print("Bkg info (level,rms): (%s,%s)" % (bkg_level, bkg_rms))
@@ -924,6 +965,10 @@ def main():
 	## Generate simulated sky map
 	print ('INFO: Generate simulated sky map...')
 	simulator= SkyMapSimulator(Nx,Ny,pixsize)
+	simulator.set_ref_pix(crpix1,crpix2)
+	simulator.set_ref_pix_coords(crval1,crval2)
+	simulator.set_coord_system_type(ctype1,ctype2)
+
 	simulator.set_map_filename(outputfile)
 	simulator.set_model_filename(mask_outputfile)
 	simulator.set_source_filename(outputfile_sources)
