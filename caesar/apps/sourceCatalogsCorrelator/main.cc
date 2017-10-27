@@ -100,6 +100,10 @@ int HasFitInfo;
 double S_fit;
 double X0_fit;
 double Y0_fit;
+double sigmaX_fit;
+double sigmaY_fit;
+double theta_fit;
+double offset_fit;
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
@@ -361,6 +365,9 @@ int CorrelateSourceCatalogs()
 		S_fit= -1;
 		X0_fit= -1;
 		Y0_fit= -1;
+		sigmaX_fit= -1;
+		sigmaY_fit= -1;
+		offset_fit= -1;
 
 		//Loop over second catalogue (e.g. detected/reconstructed sources)
 		for(size_t j=0;j<sources_rec.size();j++){
@@ -425,6 +432,9 @@ int CorrelateSourceCatalogs()
 					double X0_fitcomp= fitPars.GetParValue(i,"x0");	
 					double Y0_fitcomp= fitPars.GetParValue(i,"y0");
 					double S_fitcomp= fitPars.GetParValue(i,"A");
+					double sigmaX_fitcomp= fitPars.GetParValue(i,"sigmaX");
+					double sigmaY_fitcomp= fitPars.GetParValue(i,"sigmaY");
+					double offset_fitcomp= fitPars.GetOffsetPar();
 					double dx= X0_fitcomp-X0_true;
 					double dy= Y0_fitcomp-Y0_true;
 					double dist= sqrt(dx*dx+dy*dy);
@@ -433,6 +443,9 @@ int CorrelateSourceCatalogs()
 						S_fit= S_fitcomp;
 						X0_fit= X0_fitcomp;
 						Y0_fit= Y0_fitcomp;
+						sigmaX_fit= sigmaX_fitcomp;
+						sigmaY_fit= sigmaY_fitcomp;
+						offset_fit= offset_fitcomp;
 					}
 				}//end loop fitted components
 
@@ -483,7 +496,11 @@ void Init(){
 	matchedSourceInfo->Branch("S_fit",&S_fit,"S_fit/D");
 	matchedSourceInfo->Branch("X0_fit",&X0_fit,"X0_fit/D");
 	matchedSourceInfo->Branch("Y0_fit",&Y0_fit,"Y0_fit/D");
-
+	matchedSourceInfo->Branch("sigmaX_fit",&sigmaX_fit,"sigmaX_fit/D");
+	matchedSourceInfo->Branch("sigmaY_fit",&sigmaY_fit,"sigmaY_fit/D");
+	matchedSourceInfo->Branch("theta_fit",&theta_fit,"theta_fit/D");
+	matchedSourceInfo->Branch("offset_fit",&offset_fit,"offset_fit/D");
+	
 }//close Init()
 
 void Save()
