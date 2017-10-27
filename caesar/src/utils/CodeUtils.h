@@ -248,16 +248,12 @@ class CodeUtils : public TObject {
 				else{
 					tempBuffer.push_back(data[i]);
 				}
-				/*
-      	if (!markedElements[i]) {
-					tempBuffer.push_back(data[i]);
-				}
-				*/
     	}
     	data = tempBuffer;
 		}//close DeleteItems()
 
 
+		
 		/**
 		* \brief Order vectors and get ordering index
 		*/

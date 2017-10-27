@@ -466,6 +466,11 @@ class Blob : public TNamed {
 		//==         CONTOURS
 		//================================================
 		/**
+		* \brief Has contours
+		*/
+		bool HasContours(){return !m_Contours.empty();}
+
+		/**
 		* \brief Return contours
 		*/
 		std::vector<Contour*> GetContours(){return m_Contours;}
@@ -483,7 +488,10 @@ class Blob : public TNamed {
 			m_Contours.push_back(aContour);
 		}
 
-		
+		/**
+		* \brief Is point on contour?
+		*/
+		bool IsPointOnContour(double x,double y,double tol=1);
 
 	private:
 

@@ -217,7 +217,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(use2ndPassInLocalBkg,bool,true,false,true);
 		REGISTER_OPTION(skipOutliersInLocalBkg,bool,false,false,true);
 		REGISTER_OPTION(localBkgMethod,int,1,1,2);
-		REGISTER_OPTION(bkgEstimator,int,2,1,4);
+		REGISTER_OPTION(bkgEstimator,int,2,0,5);
 		REGISTER_OPTION(useBeamInfoInBkg,bool,true,false,true);
 		REGISTER_OPTION(boxSizeX,double,20,0.01,1000);
 		REGISTER_OPTION(boxSizeY,double,20,0.01,1000);
@@ -309,7 +309,11 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(fitThetaLimit,double,5,0,360);
 		REGISTER_OPTION(useFluxZCutInFit,bool,false,false,true);
 		REGISTER_OPTION(fitZCutMin,double,2.5,0,1000);
-		
+		REGISTER_OPTION(peakMinKernelSize,int,3,0,101);
+		REGISTER_OPTION(peakMaxKernelSize,int,7,0,101);
+		REGISTER_OPTION(peakKernelMultiplicityThr,int,1,0,100);
+		REGISTER_OPTION(peakShiftTolerance,int,1,0,20);
+		REGISTER_OPTION(peakZThrMin,double,1,0,1000);
 		//REGISTER_OPTION(deblendCurvThr,double,0,-0.0001,1.00001);	
 		//REGISTER_OPTION(deblendComponentMinNPix,double,5,0,100000);			
 			

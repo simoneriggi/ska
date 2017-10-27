@@ -78,15 +78,18 @@ class MorphFilter : public TObject {
 	public:
 			
 		/**
-		* \brief Find peaks in image by combining local peaks found with 3 different dilation kernel sizes
+		* \brief Find peaks in image by combining local peaks found with different dilation kernel sizes
 		*/
-		static int FindPeaks(std::vector<TVector2>& peakPoints,Image* img,int peakShiftTolerance=1,bool skipBorders=true);
+		static int FindPeaks(std::vector<TVector2>& peakPoints,Image* img,std::vector<int> kernelSizes={3,5},int peakShiftTolerance=1,bool skipBorders=true,int peakKernelMultiplicityThr=-1);
 
 		/**
 		* \brief Dilate image with specified kernel
 		*/
 		static Image* Dilate(std::vector<long int>& peakPixelIds,Image* img,int KernSize,bool skipBorders=true);
-
+		/**
+		* \brief Apply a morphological operation (DILATE/ERODE, OPENING/CLOSING, ...) to input image with configurable kernel and other pars  
+		*/
+		static Image* GetFiltered(std::vector<long int>& peakPixelIds,Image* img,int KernSize,int morphOp,int structElementType,int niters,bool skipBorders);
 		/**
 		* \brief Dilate image around specified sources position
 		*/

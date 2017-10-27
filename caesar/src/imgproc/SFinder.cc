@@ -511,9 +511,24 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(fitThetaLimit,m_fitThetaLimit);
 	GET_OPTION_VALUE(useFluxZCutInFit,m_useFluxZCutInFit);
 	GET_OPTION_VALUE(fitZCutMin,m_fitZCutMin);
+	GET_OPTION_VALUE(peakMinKernelSize,m_peakMinKernelSize);
+	GET_OPTION_VALUE(peakMaxKernelSize,m_peakMaxKernelSize);
+	GET_OPTION_VALUE(peakKernelMultiplicityThr,m_peakKernelMultiplicityThr);
+	GET_OPTION_VALUE(peakShiftTolerance,m_peakShiftTolerance);	
+	GET_OPTION_VALUE(peakZThrMin,m_peakZThrMin);
+
 	//GET_OPTION_VALUE(deblendCurvThr,m_deblendCurvThr);
 	//GET_OPTION_VALUE(deblendComponentMinNPix,m_deblendComponentMinNPix);
 	
+	if(m_peakMinKernelSize>m_peakMaxKernelSize){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Invalid peak kernel size option given (hint: min kernel must be larger or equal to max kernel size)!");
+		return -1;
+	}
+	if(m_peakMinKernelSize<=0 || m_peakMinKernelSize%2==0 || m_peakMaxKernelSize<=0 || m_peakMaxKernelSize%2==0){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Invalid peak kernel sizes given (hint: kernel size must be positive and odd)!");
+		return -1;
+	}
+
 	//Get smoothing options
 	GET_OPTION_VALUE(usePreSmoothing,m_UsePreSmoothing);
 	GET_OPTION_VALUE(smoothFilter,m_SmoothFilter);
@@ -656,11 +671,9 @@ int SFinder::RunTask(TaskData* taskData,bool storeData){
 		INFO_LOG("[PROC "<<m_procId<<"] - Searching compact sources...");
 		auto t0_sfinder = chrono::steady_clock::now();	
 
-		//significanceMap= FindCompactSources(taskImg,bkgData,taskData);
 		significanceMap= FindCompactSourcesRobust(taskImg,bkgData,taskData,m_compactSourceSearchNIters);
 		if(!significanceMap){
 			ERROR_LOG("[PROC "<<m_procId<<"] - Compact source search failed!");
-			//stopTask= true;
 			status= -1;
 		}
 		auto t1_sfinder = chrono::steady_clock::now();	
@@ -2340,6 +2353,11 @@ int SFinder::FitSources(std::vector<Source*>& sources){
 	fitOptions.thetaLimit= m_fitThetaLimit;
 	fitOptions.useFluxZCut= m_useFluxZCutInFit;
 	fitOptions.fluxZThrMin= m_fitZCutMin;
+	fitOptions.peakMinKernelSize= m_peakMinKernelSize;
+	fitOptions.peakMaxKernelSize= m_peakMaxKernelSize;
+	fitOptions.peakZThrMin= m_peakZThrMin;
+	fitOptions.peakKernelMultiplicityThr= m_peakKernelMultiplicityThr;
+	fitOptions.peakShiftTolerance= m_peakShiftTolerance;
 
 	for(size_t i=0;i<sources.size();i++){
 

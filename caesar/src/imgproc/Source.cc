@@ -219,7 +219,8 @@ void Source::Draw(bool drawBoundingBox,bool drawEllipse,bool drawNested,int line
 const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 
 	//Check if has pixels
-	if(NPix<=0) return std::string("");
+	//NB: DS9 crashes miserably when given a polygon region with one point 
+	if(NPix<=1) return std::string("");
 
 	//global color=red dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1 image
 	std::stringstream sstream;

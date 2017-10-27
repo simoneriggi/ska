@@ -424,6 +424,12 @@ class SFinder : public TObject {
 		double m_fitThetaLimit;
 		bool m_useFluxZCutInFit;
 		double m_fitZCutMin;
+		int m_peakMinKernelSize;
+		int m_peakMaxKernelSize;
+		int m_peakKernelMultiplicityThr;
+		int m_peakShiftTolerance;
+		double m_peakZThrMin;
+		
 		//double m_deblendCurvThr;
 		//double m_deblendComponentMinNPix;
 		

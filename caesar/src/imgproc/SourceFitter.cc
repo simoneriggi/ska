@@ -126,10 +126,19 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		return -1;
 	}
 
-	//## Set fit options
-	//fitOptions
-
+	//## Check fit options
 	INFO_LOG("Fitting source (id="<<aSource->Id<<", name="<<aSource->GetName()<<") assuming these blob pars: {Bmaj(pix)="<<fitOptions.bmaj<<", Bmin(pix)="<<fitOptions.bmin<<", Bpa(deg)="<<fitOptions.bpa<<"}");
+
+	if(fitOptions.peakMinKernelSize>fitOptions.peakMaxKernelSize){
+		ERROR_LOG("Invalid peak kernel sizes given (hint: min kernel must be larger or equal to max kernel size)!");
+		m_fitStatus= eFitAborted;
+		return -1;
+	}
+	if(fitOptions.peakMinKernelSize<=0 || fitOptions.peakMinKernelSize%2==0 || fitOptions.peakMaxKernelSize<=0 || fitOptions.peakMaxKernelSize%2==0){
+		ERROR_LOG("Invalid peak kernel sizes given (hint: kernel size must be positive and odd)!");
+		m_fitStatus= eFitAborted;
+		return -1;
+	}
 
 	//## Check if stats has been computed, otherwise compute them
 	if(!aSource->HasStats()){
@@ -151,7 +160,7 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 	long int nBoxY= Ymax - Ymin + 1;
 	TH2D* fluxMapHisto= new TH2D("","",nBoxX,Xmin-0.5,Xmax+0.5,nBoxY,Ymin-0.5,Ymax+0.5);
 	fluxMapHisto->Sumw2();
-	Image* curvMap= new Image(nBoxX,nBoxY,Xmin,Ymin,"");
+	Image* peakSearchMap= new Image(nBoxX,nBoxY,Xmin,Ymin,"");
 	
 	std::vector<Pixel*> pixels= aSource->GetPixels();
 	double bkgMean= 0.;
@@ -181,8 +190,8 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 				rmsMean+= rms;
 				ndata++;
 			}
-			//curvMap->Fill(x,y,Scurv);	
-			curvMap->Fill(x,y,S);	
+			//peakSearchMap->Fill(x,y,Scurv);	
+			peakSearchMap->Fill(x,y,S);	
 		}//end loop pixels
 
 		bkgMean/= (double)(ndata);
@@ -199,8 +208,8 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 			double rms= bkgData.second;
 			 
 			fluxMapHisto->Fill(x,y,S);
-			//curvMap->Fill(x,y,Scurv);	
-			curvMap->Fill(x,y,S);	
+			//peakSearchMap->Fill(x,y,Scurv);	
+			peakSearchMap->Fill(x,y,S);	
 			bkgMean+= bkg;
 			rmsMean+= rms;
 		}//end loop pixels
@@ -217,8 +226,8 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		m_fitStatus= eFitAborted;
 		delete fluxMapHisto;
 		fluxMapHisto= 0;
-		delete curvMap;
-		curvMap= 0;
+		delete peakSearchMap;
+		peakSearchMap= 0;
 		return -1;
 	}
 
@@ -226,24 +235,69 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 	//## Method: Find peaks in curvature map
 	INFO_LOG("Finding peaks in source (id="<<aSource->Id<<", name="<<aSource->GetName()<<")");	
 	std::vector<TVector2> peakPoints;
-	int peakShiftTolerance= 2;
 	bool skipBorders= true;
-	if(curvMap->FindPeaks(peakPoints,peakShiftTolerance,skipBorders)<0){
+	std::vector<int> kernels;
+	for(int k=fitOptions.peakMinKernelSize;k<=fitOptions.peakMaxKernelSize;k+=2){
+		kernels.push_back(k);
+	}
+
+	if(peakSearchMap->FindPeaks(peakPoints,kernels,fitOptions.peakShiftTolerance,skipBorders,fitOptions.peakKernelMultiplicityThr)<0){
 		WARN_LOG("Failed to find peaks in source curvature map!");
 		m_fitStatus= eFitAborted;
-		delete curvMap;
-		curvMap= 0;
+		delete peakSearchMap;
+		peakSearchMap= 0;
 		delete fluxMapHisto;
 		fluxMapHisto= 0;
 		return -1;
 	}
+	
+	//Clear peak search map
+	if(peakSearchMap){
+		delete peakSearchMap;	
+		peakSearchMap= 0;
+	}
+
+	//## Select peaks (skip peaks at boundary or faint peaks)
+	std::vector<TVector2> peaks_selected;
+	for(size_t i=0;i<peakPoints.size();i++){
+		double x= peakPoints[i].X();
+		double y= peakPoints[i].Y();
+		long int gbin= fluxMapHisto->FindBin(x,y);
+		if(fluxMapHisto->IsBinOverflow(gbin) || fluxMapHisto->IsBinUnderflow(gbin)){
+			WARN_LOG("Failed to find gbin of peak("<<x<<","<<y<<"), this should not occur!");
+			m_fitStatus= eFitAborted;
+			delete fluxMapHisto;
+			fluxMapHisto= 0;	
+			return -1;
+		}
+
+		//Remove faint peaks
+		if(rmsMean>0){
+			double Speak= fluxMapHisto->GetBinContent(gbin);
+			double Zpeak= (Speak-bkgMean)/rmsMean;
+			if(Zpeak<fitOptions.peakZThrMin) {
+				INFO_LOG("Removing peak ("<<x<<","<<y<<") from the list as below peak significance thr (Zpeak="<<Zpeak<<"<"<<fitOptions.peakZThrMin<<")");
+				continue;
+			}
+		}
+
+		//Remove peaks lying on the source contour
+		if(aSource->HasContours() && aSource->IsPointOnContour(x,y,0.5)) {
+			INFO_LOG("Removing peak ("<<x<<","<<y<<") from the list as lying on source contour");
+			continue;
+		}
+
+		//Add peak to selected peak
+		peaks_selected.push_back(peakPoints[i]);
+	}//end loop peaks
+	peakPoints.clear();
+	peakPoints= peaks_selected;
+
 
 	int nComponents= static_cast<int>(peakPoints.size());
 	if(nComponents<=0){
 		WARN_LOG("No components found in source (id="<<aSource->Id<<", name="<<aSource->GetName()<<"), this should not occur (at least one should be found)!");	
 		m_fitStatus= eFitAborted;
-		delete curvMap;
-		curvMap= 0;
 		delete fluxMapHisto;
 		fluxMapHisto= 0;
 		return -1;
@@ -261,8 +315,6 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		if(fluxMapHisto->IsBinOverflow(gbin) || fluxMapHisto->IsBinUnderflow(gbin)){
 			WARN_LOG("Failed to find gbin of peak("<<x<<","<<y<<"), this should not occur!");
 			m_fitStatus= eFitAborted;
-			delete curvMap;
-			curvMap= 0;
 			delete fluxMapHisto;
 			fluxMapHisto= 0;	
 			return -1;
@@ -334,8 +386,8 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		
 		//## Set i-th component parameters
 		//- Amplitude
-		double Speak_min= std::max(Smin, Speak*(1 - fitOptions.amplLimit) );//0.9
-		double Speak_max= std::min(Smax, Speak*(1 + fitOptions.amplLimit) );//1.10
+		double Speak_min= std::min(Smin, Speak*(1 - fitOptions.amplLimit) );
+		double Speak_max= std::max(Smax, Speak*(1 + fitOptions.amplLimit) );
 		sourceFitFcn->SetParName(par_counter,Form("%s_%d",parNamePrefix[0].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter,Speak);
 		sourceFitFcn->SetParLimits(par_counter,Speak_min,Speak_max);
@@ -424,8 +476,6 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 	if(prefitStatus!=0){
 		WARN_LOG("Source pre-fit failed or did not converge.");
 		m_fitStatus= eFitNotConverged;
-		delete curvMap;
-		curvMap= 0;
 		delete fluxMapHisto;
 		fluxMapHisto= 0;
 		delete sourceFitFcn;
@@ -494,6 +544,9 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 	TBackCompFitter* fitter = (TBackCompFitter *) TVirtualFitter::GetFitter();
 	const ROOT::Fit::FitResult& fitRes = fitter->GetFitResult();
 	
+	//==============================================
+	//==             FIT RESULTS
+	//==============================================
 	//## Retrieve fit results
 	m_fitStatus= eFitNotConverged;
 	int fitMinimizerStatus= -1;
@@ -547,9 +600,13 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 	m_sourceFitPars.SetOffsetPar(fittedOffset);
 	m_sourceFitPars.SetOffsetParErr(fittedOffsetErr);
 
+	//==============================================
+	//==             FIT RESIDUALS
+	//==============================================
 	//Compute fit residuals	
-	double residualMean= 0;
-	double nres= 0;
+	std::vector<double> residuals;
+	double residualMax= -1.e+99;
+	double residualMin= 1.e+99;
 	for (int i=0;i<fluxMapHisto->GetNbinsX();i++) {
 		double x= fluxMapHisto->GetXaxis()->GetBinCenter(i+1);
 		for (int j=0;j<fluxMapHisto->GetNbinsY();j++) {
@@ -558,21 +615,37 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 			if(!std::isnormal(data) || data==0) continue;
 			double model= sourceFitFcn->Eval(x,y);
   		double res = data - model;
-			residualMean+= res;
-			nres++;
+			if(res<residualMin) residualMin= res;
+			if(res>residualMax) residualMax= res;
+			residuals.push_back(res);
 		}
   }
-	if(nres>0) residualMean/= nres;
-	INFO_LOG("Fit residual mean="<<residualMean);
+	
+	//Compute residual stats
+	double residualMean= 0;
+	double residualRMS= 0;
+	StatsUtils::ComputeMeanAndRMS(residualMean,residualRMS,residuals);
+	double residualMedian= StatsUtils::GetMedianFast<double>(residuals);
+	double residualMAD= StatsUtils::GetMADFast(residuals,residualMedian);	
+	
+	m_sourceFitPars.SetResidualMin(residualMin);
+	m_sourceFitPars.SetResidualMax(residualMax);
+	m_sourceFitPars.SetResidualMean(residualMean);
+	m_sourceFitPars.SetResidualRMS(residualRMS);
+	m_sourceFitPars.SetResidualMedian(residualMedian);
+	m_sourceFitPars.SetResidualMAD(residualMAD);
+	
+	INFO_LOG("Fit residual stats: min/max="<<residualMin<<"/"<<residualMax<<", mean="<<residualMean<<", rms="<<residualRMS<<", median="<<residualMedian<<", mad="<<residualMAD);
 	
 	//Clear up data
-	delete curvMap;
-	curvMap= 0;
-	delete fluxMapHisto;
-	fluxMapHisto= 0;
-	delete sourceFitFcn;
-	sourceFitFcn= 0;
-	
+	if(fluxMapHisto){
+		delete fluxMapHisto;
+		fluxMapHisto= 0;
+	}
+	if(sourceFitFcn){
+		delete sourceFitFcn;
+		sourceFitFcn= 0;
+	}
 	return 0;
 
 }//close FitSource()
@@ -582,6 +655,7 @@ bool SourceFitter::HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes)
 {
 	//Loop over parameters and check if they converged at bounds
 	bool hasParAtLimits= false;
+	double parAtLimitThr= 0.1;//in percentage
 	
 	for(int i=0;i<fitRes.NPar();i++){
 		if(!fitRes.IsParameterBound(i) || fitRes.IsParameterFixed(i) ) continue;
@@ -591,8 +665,11 @@ bool SourceFitter::HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes)
 		double par_max= 0;
 		fitRes.ParameterBounds(i,par_min,par_max);
 		double par= fitRes.Parameter(i);		
-		
-		if(par==par_min || par==par_max){
+		double parRelDiffMin= fabs(par/par_min-1);
+		double parRelDiffMax= fabs(par/par_max-1);
+
+		//if(par==par_min || par==par_max){
+		if(parRelDiffMin<parAtLimitThr || parRelDiffMax<parAtLimitThr){	
 			hasParAtLimits= true;
 			break;
 		}

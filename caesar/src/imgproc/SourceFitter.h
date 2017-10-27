@@ -77,6 +77,17 @@ struct SourceFitOptions {
 	//- Max number of components to be fitted
 	int nMaxComponents;
 
+	//- Number of matching peaks across kernels (-1=peak detected in all kernels, ...) and distance tolerance
+	int peakKernelMultiplicityThr;
+	int peakShiftTolerance;
+
+	//- Dilation kernels to be used when finding peaks
+	int peakMinKernelSize;
+	int peakMaxKernelSize;
+
+	//- Peak flux significance min threshold (in nsigmas wrt to avg bkg & rms)
+	double peakZThrMin;	
+
 	//- Bkg options
 	bool fixBkg;
 	bool useEstimatedBkgLevel;
@@ -98,6 +109,8 @@ struct SourceFitOptions {
 	bool useFluxZCut;
 	double fluxZThrMin;
 
+	
+
 	//Default constructor
 	SourceFitOptions() 
 	{
@@ -116,6 +129,11 @@ struct SourceFitOptions {
 		thetaLimit= 5;//deg
 		useFluxZCut= false;
 		fluxZThrMin= 2.5;//in nsigmas
+		peakZThrMin= 0;//in nsigmas
+		peakMinKernelSize= 3;
+		peakMaxKernelSize= 7;
+		peakKernelMultiplicityThr= 1;
+		peakShiftTolerance= 2;
 	}//close constructor
 };//close SourceFitOptions
 
@@ -211,6 +229,17 @@ class SourceComponentPars : public TObject {
 
 			return ellipse;
 		}//close GetFitEllipse()
+
+		/**
+		* \brief Get flux density
+		*/
+		double GetFluxDensity(){
+			double ampl= FitPars["A"];
+			double Bmaj= FitPars["sigmaX"];
+			double Bmin= FitPars["sigmaY"];
+			double fluxDensity= TMath::Pi()*ampl*Bmaj*Bmin/(4*log(2));
+			return fluxDensity;
+		}
 
 	private:
 		
@@ -337,6 +366,14 @@ class SourceFitPars : public TObject {
 		int GetNComponents(){return nComponents;}
 
 		/**
+		* \brief Get component flux density
+		*/
+		double GetComponentFluxDensity(int componentId){
+			if(componentId<0 || componentId>=nComponents) return -999;
+			return pars[componentId].GetFluxDensity();
+		}
+
+		/**
 		* \brief Set chi2 
 		*/
 		void SetChi2(double value){chi2=value;}
@@ -395,8 +432,55 @@ class SourceFitPars : public TObject {
 		*/
 		int GetNFitPoints(){return nfit_points;}
 
-		
-		
+		/**
+		* \brief Get residual mean
+		*/
+		double GetResidualMean(){return residualMean;}
+		/**
+		* \brief Set residual mean
+		*/
+		void SetResidualMean(double value){residualMean=value;}
+		/**
+		* \brief Get residual rms
+		*/
+		double GetResidualRMS(){return residualRMS;}
+		/**
+		* \brief Set residual rms
+		*/
+		void SetResidualRMS(double value){residualRMS=value;}
+		/**
+		* \brief Get residual median
+		*/
+		double GetResidualMedian(){return residualMedian;}
+		/**
+		* \brief Set residual median
+		*/
+		void SetResidualMedian(double value){residualMedian=value;}
+		/**
+		* \brief Get residual mad
+		*/
+		double GetResidualMAD(){return residualMAD;}
+		/**
+		* \brief Set residual mad
+		*/
+		void SetResidualMAD(double value){residualMAD=value;}
+		/**
+		* \brief Get residual min
+		*/
+		double GetResidualMin(){return residualMin;}
+		/**
+		* \brief Set residual min
+		*/
+		void SetResidualMin(double value){residualMin=value;}		
+		/**
+		* \brief Get residual max
+		*/
+		double GetResidualMax(){return residualMax;}
+		/**
+		* \brief Set residual max
+		*/
+		void SetResidualMax(double value){residualMax=value;}
+
 		/**
 		* \brief Print
 		*/
@@ -429,8 +513,13 @@ class SourceFitPars : public TObject {
 			minimizer_status= -1;
 			offset= 0;
 			offset_err= 0;
+			residualMean= 0;
+			residualRMS= 0;
+			residualMedian= 0;
+			residualMAD= 0;
+			residualMin= 0;
+			residualMax= 0;
 			pars.clear();
-			//for(int i=0;i<nComponents;i++) pars.push_back(SourceComponentPars());
 		}
 
 	private:
@@ -443,6 +532,12 @@ class SourceFitPars : public TObject {
 		int minimizer_status;
 		double offset;
 		double offset_err;
+		double residualMean;
+		double residualRMS;	
+		double residualMedian;
+		double residualMAD;
+		double residualMin;	
+		double residualMax;
 		std::vector<SourceComponentPars> pars;
 
 	ClassDef(SourceFitPars,1)

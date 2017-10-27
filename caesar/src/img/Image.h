@@ -835,12 +835,12 @@ class Image : public TNamed {
 		/**
 		* \brief Find image peaks
 		*/
-		int FindPeaks(std::vector<TVector2>& peakPoints,int peakShiftTolerance=1,bool skipBorders=true);
+		int FindPeaks(std::vector<TVector2>& peakPoints,std::vector<int> kernelSizes={3,5,7},int peakShiftTolerance=1,bool skipBorders=true,int multiplicityThr=-1);
 
 		/**
 		* \brief Find graph with image peaks
 		*/
-		TGraph* ComputePeakGraph(int peakShiftTolerance=1,bool skipBorders=true);
+		TGraph* ComputePeakGraph(std::vector<int> kernelSizes={3,5,7},int peakShiftTolerance=1,bool skipBorders=true);
 
 
 		/**

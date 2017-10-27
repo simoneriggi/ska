@@ -2183,17 +2183,17 @@ Image* Image::GetMultiResoSaliencyMap(int resoMin,int resoMax,int resoStep,doubl
 }//close GetMultiResoSaliencyMap()
 
 
-int Image::FindPeaks(std::vector<TVector2>& peakPoints,int peakShiftTolerance,bool skipBorders)
+int Image::FindPeaks(std::vector<TVector2>& peakPoints,std::vector<int> kernelSizes, int peakShiftTolerance,bool skipBorders,int multiplicityThr)
 {
-	return MorphFilter::FindPeaks(peakPoints,this,peakShiftTolerance,skipBorders);
+	return MorphFilter::FindPeaks(peakPoints,this,kernelSizes,peakShiftTolerance,skipBorders,multiplicityThr);
 
 }//close FindPeaks()
 
-TGraph* Image::ComputePeakGraph(int peakShiftTolerance,bool skipBorders)
+TGraph* Image::ComputePeakGraph(std::vector<int> kernelSizes,int peakShiftTolerance,bool skipBorders)
 {
 	//Find peaks in image
 	std::vector<TVector2> peakPoints;
-	if(this->FindPeaks(peakPoints,skipBorders)<0){
+	if(this->FindPeaks(peakPoints,kernelSizes,peakShiftTolerance,skipBorders)<0){
 		ERROR_LOG("Failed to find peaks in image!");
 		return nullptr;
 	}
