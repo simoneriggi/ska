@@ -77,9 +77,9 @@ fi
 CMD="$CMD $EXE --config=$CONFIGFILE"
 
 echo "INFO: Running cmd: $CMD"
-eval $CMD
+#eval $CMD
+exec $CMD &
 
-
-echo "INFO: End source finder run."
+echo "INFO: End source finder script run."
 
 
