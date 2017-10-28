@@ -2534,10 +2534,10 @@ ImgBkgData* SFinder::ComputeStatsAndBkg(Image* img){
 			return nullptr;
 		}
 
-		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes as ("<<m_BoxSizeX<<","<<m_BoxSizeY<<") x beam (beam=#"<<pixelWidthInBeam<<" pixels) ...");
 		boxSizeX= pixelWidthInBeam*m_BoxSizeX;
 		boxSizeY= pixelWidthInBeam*m_BoxSizeY;
-
+		INFO_LOG("[PROC "<<m_procId<<"] - Setting bkg boxes to ("<<boxSizeX<<","<<boxSizeY<<") pixels (set equal to ("<<m_BoxSizeX<<","<<m_BoxSizeY<<") x beam (beam=#"<<pixelWidthInBeam<<" pixels)) ...");
+		
 	}//close if use beam info
 	else{
 		WARN_LOG("[PROC "<<m_procId<<"] - Using image fractions to set bkg box size (beam info option is turned off)...");

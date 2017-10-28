@@ -722,6 +722,7 @@ double SourceFitter::Gaus2DFcn(double* x, double* par){
 	double theta= par[5];
 	theta*= TMath::DegToRad();
 
+	/*
 	double sigmaX2= sigmaX*sigmaX;
 	double sigmaY2= sigmaY*sigmaY;
 
@@ -736,13 +737,26 @@ double SourceFitter::Gaus2DFcn(double* x, double* par){
 	//double b= -sin2Theta/(4*sigmaX2) + sin2Theta/(4*sigmaY2);
 	double b= sin2Theta/(4*sigmaX2) - sin2Theta/(4*sigmaY2);
 	double c= sinTheta2/(2*sigmaX2) + cosTheta2/(2*sigmaY2);
-
 	double argX= a*(X-X0)*(X-X0);
 	double argY= c*(Y-Y0)*(Y-Y0);
 	double argXY= 2*b*(X-X0)*(Y-Y0);
 	double z= argX+argXY+argY;
 
 	double fcn= A*exp(-z);
+	*/
+
+	
+	double cost2= cos(theta)*cos(theta);
+	double sint2= sin(theta)*sin(theta);
+	double sin2t = sin(2. * theta);
+	double xstd2= sigmaX*sigmaX;
+	double ystd2= sigmaY*sigmaY;
+	double xdiff = X - X0;
+  double ydiff = Y - Y0;
+	double a = 0.5 * ((cost2 / xstd2) + (sint2 / ystd2));
+  double b = 0.5 * ((sin2t / xstd2) - (sin2t / ystd2));
+  double c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2));
+	double fcn= A * exp(-((a * xdiff*xdiff) + (b * xdiff * ydiff) + (c * ydiff*ydiff)));
 
 	return fcn;
 

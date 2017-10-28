@@ -234,10 +234,11 @@ class SourceComponentPars : public TObject {
 		* \brief Get flux density
 		*/
 		double GetFluxDensity(){
+			//Gaussian Area= pi*bmaj*bmin/(4*log(2)) or Area=2*pi*sigmaX*sigmaY
 			double ampl= FitPars["A"];
-			double Bmaj= FitPars["sigmaX"];
-			double Bmin= FitPars["sigmaY"];
-			double fluxDensity= TMath::Pi()*ampl*Bmaj*Bmin/(4*log(2));
+			double sigmaX= FitPars["sigmaX"];
+			double sigmaY= FitPars["sigmaY"];
+			double fluxDensity= 2*TMath::Pi()*ampl*sigmaX*sigmaY;
 			return fluxDensity;
 		}
 
