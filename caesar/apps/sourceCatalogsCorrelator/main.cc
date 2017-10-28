@@ -89,6 +89,7 @@ double Smax;
 double S_true;
 double X0_true;
 double Y0_true;
+double fluxDensity_true;
 std::string SourceName_rec;
 int SourceType_rec;
 double S_rec;
@@ -104,6 +105,7 @@ double sigmaX_fit;
 double sigmaY_fit;
 double theta_fit;
 double offset_fit;
+double fluxDensity_fit;
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
@@ -351,6 +353,7 @@ int CorrelateSourceCatalogs()
 		if(hasTrueInfo){
 			S_true= sources[i]->GetTrueFlux();
 			sources[i]->GetTruePos(X0_true,Y0_true);
+			fluxDensity_true= -1;//to be fixed
 		}	
 
 		//Init rec collection pars
@@ -368,6 +371,7 @@ int CorrelateSourceCatalogs()
 		sigmaX_fit= -1;
 		sigmaY_fit= -1;
 		offset_fit= -1;
+		fluxDensity_fit= -1;
 
 		//Loop over second catalogue (e.g. detected/reconstructed sources)
 		for(size_t j=0;j<sources_rec.size();j++){
@@ -435,6 +439,7 @@ int CorrelateSourceCatalogs()
 					double sigmaX_fitcomp= fitPars.GetParValue(i,"sigmaX");
 					double sigmaY_fitcomp= fitPars.GetParValue(i,"sigmaY");
 					double offset_fitcomp= fitPars.GetOffsetPar();
+					double fluxDensity_fitcomp= fitPars.GetComponentFluxDensity(i);
 					double dx= X0_fitcomp-X0_true;
 					double dy= Y0_fitcomp-Y0_true;
 					double dist= sqrt(dx*dx+dy*dy);
@@ -446,12 +451,14 @@ int CorrelateSourceCatalogs()
 						sigmaX_fit= sigmaX_fitcomp;
 						sigmaY_fit= sigmaY_fitcomp;
 						offset_fit= offset_fitcomp;
+						fluxDensity_fit= fluxDensity_fitcomp;
 					}
 				}//end loop fitted components
 
 				//Correct flux from Jy/beam to Jy
 				if(correctFlux){
 					S_fit/= fluxCorrectionFactor;
+					fluxDensity_fit/= fluxCorrectionFactor;
 				}
 
 			}//close has fit info
@@ -485,6 +492,7 @@ void Init(){
 	matchedSourceInfo->Branch("S_true",&S_true,"S_true/D");
 	matchedSourceInfo->Branch("X0_true",&X0_true,"X0_true/D");
 	matchedSourceInfo->Branch("Y0_true",&Y0_true,"Y0_true/D");
+	matchedSourceInfo->Branch("fluxDensity_true",&fluxDensity_true,"fluxDensity_true/D");
 	matchedSourceInfo->Branch("name_rec",&SourceName_rec);	
 	matchedSourceInfo->Branch("type_rec",&SourceType_rec,"type_rec/I");
 	matchedSourceInfo->Branch("S_rec",&S_rec,"S_rec/D");
@@ -500,7 +508,8 @@ void Init(){
 	matchedSourceInfo->Branch("sigmaY_fit",&sigmaY_fit,"sigmaY_fit/D");
 	matchedSourceInfo->Branch("theta_fit",&theta_fit,"theta_fit/D");
 	matchedSourceInfo->Branch("offset_fit",&offset_fit,"offset_fit/D");
-	
+	matchedSourceInfo->Branch("fluxDensity_fit",&fluxDensity_fit,"fluxDensity_fit/D");
+
 }//close Init()
 
 void Save()
