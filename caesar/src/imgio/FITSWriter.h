@@ -28,8 +28,10 @@
 #ifndef _FITS_WRITER_h
 #define _FITS_WRITER_h 1
 
-
 #include <TObject.h>
+
+//CFITSIO headers
+#include <fitsio.h>
 
 #include <cstdlib>
 #include <iomanip>
@@ -72,14 +74,24 @@ class FITSWriter : public TObject {
 		/**
 		* \brief Write image to FITS file
 		*/
-		static int WriteFITS(Image* img,std::string outfilename);
+		static int WriteFITS(Image* img,std::string outfilename,bool recreate=true);
 		
 	private:
 
 		/**
 		* \brief Initialize python interface
 		*/
-		static int Init();
+		//static int Init();
+
+		/**
+		* \brief Writing metadata keywords
+		*/
+		static int WriteFITSKeywords(Image* img,fitsfile* fp);
+
+		/**
+		* \brief Handle error in FITS operations
+		*/
+		static void HandleError(int& status,fitsfile* fp);
 		
 	private:
 
