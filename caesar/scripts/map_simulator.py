@@ -507,6 +507,10 @@ class SkyMapSimulator(object):
 		source.SetSimType(source_sim_type)
 		source.SetTrueInfo(ampl,x0,y0)
 
+		# Set flux correction factor
+		fluxCorrection= self.beam_area
+		source.SetBeamFluxIntegral(fluxCorrection)
+
 		# Compute stats & morph pars
 		source.ComputeStats();
 		source.ComputeMorphologyParams();
@@ -547,6 +551,11 @@ class SkyMapSimulator(object):
 		# Compute number of sources to be generated given map area in pixels
 		area= (self.nx*self.ny)*self.pixsize/(3600.*3600.) # in deg^2
 		nsources= int(round(self.source_density*area))
+		S_min= (self.zmin*self.bkg_rms) + self.bkg_level
+		S_max= (self.zmax*self.bkg_rms) + self.bkg_level
+		lgS_min= np.log(S_min)
+		lgS_max= np.log(S_max)
+
 		print 'INFO: Generating #',nsources,' compact sources in map...'
 
 		# Compute blob sigma pars given beam info
@@ -567,8 +576,12 @@ class SkyMapSimulator(object):
 			y0= random.uniform(0,self.ny)
 
 			## Compute amplitude given significance level and bkg
-			z= random.uniform(self.zmin,self.zmax)
-			S= (z*self.bkg_rms) + self.bkg_level
+			## Generate flux uniform in log
+			lgS= np.random.uniform(lgS_min,lgS_max)
+			S= np.exp(lgS)
+			z= (S-self.bkg_level)/self.bkg_rms
+			#z= random.uniform(self.zmin,self.zmax)
+			#S= (z*self.bkg_rms) + self.bkg_level
 	
 			## Generate blob
 			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta)
@@ -602,6 +615,10 @@ class SkyMapSimulator(object):
 		# Compute number of sources to be generated given map area in pixels
 		area= (self.nx*self.ny)*self.pixsize/(3600.*3600.) # in deg^2
 		nsources= int(round(self.ext_source_density*area))
+		S_min= (self.zmin*self.bkg_rms) + self.bkg_level
+		S_max= (self.zmax*self.bkg_rms) + self.bkg_level
+		lgS_min= np.log(S_min)
+		lgS_max= np.log(S_max)
 		print 'INFO: Generating #',nsources,' extended sources in map...'
 
 		
@@ -621,8 +638,12 @@ class SkyMapSimulator(object):
 			y0= random.uniform(0,self.ny)
 
 			## Compute amplitude given significance level and bkg
-			z= random.uniform(self.zmin_ext,self.zmax_ext)
-			S= (z*self.bkg_rms) + self.bkg_level
+			## Generate flux uniform in log
+			lgS= np.random.uniform(lgS_min,lgS_max)
+			S= np.exp(lgS)
+			z= (S-self.bkg_level)/self.bkg_rms
+			#z= random.uniform(self.zmin_ext,self.zmax_ext)
+			#S= (z*self.bkg_rms) + self.bkg_level
 
 			## Generate random type (1=ring, 2=ellipse, ...)
 			source_type= random.randint(1, nsource_types)
