@@ -615,8 +615,8 @@ class SkyMapSimulator(object):
 		# Compute number of sources to be generated given map area in pixels
 		area= (self.nx*self.ny)*self.pixsize/(3600.*3600.) # in deg^2
 		nsources= int(round(self.ext_source_density*area))
-		S_min= (self.zmin*self.bkg_rms) + self.bkg_level
-		S_max= (self.zmax*self.bkg_rms) + self.bkg_level
+		S_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		S_max= (self.zmax_ext*self.bkg_rms) + self.bkg_level
 		lgS_min= np.log(S_min)
 		lgS_max= np.log(S_max)
 		print 'INFO: Generating #',nsources,' extended sources in map...'
@@ -625,7 +625,7 @@ class SkyMapSimulator(object):
 		## Start generation loop
 		sources_data = Box2D(amplitude=0,x_0=0,y_0=0,x_width=2*self.nx, y_width=2*self.ny)(self.gridx, self.gridy)
 		ngen_sources= 0		
-		nsource_types= 4
+		nsource_types= 3
 		
 
 		#for index in range(0,nsources):	
@@ -646,9 +646,9 @@ class SkyMapSimulator(object):
 			#S= (z*self.bkg_rms) + self.bkg_level
 
 			## Generate random type (1=ring, 2=ellipse, ...)
-			source_type= random.randint(1, nsource_types)
+			source_sim_type= random.randint(1, nsource_types)
 			
-			if source_type==1: # Ring2D Sector model
+			if source_sim_type==1: # Ring2D Sector model
 				source_sim_type= Caesar.Source.eRingLike
 				ring_r= random.uniform(self.ring_rmin,self.ring_rmax) 
 				ring_w= random.uniform(self.ring_width_min,self.ring_width_max)
@@ -659,14 +659,14 @@ class SkyMapSimulator(object):
 				theta_max= max(theta1,theta2)
 				source_data= self.generate_ring_sector(S,x0,y0,ring_r/self.pixsize,ring_w/self.pixsize,theta_min,theta_max) # convert radius/width from arcsec to pixels
 				
-			elif source_type==2: # Ellipse 2D model
+			elif source_sim_type==2: # Ellipse 2D model
 				source_sim_type= Caesar.Source.eEllipseLike
 				ellipse_bmaj= random.uniform(self.ellipse_rmin,self.ellipse_rmax) 
 				ellipse_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax) 
 				ellipse_theta= random.uniform(0,360)
 				source_data= self.generate_ellipse(S,x0,y0,ellipse_bmaj/self.pixsize,ellipse_bmin/self.pixsize,ellipse_theta) # convert radius/width from arcsec to pixels
 
-			elif source_type==3: # bubble + shell model
+			elif source_sim_type==3: # bubble + shell model
 				source_sim_type= Caesar.Source.eBubbleLike
 				bubble_r= random.uniform(self.disk_rmin,self.disk_rmax) 
 				shell_excess= random.uniform(self.shell_disk_ampl_ratio_min,self.shell_disk_ampl_ratio_max)
@@ -679,10 +679,10 @@ class SkyMapSimulator(object):
 				theta_max= max(theta1,theta2)
 				source_data= self.generate_bubble(S,x0,y0,bubble_r,shell_S,shell_r,shell_width,theta_min,theta_max)
 				
-			elif source_type==4: # Airy disk
-				source_sim_type= Caesar.Source.eDiskLike
-				disk_r= random.uniform(self.disk_rmin,self.disk_rmax) 
-				source_data= self.generate_airy_disk(S,x0,y0,disk_r)
+			#elif source_sim_type==4: # Airy disk
+			#	source_sim_type= Caesar.Source.eDiskLike
+			#	disk_r= random.uniform(self.disk_rmin,self.disk_rmax) 
+			#	source_data= self.generate_airy_disk(S,x0,y0,disk_r)
 
 			else:
 				print('ERROR: Invalid source type given!')
