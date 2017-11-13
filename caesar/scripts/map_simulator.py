@@ -68,8 +68,10 @@ def get_args():
 	parser.add_argument('-crpix2', '--crpix2', dest='crpix2', required=False, type=float, default=1, action='store',help='CRPIX2 fits keyword (default=1)')
 	parser.add_argument('-crval1', '--crval1', dest='crval1', required=False, type=float, default=254.851041667, action='store',help='CRVAL1 fits keyword (default=1)')
 	parser.add_argument('-crval2', '--crval2', dest='crval2', required=False, type=float, default=-41.4765888889, action='store',help='CRVAL2 fits keyword (default=1)')
-	parser.add_argument('-ctype1', '--ctype1', dest='ctype1', required=False, type=str, default='RA---NCP', action='store',help='CTYPE1 fits keyword (default=1)')
-	parser.add_argument('-ctype2', '--ctype2', dest='ctype2', required=False, type=str, default='DEC--NCP', action='store',help='CTYPE2 fits keyword (default=1)')
+	#parser.add_argument('-ctype1', '--ctype1', dest='ctype1', required=False, type=str, default='RA---NCP', action='store',help='CTYPE1 fits keyword (default=1)')
+	#parser.add_argument('-ctype2', '--ctype2', dest='ctype2', required=False, type=str, default='DEC--NCP', action='store',help='CTYPE2 fits keyword (default=1)')
+	parser.add_argument('-ctype1', '--ctype1', dest='ctype1', required=False, type=str, default='RA---SIN', action='store',help='CTYPE1 fits keyword (default=1)')
+	parser.add_argument('-ctype2', '--ctype2', dest='ctype2', required=False, type=str, default='DEC--SIN', action='store',help='CTYPE2 fits keyword (default=1)')
 
 	# - BKG OPTIONS
 	parser.add_argument('--bkg', dest='enable_bkg', action='store_true')	
@@ -215,8 +217,8 @@ class SkyMapSimulator(object):
 		self.crpix2= 1
 		self.crval1= 254.851041667
 		self.crval2= -41.4765888889
-		self.ctype1= 'RA---NCP'
-		self.ctype2= 'DEC--NCP'
+		self.ctype1= 'RA---SIN'
+		self.ctype2= 'DEC--SIN'
 
 		## Source model
 		self.truncate_models= True
@@ -561,7 +563,7 @@ class SkyMapSimulator(object):
 		# Compute blob sigma pars given beam info
 		sigmax= self.compute_beam_sigma(self.beam_bmaj)
 		sigmay= self.compute_beam_sigma(self.beam_bmin)
-		theta= self.beam_bpa
+		theta= self.beam_bpa + 90. # NB: BPA is the positional angle of the major axis measuring from North (up) counter clockwise, while theta is measured wrt to x axis
 		
 		## Start generation loop
 		sources_data = Box2D(amplitude=0,x_0=0,y_0=0,x_width=2*self.nx, y_width=2*self.ny)(self.gridx, self.gridy)
@@ -572,8 +574,10 @@ class SkyMapSimulator(object):
 				print ("INFO: Generating compact source no. %s/%s" % (index+1,nsources))
 			
 			## Generate random coordinates
-			x0= random.uniform(0,self.nx)
-			y0= random.uniform(0,self.ny)
+			#x0= np.random.uniform(0,self.nx)
+			#y0= np.random.uniform(0,self.ny)
+			x0= np.random.uniform(0,self.nx-1)
+			y0= np.random.uniform(0,self.ny-1)
 
 			## Compute amplitude given significance level and bkg
 			## Generate flux uniform in log
@@ -588,9 +592,10 @@ class SkyMapSimulator(object):
 			sources_data+= blob_data
 
 			## Set model map
-			ix= int(np.floor(x0))
-			iy= int(np.floor(y0))
-			#mask_data[ix,iy]+= S
+			#ix= int(np.floor(x0))
+			#iy= int(np.floor(y0))
+			ix= int(np.round(x0))
+			iy= int(np.round(y0))
 			mask_data[iy,ix]+= S
 
 			# Make Caesar source	
@@ -599,6 +604,9 @@ class SkyMapSimulator(object):
 			source_type= Caesar.Source.ePointLike
 			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0)
 			self.caesar_sources.append(caesar_source)
+
+			print ('INFO: Source %s: Pos(%s,%s), ix=%s, iy=%s' % (source_name,str(x0),str(y0),str(ix),str(iy)))
+
 
 		return [sources_data,mask_data]
 
@@ -634,8 +642,10 @@ class SkyMapSimulator(object):
 				print ("INFO: Generating extended source no. %s/%s" % (ngen_sources+1,nsources))
 			
 			## Generate random coordinates
-			x0= random.uniform(0,self.nx)
-			y0= random.uniform(0,self.ny)
+			#x0= random.uniform(0,self.nx)
+			#y0= random.uniform(0,self.ny)
+			x0= np.random.uniform(0,self.nx-1)
+			y0= np.random.uniform(0,self.ny-1)
 
 			## Compute amplitude given significance level and bkg
 			## Generate flux uniform in log
@@ -829,7 +839,7 @@ class SkyMapSimulator(object):
 		header.set('BPA', self.beam_bpa)
 		header.set('BSCALE',1.)
 		header.set('BZERO',0.)
-		header.set('CDELT1',self.pixsize/3600.)
+		header.set('CDELT1',-self.pixsize/3600.)
 		header.set('CDELT2',self.pixsize/3600.)
 		header.set('CTYPE1',self.ctype1)
 		header.set('CTYPE2',self.ctype2)
@@ -858,7 +868,7 @@ class SkyMapSimulator(object):
 		header.set('BPA', self.beam_bpa)
 		header.set('BSCALE',1.)
 		header.set('BZERO',0.)
-		header.set('CDELT1',self.pixsize/3600.)
+		header.set('CDELT1',-self.pixsize/3600.)
 		header.set('CDELT2',self.pixsize/3600.)
 		header.set('CTYPE1',self.ctype1)
 		header.set('CTYPE2',self.ctype2)
