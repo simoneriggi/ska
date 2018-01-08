@@ -15,6 +15,7 @@ import datetime
 import numpy as np
 import random
 import math
+from ctypes import *
 
 ## ASTRO
 from scipy import ndimage
@@ -25,6 +26,7 @@ from astropy.modeling.parameters import Parameter
 from astropy.modeling.core import Fittable2DModel
 from astropy.modeling.models import Box2D, Gaussian2D, Ring2D, Ellipse2D, TrapezoidDisk2D, Disk2D, AiryDisk2D
 from photutils.datasets import make_noise_image
+from astropy import wcs
 
 ## ROOT
 import ROOT
@@ -60,6 +62,9 @@ def get_args():
 	# - GENERAL IMAGE OPTIONS
 	parser.add_argument('-nx', '--nx', dest='nx', required=True, type=int, action='store',help='Image width in pixels')
 	parser.add_argument('-ny', '--ny', dest='ny', required=True, type=int, action='store',help='Image height in pixels')
+	parser.add_argument('-marginx', '--marginx', dest='marginx', required=False, type=int, default=0,action='store',help='Image x margin in pixels')
+	parser.add_argument('-marginy', '--marginy', dest='marginy', required=False, type=int, default=0,action='store',help='Image y margin in pixels')
+	
 	parser.add_argument('-pixsize', '--pixsize', dest='pixsize', required=True, type=float, action='store',help='Map pixel size in arcsec')
 	parser.add_argument('-bmaj', '--bmaj', dest='bmaj', required=True, type=float, default=5, action='store',help='Beam bmaj in arcsec (default=5)')
 	parser.add_argument('-bmin', '--bmin', dest='bmin', required=True, type=float, default=5, action='store',help='Beam bmin in arcsec (default=5)')
@@ -110,10 +115,15 @@ def get_args():
 	parser.add_argument('-disk_shell_ampl_ratio_max', '--disk_shell_ampl_ratio_max', dest='disk_shell_ampl_ratio_max', required=False, type=float, default=0.8, action='store',help='Disk/shell amplitude ratio max (default=0.5)')
 	parser.add_argument('-disk_shell_radius_ratio_min', '--disk_shell_radius_ratio_min', dest='disk_shell_radius_ratio_min', required=False, type=float, default=0.6, action='store',help='Disk/shell radius ratio min (default=0.6)')
 	parser.add_argument('-disk_shell_radius_ratio_max', '--disk_shell_radius_ratio_max', dest='disk_shell_radius_ratio_max', required=False, type=float, default=0.9, action='store',help='Disk/shell radius ratio max (default=0.8)')
+		
+	parser.add_argument('-zmin_model', '--zmin_model', dest='model_trunc_zmin', required=False, type=float, default=1, action='store',help='Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default=1)')
 	
 	# - OUTPUT FILE OPTIONS
-	parser.add_argument('-outputfile', '--outputfile', dest='outputfile', required=True, type=str, action='store',help='Output filename')
-	parser.add_argument('-outputfile_sources', '--outputfile_sources', dest='outputfile_sources', required=True, type=str, action='store',help='Source ROOT Output filename')
+	parser.add_argument('-outputfile', '--outputfile', dest='outputfile', required=False, type=str, default='simmap.fits',action='store',help='Output filename')
+	parser.add_argument('-outputfile_model', '--outputfile_model', dest='outputfile_model', required=False, type=str, default='skymodel.fits', action='store',help='Model filename')
+	parser.add_argument('-outputfile_sources', '--outputfile_sources', dest='outputfile_sources', required=False, type=str, default='sources.root',action='store',help='Source ROOT Output filename')
+	parser.add_argument('-outputfile_ds9region', '--outputfile_ds9region', dest='outputfile_ds9region', required=False, type=str, default='dsregion.reg',action='store',help='DS9 source region filename')
+	parser.add_argument('-outputfile_casaregion', '--outputfile_casaregion', dest='outputfile_casaregion', required=False, type=str, default='casa_mask.dat',action='store',help='CASA source region filename')
 	
 	args = parser.parse_args()	
 
@@ -211,6 +221,9 @@ class SkyMapSimulator(object):
 		## Image parameters
 		self.nx = nx #in pixels
 		self.ny = ny # in pixels
+		self.marginx= 0 # in pixels (no margin)
+		self.marginy= 0 # in pixels (no margin)
+		
 		self.pixsize= pixsize # in arcsec
 		self.gridy, self.gridx = np.mgrid[0:ny, 0:nx]
 		self.crpix1= 1
@@ -222,6 +235,10 @@ class SkyMapSimulator(object):
 
 		## Source model
 		self.truncate_models= True
+		self.trunc_model_zmin= 1
+
+		## Mask box size
+		self.mask_boxsize= 10 # in pixels
 
 		## Bkg parameters
 		self.simulate_bkg= True
@@ -257,11 +274,14 @@ class SkyMapSimulator(object):
 		self.shell_disk_radius_ratio_max= 0.9
 		
 		## Map output file
-		self.mapfilename= 'SimMap.fits'
-		self.modelfilename= 'SimModel.fits'
+		self.mapfilename= 'simmap.fits'
+		self.modelfilename= 'skymodel.fits'
 		
 		## DS9 output file
-		self.ds9filename= 'SimSourceRegions.reg'
+		self.ds9filename= 'ds9region.reg'
+
+		## CASA region output file	
+		self.casafilename= 'casamask.dat'
 
 		## Caesar img & sources
 		self.outfilename= 'SimOutput.root'	
@@ -278,6 +298,13 @@ class SkyMapSimulator(object):
 		self.outtree= ROOT.TTree('SourceInfo','SourceInfo')
 		self.cs = Caesar.Source()
 		self.outtree.Branch('Source',self.cs)		
+
+	def set_margins(self,marginx,marginy):
+		""" Set margin in X & Y """
+		if (marginx<0 or marginy<0 or marginx>=self.nx/2 or marginy>=self.ny/2) :
+			raise ValueError('Invalid margin specified (<0 or larger than image half size!')
+		self.marginx= marginx
+		self.marginy= marginy
 
 	def set_ref_pix(self,x,y):
 		""" Set reference pixel (CRPIX1,CRPIX2) in FITS output """
@@ -310,9 +337,17 @@ class SkyMapSimulator(object):
 		""" Enable/disable continuous model truncation (gaussian, airy disk, ...) """
 		self.truncate_models= choice
 
+	def set_model_trunc_significance(self,value):
+		""" Set the significance level below which source model data are truncated """
+		self.trunc_model_zmin= value
+
 	def set_ds9region_filename(self,filename):
 		""" Set the output DS9 region filename """
 		self.ds9filename= filename
+
+	def set_casaregion_filename(self,filename):
+		""" Set the output CASA region filename """
+		self.casafilename= filename
 
 	def set_map_filename(self,filename):
 		""" Set the output map filename """
@@ -410,7 +445,8 @@ class SkyMapSimulator(object):
 		data= Gaussian2D(ampl,x0,y0,sigmax,sigmay,theta=math.radians(theta))(self.gridx, self.gridy)
 
 		## Truncate data at minimum significance
-		ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level
+		#ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level
+		ampl_min= (self.trunc_model_zmin*self.bkg_rms) + self.bkg_level
 		#ampl_min= self.bkg_level
 		if self.truncate_models:
 			data[data<ampl_min] = 0		
@@ -551,7 +587,8 @@ class SkyMapSimulator(object):
 					density: source density in #sources/deg^2 (e.g. 2000)
 		"""
 		# Compute number of sources to be generated given map area in pixels
-		area= (self.nx*self.ny)*self.pixsize/(3600.*3600.) # in deg^2
+		#area= (self.nx*self.ny)*self.pixsize/(3600.*3600.) # in deg^2
+		area= ((self.nx-2*self.marginx)*(self.ny-2*self.marginy))*self.pixsize/(3600.*3600.) # in deg^2
 		nsources= int(round(self.source_density*area))
 		S_min= (self.zmin*self.bkg_rms) + self.bkg_level
 		S_max= (self.zmax*self.bkg_rms) + self.bkg_level
@@ -576,8 +613,10 @@ class SkyMapSimulator(object):
 			## Generate random coordinates
 			#x0= np.random.uniform(0,self.nx)
 			#y0= np.random.uniform(0,self.ny)
-			x0= np.random.uniform(0,self.nx-1)
-			y0= np.random.uniform(0,self.ny-1)
+			#x0= np.random.uniform(0,self.nx-1)
+			#y0= np.random.uniform(0,self.ny-1)
+			x0= np.random.uniform(self.marginx,self.nx-self.marginx-1)
+			y0= np.random.uniform(self.marginy,self.ny-self.marginy-1)
 
 			## Compute amplitude given significance level and bkg
 			## Generate flux uniform in log
@@ -607,7 +646,6 @@ class SkyMapSimulator(object):
 
 			print ('INFO: Source %s: Pos(%s,%s), ix=%s, iy=%s' % (source_name,str(x0),str(y0),str(ix),str(iy)))
 
-
 		return [sources_data,mask_data]
 
 
@@ -621,7 +659,8 @@ class SkyMapSimulator(object):
 		"""
 		
 		# Compute number of sources to be generated given map area in pixels
-		area= (self.nx*self.ny)*self.pixsize/(3600.*3600.) # in deg^2
+		#area= (self.nx*self.ny)*self.pixsize/(3600.*3600.) # in deg^2
+		area= ((self.nx-2*self.marginx)*(self.ny-2*self.marginy))*self.pixsize/(3600.*3600.) # in deg^2
 		nsources= int(round(self.ext_source_density*area))
 		S_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
 		S_max= (self.zmax_ext*self.bkg_rms) + self.bkg_level
@@ -644,8 +683,10 @@ class SkyMapSimulator(object):
 			## Generate random coordinates
 			#x0= random.uniform(0,self.nx)
 			#y0= random.uniform(0,self.ny)
-			x0= np.random.uniform(0,self.nx-1)
-			y0= np.random.uniform(0,self.ny-1)
+			#x0= np.random.uniform(0,self.nx-1)
+			#y0= np.random.uniform(0,self.ny-1)
+			x0= np.random.uniform(self.marginx,self.nx-self.marginx-1)
+			y0= np.random.uniform(self.marginy,self.ny-self.marginy-1)
 
 			## Compute amplitude given significance level and bkg
 			## Generate flux uniform in log
@@ -805,7 +846,7 @@ class SkyMapSimulator(object):
 		fout = open(self.ds9filename, 'wb')
 	
 		## Write file header
-		fout.write('global color=white font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n')
+		fout.write('global color=white font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n')
 		fout.write('image\n')
 
 		## Write source contour region
@@ -816,6 +857,39 @@ class SkyMapSimulator(object):
 
 		fout.close();
 
+	def write_casa_mask(self,boxsize=10):
+		""" Write CASA mask file around simulated sources"""
+
+		## Create a WCS structure
+		w = wcs.WCS(naxis=2)
+		w.wcs.crpix = [self.crpix1, self.crpix2]
+		w.wcs.cdelt = np.array([-self.pixsize/3600., self.pixsize/3600.])
+		w.wcs.crval = [self.crval1, self.crval2]
+		w.wcs.ctype = [self.ctype1, self.ctype2]
+		#w.wcs.set_pv([(2, 1, 45.0)])
+
+		## Create mask ascii file with header
+		f = open(str(self.casafilename), 'wb')
+		f.write("#CRTFv0\n")
+		#f.write("global coord = J2000, color=blue\n")
+
+		## Create a CASA box around the source
+		for item in self.caesar_sources:
+			ix_min= item.GetIxMin()
+			ix_max= item.GetIxMax()
+			iy_min= item.GetIyMin()
+			iy_max= item.GetIyMax()
+
+			# Set box coordinates
+			pixcrd = np.array([[max(0,ix_min-boxsize/2.), max(0,iy_min-boxsize/2.)], [min(self.nx-1,ix_max+boxsize/2.), min(self.ny-1,iy_max+boxsize/2.)]], np.float_)
+			
+			# Convert pixel coordinates to world coordinates
+			world = w.wcs_pix2world(pixcrd, 1)
+			print(world)
+			f.write("box [ [{0}deg,{1}deg], [{2}deg,{3}deg] ]\n".format(min(world[0,0],world[1,0]),min(world[0,1],world[1,1]),max(world[0,0],world[1,0]),max(world[0,1],world[1,1])))
+
+		# Close ascii file
+		f.close()
 
 	def draw_map(self,data):
 		""" Draw map data """
@@ -897,11 +971,12 @@ class SkyMapSimulator(object):
 		self.outfile.cd()
 		self.caesar_img.Write()
 		self.outtree.Write()
-		self.outfile.Close()		
+		self.outfile.Close()
+
+		# Write CASA mask file
+		self.write_casa_mask(boxsize=self.mask_boxsize)		
 
 	
-
-
 ###########################
 
 
@@ -926,6 +1001,8 @@ def main():
 	# - Image args
 	Nx= args.nx
 	Ny= args.ny
+	marginX= args.marginx
+	marginY= args.marginy
 	pixsize= args.pixsize
 	ctype1= args.ctype1
 	ctype2= args.ctype2
@@ -934,6 +1011,8 @@ def main():
 	crval1= args.crval1
 	crval2= args.crval2
 
+	#- Source model
+	model_trunc_zmin= args.model_trunc_zmin
 
 	# - Bkg info args
 	enable_bkg= args.enable_bkg
@@ -969,12 +1048,16 @@ def main():
 
 	# - Output args
 	outputfile= args.outputfile
-	mask_outputfile= 'mask_' + outputfile
+	mask_outputfile= args.outputfile_model
 	outputfile_sources= args.outputfile_sources
+	outputfile_ds9region= args.outputfile_ds9region
+	outputfile_casaregion= args.outputfile_casaregion
 
 	print("*** ARGS ***")
 	print("Nx: %s" % Nx)
 	print("Ny: %s" % Ny)
+	print("Margin X: %s" % marginX)
+	print("Margin Y: %s" % marginY)
 	print("pixsize: %s" % pixsize)
 	print("ctype: (%s %s)" % (ctype1,ctype2))
 	print("crpix: (%s %s)" % (crpix1,crpix2))
@@ -996,13 +1079,18 @@ def main():
 	## Generate simulated sky map
 	print ('INFO: Generate simulated sky map...')
 	simulator= SkyMapSimulator(Nx,Ny,pixsize)
+	simulator.set_margins(marginX,marginY)
 	simulator.set_ref_pix(crpix1,crpix2)
 	simulator.set_ref_pix_coords(crval1,crval2)
 	simulator.set_coord_system_type(ctype1,ctype2)
 
+	simulator.set_model_trunc_significance(model_trunc_zmin)
+
 	simulator.set_map_filename(outputfile)
 	simulator.set_model_filename(mask_outputfile)
 	simulator.set_source_filename(outputfile_sources)
+	simulator.set_ds9region_filename(outputfile_ds9region)
+	simulator.set_casaregion_filename(outputfile_casaregion)
 	simulator.enable_bkg(enable_bkg)
 	simulator.set_bkg_pars(bkg_level,bkg_rms)
 	simulator.set_beam_info(Bmaj,Bmin,Bpa)	
