@@ -500,13 +500,18 @@ int SFinder::Configure(){
 	//Get source fitting options
 	GET_OPTION_VALUE(fitSources,m_fitSources);
 	GET_OPTION_VALUE(fitMaxNComponents,m_fitMaxNComponents);
+	GET_OPTION_VALUE(fitWithCentroidLimits,m_fitWithCentroidLimits);
+	GET_OPTION_VALUE(fitWithBkgLimits,m_fitWithBkgLimits);
 	GET_OPTION_VALUE(fitWithFixedBkg,m_fitWithFixedBkg);
 	GET_OPTION_VALUE(fitUseEstimatedBkgLevel,m_fitUseEstimatedBkgLevel);
 	GET_OPTION_VALUE(fitBkgLevel,m_fitBkgLevel);
+	GET_OPTION_VALUE(fitWithAmplLimits,m_fitWithAmplLimits);
 	GET_OPTION_VALUE(fitAmplLimit,m_fitAmplLimit);
+	GET_OPTION_VALUE(fitWithSigmaLimits,m_fitWithSigmaLimits);
 	GET_OPTION_VALUE(fixSigmaInPreFit,m_fixSigmaInPreFit);
 	GET_OPTION_VALUE(fitSigmaLimit,m_fitSigmaLimit);
 	GET_OPTION_VALUE(fitWithFixedSigma,m_fitWithFixedSigma);
+	GET_OPTION_VALUE(fitWithThetaLimits,m_fitWithThetaLimits);
 	GET_OPTION_VALUE(fitWithFixedTheta,m_fitWithFixedTheta);
 	GET_OPTION_VALUE(fitThetaLimit,m_fitThetaLimit);
 	GET_OPTION_VALUE(useFluxZCutInFit,m_useFluxZCutInFit);
@@ -2331,24 +2336,24 @@ int SFinder::FitSources(std::vector<Source*>& sources){
 	//## Loop over image sources and perform fitting stage for non-extended sources
 	INFO_LOG("[PROC "<<m_procId<<"] - Loop over image sources and perform fitting stage for non-extended sources...");
 		
-	BlobPars blobPars;
-	blobPars.bmaj= static_cast<int>( ceil(m_beamBmaj/m_pixSizeX) );//converted in pixels
-	blobPars.bmin= static_cast<int>( ceil(m_beamBmin/m_pixSizeY) );//converted in pixels
-	blobPars.bpa= m_beamBpa;
-
 	//Set fit options
 	SourceFitOptions fitOptions;	
-	fitOptions.bmaj= m_beamBmaj/m_pixSizeX;//converted in pixels
-	fitOptions.bmin= m_beamBmin/m_pixSizeY;//converted in pixels
+	fitOptions.bmaj= m_beamBmaj/m_pixSizeX;//static_cast<int>( ceil(m_beamBmaj/m_pixSizeX) );//converted in pixels
+	fitOptions.bmin= m_beamBmin/m_pixSizeY;//static_cast<int>( ceil(m_beamBmin/m_pixSizeY) );//converted in pixels
 	fitOptions.bpa= m_beamBpa;
 	fitOptions.nMaxComponents= m_fitMaxNComponents;
+	fitOptions.limitCentroidInFit= m_fitWithCentroidLimits;
+	fitOptions.limitBkgInFit= m_fitWithBkgLimits;
 	fitOptions.fixBkg= m_fitWithFixedBkg;
 	fitOptions.useEstimatedBkgLevel= m_fitUseEstimatedBkgLevel;
 	fitOptions.fixedBkgLevel= m_fitBkgLevel;
+	fitOptions.limitAmplInFit= m_fitWithAmplLimits;
 	fitOptions.amplLimit= m_fitAmplLimit;
 	fitOptions.fixSigmaInPreFit= m_fixSigmaInPreFit;
+	fitOptions.limitSigmaInFit= m_fitWithSigmaLimits;
 	fitOptions.sigmaLimit= m_fitSigmaLimit;
 	fitOptions.fixSigma= m_fitWithFixedSigma;
+	fitOptions.limitThetaInFit= m_fitWithThetaLimits;
 	fitOptions.fixTheta= m_fitWithFixedTheta;
 	fitOptions.thetaLimit= m_fitThetaLimit;
 	fitOptions.useFluxZCut= m_useFluxZCutInFit;

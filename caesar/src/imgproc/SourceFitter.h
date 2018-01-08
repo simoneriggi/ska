@@ -62,11 +62,6 @@ namespace Caesar {
 class Image;
 class Source;
 
-struct BlobPars {
-	double bmaj;//in pixels
-	double bmin;//in pixels
-	double bpa;//in deg
-};
 
 struct SourceFitOptions {
 	//- Blob start fit pars
@@ -88,21 +83,28 @@ struct SourceFitOptions {
 	//- Peak flux significance min threshold (in nsigmas wrt to avg bkg & rms)
 	double peakZThrMin;	
 
+	//- Centroid options
+	bool limitCentroidInFit;
+
 	//- Bkg options
 	bool fixBkg;
+	bool limitBkgInFit;
 	bool useEstimatedBkgLevel;
 	double fixedBkgLevel;
 		
 	//- Amplitude fit par range (example +-20% around source peak)
+	bool limitAmplInFit;
 	double amplLimit;
 
 	//- Sigma fit par range (example +-20% around source peak)
 	bool fixSigmaInPreFit;
-	bool fixSigma;
+	bool fixSigma;	
+	bool limitSigmaInFit;
 	double sigmaLimit;
 
 	//- Theta 
 	bool fixTheta;
+	bool limitThetaInFit;
 	double thetaLimit;//in deg
 
 	//- Flux significance min threshold (in nsigmas above the bkg)
@@ -118,14 +120,19 @@ struct SourceFitOptions {
     bmin= 5;//pix
 		bpa= 0;
 		nMaxComponents= 3;
+		limitCentroidInFit= true;
 		fixBkg= true;
+		limitBkgInFit= true;
 		useEstimatedBkgLevel= true;
 		fixedBkgLevel= 0;
+		limitAmplInFit= true;
 		amplLimit= 0.2;
+		limitSigmaInFit= true;
 		sigmaLimit= 0.2;
 		fixSigmaInPreFit= false;
 		fixSigma= false;
 		fixTheta= false;
+		limitThetaInFit= true;
 		thetaLimit= 5;//deg
 		useFluxZCut= false;
 		fluxZThrMin= 2.5;//in nsigmas
@@ -244,7 +251,6 @@ class SourceComponentPars : public TObject {
 
 	private:
 		
-
 	private:
 		std::map<std::string,double> FitPars;
 		std::map<std::string,double> FitParsErr;
@@ -549,13 +555,6 @@ class SourceFitPars : public TObject {
 //========================================
 //==         SOURCE FITTER
 //========================================
-/*
-struct FitData {
-	double x;
-	double y;
-	double S;
-};
-*/
 
 class SourceFitter : public TObject {
 
@@ -607,11 +606,6 @@ class SourceFitter : public TObject {
 		*/
 		static double Gaus2DFcn(double* x, double* p);
 
-		/**
-		* \brief Residual fit function
-		*/
-		//static double ResidualFitFcn(double* x, double* p);
-		
 	protected:
 		/**
 		* \brief Check if fit has parameters converged at bounds
@@ -623,7 +617,6 @@ class SourceFitter : public TObject {
 		static int m_NFitComponents;
 		static int m_fitStatus;
 		static SourceFitPars m_sourceFitPars;
-		//static std::vector<FitData> m_fitData;
 		
 	ClassDef(SourceFitter,1)
 

@@ -367,8 +367,10 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		double offset_min= std::min(Smin,offset-fabs(rmsMean));
 		double offset_max= std::min(Smax,offset+fabs(rmsMean));
 		sourceFitFcn->SetParameter(nFitPars-1,offset);
-		sourceFitFcn->SetParLimits(nFitPars-1,offset_min,offset_max);
-		INFO_LOG("offset="<<offset<<" ["<<offset_min<<","<<offset_max<<"]");
+		if(fitOptions.limitBkgInFit) {
+			sourceFitFcn->SetParLimits(nFitPars-1,offset_min,offset_max);
+			INFO_LOG("offset="<<offset<<" ["<<offset_min<<","<<offset_max<<"]");	
+		}
 	}
 	sourceFitFcn->SetParName(nFitPars-1,"offset");
 	
@@ -390,8 +392,10 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		double Speak_max= std::max(Smax, Speak*(1 + fitOptions.amplLimit) );
 		sourceFitFcn->SetParName(par_counter,Form("%s_%d",parNamePrefix[0].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter,Speak);
-		sourceFitFcn->SetParLimits(par_counter,Speak_min,Speak_max);
-		INFO_LOG("Speak="<<Speak<<" ["<<Speak_min<<","<<Speak_max<<"]");
+		if(fitOptions.limitAmplInFit){
+			sourceFitFcn->SetParLimits(par_counter,Speak_min,Speak_max);
+			INFO_LOG("Speak="<<Speak<<" ["<<Speak_min<<","<<Speak_max<<"]");
+		}
 
 		//- Centroids
 		double centroidLimit= 0.5 * sqrt(pow(fitOptions.bmaj,2) + pow(fitOptions.bmin,2));
@@ -401,13 +405,15 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		double y0_max= y + centroidLimit;
 		sourceFitFcn->SetParName(par_counter+1,Form("%s_%d",parNamePrefix[1].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter+1,x);
-		sourceFitFcn->SetParLimits(par_counter+1,x0_min,x0_max);
-
 		sourceFitFcn->SetParName(par_counter+2,Form("%s_%d",parNamePrefix[2].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter+2,y);
-		sourceFitFcn->SetParLimits(par_counter+2,y0_min,y0_max);
-		INFO_LOG("(x,y)=("<<x<<","<<y<<")"<<" bounds x("<<x0_min<<","<<x0_max<<") y("<<y0_min<<","<<y0_max<<")");
+		if(fitOptions.limitCentroidInFit){
+			sourceFitFcn->SetParLimits(par_counter+1,x0_min,x0_max);	
+			sourceFitFcn->SetParLimits(par_counter+2,y0_min,y0_max);
+			INFO_LOG("(x,y)=("<<x<<","<<y<<")"<<" bounds x("<<x0_min<<","<<x0_max<<") y("<<y0_min<<","<<y0_max<<")");
+		}
 
+		
 		//- Sigmas
 		double sigmaX= fitOptions.bmaj/GausSigma2FWHM;
 		double sigmaY= fitOptions.bmin/GausSigma2FWHM;
@@ -418,12 +424,15 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		double sigmaX_max= std::max(sourceSigmaMax_x,sigmaX*(1+fitOptions.sigmaLimit));
 		double sigmaY_max= std::max(sourceSigmaMax_y,sigmaY*(1+fitOptions.sigmaLimit));
 		sourceFitFcn->SetParName(par_counter+3,Form("%s_%d",parNamePrefix[3].c_str(),i+1));
-		sourceFitFcn->SetParameter(par_counter+3,sigmaX);
-		sourceFitFcn->SetParLimits(par_counter+3,sigmaX_min,sigmaX_max);
+		sourceFitFcn->SetParameter(par_counter+3,sigmaX);		
 		sourceFitFcn->SetParName(par_counter+4,Form("%s_%d",parNamePrefix[4].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter+4,sigmaY);
-		sourceFitFcn->SetParLimits(par_counter+4,sigmaY_min,sigmaY_max);
-		INFO_LOG("(sigmaX,sigmaY)=("<<sigmaX<<","<<sigmaY<<")"<<" bounds sigmaX("<<sigmaX_min<<","<<sigmaX_max<<") y("<<sigmaY_min<<","<<sigmaY_max<<")");
+
+		if(fitOptions.limitSigmaInFit){
+			sourceFitFcn->SetParLimits(par_counter+3,sigmaX_min,sigmaX_max);
+			sourceFitFcn->SetParLimits(par_counter+4,sigmaY_min,sigmaY_max);
+			INFO_LOG("(sigmaX,sigmaY)=("<<sigmaX<<","<<sigmaY<<")"<<" bounds sigmaX("<<sigmaX_min<<","<<sigmaX_max<<") y("<<sigmaY_min<<","<<sigmaY_max<<")");
+		}
 
 		//- Theta		
 		double theta= fitOptions.bpa;
@@ -431,8 +440,10 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 		double theta_max= theta + fitOptions.thetaLimit;
 		sourceFitFcn->SetParName(par_counter+5,Form("%s_%d",parNamePrefix[5].c_str(),i+1));
 		sourceFitFcn->SetParameter(par_counter+5,theta);
-		sourceFitFcn->SetParLimits(par_counter+5,theta_min,theta_max);
-		INFO_LOG("theta="<<theta<<" bounds ("<<theta_min<<","<<theta_max<<")");
+		if(fitOptions.limitThetaInFit){
+			sourceFitFcn->SetParLimits(par_counter+5,theta_min,theta_max);
+			INFO_LOG("theta="<<theta<<" bounds ("<<theta_min<<","<<theta_max<<")");
+		}
 
 		//Update par counter
 		par_counter+= nComponentPars;
@@ -476,11 +487,11 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 	if(prefitStatus!=0){
 		WARN_LOG("Source pre-fit failed or did not converge.");
 		m_fitStatus= eFitNotConverged;
-		delete fluxMapHisto;
-		fluxMapHisto= 0;
-		delete sourceFitFcn;
-		sourceFitFcn= 0;
-		return 0;
+		//delete fluxMapHisto;
+		//fluxMapHisto= 0;
+		//delete sourceFitFcn;
+		//sourceFitFcn= 0;
+		//return 0;
 	}
 
 	//==============================================
@@ -577,7 +588,7 @@ int SourceFitter::FitSource(Source* aSource,SourceFitOptions& fitOptions)
 	m_sourceFitPars.SetNDF(NDF);
 	m_sourceFitPars.SetNFreePars(NFreePars);
 	m_sourceFitPars.SetNFitPoints(NFittedBins);
-	m_sourceFitPars.SetStatus(fitRes.IsValid());
+	m_sourceFitPars.SetStatus(m_fitStatus);
 	m_sourceFitPars.SetMinimizerStatus(fitMinimizerStatus);
 	
 	par_counter= 0;
@@ -655,11 +666,13 @@ bool SourceFitter::HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes)
 {
 	//Loop over parameters and check if they converged at bounds
 	bool hasParAtLimits= false;
-	double parAtLimitThr= 0.1;//in percentage
+	double parAtLimitThr= 1.e-6;//in percentage
 	
-	for(int i=0;i<fitRes.NPar();i++){
+	for(unsigned int i=0;i<fitRes.NPar();i++){
 		if(!fitRes.IsParameterBound(i) || fitRes.IsParameterFixed(i) ) continue;
-	
+		
+		std::string parName= fitRes.GetParameterName(i);
+
 		//Check par limits
 		double par_min= 0;
 		double par_max= 0;
@@ -671,6 +684,7 @@ bool SourceFitter::HasFitParsAtLimit(const ROOT::Fit::FitResult& fitRes)
 		//if(par==par_min || par==par_max){
 		if(parRelDiffMin<parAtLimitThr || parRelDiffMax<parAtLimitThr){	
 			hasParAtLimits= true;
+			INFO_LOG("Fit parameter "<<parName<<" is at limit (value="<<par<<", min/max="<<par_min<<"/"<<par_max<<" rel diff min/max="<<parRelDiffMin<<"/"<<parRelDiffMax<<", thr="<<parAtLimitThr<<")");
 			break;
 		}
 	}//end loop parameters

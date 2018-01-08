@@ -437,6 +437,26 @@ class Blob : public TNamed {
 		}
 
 		/**
+		* \brief Get source pixel ix_min
+		*/
+		long int GetIxMin(){return m_Ix_min;}
+
+		/**
+		* \brief Get source pixel ix_max
+		*/
+		long int GetIxMax(){return m_Ix_max;}
+
+		/**
+		* \brief Get source pixel iy_min
+		*/
+		long int GetIyMin(){return m_Iy_min;}
+
+		/**
+		* \brief Get source pixel iy_max
+		*/
+		long int GetIyMax(){return m_Iy_max;}
+
+		/**
 		* \brief Set source pixel coordinate range
 		*/
 		void SetSourcePixelRange(long int ixmin,long int ixmax,long int iymin,long int iymax){

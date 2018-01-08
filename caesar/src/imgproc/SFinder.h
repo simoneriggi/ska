@@ -413,14 +413,19 @@ class SFinder : public TObject {
 		//Source fitting
 		bool m_fitSources;
 		int m_fitMaxNComponents;
+		bool m_fitWithCentroidLimits;
 		bool m_fitWithFixedBkg;
+		bool m_fitWithBkgLimits;
 		double m_fitBkgLevel;	
 		bool m_fitUseEstimatedBkgLevel;
+		bool m_fitWithAmplLimits;
 		double m_fitAmplLimit;
 		bool m_fixSigmaInPreFit;
+		bool m_fitWithSigmaLimits;
 		double m_fitSigmaLimit;
 		bool m_fitWithFixedSigma;
 		bool m_fitWithFixedTheta;
+		bool m_fitWithThetaLimits;
 		double m_fitThetaLimit;
 		bool m_useFluxZCutInFit;
 		double m_fitZCutMin;
