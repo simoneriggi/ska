@@ -107,7 +107,6 @@ MESSAGE(STATUS "LOG4CXX_INCLUDE_DIR: ${LOG4CXX_INCLUDE_DIRS}")
 MESSAGE(STATUS "LOG4CXX_LIBRARIES: ${LOG4CXX_LIBRARIES}")
 
 
-
 #==================================
 #==   Check for CFITSIO         ===
 #==================================
