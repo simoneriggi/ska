@@ -15,7 +15,7 @@ import datetime
 import numpy as np
 import random
 import math
-from ctypes import *
+##from ctypes import *
 
 ## ASTRO
 from scipy import ndimage
