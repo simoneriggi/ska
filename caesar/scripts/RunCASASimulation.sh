@@ -24,7 +24,25 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "*** OPTIONAL ARGS ***"	
 	echo "--startid=[START_ID] - Run start id (default: 1)"
 	echo "--sourcegenmargin=[SOURCE_GEN_MARGIN_SIZE] - Left/right margin in skymodel map for source generation (default: 0)"
-	echo "--bmaj=[BMAJ] - Bmaj of sky model map (default: 9.8)"
+	echo "--bmaj=[BMAJ] - Beam Bmaj of sky model map in arcsec (default: 9.8 arcsec)"
+	echo "--bmin=[BMIN] - Beam Bmin of sky model map in arcsec (default: 5.8 arcsec)"
+	echo "--bpa=[BMIN] - Beam position angle of sky model map in deg (default: -3 deg)"
+	echo "--bkglevel=[BKG_LEVEL] - Bkg level of sky model toy sim map in Jy (default: 10.e-6)"
+	echo "--bkgrms=[BKG_RMS] - RMS level of sky model toy sim map in Jy (default: 100.e-6)"
+	echo "--zmin=[ZMIN] - Min generated compact source significance level wrt to bkg level & rms (default: 1)"
+	echo "--zmax=[ZMAX] - Max generated compact source significance level wrt to bkg level & rms (default: 10000)"
+	echo "--zmin_model=[ZMIN_MODEL] - Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default: 1)"
+	echo "--zmin_ext=[ZMIN_EXT] - Min generated extended source significance level wrt to bkg level & rms (default: 1)"
+	echo "--zmax_ext=[ZMAX_EXT] - Max generated extended source significance level wrt to bkg level & rms (default: 5)"
+	echo "--sourcedensity=[SOURCE_DENSITY] - Compact source density in sources/deg^2 (default: 1000)"
+	echo "--extsourcedensity=[EXT_SOURCE_DENSITY] - Extended source density in sources/deg^2 (default: 100)"
+	echo "--extscalemin=[EXT_SCALE_MIN] - Minimum extended source size in arcsec (default: 10)"
+	echo "--extscalemax=[EXT_SCALE_MAX] - Maximum extended source size in arcsec (default: 100)"
+	echo "--simproject=[SIM_PROJECT] - Name of CASA simulation project (default: sim)"
+	echo "--visimagename=[VIS_IMAGE_NAME] - Name of CASA sim visibility image name (default: vis.ms)"
+	echo "--simtottime=[SIM_TOT_TIME] - Simulation total time in seconds (default: 43200)"
+	echo "--telconfigs=[TELCONFIGS] - Antenna configurations (default: [atca_all.cfg])"
+	echo "--addnoise - Add noise to CASA simulation (default: no)"
 	echo "--submit - Submit the script to the batch system using queue specified"
 	echo "--containerrun - Run inside Caesar container"
 	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
@@ -53,8 +71,28 @@ GEN_SOURCES=true
 GEN_EXT_SOURCES=false
 CONTAINER_IMG=""
 RUN_IN_CONTAINER=false
+BMAJ=9.8
+BMIN=5.8
+BPA=-3
+BKG_LEVEL=10e-6 # Jy
+BKG_RMS=100e-6 # Jy
+ZMIN=1
+ZMAX=10000
+ZMIN_EXT=1
+ZMAX_EXT=5
+ZMIN_MODEL=1
+SOURCE_DENSITY=1000
+EXT_SOURCE_DENSITY=100
+EXT_SCALE_MIN=10
+EXT_SCALE_MAX=100
+SIM_PROJECT="sim"
+VIS_IMAGE_NAME="vis.ms"
+SIM_TOT_TIME=43200
+TELCONFIGS="['atca_all.cfg']"
+ADD_NOISE=false
 
-for item in $*
+##for item in $*
+for item in "$@"
 do
 	case $item in 
 		## MANDATORY ##	
@@ -88,6 +126,48 @@ do
 		--sourcegenmargin=*)
     	SOURCE_GEN_MARGIN_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
+		--bmaj=*)
+    	BMAJ=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--bmin=*)
+    	BMIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--bpa=*)
+    	BPA=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--bkglevel=*)
+    	BKG_LEVEL=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--bkgrms=*)
+    	BKG_RMS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;	
+		--zmin=*)
+    	ZMIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--zmax=*)
+    	ZMAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--zmin_ext=*)
+    	ZMIN_EXT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--zmax_ext=*)
+    	ZMAX_EXT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--zmin_model=*)
+    	ZMIN_MODEL=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--sourcedensity=*)
+    	SOURCE_DENSITY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--extsourcedensity=*)
+    	EXT_SOURCE_DENSITY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--extscalemin=*)
+    	EXT_SCALE_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--extscalemax=*)
+    	EXT_SCALE_MAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
 		--sources*)
     	GEN_SOURCES=true
     ;;
@@ -113,7 +193,21 @@ do
 		--containerrun*)
     	RUN_IN_CONTAINER=true
     ;;
-		
+		--simproject=*)
+    	SIM_PROJECT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--visimagename=*)
+    	VIS_IMAGE_NAME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--simtottime=*)
+    	SIM_TOT_TIME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--telconfigs=*)
+    	TELCONFIGS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--addnoise*)
+    	ADD_NOISE=true
+    ;;
 
     *)
     # Unknown option
@@ -123,6 +217,8 @@ do
 	esac
 done
 
+# Compute other parameters
+CRPIX=`expr $MAP_SIZE / 2`
 
 echo ""
 echo "*****  PARSED ARGUMENTS ****"
@@ -131,8 +227,20 @@ echo "NRUNS: $NRUNS (START_ID=$START_ID)"
 echo "ENV_FILE: $ENV_FILE"
 echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "MAP_SIZE: $MAP_SIZE (pixels), PIX_SIZE=$PIX_SIZE (arcsec)"
+echo "BEAM ($BMAJ arcsec, $BMIN arcsec, $BPA deg)"
+echo "CRPIX: $CRPIX"
+echo "BKG_LEVEL: $BKG_LEVEL, BKG_RMS: $BKG_RMS"
+echo "ZMIN/ZMAX: $ZMIN/$ZMAX"
+echo "ZMIN_EXT/ZMAX_EXT: $ZMIN_EXT/$ZMAX_EXT"
+echo "EXT_SCALE MIN/MAX: $EXT_SCALE_MIN/$EXT_SCALE_MAX"
+echo "SOURCE_DENSITY: $SOURCE_DENSITY, EXT_SOURCE_DENSITY: $EXT_SOURCE_DENSITY"
+echo "ZMIN_MODEL: $ZMIN_MODEL"
 echo "SOURCE_GEN_MARGIN_SIZE: $SOURCE_GEN_MARGIN_SIZE (pixels)"
 echo "GEN_SOURCES? $GEN_EXT_SOURCES, GEN_EXT_SOURCES? $GEN_EXT_SOURCES"
+echo "SIM_PROJECT: $SIM_PROJECT, VIS: $VIS_IMAGE_NAME"
+echo "SIM_TOT_TIME: $SIM_TOT_TIME"
+echo "TELCONFIGS: $TELCONFIGS"
+echo "ADD_NOISE: $ADD_NOISE"
 echo "****************************"
 echo ""
 
@@ -176,6 +284,10 @@ fi
 if [ "$GEN_EXT_SOURCES" = false ] ; then
 	GEN_EXT_SOURCE_FLAG="--no-extsources"
 fi
+ADD_NOISE_FLAG=""
+if [ "$ADD_NOISE" = true ] ; then
+	ADD_NOISE_FLAG="--addnoise"
+fi
 
 #######################################
 ##     DEFINE & LOAD ENV VARS
@@ -206,10 +318,12 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 	echo "INFO: Creating sim directory $CASA_SIM_DIR ..."
 	mkdir -p "$CASA_SIM_DIR"
 
-	## Define output files
-  #simoutfile='SimInfo-MuonWritingAtCenterScenario_Mu_n'"$Nev"'-RUN'"$index"
-  #echo $simoutfile
-
+	## Define skymodel simulation files
+  simmapfile='simmap-RUN'"$RUN_ID"'.fits'
+	skymodelfile='skymodel-RUN'"$RUN_ID"'.fits'
+	sourcefile='sources-RUN'"$RUN_ID"'.root'
+	ds9regionfile='ds9regions-RUN'"$RUN_ID"'.reg' 
+	casaregionfile='casamask-RUN'"$RUN_ID"'.dat'
 	
 
   echo ""
@@ -252,8 +366,8 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 			echo "EXE=$CAESAR_SCRIPTS_DIR/map_simulator.py"
 		fi
 
-		echo 'EXE_ARGS="'"--nx=$MAP_SIZE --ny=$MAP_SIZE --pixsize=$PIX_SIZE --marginx=$SOURCE_GEN_MARGIN_SIZE --marginy=$SOURCE_GEN_MARGIN_SIZE $GEN_SOURCE_FLAG $GEN_EXT_SOURCE_FLAG"'"'
-#--bmaj=9.8 --bmin=5.8 --bpa=-3 --crpix1=250 --crpix2=250 --bkg --bkg_level=10e-6 --bkg_rms=100e-6 --compactsources --zmin=9999 --zmax=10000 --source_density=1000 --no-extsources --zmin_model=1 --outputfile=sim_map.fits --outputfile_model=skymodel.fits --outputfile_sources=sources.root --outputfile_ds9region=dsregions.reg --outputfile_casaregion=casa_mask.dat 
+		echo 'EXE_ARGS="'"--nx=$MAP_SIZE --ny=$MAP_SIZE --pixsize=$PIX_SIZE --marginx=$SOURCE_GEN_MARGIN_SIZE --marginy=$SOURCE_GEN_MARGIN_SIZE $GEN_SOURCE_FLAG $GEN_EXT_SOURCE_FLAG --bmaj=$BMAJ --bmin=$BMIN --bpa=$BPA --crpix1=$CRPIX --crpix2=$CRPIX --bkg --bkg_level=$BKG_LEVEL --bkg_rms=$BKG_RMS --zmin=$ZMIN --zmax=$ZMAX --zmin_ext=$ZMIN_EXT --zmax_ext=$ZMAX_EXT --source_density=$SOURCE_DENSITY --zmin_model=$ZMIN_MODEL --ext_source_density=$EXT_SOURCE_DENSITY --ext_scale_min=$EXT_SCALE_MIN --ext_scale_max=$EXT_SCALE_MAX --outputfile=$simmapfile --outputfile_model=$skymodelfile --outputfile_sources=$sourcefile --outputfile_ds9region=$ds9regionfile --outputfile_casaregion=$casaregionfile "'"'
+
 		echo 'echo "Running command $EXE $EXE_ARGS"'
 		echo '$EXE $EXE_ARGS'
 
@@ -269,7 +383,7 @@ for ((index=1; index<=$NRUNS; index=$index+1))
     echo 'cd $JOBDIR'
 
 		echo 'EXE="$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/simulate_observation.py"'
-		echo 'EXE_ARGS="'"--vis=$VIS --skymodel=$SKYMODEL"'"'
+		echo 'EXE_ARGS="'"--outproject=$SIM_PROJECT --vis=$VIS_IMAGE_NAME --skymodel=$skymodelfile --total_time=$SIM_TOT_TIME --telconfigs=$TELCONFIGS $ADD_NOISE_FLAG "'"'
 		#$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/simulate_observation.py --vis=vis.ms --skymodel=skymodel.fits
 		echo 'echo "Running command $EXE $EXE_ARGS"'
 		echo '$EXE $EXE_ARGS'

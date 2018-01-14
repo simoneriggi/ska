@@ -15,6 +15,7 @@ import datetime
 import numpy as np
 import random
 import math
+import errno
 
 ## ASTRO MODULES
 from astropy.io import fits
