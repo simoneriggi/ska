@@ -19,7 +19,7 @@ import math
 
 ## ASTRO
 from scipy import ndimage
-import pyfits
+##import pyfits
 from astropy.io import fits
 from astropy.units import Quantity
 from astropy.modeling.parameters import Parameter
