@@ -64,9 +64,9 @@ FILELIST_GIVEN=false
 INPUTFILE=""
 INPUTFILE_GIVEN=false
 OUTPUT_PROJECT="rec"
-MOSAIC_FLAG="--mosaic"
+MOSAIC_FLAG=""
 MOSAIC_IMAGE_NAME="mosaic"
-FITSOUT_FLAG="--fitsout"
+FITSOUT_FLAG=""
 FITSOUT_GIVEN=false
 FITSOUT="output.fits"
 PHASE_CENTER="J2000 254.85067091580214deg -41.47631111052697deg"
@@ -283,8 +283,15 @@ generate_exec_script(){
 
       echo 'echo ""'
       
-      echo "export JOBDIR=$jobdir"
-     
+      echo "JOBDIR=$jobdir"
+			echo 'echo "INFO: Creating job top directory $JOBDIR ..."'
+			echo 'mkdir -p "$JOBDIR"'
+			echo 'echo ""'
+
+			echo 'echo "INFO: Entering job directory $JOBDIR ..."'
+			echo 'cd $JOBDIR'
+	
+     	echo ""
       echo " "
 
            
@@ -342,20 +349,20 @@ if [ "$FILELIST_GIVEN" = true ]; then
 		filename_base=$(basename "$filename")
 		file_extension="${filename_base##*.}"
 		filename_base_noext="${filename_base%.*}"
-		filename_dir=$(dirname "${filename_base}")
+		filename_dir=$(dirname "${filename}")
 		sim_dir=$(dirname "${filename_dir}")
 		echo "INFO: Processing item $filename_base_noext in list ..."
 
 		## Create job top directory
-		JOB_DIR="$BASEDIR/RUN_$filename_base_noext"
+		JOB_DIR="$BASEDIR/Rec_$filename_base_noext-RUN$index"
 		CASA_REC_DIR="$JOB_DIR/$OUTPUT_PROJECT"
-		echo "INFO: Creating job top directory $JOB_DIR ..."
-		mkdir -p "$JOB_DIR"
-		echo "INFO: Creating rec directory $CASA_REC_DIR ..."
-		mkdir -p "$CASA_REC_DIR"
+		#echo "INFO: Creating job top directory $JOB_DIR ..."
+		#mkdir -p "$JOB_DIR"
+		#echo "INFO: Creating rec directory $CASA_REC_DIR ..."
+		#mkdir -p "$CASA_REC_DIR"
 
 		## Define rec output files	
-  	recmapfile='recmap_'"$filename_base_noext"'.fits'
+  	recmapfile='recmap_'"$filename_base_noext-RUN$index"'.fits'
 		echo "INFO: Set rec output fits file to $recmapfile ..."
 
 		## Define mask file
@@ -365,7 +372,8 @@ if [ "$FILELIST_GIVEN" = true ]; then
 			if [ "$MASK_GIVEN" = true ] ; then
 				maskimg=$MASK
 			else
-				maskimg=`find $filename_dir $sim_dir "casamask*.dat" -type f`
+				echo "INFO: Searching for mask file in dirs [$filename_dir,$sim_dir] "
+				maskimg=`find $filename_dir $sim_dir -name "casamask*.dat" -type f -print -quit`
 			fi
 			
 			## Check if empty
@@ -375,14 +383,14 @@ if [ "$FILELIST_GIVEN" = true ]; then
 		fi
 		
 		## Define executable & args variables and generate script
-		shfile="Run_$filename_base_noext"'_'"$index.sh"
+		shfile="Rec_$filename_base_noext"'-RUN'"$index.sh"
 		if [ "$RUN_IN_CONTAINER" = true ] ; then
 			EXE="singularity run --app imaging $CONTAINER_IMG"
 		else
 			EXE="$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/imaging_observation.py"
 		fi
 
-		EXE_ARGS="--vis=$filename --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter=$PHASE_CENTER --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
+		EXE_ARGS="--vis=$filename --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter='""$PHASE_CENTER""'"" --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
 		
 		echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 		generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$JOB_DIR"
@@ -415,17 +423,17 @@ else
 	filename_base=$(basename "$INPUTFILE")
 	file_extension="${filename_base##*.}"
 	filename_base_noext="${filename_base%.*}"
-	filename_dir=$(dirname "${filename_base}")
+	filename_dir=$(dirname "${INPUTFILE}")
 	sim_dir=$(dirname "${filename_dir}")
 	echo "INFO: Processing item $filename_base_noext in list ..."
 
 	## Create job top directory
-	JOB_DIR="$BASEDIR/RUN_$filename_base_noext"
+	JOB_DIR="$BASEDIR/Rec_$filename_base_noext"
 	CASA_REC_DIR="$JOB_DIR/$OUTPUT_PROJECT"
-	echo "INFO: Creating job top directory $JOB_DIR ..."
-	mkdir -p "$JOB_DIR"
-	echo "INFO: Creating rec directory $CASA_REC_DIR ..."
-	mkdir -p "$CASA_REC_DIR"
+	#echo "INFO: Creating job top directory $JOB_DIR ..."
+	#mkdir -p "$JOB_DIR"
+	#echo "INFO: Creating rec directory $CASA_REC_DIR ..."
+	#mkdir -p "$CASA_REC_DIR"
 
 	## Define rec output files	
   recmapfile='recmap_'"$filename_base_noext"'.fits'
@@ -438,7 +446,8 @@ else
 		if [ "$MASK_GIVEN" = true ] ; then
 			maskimg=$MASK
 		else
-			maskimg=`find $filename_dir $sim_dir "casamask*.dat" -type f`
+			echo "INFO: Searching for mask file in dirs [$filename_dir,$sim_dir] "
+			maskimg=`find $filename_dir $sim_dir -name "casamask*.dat" -type f -print -quit`
 		fi
 			
 		## Check if empty
@@ -448,7 +457,7 @@ else
 	fi
 		
 	## Define executable & args variables and generate script
-	shfile="Run_$filename_base_noext"'.sh'
+	shfile="Rec_$filename_base_noext"'.sh'
 
 	if [ "$RUN_IN_CONTAINER" = true ] ; then
 		EXE="singularity run --app imaging $CONTAINER_IMG"
@@ -456,7 +465,7 @@ else
 		EXE="$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/imaging_observation.py"
 	fi
 
-	EXE_ARGS="--vis=$filename --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter=$PHASE_CENTER --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
+	EXE_ARGS="--vis=$filename --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter='""$PHASE_CENTER""'"" --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
 
 	echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 	jobId=" "

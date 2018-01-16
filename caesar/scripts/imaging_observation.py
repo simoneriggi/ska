@@ -56,10 +56,10 @@ def get_args():
 	parser.add_argument('-niter', '--niter', dest='niter', required=False, type=int, default=1000,action='store',help='Clean tot number of iterations (default=1000)')
 	parser.add_argument('-cycleniter', '--cycleniter', dest='cycleniter', required=False, type=int, default=-1,action='store',help='Max cycle niter (default=-1)')
 	parser.add_argument('-threshold', '--threshold', dest='threshold', required=False, type=float, default=0,action='store',help='Stopping threshold in Jy (default=0)')
-	parser.add_argument('--mosaic', dest='enable_mosaic', action='store_true')		
+	##parser.add_argument('--mosaic', dest='enable_mosaic', action='store_true')		
 	parser.add_argument('--no-mosaic', dest='enable_mosaic', action='store_false')	
 	parser.set_defaults(enable_mosaic=True)
-	parser.add_argument('--fitsout', dest='enable_fitsout', action='store_true')		
+	##parser.add_argument('--fitsout', dest='enable_fitsout', action='store_true')		
 	parser.add_argument('--no-fitsout', dest='enable_fitsout', action='store_false')	
 	parser.set_defaults(enable_fitsout=True)
 	parser.add_argument('-fitsout', '--fitsout', dest='fitsout', required=False, type=str, default='output.fits',action='store',help='Output FITS file (default=output.fits)')
@@ -181,8 +181,8 @@ def main():
 	bunit_list= []
 	for field in range(0,npointings):
 		
-		##imgname= outproject + '_field' + str(field) + '/recmap'
-		imgname= outproject + '/field' + str(field) + '/recmap'
+		imgname= outproject + '_field' + str(field) + '/recmap'
+		##imgname= outproject + '/field' + str(field) + '/recmap'
 		weightmap= imgname + '.pb'
 		cleanmap= imgname + '.image'
 		weightmap_list.append(weightmap) 
