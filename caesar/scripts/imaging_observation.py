@@ -43,7 +43,7 @@ def get_args():
 	parser.add_argument('-mapsize', '--mapsize', dest='mapsize', required=True, type=int,action='store',help='Map size in pixels')
 	
 	# OPTIONAL OPTIONS	
-	parser.add_argument('-outimage', '--outimage', dest='outimage', required=False, type=str, default='linmos',action='store',help='Output mosaic image')
+	parser.add_argument('-outimage', '--outimage', dest='outimage', required=False, type=str, default='mosaic',action='store',help='Output mosaic image')
 	parser.add_argument('-mask', '--mask', dest='mask', required=False, type=str, default='',action='store',help='Mask file (default=none)')
 	parser.add_argument('-outproject', '--outproject', dest='outproject', required=False, type=str, default='rec',action='store',help='Output project name (default=rec)')
 	parser.add_argument('-pixsize', '--pixsize', dest='pixsize', required=False, type=str, default='1arcsec',action='store',help='Pixel size (default=1 arcsec)')
@@ -52,11 +52,18 @@ def get_args():
 	parser.add_argument('-gridder', '--gridder', dest='gridder', required=False, type=str, default='standard',action='store',help='Gridder (default=standard)')
 	parser.add_argument('-weighting', '--weighting', dest='weighting', required=False, type=str, default='briggs',action='store',help='weighting (default=briggs)')
 	parser.add_argument('-projection', '--projection', dest='projection', required=False, type=str, default='SIN',action='store',help='projection (default=SIN)')
-	parser.add_argument('-fitsout', '--fitsout', dest='fitsout', required=False, type=str, default='output.fits',action='store',help='Output FITS file (default=output.fits)')
+	
 	parser.add_argument('-niter', '--niter', dest='niter', required=False, type=int, default=1000,action='store',help='Clean tot number of iterations (default=1000)')
 	parser.add_argument('-cycleniter', '--cycleniter', dest='cycleniter', required=False, type=int, default=-1,action='store',help='Max cycle niter (default=-1)')
 	parser.add_argument('-threshold', '--threshold', dest='threshold', required=False, type=float, default=0,action='store',help='Stopping threshold in Jy (default=0)')
-	
+	parser.add_argument('--mosaic', dest='enable_mosaic', action='store_true')		
+	parser.add_argument('--no-mosaic', dest='enable_mosaic', action='store_false')	
+	parser.set_defaults(enable_mosaic=True)
+	parser.add_argument('--fitsout', dest='enable_fitsout', action='store_true')		
+	parser.add_argument('--no-fitsout', dest='enable_fitsout', action='store_false')	
+	parser.set_defaults(enable_fitsout=True)
+	parser.add_argument('-fitsout', '--fitsout', dest='fitsout', required=False, type=str, default='output.fits',action='store',help='Output FITS file (default=output.fits)')
+
 	parser.add_argument('-c', dest='scriptname', required=False, type=str, default='',action='store',help='Script name')
 
 	args = parser.parse_args()	
@@ -126,10 +133,15 @@ def main():
 	weighting= args.weighting
 	projection= args.projection
 	outimage= args.outimage
-	mosaicimage= outproject + '_' + outimage
-	fitsout= args.fitsout
 	cycleniter= args.cycleniter
 	threshold= args.threshold
+
+	enable_mosaic= args.enable_mosaic
+	##mosaicimage= outproject + '_' + outimage
+	mosaicimage= outproject + '/' + outimage
+	
+	enable_fitsout= args.enable_fitsout	
+	fitsout= args.fitsout
 
 	print("*** ARGS ***")
 	print 'vis: ', vis
@@ -168,7 +180,9 @@ def main():
 	bpa_list= []
 	bunit_list= []
 	for field in range(0,npointings):
-		imgname= outproject + '_field' + str(field) + '/recmap'
+		
+		##imgname= outproject + '_field' + str(field) + '/recmap'
+		imgname= outproject + '/field' + str(field) + '/recmap'
 		weightmap= imgname + '.pb'
 		cleanmap= imgname + '.image'
 		weightmap_list.append(weightmap) 
@@ -214,25 +228,28 @@ def main():
 	print 'bunit_list=',bunit_list
 	
 	## Make linear mosaic with all fields
-	lm= casac.linearmosaic()
-	lm.defineoutputimage(nx=mapsize,ny=mapsize,cellx=pixsize,celly=pixsize, imagecenter=phasecenter,outputimage=mosaicimage)
-	lm.setlinmostype('optimal')
-	##lm.makemosaic(images=['rec_field0/recmap.image','rec_field1/recmap.image'],weightimages=['rec_field0/recmap.pb','rec_field1/recmap.pb'])
-	lm.makemosaic(images=cleanmap_list,weightimages=weightmap_list)
-	#lm.saultweightimage('test_sault.linmos') 
+	if enable_mosaic:
+		lm= casac.linearmosaic()
+		lm.defineoutputimage(nx=mapsize,ny=mapsize,cellx=pixsize,celly=pixsize, imagecenter=phasecenter,outputimage=mosaicimage)
+		lm.setlinmostype('optimal')
+		##lm.makemosaic(images=['rec_field0/recmap.image','rec_field1/recmap.image'],weightimages=['rec_field0/recmap.pb','rec_field1/recmap.pb'])
+		lm.makemosaic(images=cleanmap_list,weightimages=weightmap_list)
+		#lm.saultweightimage('test_sault.linmos') 
 
-	## Set missing field in mosaic image header
-	## NB: beam info are missing. Each field has its own restoring beam info. Which one to use? Using first pointing for the moment (FIX ME)	
-	cleanmap_head= imhead(imagename=cleanmap_list[0],mode='list')
-	imhead(mosaicimage, mode="put", hdkey='beammajor', hdvalue=str(cleanmap_head['beammajor']['value']) + cleanmap_head['beammajor']['unit'])
-	imhead(mosaicimage, mode="put", hdkey='beamminor', hdvalue=str(cleanmap_head['beamminor']['value']) + cleanmap_head['beamminor']['unit'])
-	imhead(mosaicimage, mode="put", hdkey='beampa', hdvalue=str(cleanmap_head['beampa']['value']) + cleanmap_head['beampa']['unit'])
-	imhead(mosaicimage, mode="put", hdkey='bunit', hdvalue=cleanmap_head['bunit'])
+		## Set missing field in mosaic image header
+		## NB: beam info are missing. Each field has its own restoring beam info. Which one to use? Using the largest bmaj. Alternatively one can set the restoring beam in tclean (FIX ME)
+		largest_bmaj_index= bmaj_list.index(max(bmaj_list))	
+		cleanmap_head= imhead(imagename=cleanmap_list[largest_bmaj_index],mode='list')
+		imhead(mosaicimage, mode="put", hdkey='beammajor', hdvalue=str(cleanmap_head['beammajor']['value']) + cleanmap_head['beammajor']['unit'])
+		imhead(mosaicimage, mode="put", hdkey='beamminor', hdvalue=str(cleanmap_head['beamminor']['value']) + cleanmap_head['beamminor']['unit'])
+		imhead(mosaicimage, mode="put", hdkey='beampa', hdvalue=str(cleanmap_head['beampa']['value']) + cleanmap_head['beampa']['unit'])
+		imhead(mosaicimage, mode="put", hdkey='bunit', hdvalue=cleanmap_head['bunit'])
 
-	## Exporting to FITS
-	exported_map= mosaicimage 
-	print ('INFO: Exporting mosaic map %s to FITS...' % exported_map)
-	exportfits(imagename=exported_map, fitsimage=fitsout, history=False, overwrite=True)
+		## Exporting to FITS
+		if enable_fitsout:
+			exported_map= mosaicimage 
+			print ('INFO: Exporting mosaic map %s to FITS...' % exported_map)
+			exportfits(imagename=exported_map, fitsimage=fitsout, history=False, overwrite=True)
 
 	
 	t_stop = time.time()

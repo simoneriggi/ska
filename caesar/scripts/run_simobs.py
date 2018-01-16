@@ -153,7 +153,7 @@ def analyze_observation(vis,project_name='rec',niter=500,mask='',skymodel='',fit
 	#hdulist.writeto(fitsout,overwrite=True)
 
 
-def clean_observation(vis,niter=500,mask='',imagename='',image_size='',cell_size='1arcsec',weighting='briggs',projection='CAR',deconvolver='clark',gridder='mosaic',fitsout='output.fits',interactive=False):
+def clean_observation(vis,niter=500,mask='',imagename='',field='',image_size='',cell_size='1arcsec',phase_center='',weighting='briggs',projection='CAR',deconvolver='clark',gridder='mosaic',fitsout='output.fits',interactive=False):
 	""" Clean observation """
 	
 	## Set image name if empty
@@ -166,10 +166,11 @@ def clean_observation(vis,niter=500,mask='',imagename='',image_size='',cell_size
 	print ('INFO: Cleaning simulated data and produce final image...')
 	tclean(
 		imagename=imagename,
-		vis=vis, 
-		#mask=mask,
+		vis=vis,
+		field=field, 
+		mask=mask,
 		imsize=image_size,
-		#phasecenter=phase_center,
+		phasecenter=phase_center,
 		projection=projection,
 		cell=cell_size,	
 		niter=niter,
@@ -183,6 +184,50 @@ def clean_observation(vis,niter=500,mask='',imagename='',image_size='',cell_size
 	exported_map= imagename + '.image' 
 	print ('INFO: Exporting CASA map %s to FITS...' % exported_map)
 	exportfits(imagename=exported_map, fitsimage=fitsout, history=False, overwrite=True)
+
+
+def run_sim(outvis='vis.ms',skymodel='skymodel.fits',sim_projname='sim',total_time='43200s',telconfigs=['atca_all.cfg'],obsmode='int',maptype='hexagonal',mapsize='',direction='',indirection='',incell='',incenter= '2.1GHz',inwidth='1GHz',integration='10s',use_noise_vis=True,add_thermal_noise=False,niter=1000,recimgname='',mask=''):
+	""" Simulate and imaging a sky model field"""
+
+	## Simulate observation
+	simulate_observation(
+		concat_vis=outvis,
+		skymodel=skymodel,
+		project_name=sim_projname,
+		total_time=total_time,
+		telconfigs=telconfigs,
+		obsmode=obsmode,
+		maptype=maptype,
+		mapsize=mapsize,
+		direction=direction,
+		indirection=indirection,
+		incell=incell,
+		incenter=incenter,
+		inwidth=inwidth,
+		integration=integration,
+		use_noise_vis=use_noise_vis,
+		add_thermal_noise=add_thermal_noise
+	)
+
+	# Retrieve number of pointings
+	tb.open(outvis + '/FIELD')
+	npointings= tb.nrows
+	print ('#' + str(npointings) + ' pointings present'
+	
+	# Imaging
+	clean_observation(
+		vis=outvis,
+		niter=niter,
+		mask=mask,
+		imagename=recimgname,
+		#field='',image_size='',cell_size='1arcsec',phase_center='',weighting='briggs',projection='CAR',deconvolver='clark',gridder='mosaic',fitsout='output.fits',interactive=False
+	)
+	
+	#lm=casac.linearmosaic()
+	#lm.defineoutputimage(nx=2560, cellx='1arcsec', imagecenter='J2000 254.85067091580214deg -41.47631111052697deg', outputimage='linmos')
+	#lm.setlinmostype('optimal')
+	#lm.makemosaic(images=['rec_field0/recmap.image','rec_field1/recmap.image'],weightimages=['rec_field0/recmap.pb','rec_field1/recmap.pb'])
+	#lm.saultweightimage(’test_sault.linmos’) 
 
 def casa_to_fits(image_name,outfits='exported_map.fits'):
 	""" Export a CASA image to FITS """

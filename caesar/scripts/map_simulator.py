@@ -66,7 +66,7 @@ def get_args():
 	parser.add_argument('-marginy', '--marginy', dest='marginy', required=False, type=int, default=0,action='store',help='Image y margin in pixels')
 	
 	parser.add_argument('-pixsize', '--pixsize', dest='pixsize', required=True, type=float, action='store',help='Map pixel size in arcsec')
-	parser.add_argument('-bmaj', '--bmaj', dest='bmaj', required=True, type=float, default=5, action='store',help='Beam bmaj in arcsec (default=5)')
+	parser.add_argument('-bmaj', '--bmaj', dest='bmaj', required=True, type=float, default=10, action='store',help='Beam bmaj in arcsec (default=5)')
 	parser.add_argument('-bmin', '--bmin', dest='bmin', required=True, type=float, default=5, action='store',help='Beam bmin in arcsec (default=5)')
 	parser.add_argument('-bpa', '--bpa', dest='bpa', required=False, type=float, default=0, action='store',help='Beam bpa in deg (default=0)')
 	parser.add_argument('-crpix1', '--crpix1', dest='crpix1', required=False, type=float, default=1, action='store',help='CRPIX1 fits keyword (default=1)')
@@ -82,8 +82,8 @@ def get_args():
 	parser.add_argument('--bkg', dest='enable_bkg', action='store_true')	
 	parser.add_argument('--no-bkg', dest='enable_bkg', action='store_false')	
 	parser.set_defaults(enable_bkg=True)
-	parser.add_argument('-bkg_level', '--bkg_level', dest='bkg_level', required=False, type=float, default=0, action='store',help='Bkg level (default=0)')
-	parser.add_argument('-bkg_rms', '--bkg_rms', dest='bkg_rms', required=False, type=float, default=0, action='store',help='Bkg rms (default=0)')
+	parser.add_argument('-bkg_level', '--bkg_level', dest='bkg_level', required=False, type=float, default=10e-6, action='store',help='Bkg level (default=0)')
+	parser.add_argument('-bkg_rms', '--bkg_rms', dest='bkg_rms', required=False, type=float, default=100e-6, action='store',help='Bkg rms (default=0)')
 
 	# - COMPACT SOURCE OPTIONS
 	parser.add_argument('--compactsources', dest='enable_compactsources', action='store_true')	

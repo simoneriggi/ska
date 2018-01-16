@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 NARGS="$#"
 echo "INFO: NARGS= $NARGS"
@@ -23,6 +23,7 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--fileprefix=[FILE_PREFIX] - File prefix filter [default: none]"
 	echo "--stripext - Strip file extension before writing to list? [default=no]"
 	echo "--strippath - Strip file path before writing to list? [default=no]"
+	echo "--searchdir - Search for directories (instead of files) with given prefix and extension [default=no]"
 	echo "--recursive - Search recursively down from ROOT_DIR [default=no]"
 	echo "--output=[OUTPUTFILE] - Output file name with file list [default=filelist.txt]"
 	echo "=========================="
@@ -32,14 +33,16 @@ fi
 #######################################
 ##         PARSE ARGS
 #######################################
+CURRENTDIR=$PWD
 FILE_EXT=""
 FILE_EXT_GIVEN=false
 FILE_PREFIX=""
 STRIP_EXT=false
 STRIP_PATH=false
-RECURSIVE=false
 ROOT_DIR="$PWD"
 OUTPUTFILE="filelist.txt"
+SEARCH_TYPE_FLAG="-type f" # search for files
+RECURSIVE_FLAG="-maxdepth 1"
 
 for item in $*
 do
@@ -69,7 +72,10 @@ do
     	STRIP_PATH=true
     ;;
 		--recursive*)
-    	RECURSIVE=true
+			RECURSIVE_FLAG=" "
+    ;;
+		--searchdir*)
+    	SEARCH_TYPE_FLAG="-type d" # search for directories
     ;;
 
     *)
@@ -80,48 +86,45 @@ do
 	esac
 done
 
-CURRENTDIR=$PWD
 
-echo "$CURRENTDIR"
 
-if [ "$RECURSIVE" = true ]; then
-	# Recursive search
-	for file in $ROOT_DIR/$FILE_PREFIX*.$FILE_EXTENSION $ROOT_DIR/**/$FILE_PREFIX*.$FILE_EXTENSION ; do
+#######################################
+##         PROCESS FILENAME
+#######################################
+process_filename(){
+	local filename=$1
+	local strippath=$2
+	local stripext=$3
+	local fileext=$4
+	local outputfile=$5
+	
+	# Strip path?
+	if [ "$strippath" = true ]; then
+		filename_base=$(basename $filename)
+		filename=$filename_base
+	fi
 		
-		# Strip path?
-		if [ "$STRIP_PATH" = true ]; then
-			file_base=$(basename $file)
-			file=$file_base
-		fi
-		
-		# Strip extension?
-		if [ "$STRIP_EXT" = true ]; then
-			file_noExtension="${file//.$FILE_EXTENSION/}"
-			file=$file_noExtension
-		fi
+	# Strip extension?
+	if [ "$stripext" = true ]; then
+		filename_noext="${filename//.$fileext/}"
+		filename=$filename_noext
+	fi
 
-  	echo $file
-  	echo $file >> $CURRENTDIR/$OUTPUTFILE
-	done
+	# Print processed filename to file list	
+	echo $filename
+  echo $filename >> $outputfile
+}
 
-else
-	# Normal search
-	for file in $ROOT_DIR/$FILE_PREFIX*.$FILE_EXTENSION ; do
- 		# Strip path?
-		if [ "$STRIP_PATH" = true ]; then
-			file_base=$(basename $file)
-			file=$file_base
-		fi
-		
-		# Strip extension?
-		if [ "$STRIP_EXT" = true ]; then
-			file_noExtension="${file//.$FILE_EXTENSION/}"
-			file=$file_noExtension
-		fi
 
-  	echo $file
-  	echo $file >> $CURRENTDIR/$OUTPUTFILE
-	done
-fi
+
+## Process file/directory found by find command
+FIND_CMD="find $ROOT_DIR $RECURSIVE_FLAG $SEARCH_TYPE_FLAG -name "'"'"$FILE_PREFIX*.$FILE_EXT"'"'
+echo "Executing find command: $FIND_CMD"
+
+#find $ROOT_DIR "$RECURSIVE_FLAG" "$SEARCH_TYPE_FLAG" -name "$FILE_PREFIX*.$FILE_EXT"  | while read item; do
+eval $FIND_CMD | while read item; do
+	process_filename "$item" "$STRIP_PATH" "$STRIP_EXT" "$FILE_EXT" "$CURRENTDIR/$OUTPUTFILE"
+done
+
 
 

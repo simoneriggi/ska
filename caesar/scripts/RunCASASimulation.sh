@@ -43,6 +43,9 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--simtottime=[SIM_TOT_TIME] - Simulation total time in seconds (default: 43200)"
 	echo "--telconfigs=[TELCONFIGS] - Antenna configurations (default: [atca_all.cfg])"
 	echo "--addnoise - Add noise to CASA simulation (default: no)"
+	echo "--maptype=[MAP_TYPE] - Simulated map type (square|hexagonal) (default=square)"
+	echo "--frequency=[FREQUENCY_CENTER] - Frequency centroid of simulated data with units (default=2.1GHz)"
+	echo "--frequencybw=[FREQUENCY_BANDWIDTH] - Frequency bandwidth of simulated data with units (default=10MHz)"
 	echo "--submit - Submit the script to the batch system using queue specified"
 	echo "--containerrun - Run inside Caesar container"
 	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
@@ -85,11 +88,17 @@ SOURCE_DENSITY=1000
 EXT_SOURCE_DENSITY=100
 EXT_SCALE_MIN=10
 EXT_SCALE_MAX=100
-SIM_PROJECT="sim"
-VIS_IMAGE_NAME="vis.ms"
+SIM_PROJECT="" # "sim"
+SIM_PROJECT_GIVEN=false
+VIS_IMAGE_NAME="" # "vis.ms"
+VIS_IMAGE_NAME_GIVEN=false
 SIM_TOT_TIME=43200
 TELCONFIGS="['atca_all.cfg']"
 ADD_NOISE=false
+MAP_TYPE="square"
+FREQUENCY="2.1GHz"
+FREQUENCYBW="10MHz"
+
 
 ##for item in $*
 for item in "$@"
@@ -195,9 +204,11 @@ do
     ;;
 		--simproject=*)
     	SIM_PROJECT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+			SIM_PROJECT_GIVEN=true
     ;;
 		--visimagename=*)
     	VIS_IMAGE_NAME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+			VIS_IMAGE_NAME_GIVEN=true
     ;;
 		--simtottime=*)
     	SIM_TOT_TIME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
@@ -208,7 +219,15 @@ do
 		--addnoise*)
     	ADD_NOISE=true
     ;;
-
+		--maptype=*)
+    	MAP_TYPE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--frequency=*)
+    	FREQUENCY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--frequencybw=*)
+    	FREQUENCYBW=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
     *)
     # Unknown option
     echo "ERROR: Unknown option ($item)...exit!"
@@ -241,6 +260,8 @@ echo "SIM_PROJECT: $SIM_PROJECT, VIS: $VIS_IMAGE_NAME"
 echo "SIM_TOT_TIME: $SIM_TOT_TIME"
 echo "TELCONFIGS: $TELCONFIGS"
 echo "ADD_NOISE: $ADD_NOISE"
+echo "MAP_TYPE: $MAP_TYPE"
+echo "FREQUENCY CENTER/BW: $FREQUENCY/$FREQUENCYBW"
 echo "****************************"
 echo ""
 
@@ -311,12 +332,10 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 
 	## Create job top directory
 	JOB_DIR="$BASEDIR/RUN$RUN_ID"
-	CASA_SIM_DIR="$JOB_DIR/sim"
-	echo "INFO: Creating job top directory $JOB_DIR ..."
-	mkdir -p "$JOB_DIR"
+	##CASA_SIM_DIR="$JOB_DIR/sim"
+	##echo "INFO: Creating job top directory $JOB_DIR ..."
+	##mkdir -p "$JOB_DIR"
 
-	echo "INFO: Creating sim directory $CASA_SIM_DIR ..."
-	mkdir -p "$CASA_SIM_DIR"
 
 	## Define skymodel simulation files
   simmapfile='simmap-RUN'"$RUN_ID"'.fits'
@@ -324,13 +343,27 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 	sourcefile='sources-RUN'"$RUN_ID"'.root'
 	ds9regionfile='ds9regions-RUN'"$RUN_ID"'.reg' 
 	casaregionfile='casamask-RUN'"$RUN_ID"'.dat'
+
+	## Define CASA simulation image
+	##simproject='sim-RUN'"$RUN_ID"
+	simproject='sim'
+	if [ "$SIM_PROJECT_GIVEN" = true ] ; then
+		simproject=$SIM_PROJECT
+	fi
 	
+
+	## Define CASA visibility image
+	##visimg='vis-RUN'"$RUN_ID"'.ms'
+	visimg='vis.ms'
+	if [ "$VIS_IMAGE_NAME_GIVEN" = true ] ; then
+		visimg=$VIS_IMAGE_NAME	
+	fi
 
   echo ""
 
 	## Generate script
 	shfile="Sim-RUN$RUN_ID.sh"
-	echo "*** Creating sh file $shfile ***"
+	echo "INFO: Creating sh file $shfile ..."
 	(
 		echo "#!/bin/bash"
 		echo "#PBS -o $BASEDIR"
@@ -346,7 +379,11 @@ for ((index=1; index<=$NRUNS; index=$index+1))
     echo 'echo "*************************************************"'
     echo 'echo "****         PREPARE JOB                     ****"'
     echo 'echo "*************************************************"'
-		echo "export JOBDIR=$JOB_DIR" 
+		echo "JOBDIR=$JOB_DIR" 
+		echo 'echo "INFO: Creating job top directory $JOBDIR ..."'
+		echo 'mkdir -p "$JOBDIR"'
+		echo 'echo ""'
+	
 		echo 'echo "INFO: Entering job directory $JOBDIR ..."'
 		echo 'cd $JOBDIR'
     echo 'echo "INFO: Source the software environment ..."'
@@ -359,11 +396,13 @@ for ((index=1; index<=$NRUNS; index=$index+1))
     echo 'echo "*************************************************"'
     echo 'echo "****         RUN SKYMODEL SIMULATION         ****"'
     echo 'echo "*************************************************"'
-		
+		echo 'echo ""'
+    echo 'cd $JOBDIR'
+
 		if [ "$RUN_IN_CONTAINER" = true ] ; then
-			echo "EXE=singularity run --app skymodelgenerator $CONTAINER_IMG"
+			echo 'EXE="'"singularity run --app skymodel $CONTAINER_IMG"'"'
 		else
-			echo "EXE=$CAESAR_SCRIPTS_DIR/map_simulator.py"
+			echo 'EXE="'"$CAESAR_SCRIPTS_DIR/map_simulator.py"'"'
 		fi
 
 		echo 'EXE_ARGS="'"--nx=$MAP_SIZE --ny=$MAP_SIZE --pixsize=$PIX_SIZE --marginx=$SOURCE_GEN_MARGIN_SIZE --marginy=$SOURCE_GEN_MARGIN_SIZE $GEN_SOURCE_FLAG $GEN_EXT_SOURCE_FLAG --bmaj=$BMAJ --bmin=$BMIN --bpa=$BPA --crpix1=$CRPIX --crpix2=$CRPIX --bkg --bkg_level=$BKG_LEVEL --bkg_rms=$BKG_RMS --zmin=$ZMIN --zmax=$ZMAX --zmin_ext=$ZMIN_EXT --zmax_ext=$ZMAX_EXT --source_density=$SOURCE_DENSITY --zmin_model=$ZMIN_MODEL --ext_source_density=$EXT_SOURCE_DENSITY --ext_scale_min=$EXT_SCALE_MIN --ext_scale_max=$EXT_SCALE_MAX --outputfile=$simmapfile --outputfile_model=$skymodelfile --outputfile_sources=$sourcefile --outputfile_ds9region=$ds9regionfile --outputfile_casaregion=$casaregionfile "'"'
@@ -382,9 +421,15 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 		echo 'echo ""'
     echo 'cd $JOBDIR'
 
-		echo 'EXE="$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/simulate_observation.py"'
-		echo 'EXE_ARGS="'"--outproject=$SIM_PROJECT --vis=$VIS_IMAGE_NAME --skymodel=$skymodelfile --total_time=$SIM_TOT_TIME --telconfigs=$TELCONFIGS $ADD_NOISE_FLAG "'"'
-		#$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/simulate_observation.py --vis=vis.ms --skymodel=skymodel.fits
+		if [ "$RUN_IN_CONTAINER" = true ] ; then
+			echo 'EXE="'"singularity run --app simulation $CONTAINER_IMG"'"'
+		else
+			##echo 'EXE="$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/simulate_observation.py"'
+			echo 'EXE="'"$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/simulate_observation.py"'"'
+		fi
+
+		echo 'EXE_ARGS="'"--outproject=$simproject --vis=$visimg --skymodel=$skymodelfile --total_time=$SIM_TOT_TIME --telconfigs=$TELCONFIGS $ADD_NOISE_FLAG --maptype=$MAP_TYPE --frequency_center=$FREQUENCY --frequency_bandwidth=$FREQUENCYBW "'"'
+		
 		echo 'echo "Running command $EXE $EXE_ARGS"'
 		echo '$EXE $EXE_ARGS'
     

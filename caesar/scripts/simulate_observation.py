@@ -46,14 +46,17 @@ def get_args():
 	parser.add_argument('-outproject', '--outproject', dest='outproject', required=False, type=str, default='sim',action='store',help='Output simulation project name (default=sim)')
 	
 	parser.add_argument('-total_time', '--total_time', dest='total_time', required=False, type=int, default=43200,action='store',help='Total observation time in seconds (default=43200)')
-	parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, type=list, default=['atca_all.cfg'],action='store',help='Telescope configuration list (default=atca_all.cfg)')
+	#parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, type=list, default=['atca_all.cfg'],action='store',help='Telescope configuration list (default=atca_all.cfg)')
+	#parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, nargs='+', type=str, default=['atca_all.cfg'],action='store',help='Telescope configuration list (default=atca_all.cfg)')
+	parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, type=str, default='atca_all.cfg',action='store',help='Telescope configuration list (comma separated) (default=atca_all.cfg)')
+
 	parser.add_argument('-mapsize', '--mapsize', dest='mapsize', required=False, type=str, default='',action='store',help='Map size (default=equal to skymodel')
 	parser.add_argument('-pixsize', '--pixsize', dest='pixsize', required=False, type=str, default='',action='store',help='Pixel size (default=equal to skymodel')
 	parser.add_argument('-addnoise','--addnoise', dest='addnoise', action='store_false')
 	parser.set_defaults(addnoise=False)
 	parser.add_argument('-frequency_center', '--frequency_center', dest='frequency_center', required=False, type=str, default='2.1GHz',action='store',help='Frequency center (default=2.1GHz)')
 	parser.add_argument('-frequency_bandwidth', '--frequency_bandwidth', dest='frequency_bandwidth', required=False, type=str, default='10MHz',action='store',help='Frequency bandwidth (default=10MHz)')
-	parser.add_argument('-maptype', '--maptype', dest='maptype', required=False, type=str, default='square',action='store',help='Map type (default=square)')
+	parser.add_argument('-maptype', '--maptype', dest='maptype', required=False, type=str, default='square',action='store',help='Map type {square|hexagonal} (default=square)')
 	parser.add_argument('-obsmode', '--obsmode', dest='obsmode', required=False, type=str, default='int',action='store',help='Observation mode (default=int)')
 	parser.add_argument('-c', dest='scriptname', required=False, type=str, default='',action='store',help='Script name')
 
@@ -73,7 +76,7 @@ def mkdir_p(path):
 
 
 #### SIMULATE OBSERVATION ####
-def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simobs_step=True,project_name='sim',total_time='43200s',telconfigs=['atca_6a.cfg','atca_6b.cfg','atca_ew352.cfg','atca_ew367.cfg'],obsmode='int',maptype='hexagonal',mapsize='',direction='',indirection='',incell='',incenter= '2.1GHz',inwidth='10MHz',integration='10s',imgaxes=['254.851041667','-41.4765888889','2.1GHz','I'],use_noise_vis=True,add_thermal_noise=False):
+def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simobs_step=True,project_name='sim',total_time='43200s',telconfigs=['atca_6a.cfg','atca_6b.cfg','atca_ew352.cfg','atca_ew367.cfg'],obsmode='int',maptype='square',mapsize='',direction='',indirection='',incell='',incenter= '2.1GHz',inwidth='10MHz',integration='10s',imgaxes=['254.851041667','-41.4765888889','2.1GHz','I'],use_noise_vis=True,add_thermal_noise=False):
 	"""Simulate an observation from a sky model"""
 
 	# Create output dir
@@ -85,6 +88,7 @@ def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simob
 	## Import sky model FITS file?
 	##skymodel_img= project_name + '/' + str(skymodel_file_base) + '-casa'
 	skymodel_img= project_name + '/skymodel'
+	##skymodel_img= project_name + '.skymodel'
 	print ('INFO: Importing sky model FITS file %s in CASA as image %s...' % (skymodel,skymodel_img))
 	importfits(fitsimage=skymodel,imagename=skymodel_img,overwrite=True)
 		
@@ -95,8 +99,10 @@ def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simob
 		config_base, config_ext= os.path.splitext(os.path.basename(config)) 
 		if use_noise_vis:
 			vis= project_name + '/' + project_name + '.' + config_base + '.noisy.ms'
+			#vis= project_name + '.' + config_base + '.noisy.ms'
 		else:
 			vis= project_name + '/' + project_name + '.' + config_base + '.ms'
+			#vis= project_name + '.' + config_base + '.ms'
 		vis_list.append(vis) 
 
 		# Execute the simulation step?
@@ -155,10 +161,13 @@ def main():
 	outproject= args.outproject
 	vis= args.vis
 	visout= outproject + '/' + vis
+	
 	skymodel= args.skymodel
 	total_time= args.total_time
 	t_tot= str(total_time) + 's'
-	telconfigs= args.telconfigs
+	#telconfigs= args.telconfigs
+	telconfigs = [str(item) for item in args.telconfigs.split(',')]
+
 	mapsize= args.mapsize
 	maptype= args.maptype
 	obsmode= args.obsmode

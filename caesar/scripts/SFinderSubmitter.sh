@@ -67,6 +67,7 @@ fi
 #######################################
 ##         PARSE ARGS
 #######################################
+ENV_FILE=""
 SUBMIT=false
 FILELIST_GIVEN=false
 INPUTFILE=""
@@ -482,14 +483,19 @@ generate_config(){
 		echo '//=================================='
 		echo "fitSources = $FIT_SOURCES                      | Deblend point-like sources with multi-component gaus fit (T/F)"
 		echo 'fitMaxNComponents = 3                          | Maximum number of components fitted in a blob (T/F)'
+		echo 'fitWithCentroidLimits = true 									 | Use limits when fitting gaussian centroid (T/F)'
+		echo 'fitWithBkgLimits = true												 | Use limits when fitting bkg offset (T/F)'
 		echo 'fitWithFixedBkg = true                         | Fix bkg level parameter in fit (T/F)'
 		echo 'fitUseEstimatedBkgLevel = true                 | Use estimated (avg bkg) as bkg level par in fit (T/F)'
 		echo 'fitBkgLevel = 0                                | Fixed bkg level used when fitWithFixedBkg=true'
+		echo 'fitWithAmplLimits = true                       | Use limits when fitting gaussian amplitude (T/F)'
 		echo 'fitAmplLimit = 0.3                             | Flux amplitude limit around source peak (e.g. Speak*(1+-fitAmplLimit))'
 		echo 'fixSigmaInPreFit = true                        | Fix sigma in prefit (T/F)'
 		echo 'fitWithFixedSigma = false                      | Fix sigmas in fit (T/F)'
+		echo 'fitWithSigmaLimits = true                      | Use limits when fitting gaussian sigmas (T/F)'
 		echo 'fitSigmaLimit = 0.3                            | Gaussian sigma limit around psf or beam (e.g. Bmaj*(1+-fitSigmaLimit))'
 		echo 'fitWithFixedTheta = false                      | Fix gaussian ellipse theta par in fit (T/F)'
+		echo 'fitWithThetaLimits = true                      | Use limits when fitting gaussian theta par (T/F)'
 		echo 'fitThetaLimit = 5                              | Gaussian theta limit around psf or beam in degrees (e.g. Bpa +- fitThetaLimit)'
 		echo 'useFluxZCutInFit = false                       | Include in fit only source pixels above a given flux significance level (T/F)'
 		echo 'fitZCutMin = 2.5                               | Flux significance below which source pixels are not included in the fit'
