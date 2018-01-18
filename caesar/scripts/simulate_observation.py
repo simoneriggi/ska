@@ -58,6 +58,10 @@ def get_args():
 	parser.add_argument('-frequency_bandwidth', '--frequency_bandwidth', dest='frequency_bandwidth', required=False, type=str, default='10MHz',action='store',help='Frequency bandwidth (default=10MHz)')
 	parser.add_argument('-maptype', '--maptype', dest='maptype', required=False, type=str, default='square',action='store',help='Map type {square|hexagonal} (default=square)')
 	parser.add_argument('-obsmode', '--obsmode', dest='obsmode', required=False, type=str, default='int',action='store',help='Observation mode (default=int)')
+	parser.add_argument('-graphics','--graphics', dest='enable_graphics', action='store_true')
+	parser.add_argument('-no-graphics','--no-graphics', dest='enable_graphics', action='store_false')
+	parser.set_defaults(enable_graphics=True)
+	
 	parser.add_argument('-c', dest='scriptname', required=False, type=str, default='',action='store',help='Script name')
 
 	args = parser.parse_args()	
@@ -76,7 +80,7 @@ def mkdir_p(path):
 
 
 #### SIMULATE OBSERVATION ####
-def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simobs_step=True,project_name='sim',total_time='43200s',telconfigs=['atca_6a.cfg','atca_6b.cfg','atca_ew352.cfg','atca_ew367.cfg'],obsmode='int',maptype='square',mapsize='',direction='',indirection='',incell='',incenter= '2.1GHz',inwidth='10MHz',integration='10s',imgaxes=['254.851041667','-41.4765888889','2.1GHz','I'],use_noise_vis=True,add_thermal_noise=False):
+def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simobs_step=True,project_name='sim',total_time='43200s',telconfigs=['atca_6a.cfg','atca_6b.cfg','atca_ew352.cfg','atca_ew367.cfg'],obsmode='int',maptype='square',mapsize='',direction='',indirection='',incell='',incenter= '2.1GHz',inwidth='10MHz',integration='10s',imgaxes=['254.851041667','-41.4765888889','2.1GHz','I'],use_noise_vis=True,add_thermal_noise=False,graphics='both'):
 	"""Simulate an observation from a sky model"""
 
 	# Create output dir
@@ -131,6 +135,7 @@ def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simob
 				maptype=maptype,
 				mapsize=mapsize,
 				thermalnoise=thermalnoise,
+				graphics=graphics,
 				overwrite=True
 			)
 			
@@ -174,6 +179,10 @@ def main():
 	pixsize= args.pixsize
 	frequency_center= args.frequency_center
 	frequency_bandwidth= args.frequency_bandwidth
+	enable_graphics= args.enable_graphics
+	graphics= 'both'
+	if not enable_graphics:
+		graphics= 'none'
 	addnoise= args.addnoise
 	use_noise_vis= False
 	add_thermal_noise= False
@@ -196,6 +205,7 @@ def main():
 	print 'add_thermal_noise? ', add_thermal_noise
 	print 'frequency_center=',frequency_center
 	print 'frequency_bandwidth=',frequency_bandwidth
+	print 'graphics=',graphics
 	print("************")
 		
 	## Simulate observation
@@ -214,7 +224,8 @@ def main():
 		inwidth=frequency_bandwidth,
 		use_noise_vis=use_noise_vis,
 		add_thermal_noise=add_thermal_noise,
-		total_time=t_tot
+		total_time=t_tot,	
+		graphics=graphics
 	)
 	t_stop = time.time()
 	t_elapsed = t_stop - t_start
