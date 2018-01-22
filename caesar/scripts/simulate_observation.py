@@ -49,7 +49,6 @@ def get_args():
 	#parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, type=list, default=['atca_all.cfg'],action='store',help='Telescope configuration list (default=atca_all.cfg)')
 	#parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, nargs='+', type=str, default=['atca_all.cfg'],action='store',help='Telescope configuration list (default=atca_all.cfg)')
 	parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, type=str, default='atca_all.cfg',action='store',help='Telescope configuration list (comma separated) (default=atca_all.cfg)')
-
 	parser.add_argument('-mapsize', '--mapsize', dest='mapsize', required=False, type=str, default='',action='store',help='Map size (default=equal to skymodel')
 	parser.add_argument('-pixsize', '--pixsize', dest='pixsize', required=False, type=str, default='',action='store',help='Pixel size (default=equal to skymodel')
 	parser.add_argument('-addnoise','--addnoise', dest='addnoise', action='store_false')
@@ -99,8 +98,11 @@ def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simob
 	## Generate simulated sky map visibilities
 	print ('INFO: Generate simulated observation from sky model for given telescope configurations (n=%d configs)...' % len(telconfigs))
 	vis_list= []	
+	index = 0 
 	for config in telconfigs:
 		config_base, config_ext= os.path.splitext(os.path.basename(config)) 
+		#current_obsmode= obsmode[index]
+
 		if use_noise_vis:
 			vis= project_name + '/' + project_name + '.' + config_base + '.noisy.ms'
 			#vis= project_name + '.' + config_base + '.noisy.ms'
@@ -129,6 +131,7 @@ def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simob
 				indirection=indirection,
 				direction=direction,	
 				antennalist=config,
+				sdantlist=config,
 				totaltime=total_time,
 				integration=integration,
 				obsmode=obsmode,
@@ -138,7 +141,10 @@ def simulate_observation(concat_vis='vis.ms',skymodel='skymodel.fits',exec_simob
 				graphics=graphics,
 				overwrite=True
 			)
-			
+	
+		## Update index
+		index += 1
+
 	## Concatenate visibilities
 	print 'INFO: Concatenating visibilities: ', vis_list
 	concat(vis=vis_list, concatvis=concat_vis)	
@@ -176,6 +182,7 @@ def main():
 	mapsize= args.mapsize
 	maptype= args.maptype
 	obsmode= args.obsmode
+	##obsmode= [str(item) for item in args.obsmode.split(',')]
 	pixsize= args.pixsize
 	frequency_center= args.frequency_center
 	frequency_bandwidth= args.frequency_bandwidth

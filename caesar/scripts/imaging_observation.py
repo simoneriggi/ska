@@ -57,13 +57,18 @@ def get_args():
 	parser.add_argument('-cycleniter', '--cycleniter', dest='cycleniter', required=False, type=int, default=-1,action='store',help='Max cycle niter (default=-1)')
 	parser.add_argument('-threshold', '--threshold', dest='threshold', required=False, type=float, default=0,action='store',help='Stopping threshold in Jy (default=0)')
 	##parser.add_argument('--mosaic', dest='enable_mosaic', action='store_true')		
-	parser.add_argument('--no-mosaic', dest='enable_mosaic', action='store_false')	
+	parser.add_argument('--no-mosaic', dest='enable_mosaic', action='store_false')
 	parser.set_defaults(enable_mosaic=True)
 	##parser.add_argument('--fitsout', dest='enable_fitsout', action='store_true')		
 	parser.add_argument('--no-fitsout', dest='enable_fitsout', action='store_false')	
 	parser.set_defaults(enable_fitsout=True)
 	parser.add_argument('-fitsout', '--fitsout', dest='fitsout', required=False, type=str, default='output.fits',action='store',help='Output FITS file (default=output.fits)')
 
+	parser.add_argument('-scales', '--scales', dest='scales', required=False, type=str, default='0',action='store',help='List of scales (in pixels) for multiscale deconvolver (comma separated) (default=0)')
+
+	parser.add_argument('--interactive', dest='enable_interactive', action='store_true')	
+	parser.set_defaults(enable_interactive=False)
+	
 	parser.add_argument('-c', dest='scriptname', required=False, type=str, default='',action='store',help='Script name')
 
 	args = parser.parse_args()	
@@ -71,7 +76,7 @@ def get_args():
 	return args
 
 
-def clean_observation(vis,image_size,niter=1000,cycleniter=-1,threshold=0,mask='',imagename='',field='',cell_size='1arcsec',phase_center='',weighting='briggs',projection='SIN',deconvolver='clark',gridder='standard',savefits=True,fitsout='output.fits',interactive=False):
+def clean_observation(vis,image_size,niter=1000,cycleniter=-1,threshold=0,mask='',imagename='',field='',cell_size='1arcsec',phase_center='',weighting='briggs',projection='SIN',deconvolver='clark',gridder='standard',scales=[0],savefits=True,fitsout='output.fits',interactive=False):
 	""" Clean observation """
 	
 	## Set image name if empty
@@ -97,6 +102,7 @@ def clean_observation(vis,image_size,niter=1000,cycleniter=-1,threshold=0,mask='
 		deconvolver=deconvolver,
 		gridder=gridder,
 		weighting=weighting,
+		scales=scales,
 		interactive=interactive
 	)
 
@@ -142,6 +148,13 @@ def main():
 	
 	enable_fitsout= args.enable_fitsout	
 	fitsout= args.fitsout
+	
+	enable_interactive= args.enable_interactive
+	scales_str = [str(item) for item in args.scales.split(',')]
+	scales= []
+	for item in scales_str:
+		scale_int= int(item)
+		scales.append(scale_int)
 
 	print("*** ARGS ***")
 	print 'vis: ', vis
@@ -156,6 +169,7 @@ def main():
 	print 'deconvolver: ', deconvolver
 	print 'gridder: ', gridder
 	print 'weighting: ', weighting
+	print 'scales: ', scales
 	print 'projection: ', projection
 	print 'outimage: ', outimage
 	print 'mosaicimage: ', mosaicimage
@@ -203,9 +217,10 @@ def main():
 			projection=projection,	
 			deconvolver=deconvolver,
 			gridder=gridder,
+			scales=scales,
 			savefits=False,
 			fitsout='tmpfield.fits',
-			interactive=False
+			interactive=enable_interactive
 		)
 		
 		## Retrieve beam information per each cleaned map

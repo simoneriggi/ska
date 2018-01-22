@@ -39,7 +39,7 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--threshold=[THRESHOLD] - Clean residual threshold to stop clean (default=0)"
 	echo "--usemask - Use a mask in cleaning (default=no)"
 	echo "--mask=[MASK] - Name of mask file (default=search for mask file in simulation dir))"
-
+	echo "--scales=[SCALES] - List of scales (in pixels) for multiscale cleaning (default: [0])"
 	echo "--submit - Submit the script to the batch system using queue specified"
 	echo "--containerrun - Run inside Caesar container"
 	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
@@ -80,6 +80,7 @@ THRESHOLD=0
 MASK=""
 USE_MASK=false
 MASK_GIVEN=false
+SCALES="['0']"
 
 for item in "$@"
 do
@@ -163,7 +164,9 @@ do
     	MASK=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
 			MASK_GIVEN=true
     ;;
-
+		--scales=*)
+    	SCALES=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
 		--queue=*)
     	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
@@ -191,6 +194,11 @@ echo ""
 echo "*****  PARSED ARGUMENTS ****"
 echo "INPUTFILE: $INPUTFILE"
 echo "FILELIST: $FILELIST, NMAX_PROCESSED_FILES: $NMAX_PROCESSED_FILES"
+echo "PHASE_CENTER: $PHASE_CENTER"
+echo "WEIGHTING: $WEIGHTING"
+echo "DECONVOLVER: $DECONVOLVER"
+echo "GRIDDER: $GRIDDER"
+echo "SCALES: $SCALES"
 echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE"
 echo "ENV_FILE: $ENV_FILE"
 echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
@@ -255,6 +263,7 @@ generate_exec_script(){
 	local exe=$3
 	local exe_args=$4
 	local jobdir=$5
+	local recdir=$6
 
 	echo "INFO: Creating sh file $shfile (jobindex=$jobindex, exe=$exe, exe_args=$exe_args)..."
 	( 
@@ -286,6 +295,11 @@ generate_exec_script(){
       echo "JOBDIR=$jobdir"
 			echo 'echo "INFO: Creating job top directory $JOBDIR ..."'
 			echo 'mkdir -p "$JOBDIR"'
+			echo 'echo ""'
+
+			echo "RECDIR=$recdir"
+			echo 'echo "INFO: Creating job rec directory $RECDIR ..."'
+			echo 'mkdir -p "$RECDIR"'
 			echo 'echo ""'
 
 			echo 'echo "INFO: Entering job directory $JOBDIR ..."'
@@ -390,10 +404,10 @@ if [ "$FILELIST_GIVEN" = true ]; then
 			EXE="$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/imaging_observation.py"
 		fi
 
-		EXE_ARGS="--vis=$filename --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter='""$PHASE_CENTER""'"" --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
+		EXE_ARGS="--vis=$filename --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter='""$PHASE_CENTER""'"" --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --scales=$SCALES --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
 		
 		echo "INFO: Creating script file $shfile for input file: $filename_base ..."
-		generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$JOB_DIR"
+		generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$JOB_DIR" "$CASA_REC_DIR"
 
 
 		# Submits the job to batch system
@@ -465,11 +479,11 @@ else
 		EXE="$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/imaging_observation.py"
 	fi
 
-	EXE_ARGS="--vis=$filename --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter='""$PHASE_CENTER""'"" --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
+	EXE_ARGS="--vis=$INPUTFILE --mask=$maskimg --mapsize=$MAP_SIZE $MOSAIC_FLAG --outimage=$MOSAIC_IMAGE_NAME --outproject=$OUTPUT_PROJECT $FITSOUT_FLAG --fitsout=$recmapfile --pixsize=$PIX_SIZE --phasecenter='""$PHASE_CENTER""'"" --deconvolver=$DECONVOLVER --gridder=$GRIDDER --weighting=$WEIGHTING --scales=$SCALES --projection=$PROJECTION --niter=$NITER --cycleniter=$CYCLENITER --threshold=$THRESHOLD "
 
 	echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 	jobId=" "
-	generate_exec_script "$shfile" "$jobId" "$EXE" "$EXE_ARGS" "$JOB_DIR"
+	generate_exec_script "$shfile" "$jobId" "$EXE" "$EXE_ARGS" "$JOB_DIR" "$CASA_REC_DIR"
 
 	# Submits the job to batch system
 	if [ "$SUBMIT" = true ] ; then

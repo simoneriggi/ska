@@ -117,7 +117,9 @@ def get_args():
 	parser.add_argument('-disk_shell_radius_ratio_max', '--disk_shell_radius_ratio_max', dest='disk_shell_radius_ratio_max', required=False, type=float, default=0.9, action='store',help='Disk/shell radius ratio max (default=0.8)')
 		
 	parser.add_argument('-zmin_model', '--zmin_model', dest='model_trunc_zmin', required=False, type=float, default=1, action='store',help='Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default=1)')
+	parser.add_argument('-mask_boxsize', '--mask_boxsize', dest='mask_boxsize', required=False, type=float, default=10, action='store',help='Mask box size in pixels (default=10)')
 	
+
 	# - OUTPUT FILE OPTIONS
 	parser.add_argument('-outputfile', '--outputfile', dest='outputfile', required=False, type=str, default='simmap.fits',action='store',help='Output filename')
 	parser.add_argument('-outputfile_model', '--outputfile_model', dest='outputfile_model', required=False, type=str, default='skymodel.fits', action='store',help='Model filename')
@@ -298,6 +300,12 @@ class SkyMapSimulator(object):
 		self.outtree= ROOT.TTree('SourceInfo','SourceInfo')
 		self.cs = Caesar.Source()
 		self.outtree.Branch('Source',self.cs)		
+
+	def set_mask_box_size(self,boxsize):
+		""" Set mask box size """
+		if boxsize<=0:	
+			raise ValueError('Invalid boxsize specified (shall be larger than 0')
+		self.mask_boxsize= boxsize	
 
 	def set_margins(self,marginx,marginy):
 		""" Set margin in X & Y """
@@ -1052,6 +1060,7 @@ def main():
 	outputfile_sources= args.outputfile_sources
 	outputfile_ds9region= args.outputfile_ds9region
 	outputfile_casaregion= args.outputfile_casaregion
+	mask_boxsize= args.mask_boxsize
 
 	print("*** ARGS ***")
 	print("Nx: %s" % Nx)
@@ -1074,6 +1083,7 @@ def main():
 	print("Extended source scale min/max: (%s,%s)" % (ext_scale_min, ext_scale_max))
 	print("Output filename: %s " % outputfile)
 	print("Mask output filename: %s " % mask_outputfile)
+	print("Mask box size: %s " % mask_boxsize)
 	print("************")
 
 	## Generate simulated sky map
@@ -1106,6 +1116,7 @@ def main():
 	simulator.set_ellipse_pars(ext_scale_min,ext_scale_max)
 	simulator.set_disk_pars(ext_scale_min,ext_scale_max)
 	simulator.set_disk_shell_pars(disk_shell_ampl_ratio_min,disk_shell_ampl_ratio_max,disk_shell_radius_ratio_min,disk_shell_radius_ratio_max)
+	simulator.set_mask_box_size(mask_boxsize)
 	#[data, mask_data]= simulator.generate_map()
 	simulator.generate_map()
 
