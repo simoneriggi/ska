@@ -102,12 +102,13 @@ def get_args():
 	parser.add_argument('-zmax_ext', '--zmax_ext', dest='zmax_ext', required=False, type=float, default=2, action='store',help='Maximum extended source significance level in sigmas above the bkg (default=2)')
 	parser.add_argument('-ext_scale_min', '--ext_scale_min', dest='ext_scale_min', required=False, type=float, default=10, action='store',help='Minimum extended source size in arcsec (default=10)')
 	parser.add_argument('-ext_scale_max', '--ext_scale_max', dest='ext_scale_max', required=False, type=float, default=3600, action='store',help='Maximum extended source size in arcsec (default=3600)')
+	parser.add_argument('-ext_source_type', '--ext_source_type', dest='ext_source_type', required=False, type=int, default=-1, action='store',help='Extended source type to generate (-1=all types from available models, 1=ring, 2=ellipse, 3=bubble+shell, 4=airy disk (default=-1)')
 
 	# - SOURCE MODEL OPTIONS
 	parser.add_argument('-ring_rmin', '--ring_rmin', dest='ring_rmin', required=False, type=float, default=0.5, action='store',help='Minimum ring radius in arcsec (default=1)')
 	parser.add_argument('-ring_rmax', '--ring_rmax', dest='ring_rmax', required=False, type=float, default=10, action='store',help='Maximum ring radius in arcsec (default=10)')
-	parser.add_argument('-ring_wmin', '--ring_wmin', dest='ring_wmin', required=False, type=float, default=1, action='store',help='Minimum ring width in arcsec (default=1)')
-	parser.add_argument('-ring_wmax', '--ring_wmax', dest='ring_wmax', required=False, type=float, default=5, action='store',help='Maximum ring width in arcsec (default=10)')
+	parser.add_argument('-ring_wmin', '--ring_wmin', dest='ring_wmin', required=False, type=float, default=2, action='store',help='Minimum ring width in arcsec (default=1)')
+	parser.add_argument('-ring_wmax', '--ring_wmax', dest='ring_wmax', required=False, type=float, default=10, action='store',help='Maximum ring width in arcsec (default=10)')
 	parser.add_argument('-ellipse_rmin', '--ellipse_rmin', dest='ellipse_rmin', required=False, type=float, default=0.5, action='store',help='Ellipse bmaj in arcsec (default=1)')
 	parser.add_argument('-ellipse_rmax', '--ellipse_rmax', dest='ellipse_rmax', required=False, type=float, default=10, action='store',help='Ellipse bmin in arcsec (default=10)')
 	
@@ -259,15 +260,17 @@ class SkyMapSimulator(object):
 		
 		## Extended source parameters
 		self.simulate_ext_sources= True
+		self.ext_source_type= -1 # all source models generated
 		self.ext_source_density= 10 # in sources/deg^2
 		self.zmin_ext= 0.5 # in sigmas 
 		self.zmax_ext= 5	 # in sigmas 
 		self.ring_rmin= 2. # in arcsec
 		self.ring_rmax= 10. # in arcsec
-		self.ring_width_min= 1 # in arcsec
+		self.ring_width_min= 5 # in arcsec
 		self.ring_width_max= 10 # in arcsec 	 
 		self.ellipse_rmin= 1 # in arcsec
 		self.ellipse_rmax= 10 # in arcsec
+		self.ellipse_rratiomin= 0.7 # ratio rmin/rmax
 		self.disk_rmin= 2 # in arcsec
 		self.disk_rmax= 10 # in arcsec
 		self.shell_disk_ampl_ratio_min= 0.1
@@ -348,6 +351,10 @@ class SkyMapSimulator(object):
 	def set_model_trunc_significance(self,value):
 		""" Set the significance level below which source model data are truncated """
 		self.trunc_model_zmin= value
+
+	def set_ext_source_type(self,value):
+		""" Set the extended source type to be generated (-1=all, 1=ring, 2=ellipse, 3=bubble+shell, 4=airy)"""
+		self.ext_source_type= value
 
 	def set_ds9region_filename(self,filename):
 		""" Set the output DS9 region filename """
@@ -442,20 +449,22 @@ class SkyMapSimulator(object):
 		bkg_data = make_noise_image(shape, type='gaussian', mean=self.bkg_level, stddev=self.bkg_rms)
 		return bkg_data
     
-	def generate_blob(self,ampl,x0,y0,sigmax,sigmay,theta):
+	def generate_blob(self,ampl,x0,y0,sigmax,sigmay,theta,trunc_thr):
 		""" Generate a blob 
 				Arguments: 
 					ampl: peak flux in Jy
 					x0, y0: gaussian means in pixels
 					sigmax, sigmay: gaussian sigmas in pixels
 					theta: rotation in degrees
+					trunc_thr: truncation significance threshold
 		"""
 		data= Gaussian2D(ampl,x0,y0,sigmax,sigmay,theta=math.radians(theta))(self.gridx, self.gridy)
 
 		## Truncate data at minimum significance
-		#ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level
-		ampl_min= (self.trunc_model_zmin*self.bkg_rms) + self.bkg_level
-		#ampl_min= self.bkg_level
+		#ampl_min= (self.trunc_model_zmin*self.bkg_rms) + self.bkg_level ## For compact sources
+		#ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level  # OLD
+		#ampl_min= self.bkg_level # OLD
+		ampl_min= (trunc_thr*self.bkg_rms) + self.bkg_level
 		if self.truncate_models:
 			data[data<ampl_min] = 0		
 
@@ -635,7 +644,7 @@ class SkyMapSimulator(object):
 			#S= (z*self.bkg_rms) + self.bkg_level
 	
 			## Generate blob
-			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta)
+			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta,trunc_thr=self.trunc_model_zmin)
 			sources_data+= blob_data
 
 			## Set model map
@@ -679,9 +688,11 @@ class SkyMapSimulator(object):
 		
 		## Start generation loop
 		sources_data = Box2D(amplitude=0,x_0=0,y_0=0,x_width=2*self.nx, y_width=2*self.ny)(self.gridx, self.gridy)
-		ngen_sources= 0		
-		nsource_types= 3
-		
+		ngen_sources= 0	
+		if self.ext_source_type==-1:	
+			nsource_types= 5
+		else:
+			nsource_types= 1
 
 		#for index in range(0,nsources):	
 		while (ngen_sources<nsources):
@@ -705,8 +716,11 @@ class SkyMapSimulator(object):
 			#S= (z*self.bkg_rms) + self.bkg_level
 
 			## Generate random type (1=ring, 2=ellipse, ...)
-			source_sim_type= random.randint(1, nsource_types)
-			
+			if self.ext_source_type==-1:
+				source_sim_type= random.randint(1, nsource_types)
+			else:
+				source_sim_type= self.ext_source_type			
+
 			if source_sim_type==1: # Ring2D Sector model
 				source_sim_type= Caesar.Source.eRingLike
 				ring_r= random.uniform(self.ring_rmin,self.ring_rmax) 
@@ -721,7 +735,8 @@ class SkyMapSimulator(object):
 			elif source_sim_type==2: # Ellipse 2D model
 				source_sim_type= Caesar.Source.eEllipseLike
 				ellipse_bmaj= random.uniform(self.ellipse_rmin,self.ellipse_rmax) 
-				ellipse_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax) 
+				#ellipse_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
+				ellipse_bmin= random.uniform(max(self.ellipse_rratiomin*ellipse_bmaj,self.ellipse_rmin),self.ellipse_rmax)
 				ellipse_theta= random.uniform(0,360)
 				source_data= self.generate_ellipse(S,x0,y0,ellipse_bmaj/self.pixsize,ellipse_bmin/self.pixsize,ellipse_theta) # convert radius/width from arcsec to pixels
 
@@ -738,10 +753,18 @@ class SkyMapSimulator(object):
 				theta_max= max(theta1,theta2)
 				source_data= self.generate_bubble(S,x0,y0,bubble_r,shell_S,shell_r,shell_width,theta_min,theta_max)
 				
-			#elif source_sim_type==4: # Airy disk
-			#	source_sim_type= Caesar.Source.eDiskLike
-			#	disk_r= random.uniform(self.disk_rmin,self.disk_rmax) 
-			#	source_data= self.generate_airy_disk(S,x0,y0,disk_r)
+			elif source_sim_type==4: # Airy disk
+				source_sim_type= Caesar.Source.eDiskLike
+				disk_r= random.uniform(self.disk_rmin,self.disk_rmax) 
+				source_data= self.generate_airy_disk(S,x0,y0,disk_r)
+
+			elif source_sim_type==5: # Gaussian Blob like
+				source_sim_type= Caesar.Source.eBlobLike
+				blob_bmaj= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
+				#blob_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
+				blob_bmin= random.uniform(max(self.ellipse_rratiomin*blob_bmaj,self.ellipse_rmin),self.ellipse_rmax)
+				blob_theta= random.uniform(0,360)
+				source_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=blob_bmaj/self.pixsize,sigmay=blob_bmin/self.pixsize,theta=blob_theta,trunc_thr=self.zmin_ext)
 
 			else:
 				print('ERROR: Invalid source type given!')
@@ -1038,6 +1061,7 @@ def main():
 
 	# - Extended source args
 	enable_extsources= args.enable_extsources
+	ext_source_type= args.ext_source_type
 	Zmin_ext= args.zmin_ext
 	Zmax_ext= args.zmax_ext
 	ext_source_density= args.ext_source_density
@@ -1078,6 +1102,7 @@ def main():
 	print("Source significance range: (%s,%s)" % (Zmin, Zmax))
 	print("Source density (deg^-2): %s" % source_density)	
 	print("Enable extended sources? %s" % str(enable_extsources) )
+	print("Extended source type %s" %str(ext_source_type) )
 	print("Extended source significance range: (%s,%s)" % (Zmin_ext, Zmax_ext))
 	print("Extended source density (deg^-2): %s" % ext_source_density)
 	print("Extended source scale min/max: (%s,%s)" % (ext_scale_min, ext_scale_max))
@@ -1108,6 +1133,7 @@ def main():
 	simulator.set_source_significance_range(Zmin,Zmax)
 	simulator.set_source_density(source_density)
 	simulator.enable_extended_sources(enable_extsources)
+	simulator.set_ext_source_type(ext_source_type)
 	simulator.set_ext_source_significance_range(Zmin_ext,Zmax_ext)
 	simulator.set_ext_source_density(ext_source_density)
 	#simulator.set_ring_pars(ring_rmin,ring_rmax,ring_wmin,ring_wmax)
