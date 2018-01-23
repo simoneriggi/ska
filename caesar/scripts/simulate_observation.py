@@ -51,7 +51,7 @@ def get_args():
 	parser.add_argument('-telconfigs', '--telconfigs', dest='telconfigs', required=False, type=str, default='atca_all.cfg',action='store',help='Telescope configuration list (comma separated) (default=atca_all.cfg)')
 	parser.add_argument('-mapsize', '--mapsize', dest='mapsize', required=False, type=str, default='',action='store',help='Map size (default=equal to skymodel')
 	parser.add_argument('-pixsize', '--pixsize', dest='pixsize', required=False, type=str, default='',action='store',help='Pixel size (default=equal to skymodel')
-	parser.add_argument('-addnoise','--addnoise', dest='addnoise', action='store_false')
+	parser.add_argument('-addnoise','--addnoise', dest='addnoise', action='store_true')
 	parser.set_defaults(addnoise=False)
 	parser.add_argument('-frequency_center', '--frequency_center', dest='frequency_center', required=False, type=str, default='2.1GHz',action='store',help='Frequency center (default=2.1GHz)')
 	parser.add_argument('-frequency_bandwidth', '--frequency_bandwidth', dest='frequency_bandwidth', required=False, type=str, default='10MHz',action='store',help='Frequency bandwidth (default=10MHz)')
