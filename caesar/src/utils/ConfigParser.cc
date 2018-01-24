@@ -334,6 +334,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(cvMuPar,double,0.5,0,100);
 		REGISTER_OPTION(cvNuPar,double,0,0,100);
 		REGISTER_OPTION(cvPPar,double,1,0,100);
+		REGISTER_OPTION(cvInitContourToSaliencyMap,bool,true,false,true);
 
 		//===================================================================
 		//==  Linear Region-based Active Contour (LRAC) algorithm options  ==
@@ -342,6 +343,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(lracLambdaPar,double,0.1,0,1000);
 		REGISTER_OPTION(lracRadiusPar,double,10,0,1000);
 		REGISTER_OPTION(lracEpsPar,double,0.01,0,1000);//Convergence par
+		REGISTER_OPTION(lracInitContourToSaliencyMap,bool,true,false,true);
 
 		//===================================
 		//==  Saliency filtering options   ==
