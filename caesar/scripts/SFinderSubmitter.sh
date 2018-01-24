@@ -328,6 +328,12 @@ if [ "$CONTAINER_IMG" = "" ] && [ "$RUN_IN_CONTAINER" = true ]; then
   echo "ERROR: Empty CONTAINER_IMG argument (hint: you must specify a container image if run in container option is activated)!"
   exit 1
 fi
+RUN_IN_CONTAINER_FLAG=""
+CONTAINER_IMG_FLAG=""
+if [ "$RUN_IN_CONTAINER" = true ]; then
+	RUN_IN_CONTAINER_FLAG="--containerrun "
+	CONTAINER_IMG_FLAG="--containerimg=$CONTAINER_IMG "	
+fi
 
 #######################################
 ##     DEFINE & LOAD ENV VARS
@@ -675,7 +681,7 @@ generate_exec_script(){
 
       echo 'echo ""'
       
-      echo "export JOBDIR=$BASEDIR"
+      echo "JOBDIR=$BASEDIR"
      
       echo " "
 
@@ -753,7 +759,7 @@ if [ "$FILELIST_GIVEN" = true ]; then
 		## Define executable & args variables and generate script
 		shfile="Run_$filename_base_noext"'_'"$index.sh"
 		EXE="$CAESAR_DIR/scripts/RunSFinderMPI.sh"
-		EXE_ARGS="--nproc=$NPROC --config=$configfile"
+		EXE_ARGS="--nproc=$NPROC --config=$configfile $RUN_IN_CONTAINER_FLAG $CONTAINER_IMG_FLAG"
 		if [ "$HOSTFILE_GIVEN" = true ] ; then
 			EXE_ARGS="$EXE_ARGS --hostfile=$HOSTFILE"
 		fi
@@ -807,7 +813,7 @@ else
 	## Define executable & args variables and generate script
 	shfile="Run_$filename_base_noext"'.sh'
 	EXE="$CAESAR_DIR/scripts/RunSFinderMPI.sh"
-	EXE_ARGS="--nproc=$NPROC --config=$configfile"
+	EXE_ARGS="--nproc=$NPROC --config=$configfile $RUN_IN_CONTAINER_FLAG $CONTAINER_IMG_FLAG"
 	if [ "$HOSTFILE_GIVEN" = true ] ; then
 		EXE_ARGS="$EXE_ARGS --hostfile=$HOSTFILE"
 	fi
