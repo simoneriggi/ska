@@ -24,6 +24,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo ""
 	echo ""
 	echo "*** OPTIONAL ARGS ***"	
+	echo "--containerrun - Run inside Caesar container"
+	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
 	echo "--submit - Submit the script to the batch system using queue specified"
 	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
 	echo "--loglevel=[LOG_LEVEL] - Logging level string {INFO, DEBUG, WARN, ERROR, OFF} (default=INFO)"
@@ -69,6 +71,8 @@ fi
 #######################################
 ENV_FILE=""
 SUBMIT=false
+CONTAINER_IMG=""
+RUN_IN_CONTAINER=false
 FILELIST_GIVEN=false
 INPUTFILE=""
 INPUTFILE_GIVEN=false
@@ -139,6 +143,12 @@ do
     ;;
 		--queue=*)
     	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--containerimg=*)
+    	CONTAINER_IMG=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--containerrun*)
+    	RUN_IN_CONTAINER=true
     ;;
 		--loglevel=*)
     	LOG_LEVEL=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
@@ -274,6 +284,7 @@ done
 echo ""
 echo "*****  PARSED ARGUMENTS ****"
 echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE"
+echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "ENV_FILE: $ENV_FILE"
 echo "INPUTFILE: $INPUTFILE"
 echo "FILELIST: $FILELIST, NMAX_PROCESSED_FILES: $NMAX_PROCESSED_FILES"
@@ -313,7 +324,10 @@ if [ "$ENV_FILE" = "" ]; then
   exit 1
 fi
 
-
+if [ "$CONTAINER_IMG" = "" ] && [ "$RUN_IN_CONTAINER" = true ]; then
+  echo "ERROR: Empty CONTAINER_IMG argument (hint: you must specify a container image if run in container option is activated)!"
+  exit 1
+fi
 
 #######################################
 ##     DEFINE & LOAD ENV VARS
@@ -554,6 +568,7 @@ generate_config(){
 		echo 'cvMuPar = 0.5																				| Chan-Vese mu par'
 		echo 'cvNuPar = 0																					|	Chan-Vese nu par'
 		echo 'cvPPar = 1																					| Chan-Vese p par'
+		echo 'cvInitContourToSaliencyMap = false                  | Init contour to binarized saliency map'
 		echo '###'
 		echo '###'
 		echo '//==================================='
@@ -563,6 +578,7 @@ generate_config(){
 		echo 'lracLambdaPar = 0.1																  | Regularization par'
 		echo 'lracRadiusPar = 1																	  | Radius of locatization ball par'
 		echo 'lracEpsPar = 0.1																	  | Convergence par'
+		echo 'lracInitContourToSaliencyMap = false                  | Init contour to binarized saliency map'
 		echo '###'
 		echo '###'
 		echo '//==============================='

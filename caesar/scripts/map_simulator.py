@@ -24,7 +24,7 @@ from astropy.io import fits
 from astropy.units import Quantity
 from astropy.modeling.parameters import Parameter
 from astropy.modeling.core import Fittable2DModel
-from astropy.modeling.models import Box2D, Gaussian2D, Ring2D, Ellipse2D, TrapezoidDisk2D, Disk2D, AiryDisk2D
+from astropy.modeling.models import Box2D, Gaussian2D, Ring2D, Ellipse2D, TrapezoidDisk2D, Disk2D, AiryDisk2D, Sersic2D
 from photutils.datasets import make_noise_image
 from astropy import wcs
 
@@ -277,7 +277,10 @@ class SkyMapSimulator(object):
 		self.shell_disk_ampl_ratio_max= 0.8
 		self.shell_disk_radius_ratio_min= 0.6
 		self.shell_disk_radius_ratio_max= 0.9
-		
+		self.sersic_radius= 10 # in arcsec
+		self.sersic_ellipticity= 0.5
+		self.sersic_index= 4		
+
 		## Map output file
 		self.mapfilename= 'simmap.fits'
 		self.modelfilename= 'skymodel.fits'
@@ -401,6 +404,12 @@ class SkyMapSimulator(object):
 		self.ring_width_min= wmin
 		self.ring_width_max= wmax 	 
 
+	def set_sersic_pars(self,radius,ell,index):
+		""" Set Sersic model pars"""
+		self.sersic_radius= radius
+		self.sersis_ellipticity= ell
+		self.sersic_index= index
+
 	def set_disk_pars(self,rmin,rmax):
 		""" Set disk model parameters"""
 		self.disk_rmin= rmin
@@ -518,8 +527,20 @@ class SkyMapSimulator(object):
 
 		return data
 
+	def generate_sersic(self,ampl,x0,y0,radius,ell,index,theta):
+		""" Generate Sersic model """
+		data= Sersic2D(amplitude=ampl,x_0=x0,y_0=y0,r_eff=radius,n=index,ellip=ell,theta=math.radians(theta))(self.gridx, self.gridy) 
+			
+		## Truncate data at minimum significance
+		ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		if self.truncate_models:
+			data[data<ampl_min] = 0			
+
+		return data
+
 	def make_caesar_source(self,source_data,source_name,source_id,source_type,source_sim_type,ampl=None,x0=None,y0=None):
 		""" Create Caesar source from source data array """
+
 		# Create Caesar source
 		source= Caesar.Source()
 
@@ -546,12 +567,13 @@ class SkyMapSimulator(object):
 		#    - S= count integral
 		#    - baricenter of binary map
 		if x0 is None or y0 is None:
-			print ('No source true pos given, computing it from data...')
+			print ('INFO: No source true pos given, computing it from data...')
 			data_binary= np.where(source_data!=0,1,0)
+			#print 'INFO: data_binary sum=%d', sum(data_binary)
 			[y0,x0]= ndimage.measurements.center_of_mass(data_binary)
 
 		if ampl is None:
-			print ('No source true flux given, computing integral from data...')
+			print ('INFO: No source true flux given, computing integral from data...')
 			ampl= np.sum(source_data,axis=None)
 
 		# Set some flags
@@ -661,7 +683,7 @@ class SkyMapSimulator(object):
 			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0)
 			self.caesar_sources.append(caesar_source)
 
-			print ('INFO: Source %s: Pos(%s,%s), ix=%s, iy=%s' % (source_name,str(x0),str(y0),str(ix),str(iy)))
+			print ('INFO: Source %s: Pos(%s,%s), ix=%s, iy=%s, S=%s' % (source_name,str(x0),str(y0),str(ix),str(iy),str(S)))
 
 		return [sources_data,mask_data]
 
@@ -684,6 +706,8 @@ class SkyMapSimulator(object):
 		lgS_min= np.log(S_min)
 		lgS_max= np.log(S_max)
 		print 'INFO: Generating #',nsources,' extended sources in map...'
+
+		print('INFO: zmin_ext=%s, zmax_ext=%s, Smin=%s, Smax=%s' % (str(self.zmin_ext),str(self.zmax_ext),str(S_min),str(S_max)) )
 
 		
 		## Start generation loop
@@ -753,16 +777,23 @@ class SkyMapSimulator(object):
 				theta_max= max(theta1,theta2)
 				source_data= self.generate_bubble(S,x0,y0,bubble_r,shell_S,shell_r,shell_width,theta_min,theta_max)
 				
-			elif source_sim_type==4: # Airy disk
+			#elif source_sim_type==4: # Airy disk
+			#	source_sim_type= Caesar.Source.eDiskLike
+			#	disk_r= random.uniform(self.disk_rmin,self.disk_rmax) 
+			#	source_data= self.generate_airy_disk(S,x0,y0,disk_r)
+
+			elif source_sim_type==4: # Sersic
 				source_sim_type= Caesar.Source.eDiskLike
-				disk_r= random.uniform(self.disk_rmin,self.disk_rmax) 
-				source_data= self.generate_airy_disk(S,x0,y0,disk_r)
+				sersic_r= random.uniform(self.disk_rmin,self.disk_rmax)
+				sersic_theta= random.uniform(0,360)
+				sersic_ell= random.uniform(0,1)
+				source_data= self.generate_sersic(S,x0,y0,sersic_r,sersic_ell,self.sersic_index,sersic_theta)
 
 			elif source_sim_type==5: # Gaussian Blob like
 				source_sim_type= Caesar.Source.eBlobLike
 				blob_bmaj= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
 				#blob_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
-				blob_bmin= random.uniform(max(self.ellipse_rratiomin*blob_bmaj,self.ellipse_rmin),self.ellipse_rmax)
+				blob_bmin= random.uniform(max(self.ellipse_rratiomin*blob_bmaj,self.ellipse_rmin),blob_bmaj)
 				blob_theta= random.uniform(0,360)
 				source_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=blob_bmaj/self.pixsize,sigmay=blob_bmin/self.pixsize,theta=blob_theta,trunc_thr=self.zmin_ext)
 
@@ -770,6 +801,11 @@ class SkyMapSimulator(object):
 				print('ERROR: Invalid source type given!')
 				continue			
 	
+			## Check if source data contains all zeros (e.g. truncation removed all data)
+			if np.count_nonzero(source_data)<=0:
+				print('WARN: Generated extended source data contains all zeros, regenerate...')
+				continue
+
 			## Check if source pixels and its contour has been already taken before
 			source_indexes= (source_data!=0) # get all source data pixels (others are 0)
 			source_indexes_xright= (np.roll(source_data,1,axis=1)!=0)
@@ -788,6 +824,10 @@ class SkyMapSimulator(object):
 			# Add to extended source data and mask
 			sources_data+= source_data
 			ngen_sources+= 1
+
+			# Set model map
+			ix= int(np.round(x0))
+			iy= int(np.round(y0))
 			
 			# Make Caesar source	
 			source_name= 'Sext' + str(ngen_sources)
@@ -795,6 +835,9 @@ class SkyMapSimulator(object):
 			source_type= Caesar.Source.eExtended
 			caesar_source= self.make_caesar_source(source_data,source_name,source_id,source_type,source_sim_type)
 			self.caesar_sources.append(caesar_source)
+
+			print ('INFO: Ext Source %s: Pos(%s,%s), ix=%s, iy=%s, S=%s' % (source_name,str(x0),str(y0),str(ix),str(iy),str(S)))
+
 
 		return sources_data
 
