@@ -72,7 +72,7 @@ LRACSegmenter::~LRACSegmenter() {
 Image* LRACSegmenter::FindSegmentation(Image* inputImg,Image* inputSegmMap,int niters,double lambda,double radius,double eps){
 
 	//Check inputs
-	if(!inputImg || !inputSegmMap){
+	if(!inputImg){
 		ERROR_LOG("Null ptr to input/mask images!");
 		return nullptr;
 	}
@@ -87,7 +87,7 @@ Image* LRACSegmenter::FindSegmentation(Image* inputImg,Image* inputSegmMap,int n
 	long int npixels= inputImg->GetNPixels();
 
 	//Check img & mask size	
-	if(!inputSegmMap->HasSameBinning(inputImg)){
+	if(inputSegmMap && !inputSegmMap->HasSameBinning(inputImg)){
 		ERROR_LOG("Initial segmentation map has different binning wrt to input image!");
 		return nullptr;
 	}
@@ -125,20 +125,50 @@ Image* LRACSegmenter::FindSegmentation(Image* inputImg,Image* inputSegmMap,int n
 	//Fill arrays
 	long int index= 0;
 
-	for(long int i=0;i<Nx;i++){
-		long int ix= i;
-		for(long int j=0;j<Ny;j++){
-			long int iy= Ny-1-j;
-			double w= inputImg_norm->GetPixelValue(ix,iy);
-			double segm= inputSegmMap->GetPixelValue(ix,iy);
-			img[index]= w;
-			mask[index]= segm;
-			phi[index]= segm;
-			label[index]= segm; 
-			//INFO_LOG("img("<<index+1<<")="<<img[index]);
-			index++; 
-		}//end loop bins y
-	}//end loop bins x
+	if(inputSegmMap){
+		for(long int i=0;i<Nx;i++){
+			long int ix= i;
+			for(long int j=0;j<Ny;j++){
+				long int iy= Ny-1-j;
+				double w= inputImg_norm->GetPixelValue(ix,iy);
+				double segm= inputSegmMap->GetPixelValue(ix,iy);
+				img[index]= w;
+				mask[index]= segm;
+				phi[index]= segm;
+				label[index]= segm; 
+				//INFO_LOG("img("<<index+1<<")="<<img[index]);
+				index++; 
+			}//end loop bins y
+		}//end loop bins x
+	}//close if
+	else{
+		
+		//## Set up initial circular contour for a 256x256 image
+		double rowCenter= Nx/2.0;
+		double colCenter= Ny/2.0;
+		double initContourRadius= 0.5;//1
+		INFO_LOG("Initializing level set from dummy gaussian (center("<<rowCenter<<","<<colCenter<<", radius="<<initContourRadius<<")");
+	
+		for(long int i=0;i<Nx;i++){
+			long int ix= i;
+			for(long int j=0;j<Ny;j++){
+				long int iy= Ny-1-j;
+				double w= inputImg_norm->GetPixelValue(ix,iy);
+
+				double x= double(i) - rowCenter;
+				double y= double(j) - colCenter;
+				double segm= 900.0/(900.0 + x*x + y*y ) - initContourRadius;
+				
+				img[index]= w;
+				mask[index]= segm;
+				phi[index]= segm;
+				label[index]= segm; 
+				//INFO_LOG("img("<<index+1<<")="<<img[index]);
+				index++; 
+
+			}//end loop bins y
+		}//end loop bins x
+	}//close else
 
   //Initialize lists, phi, and labels
 	INFO_LOG("Initialize lists, phi and labels...");

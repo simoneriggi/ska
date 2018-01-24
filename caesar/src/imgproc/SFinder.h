@@ -477,12 +477,14 @@ class SFinder : public TObject {
 		double m_cvMuPar;
 		double m_cvNuPar;
 		double m_cvPPar;
+		bool m_cvInitContourToSaliencyMap;
 
 		//LRAC options
 		int m_lracNIters;
 		double m_lracLambdaPar;
 		double m_lracRadiusPar;
 		double m_lracEpsPar;
+		bool m_lracInitContourToSaliencyMap;
 
 		//Hierachical clustering data
 		Image* m_LaplImg;

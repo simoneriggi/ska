@@ -581,12 +581,14 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(cvMuPar,m_cvMuPar);
 	GET_OPTION_VALUE(cvNuPar,m_cvNuPar);
 	GET_OPTION_VALUE(cvPPar,m_cvPPar);
+	GET_OPTION_VALUE(cvInitContourToSaliencyMap,m_cvInitContourToSaliencyMap);
 
 	//LRAC algorithm options
 	GET_OPTION_VALUE(lracNIters,m_lracNIters);	
 	GET_OPTION_VALUE(lracLambdaPar,m_lracLambdaPar);
 	GET_OPTION_VALUE(lracRadiusPar,m_lracRadiusPar);
 	GET_OPTION_VALUE(lracEpsPar,m_lracEpsPar);
+	GET_OPTION_VALUE(lracInitContourToSaliencyMap,m_lracInitContourToSaliencyMap);
 
 	//Hierarchical clustering options
 	GET_OPTION_VALUE(spMergingEdgeModel,m_spMergingEdgeModel);
@@ -1966,58 +1968,62 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 	//==    PRELIMINARY STAGES
 	//==========================================	
 	//## Compute saliency
-	INFO_LOG("[PROC "<<m_procId<<"] - Computing image saliency map...");
-	Image* saliencyImg= img->GetMultiResoSaliencyMap(
-		m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
-		m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
-		m_SaliencyMultiResoCombThrFactor,
-		m_SaliencyUseBkgMap,m_SaliencyUseNoiseMap,bkgData,
-		m_SaliencyThrFactor,m_SaliencyImgThrFactor
-	);
-	if(saliencyImg){
-		if(storeData) m_SaliencyImg= saliencyImg;
-	}
-	else{
-		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to compute saliency map!");
-		return nullptr;
-	}
-	
-	//## Get saliency map optimal threshold
-	INFO_LOG("[PROC "<<m_procId<<"] - Computing saliency map optimal threshold...");
-	bool smoothPixelHisto= true;
-	int pixelHistoNBins= 100;
-	double signalThr= saliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
-	if(TMath::IsNaN(signalThr) || fabs(signalThr)==TMath::Infinity()){
-		ERROR_LOG("[PROC "<<m_procId<<"] - Invalid numeric threshold returned as threshold computation failed!");
-		return nullptr;
-	}	
-
-	//## Get saliency binarized image
-	INFO_LOG("[PROC "<<m_procId<<"] - Thresholding the saliency map @ thr="<<signalThr<<" and compute binarized map...");
+	Image* signalMarkerImg= nullptr;
 	double fgValue= 1;
-	Image* signalMarkerImg= saliencyImg->GetBinarizedImage(signalThr,fgValue,false);
-	if(!signalMarkerImg){
-		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to get saliency binarized map!");
+	if(m_cvInitContourToSaliencyMap){
+		INFO_LOG("[PROC "<<m_procId<<"] - Computing image saliency map...");
+		Image* saliencyImg= img->GetMultiResoSaliencyMap(
+			m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
+			m_spBeta,m_spMinArea,m_SaliencyNNFactor,m_SaliencyUseRobustPars,m_SaliencyDissExpFalloffPar,m_SaliencySpatialDistRegPar,
+			m_SaliencyMultiResoCombThrFactor,
+			m_SaliencyUseBkgMap,m_SaliencyUseNoiseMap,bkgData,
+			m_SaliencyThrFactor,m_SaliencyImgThrFactor
+		);
+		if(saliencyImg){
+			if(storeData) m_SaliencyImg= saliencyImg;
+		}
+		else{
+			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to compute saliency map!");
+			return nullptr;
+		}
+	
+		//## Get saliency map optimal threshold
+		INFO_LOG("[PROC "<<m_procId<<"] - Computing saliency map optimal threshold...");
+		bool smoothPixelHisto= true;
+		int pixelHistoNBins= 100;
+		double signalThr= saliencyImg->FindOptimalGlobalThreshold(m_SaliencyThrFactor,pixelHistoNBins,smoothPixelHisto);
+		if(TMath::IsNaN(signalThr) || fabs(signalThr)==TMath::Infinity()){
+			ERROR_LOG("[PROC "<<m_procId<<"] - Invalid numeric threshold returned as threshold computation failed!");
+			return nullptr;
+		}	
+
+		//## Get saliency binarized image
+		INFO_LOG("[PROC "<<m_procId<<"] - Thresholding the saliency map @ thr="<<signalThr<<" and compute binarized map...");
+		
+		signalMarkerImg= saliencyImg->GetBinarizedImage(signalThr,fgValue,false);
+		if(!signalMarkerImg){
+			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to get saliency binarized map!");
+			if(saliencyImg && !storeData){
+				delete saliencyImg;
+				saliencyImg= 0;
+			}
+			return nullptr;
+		}
+		
+		//Delete saliency if not needed
 		if(saliencyImg && !storeData){
 			delete saliencyImg;
 			saliencyImg= 0;
 		}
-		return nullptr;
-	}
-		
-	//Delete saliency if not needed
-	if(saliencyImg && !storeData){
-		delete saliencyImg;
-		saliencyImg= 0;
-	}
 
-	//## If binarized mage is empty (e.g. only background) do not run contour algorithm
-	if(signalMarkerImg->GetMaximum()<=0){
-		WARN_LOG("[PROC "<<m_procId<<"] - No signal objects detected in saliency map (only background), will not run active contour (NB: no extended sources detected in this image!)");
-		delete signalMarkerImg;
-		signalMarkerImg= 0;
-		return nullptr;
-	}
+		//## If binarized mage is empty (e.g. only background) do not run contour algorithm
+		if(signalMarkerImg->GetMaximum()<=0){
+			WARN_LOG("[PROC "<<m_procId<<"] - No signal objects detected in saliency map (only background), will not run active contour (NB: no extended sources detected in this image!)");
+			delete signalMarkerImg;
+			signalMarkerImg= 0;
+			return nullptr;
+		}
+	}//close if initCVToSaliencyMap
 
 	//==========================================
 	//==    RUN ACTIVE CONTOUR SEGMENTATION
@@ -2040,8 +2046,10 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 	}
 	else{
 		ERROR_LOG("[PROC "<<m_procId<<"] - Invalid active contour method specified ("<<m_activeContourMethod<<")!");
-		delete signalMarkerImg;
-		signalMarkerImg= 0;
+		if(signalMarkerImg){		
+			delete signalMarkerImg;
+			signalMarkerImg= 0;
+		}
 		return nullptr;
 	}
 
