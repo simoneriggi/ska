@@ -29,15 +29,19 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--bpa=[BMIN] - Beam position angle of sky model map in deg (default: -3 deg)"
 	echo "--bkglevel=[BKG_LEVEL] - Bkg level of sky model toy sim map in Jy (default: 10.e-6)"
 	echo "--bkgrms=[BKG_RMS] - RMS level of sky model toy sim map in Jy (default: 100.e-6)"
+	echo "--sources - Generate compact sources in skymodel (default: true)"
+	echo "--no-sources - Do not generate compact sources in skymodel. NB: If not given compact sources are generated."
 	echo "--zmin=[ZMIN] - Min generated compact source significance level wrt to bkg level & rms (default: 1)"
 	echo "--zmax=[ZMAX] - Max generated compact source significance level wrt to bkg level & rms (default: 10000)"
-	echo "--zmin_model=[ZMIN_MODEL] - Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default: 1)"
-	echo "--zmin_ext=[ZMIN_EXT] - Min generated extended source significance level wrt to bkg level & rms (default: 1)"
-	echo "--zmax_ext=[ZMAX_EXT] - Max generated extended source significance level wrt to bkg level & rms (default: 5)"
+	echo "--zmin-model=[ZMIN_MODEL] - Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default: 1)"
+	echo "--extsources - Generate extended sources in skymodel (default=no)"
+	echo "--no-extsources - Do not generate extended sources in skymodel. NB: By default extended sources are not generated."
 	echo "--sourcedensity=[SOURCE_DENSITY] - Compact source density in sources/deg^2 (default: 1000)"
-	echo "--extsourcedensity=[EXT_SOURCE_DENSITY] - Extended source density in sources/deg^2 (default: 100)"
-	echo "--extscalemin=[EXT_SCALE_MIN] - Minimum extended source size in arcsec (default: 10)"
-	echo "--extscalemax=[EXT_SCALE_MAX] - Maximum extended source size in arcsec (default: 100)"
+	echo "--ext-zmin=[ZMIN_EXT] - Min generated extended source significance level wrt to bkg level & rms (default: 1)"
+	echo "--ext-zmax=[ZMAX_EXT] - Max generated extended source significance level wrt to bkg level & rms (default: 5)"
+	echo "--ext-sourcedensity=[EXT_SOURCE_DENSITY] - Extended source density in sources/deg^2 (default: 100)"
+	echo "--ext-scalemin=[EXT_SCALE_MIN] - Minimum extended source size in arcsec (default: 10)"
+	echo "--ext-scalemax=[EXT_SCALE_MAX] - Maximum extended source size in arcsec (default: 100)"
 	echo "--simproject=[SIM_PROJECT] - Name of CASA simulation project (default: sim)"
 	echo "--visimagename=[VIS_IMAGE_NAME] - Name of CASA sim visibility image name (default: vis.ms)"
 	echo "--simtottime=[SIM_TOT_TIME] - Simulation total time in seconds (default: 43200)"
@@ -150,46 +154,51 @@ do
 		--bkgrms=*)
     	BKG_RMS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;	
-		--zmin=*)
-    	ZMIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--zmax=*)
-    	ZMAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--zmin_ext=*)
-    	ZMIN_EXT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--zmax_ext=*)
-    	ZMAX_EXT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--zmin_model=*)
-    	ZMIN_MODEL=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--sourcedensity=*)
-    	SOURCE_DENSITY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--extsourcedensity=*)
-    	EXT_SOURCE_DENSITY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--extscalemin=*)
-    	EXT_SCALE_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
-		--extscalemax=*)
-    	EXT_SCALE_MAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
-    ;;
+
+		## COMPACT SOURCES OPTIONS
 		--sources*)
     	GEN_SOURCES=true
     ;;
 		--no-sources*)
     	GEN_SOURCES=false
     ;;
+		--zmin=*)
+    	ZMIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--zmax=*)
+    	ZMAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--zmin-model=*)
+    	ZMIN_MODEL=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--sourcedensity=*)
+    	SOURCE_DENSITY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+
+		## EXTENDED SOURCES OPTIONS
 		--extsources*)
     	GEN_EXT_SOURCES=true
     ;;
 		--no-extsources*)
     	GEN_EXT_SOURCES=false
     ;;
-
+		--ext-zmin=*)
+    	ZMIN_EXT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--ext-zmax=*)
+    	ZMAX_EXT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--ext-sourcedensity=*)
+    	EXT_SOURCE_DENSITY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--ext-scalemin=*)
+    	EXT_SCALE_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--ext-scalemax=*)
+    	EXT_SCALE_MAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		
+		## SUBMISSION OPTIONS
 		--queue=*)
     	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
