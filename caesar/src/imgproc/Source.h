@@ -55,6 +55,34 @@ namespace Caesar {
 
 class Contour;
 
+
+//======================================
+//==      STRUCT: SourceOverlapMatchPars
+//======================================
+struct SourceOverlapMatchPars {
+
+	//Standard constructor
+	SourceOverlapMatchPars(){
+		ResetPars();
+	}
+	//Param constructor
+	SourceOverlapMatchPars(long int _index,float _fraction):
+		index(_index), overlapFraction(_fraction)
+	{}
+	
+	//Reset pars
+	void ResetPars(){index=-1; overlapFraction=0; overlappingSourceIndexes.clear();}
+
+	//Pars
+	long int index;//index of match source in collection
+	float overlapFraction;//overlap fraction (>0)
+	std::vector<long int> overlappingSourceIndexes;//list of source index in collection overlapping with this source
+
+};//close SourceOverlapMatchPars struct
+
+//======================================
+//==      CLASS: SOURCE
+//======================================
 class Source : public Blob {
 
 	public:
@@ -258,6 +286,12 @@ class Source : public Blob {
 		* \brief Get number of matching pixels between this and another source
 		*/
 		long int GetNMatchingPixels(Source* aSource);
+
+		/**
+		* \brief Find source match in a collection by overlapping area
+		*/
+		bool FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const std::vector<Source*>& sources, float overlapThr);
+
 
 		/**
 		* \brief Get distance in pixels between source centroids

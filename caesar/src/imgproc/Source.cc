@@ -100,6 +100,7 @@ void Source::Copy(TObject &obj) const {
 	// Copy this source to source obj	
   ((Source&)obj).Type = Type;
 	((Source&)obj).Flag = Flag;	
+	((Source&)obj).SimType= SimType;
 	((Source&)obj).m_BeamFluxIntegral = m_BeamFluxIntegral;
 	((Source&)obj).m_IsGoodSource = m_IsGoodSource;	
 	((Source&)obj).m_DepthLevel = m_DepthLevel;
@@ -425,6 +426,81 @@ long int Source::GetNMatchingPixels(Source* aSource){
 	return nMergedPixels;
 
 }//close GetNMatchingPixels()
+
+
+bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const std::vector<Source*>& sources, float matchOverlapThr)
+{
+	//Reset pars
+	pars.ResetPars();
+
+	//Check given threshold
+	if(matchOverlapThr<=0){
+		WARN_LOG("Invalid threshold ("<<matchOverlapThr<<") given (hint: should be >0)!");
+		return false;
+	}
+ 
+	//Return if given source collection to be searched is empty
+	if(sources.empty()) {
+		WARN_LOG("Given source collection is empty, no match can be searched!");
+		return false;
+	}
+
+	//Return if this source has no pixels
+	if(m_Pixels.empty() || NPix<=0){
+		WARN_LOG("This source has no pixels stored, cannot search for a match with a source catalog!");
+		return false;
+	}	
+
+	//Loop over sources to find matches
+	std::vector<SourceOverlapMatchPars> tmpMatchPars;
+	std::vector<long int> overlappingSourceIndexes;
+
+	for(size_t j=0;j<sources.size();j++){
+		long int NMatchingPixels= this->GetNMatchingPixels(sources[j]);
+		double matchingPixelFraction= (double)(NMatchingPixels)/(double)(NPix);
+
+		//Add match source to tmp matches
+		if(NMatchingPixels>0){
+			overlappingSourceIndexes.push_back(j);
+			if(matchingPixelFraction>=matchOverlapThr){
+				tmpMatchPars.push_back(SourceOverlapMatchPars(matchingPixelFraction,j));
+			}
+		}
+	}//end loop sources	
+
+	//Check if match is found
+	if(tmpMatchPars.empty()) return false;
+
+	//Search for best overlap in case of multiple matches
+	if(tmpMatchPars.size()>1) {
+		INFO_LOG("#"<<tmpMatchPars.size()<<" source matches found, searching for the best one ...");
+		
+		double overlap_best= 1.e+99;
+		int best_index= -1;
+
+		for(size_t j=0;j<tmpMatchPars.size();j++){
+			double overlap= tmpMatchPars[j].overlapFraction;	
+			if(overlap>=overlap_best){
+				best_index= j;
+				overlap_best= overlap;
+			}
+		}//end loop matched sources
+
+		pars= tmpMatchPars[best_index];
+
+	}//close if
+	else{
+		pars= tmpMatchPars[0];
+	}
+
+	//Set overlapping source indexes
+	pars.overlappingSourceIndexes= overlappingSourceIndexes;
+
+	return true;
+
+}//close FindSourceMatchByOverlapArea()
+
+
 
 int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,bool computeStatPars,bool computeMorphPars){
 

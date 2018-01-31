@@ -1196,6 +1196,19 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 		INFO_LOG("[PROC "<<m_procId<<"] - #"<<sources_iter.size()<<" compact sources found at iter "<<k+1<<", appending them to list...");
 		iterations_done++;
 
+		//## Rename sources (from 2nd iterations)
+		//## NB: Need to add renaming with multiprocessor (TO BE DONE)
+		if(k>0){
+			int startId= sources[sources.size()-1]->Id;
+			for(size_t i=0;i<sources_iter.size();i++){
+				long int Id_old= sources_iter[i]->Id;
+				long int Id_new= Id_old + startId;	
+				TString Name_new= Form("S%d",static_cast<int>(Id_new));
+				sources_iter[i]->Id= Id_new;
+				sources_iter[i]->SetName(std::string(Name_new));
+			}
+		}//close if
+
 		//## Append sources found at this iteration to main collection
 		sources.insert(sources.end(),sources_iter.begin(),sources_iter.end());
 
@@ -1359,6 +1372,13 @@ Image* SFinder::FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<
 		ERROR_LOG("[PROC "<<m_procId<<"] - Null ptr to given input image!");
 		return nullptr;
 	}
+
+	//#####  DEBUG ###########
+	//INFO_LOG("[PROC "<<m_procId<<"] - Printing source info before residual map...");
+	//for(size_t k=0;k<sources.size();k++) {
+	//	INFO_LOG("[PROC "<<m_procId<<"] - Source no. "<<k<<": name="<<sources[k]->GetName()<<",id="<<sources[k]->Id<<", n="<<sources[k]->NPix<<" type="<<sources[k]->Type<<" (X0,Y0)=("<<sources[k]->X0<<","<<sources[k]->Y0<<")");
+	//}//end loop sources
+	//########################
 
 	//Compute residual map
 	Image* residualImg= 0;
@@ -1696,7 +1716,7 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 	//## Compute Laplacian filtered image
 	INFO_LOG("[PROC "<<m_procId<<"] - Computing laplacian image...");
 	Image* laplImg= ComputeLaplacianImage(img);
-	if(m_LaplImg){
+	if(laplImg){
 		if(storeData) m_LaplImg= laplImg;
 	}
 	else{
@@ -1970,7 +1990,7 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 	//## Compute saliency
 	Image* signalMarkerImg= nullptr;
 	double fgValue= 1;
-	if(m_cvInitContourToSaliencyMap){
+	if( (m_activeContourMethod==eChanVeseAC && m_cvInitContourToSaliencyMap) || (m_activeContourMethod==eLRAC && m_lracInitContourToSaliencyMap) ){
 		INFO_LOG("[PROC "<<m_procId<<"] - Computing image saliency map...");
 		Image* saliencyImg= img->GetMultiResoSaliencyMap(
 			m_SaliencyResoMin,m_SaliencyResoMax,m_SaliencyResoStep,
@@ -2092,6 +2112,7 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 			if(Smedian<imgMedian) sourcesToBeRemoved.push_back(k);
 		}
 		CodeUtils::DeleteItems(sources, sourcesToBeRemoved);
+		INFO_LOG("[PROC "<<m_procId<<"] - #"<<sourcesToBeRemoved.size()<<" sources found by ChanVese algo were removed (tagged as negative excess)...");
 
 	}//close if
 	else {
@@ -2609,12 +2630,28 @@ int SFinder::SaveDS9RegionFile(){
 
 	//## Saving DS9 file region
 	DEBUG_LOG("[PROC "<<m_procId<<"] - Saving DS9 region header...");
-	fprintf(fout,"global color=red font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n");
+	fprintf(fout,"global color=red font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n");
 	fprintf(fout,"image\n");
 
 	DEBUG_LOG("[PROC "<<m_procId<<"] - Saving "<<m_SourceCollection.size()<<" sources to file...");
 
+	std::string colorStr_last= "white";
+
 	for(unsigned int k=0;k<m_SourceCollection.size();k++){
+		int source_type= m_SourceCollection[k]->Type;
+		bool isAtEdge= m_SourceCollection[k]->IsAtEdge();
+
+		//Set source color
+		std::string colorStr= "white";
+		if(source_type==Source::eExtended) colorStr= "green";
+		else if(source_type==Source::ePointLike) colorStr= "red";
+		else if(source_type==Source::eCompact) colorStr= "blue";
+		else colorStr= "magenta";
+		if(colorStr!=colorStr_last){
+			colorStr_last= colorStr;
+			fprintf(fout,"global color=%s font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n",colorStr.c_str());
+		}
+
 		DEBUG_LOG("[PROC "<<m_procId<<"] - Dumping DS9 region info for source no. "<<k<<" ...");
 		std::string regionInfo= "";
 		if(m_DS9RegionFormat==ePolygonRegion) regionInfo= m_SourceCollection[k]->GetDS9Region(true);
