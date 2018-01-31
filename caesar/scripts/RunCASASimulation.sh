@@ -54,6 +54,7 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--containerrun - Run inside Caesar container"
 	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
 	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
+	echo "--with-graphics - Enable graphics in simobserve. NB: Container run crashes with CASA graphics enabled (default=disabled)" 	
 	echo "=========================="
 	exit 1
 fi
@@ -102,7 +103,7 @@ ADD_NOISE=false
 MAP_TYPE="square"
 FREQUENCY="2.1GHz"
 FREQUENCYBW="10MHz"
-
+GRAPHICS_FLAG="--no-graphics"
 
 ##for item in $*
 for item in "$@"
@@ -237,6 +238,10 @@ do
 		--frequencybw=*)
     	FREQUENCYBW=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+		--with-graphics*)
+    	GRAPHICS_FLAG="--graphics"
+    ;;
+
     *)
     # Unknown option
     echo "ERROR: Unknown option ($item)...exit!"
@@ -271,6 +276,7 @@ echo "TELCONFIGS: $TELCONFIGS"
 echo "ADD_NOISE: $ADD_NOISE"
 echo "MAP_TYPE: $MAP_TYPE"
 echo "FREQUENCY CENTER/BW: $FREQUENCY/$FREQUENCYBW"
+echo "GRAPHICS_FLAG: $GRAPHICS_FLAG"
 echo "****************************"
 echo ""
 
@@ -437,7 +443,7 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 			echo 'EXE="'"$CASAPATH/bin/casa --nologger --log2term --nogui -c $CAESAR_SCRIPTS_DIR/simulate_observation.py"'"'
 		fi
 
-		echo 'EXE_ARGS="'"--outproject=$simproject --vis=$visimg --skymodel=$skymodelfile --total_time=$SIM_TOT_TIME --telconfigs=$TELCONFIGS $ADD_NOISE_FLAG --maptype=$MAP_TYPE --frequency_center=$FREQUENCY --frequency_bandwidth=$FREQUENCYBW "'"'
+		echo 'EXE_ARGS="'"--outproject=$simproject --vis=$visimg --skymodel=$skymodelfile --total_time=$SIM_TOT_TIME --telconfigs=$TELCONFIGS $ADD_NOISE_FLAG --maptype=$MAP_TYPE --frequency_center=$FREQUENCY --frequency_bandwidth=$FREQUENCYBW $GRAPHICS_FLAG "'"'
 		
 		echo 'echo "Running command $EXE $EXE_ARGS"'
 		echo '$EXE $EXE_ARGS'
