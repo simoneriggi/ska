@@ -683,7 +683,7 @@ class SkyMapSimulator(object):
 			source_name= 'S' + str(index+1)
 			source_id= index+1
 			source_type= Caesar.Source.ePointLike
-			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0,source_max_scale)
+			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0,source_max_scale=source_max_scale)
 			self.caesar_sources.append(caesar_source)
 
 			print ('INFO: Source %s: Pos(%s,%s), ix=%s, iy=%s, S=%s' % (source_name,str(x0),str(y0),str(ix),str(iy),str(S)))
