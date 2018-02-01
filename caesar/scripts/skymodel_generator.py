@@ -86,6 +86,7 @@ def get_args():
 	parser.add_argument('-bkg_rms', '--bkg_rms', dest='bkg_rms', required=False, type=float, default=100e-6, action='store',help='Bkg rms (default=0)')
 
 	# - COMPACT SOURCE OPTIONS
+	parser.add_argument('-npixels_min', '--npixels_min', dest='npixels_min', required=False, type=int, default=5, action='store',help='Minimum number of pixels for a generated source (default=5)')
 	parser.add_argument('--compactsources', dest='enable_compactsources', action='store_true')	
 	parser.add_argument('--no-compactsources', dest='enable_compactsources', action='store_false')	
 	parser.set_defaults(enable_compactsources=True)
@@ -347,6 +348,10 @@ class SkyMapSimulator(object):
 	def enable_bkg(self,choice):
 		""" Enable/disable bkg generation """
 		self.simulate_bkg= choice
+
+	def set_min_npixels(self,choice):
+		""" Set the minimum number of pixels for a generated source"""
+		self.npixels_min= value
 
 	def truncate_models(self,choice):
 		""" Enable/disable continuous model truncation (gaussian, airy disk, ...) """
@@ -1117,6 +1122,7 @@ def main():
 
 	#- Source model
 	model_trunc_zmin= args.model_trunc_zmin
+	npixels_min= args.npixels_min
 
 	# - Bkg info args
 	enable_bkg= args.enable_bkg
@@ -1193,7 +1199,7 @@ def main():
 	simulator.set_coord_system_type(ctype1,ctype2)
 
 	simulator.set_model_trunc_significance(model_trunc_zmin)
-
+	simulator.set_npixels_min(npixels_min)
 	simulator.set_map_filename(outputfile)
 	simulator.set_model_filename(mask_outputfile)
 	simulator.set_source_filename(outputfile_sources)
