@@ -101,6 +101,7 @@ void Source::Copy(TObject &obj) const {
   ((Source&)obj).Type = Type;
 	((Source&)obj).Flag = Flag;	
 	((Source&)obj).SimType= SimType;
+	((Source&)obj).SimMaxScale= SimMaxScale;
 	((Source&)obj).m_BeamFluxIntegral = m_BeamFluxIntegral;
 	((Source&)obj).m_IsGoodSource = m_IsGoodSource;	
 	((Source&)obj).m_DepthLevel = m_DepthLevel;
@@ -146,6 +147,7 @@ void Source::Init(){
 	Type= eUnknown;
 	Flag= eCandidate;
 	SimType= eUnknownSimClass;
+	SimMaxScale= 0;
 	m_BeamFluxIntegral= 0;
 	
 	m_IsGoodSource= true;
@@ -456,14 +458,17 @@ bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const st
 	std::vector<long int> overlappingSourceIndexes;
 
 	for(size_t j=0;j<sources.size();j++){
+		int type= sources[j]->Type;
 		long int NMatchingPixels= this->GetNMatchingPixels(sources[j]);
 		double matchingPixelFraction= (double)(NMatchingPixels)/(double)(NPix);
-
+		
 		//Add match source to tmp matches
 		if(NMatchingPixels>0){
 			overlappingSourceIndexes.push_back(j);
 			if(matchingPixelFraction>=matchOverlapThr){
-				tmpMatchPars.push_back(SourceOverlapMatchPars(matchingPixelFraction,j));
+				tmpMatchPars.push_back(SourceOverlapMatchPars(j,matchingPixelFraction));
+	
+				INFO_LOG("Source "<<this->GetName()<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): found match with source "<<sources[j]->GetName()<<" (X0="<<sources[j]->X0<<", Y0="<<sources[j]->Y0<<", N="<<sources[j]->NPix<<"), NMatchingPixels="<<NMatchingPixels<<" f="<<matchingPixelFraction<<" (t="<<matchOverlapThr<<")");
 			}
 		}
 	}//end loop sources	
@@ -475,8 +480,8 @@ bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const st
 	if(tmpMatchPars.size()>1) {
 		INFO_LOG("#"<<tmpMatchPars.size()<<" source matches found, searching for the best one ...");
 		
-		double overlap_best= 1.e+99;
-		int best_index= -1;
+		double overlap_best= -1.e+99;
+		int best_index= 0;
 
 		for(size_t j=0;j<tmpMatchPars.size();j++){
 			double overlap= tmpMatchPars[j].overlapFraction;	
@@ -500,6 +505,104 @@ bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const st
 
 }//close FindSourceMatchByOverlapArea()
 
+
+bool Source::FindSourceMatchByPos(SourcePosMatchPars& pars, const std::vector<Source*>& sources, float matchPosThr)
+{
+	//Reset pars
+	pars.ResetPars();
+
+	//Check given threshold
+	if(matchPosThr<=0){
+		WARN_LOG("Invalid threshold ("<<matchPosThr<<") given (hint: should be >0)!");
+		return false;
+	}
+ 
+	//Return if given source collection to be searched is empty
+	if(sources.empty()) {
+		WARN_LOG("Given source collection is empty, no match can be searched!");
+		return false;
+	}
+
+	//Return if this source has no pixels
+	if(m_Pixels.empty() || NPix<=0){
+		WARN_LOG("This source has no pixels stored, cannot search for a match with a source catalog!");
+		return false;
+	}	
+
+	//Set reference position to be compared with collection
+	double X0_ref= X0;
+	double Y0_ref= Y0;
+	if(m_HasTrueInfo){
+		X0_ref= m_X0_true;
+		Y0_ref= m_Y0_true;
+	}	
+
+	//Loop over all reconstructed sources and match them in position
+	std::vector<SourcePosMatchPars> tmpMatchPars;	
+	
+	for(size_t j=0;j<sources.size();j++){
+		//If source has fit info loop over fitted components to find best match
+		bool hasFitInfo= sources[j]->HasFitInfo();
+		if(hasFitInfo){
+			SourceFitPars fitPars= sources[j]->GetFitPars();
+			double dist_best= 1.e+99;
+			long int best_component= -1;
+			for(int k=0;k<fitPars.GetNComponents();k++){
+				double X0_fitcomp= fitPars.GetParValue(k,"x0");	
+				double Y0_fitcomp= fitPars.GetParValue(k,"y0");
+				double dx= fabs(X0_fitcomp-X0_ref);
+				double dy= fabs(Y0_fitcomp-Y0_ref);
+				double dist= sqrt(dx*dx+dy*dy);
+				if(dx<=matchPosThr && dy<=matchPosThr && dist<dist_best){//match found
+					best_component= k;
+					dist_best= dist;
+				}
+			}//end loop fitted components	
+			
+			if(best_component!=-1){
+				tmpMatchPars.push_back(SourcePosMatchPars(j,dist_best,best_component));	
+			}
+	
+		}//close if has fit info
+		else{
+			//No fit info available so compute offset using source barycenter 
+			double dx= fabs(sources[j]->X0 - X0_ref);
+			double dy= fabs(sources[j]->Y0 - Y0_ref);
+			double dist= sqrt(dx*dx+dy*dy);
+			if(dx<=matchPosThr && dy<=matchPosThr){//match found
+				tmpMatchPars.push_back(SourcePosMatchPars(j,dist,-1));
+			}
+		}//close else !has fit info
+	}//end loop sources
+
+	//Check if match is found
+	if(tmpMatchPars.empty()) return false;
+
+	//Search for best overlap in case of multiple matches
+	if(tmpMatchPars.size()>1) {
+		INFO_LOG("#"<<tmpMatchPars.size()<<" source matches found, searching for the best one ...");
+		
+		double dist_best= 1.e+99;
+		int best_index= -1;
+
+		for(size_t j=0;j<tmpMatchPars.size();j++){
+			double dist= tmpMatchPars[j].posDiff;	
+			if(dist<=dist_best){
+				best_index= j;
+				dist_best= dist;
+			}
+		}//end loop matched sources
+
+		pars= tmpMatchPars[best_index];
+
+	}//close if
+	else{
+		pars= tmpMatchPars[0];
+	}
+
+	return true;
+
+}//close FindSourceMatchByPos()
 
 
 int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,bool computeStatPars,bool computeMorphPars){

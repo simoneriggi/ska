@@ -80,6 +80,31 @@ struct SourceOverlapMatchPars {
 
 };//close SourceOverlapMatchPars struct
 
+
+//======================================
+//==      STRUCT: SourcePosMatchPars
+//======================================
+struct SourcePosMatchPars {
+
+	//Standard constructor
+	SourcePosMatchPars(){
+		ResetPars();
+	}
+	//Param constructor
+	SourcePosMatchPars(long int _index,float _posDiff,long int _fitComponentIndex=-1):
+		index(_index), posDiff(_posDiff), fitComponentIndex(_fitComponentIndex)
+	{}
+	
+	//Reset pars
+	void ResetPars(){index=-1; fitComponentIndex=-1; posDiff=0;}
+
+	//Pars
+	long int index;//index of match source in collection
+	float posDiff;//posDiff (>0)
+	long int fitComponentIndex;
+	
+};//close SourcePosMatchPars struct
+
 //======================================
 //==      CLASS: SOURCE
 //======================================
@@ -145,6 +170,10 @@ class Source : public Blob {
 		* \brief Set source sim type
 		*/
 		void SetSimType(SimSourceType choice){SimType=choice;}
+		/**
+		* \brief Set source sim max scale
+		*/
+		void SetSimMaxScale(float val){SimMaxScale=val;}
 		/**
 		* \brief Set beam flux integral
 		*/
@@ -292,7 +321,12 @@ class Source : public Blob {
 		*/
 		bool FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const std::vector<Source*>& sources, float overlapThr);
 
+		/**
+		* \brief Find source match in a collection by position
+		*/
+		bool FindSourceMatchByPos(SourcePosMatchPars& pars, const std::vector<Source*>& sources, float posThr);
 
+		
 		/**
 		* \brief Get distance in pixels between source centroids
 		*/
@@ -357,6 +391,7 @@ class Source : public Blob {
 		int Type;
 		int Flag;
 		int SimType;
+		float SimMaxScale;//in arcsec
 
 	private:
 		double m_BeamFluxIntegral;
