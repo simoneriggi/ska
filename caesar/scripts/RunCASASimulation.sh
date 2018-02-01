@@ -54,6 +54,7 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--containerrun - Run inside Caesar container"
 	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
 	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
+	echo "--jobwalltime=[JOB_WALLTIME] - Job wall time in batch system (default=96:00:00)" 
 	echo "--with-graphics - Enable graphics in simobserve. NB: Container run crashes with CASA graphics enabled (default=disabled)" 	
 	echo "=========================="
 	exit 1
@@ -98,12 +99,14 @@ SIM_PROJECT_GIVEN=false
 VIS_IMAGE_NAME="" # "vis.ms"
 VIS_IMAGE_NAME_GIVEN=false
 SIM_TOT_TIME=43200
-TELCONFIGS="['atca_all.cfg']"
+#TELCONFIGS="['atca_all.cfg']"
+TELCONFIGS="'atca_all.cfg'"
 ADD_NOISE=false
 MAP_TYPE="square"
 FREQUENCY="2.1GHz"
 FREQUENCYBW="10MHz"
 GRAPHICS_FLAG="--no-graphics"
+JOB_WALLTIME="96:00:00"
 
 ##for item in $*
 for item in "$@"
@@ -203,6 +206,9 @@ do
 		--queue=*)
     	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
+		--jobwalltime=*)
+			JOB_WALLTIME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`	
+		;;
 		--submit*)
     	SUBMIT=true
     ;;
@@ -255,7 +261,7 @@ CRPIX=`expr $MAP_SIZE / 2`
 
 echo ""
 echo "*****  PARSED ARGUMENTS ****"
-echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE"
+echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME"
 echo "NRUNS: $NRUNS (START_ID=$START_ID)"
 echo "ENV_FILE: $ENV_FILE"
 echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
@@ -381,15 +387,18 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 	echo "INFO: Creating sh file $shfile ..."
 	(
 		echo "#!/bin/bash"
+		echo "#PBS -N SimJob$RUN_ID"
+		echo "#PBS -j oe"
 		echo "#PBS -o $BASEDIR"
     echo "#PBS -o $BASEDIR"
+		echo "#PBS -l walltime=$JOB_WALLTIME"
     echo '#PBS -r n'
-    echo '#PBS -S /bin/sh'
-    echo "#PBS -N SimJob$RUN_ID"
+    echo '#PBS -S /bin/bash'    
     echo '#PBS -p 1'
 
     echo " "
     echo " "
+		echo 'echo "INFO: Running on host $HOSTNAME ..."'
 
     echo 'echo "*************************************************"'
     echo 'echo "****         PREPARE JOB                     ****"'

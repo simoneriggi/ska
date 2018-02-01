@@ -538,7 +538,7 @@ class SkyMapSimulator(object):
 
 		return data
 
-	def make_caesar_source(self,source_data,source_name,source_id,source_type,source_sim_type,ampl=None,x0=None,y0=None):
+	def make_caesar_source(self,source_data,source_name,source_id,source_type,source_sim_type,ampl=None,x0=None,y0=None,source_max_scale=None):
 		""" Create Caesar source from source data array """
 
 		# Create Caesar source
@@ -582,6 +582,8 @@ class SkyMapSimulator(object):
 		source.SetType(source_type)
 		source.SetFlag(Caesar.Source.eFake)
 		source.SetSimType(source_sim_type)
+		if source_max_scale is not None:
+			source.SetSimMaxScale(source_max_scale)
 		source.SetTrueInfo(ampl,x0,y0)
 
 		# Set flux correction factor
@@ -640,7 +642,8 @@ class SkyMapSimulator(object):
 		sigmax= self.compute_beam_sigma(self.beam_bmaj)
 		sigmay= self.compute_beam_sigma(self.beam_bmin)
 		theta= self.beam_bpa + 90. # NB: BPA is the positional angle of the major axis measuring from North (up) counter clockwise, while theta is measured wrt to x axis
-		
+		source_max_scale= 2*max(self.beam_bmaj,self.beam_bmin)		
+
 		## Start generation loop
 		sources_data = Box2D(amplitude=0,x_0=0,y_0=0,x_width=2*self.nx, y_width=2*self.ny)(self.gridx, self.gridy)
 		mask_data = Box2D(amplitude=0,x_0=0,y_0=0,x_width=2*self.nx, y_width=2*self.ny)(self.gridx, self.gridy)
@@ -680,7 +683,7 @@ class SkyMapSimulator(object):
 			source_name= 'S' + str(index+1)
 			source_id= index+1
 			source_type= Caesar.Source.ePointLike
-			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0)
+			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0,source_max_scale)
 			self.caesar_sources.append(caesar_source)
 
 			print ('INFO: Source %s: Pos(%s,%s), ix=%s, iy=%s, S=%s' % (source_name,str(x0),str(y0),str(ix),str(iy),str(S)))
@@ -743,7 +746,9 @@ class SkyMapSimulator(object):
 			if self.ext_source_type==-1:
 				source_sim_type= random.randint(1, nsource_types)
 			else:
-				source_sim_type= self.ext_source_type			
+				source_sim_type= self.ext_source_type
+
+			source_max_scale= 0.	
 
 			if source_sim_type==1: # Ring2D Sector model
 				source_sim_type= Caesar.Source.eRingLike
@@ -754,6 +759,12 @@ class SkyMapSimulator(object):
 				theta2= random.uniform(-180,180)
 				theta_min= min(theta1,theta2)
 				theta_max= max(theta1,theta2)
+				dtheta= theta_max-theta_min
+				r= ring_r
+				R= ring_r + ring_w
+				sector_diagonal= np.sqrt( r*r + R*R - 2*r*R*np.cos(np.deg2rad(dtheta)) )
+				sector_arc= 2*R*np.pi*dtheta/360.
+				source_max_scale= max(max(sector_arc,ring_w),sector_diagonal)
 				source_data= self.generate_ring_sector(S,x0,y0,ring_r/self.pixsize,ring_w/self.pixsize,theta_min,theta_max) # convert radius/width from arcsec to pixels
 				
 			elif source_sim_type==2: # Ellipse 2D model
@@ -762,6 +773,7 @@ class SkyMapSimulator(object):
 				#ellipse_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
 				ellipse_bmin= random.uniform(max(self.ellipse_rratiomin*ellipse_bmaj,self.ellipse_rmin),self.ellipse_rmax)
 				ellipse_theta= random.uniform(0,360)
+				source_max_scale= max(ellipse_bmaj,ellipse_bmin)
 				source_data= self.generate_ellipse(S,x0,y0,ellipse_bmaj/self.pixsize,ellipse_bmin/self.pixsize,ellipse_theta) # convert radius/width from arcsec to pixels
 
 			elif source_sim_type==3: # bubble + shell model
@@ -775,6 +787,7 @@ class SkyMapSimulator(object):
 				theta2= random.uniform(-180,180)
 				theta_min= min(theta1,theta2)
 				theta_max= max(theta1,theta2)
+				source_max_scale= bubble_r*2
 				source_data= self.generate_bubble(S,x0,y0,bubble_r,shell_S,shell_r,shell_width,theta_min,theta_max)
 				
 			#elif source_sim_type==4: # Airy disk
@@ -787,6 +800,7 @@ class SkyMapSimulator(object):
 				sersic_r= random.uniform(self.disk_rmin,self.disk_rmax)
 				sersic_theta= random.uniform(0,360)
 				sersic_ell= random.uniform(0,1)
+				source_max_scale= 2*sersic_r
 				source_data= self.generate_sersic(S,x0,y0,sersic_r,sersic_ell,self.sersic_index,sersic_theta)
 
 			elif source_sim_type==5: # Gaussian Blob like
@@ -795,6 +809,7 @@ class SkyMapSimulator(object):
 				#blob_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
 				blob_bmin= random.uniform(max(self.ellipse_rratiomin*blob_bmaj,self.ellipse_rmin),blob_bmaj)
 				blob_theta= random.uniform(0,360)
+				source_max_scale= 2*max(blob_bmin,blob_bmax)
 				source_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=blob_bmaj/self.pixsize,sigmay=blob_bmin/self.pixsize,theta=blob_theta,trunc_thr=self.zmin_ext)
 
 			else:
@@ -833,7 +848,7 @@ class SkyMapSimulator(object):
 			source_name= 'Sext' + str(ngen_sources)
 			source_id= ngen_sources
 			source_type= Caesar.Source.eExtended
-			caesar_source= self.make_caesar_source(source_data,source_name,source_id,source_type,source_sim_type)
+			caesar_source= self.make_caesar_source(source_data,source_name,source_id,source_type,source_sim_type,None,None,None,source_max_scale)
 			self.caesar_sources.append(caesar_source)
 
 			print ('INFO: Ext Source %s: Pos(%s,%s), ix=%s, iy=%s, S=%s' % (source_name,str(x0),str(y0),str(ix),str(iy),str(S)))

@@ -43,7 +43,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--submit - Submit the script to the batch system using queue specified"
 	echo "--containerrun - Run inside Caesar container"
 	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
-	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
+	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system"
+	echo "--jobwalltime=[JOB_WALLTIME] - Job wall time in batch system (default=96:00:00)"
 	echo "=========================="
 	exit 1
 fi
@@ -80,7 +81,9 @@ THRESHOLD=0
 MASK=""
 USE_MASK=false
 MASK_GIVEN=false
-SCALES="['0']"
+##SCALES="['0']"
+SCALES="'0'"
+JOB_WALLTIME="96:00:00"
 
 for item in "$@"
 do
@@ -170,6 +173,9 @@ do
 		--queue=*)
     	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
+		--jobwalltime=*)
+			JOB_WALLTIME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`	
+		;;
 		--submit*)
     	SUBMIT=true
     ;;
@@ -199,7 +205,7 @@ echo "WEIGHTING: $WEIGHTING"
 echo "DECONVOLVER: $DECONVOLVER"
 echo "GRIDDER: $GRIDDER"
 echo "SCALES: $SCALES"
-echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE"
+echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME"
 echo "ENV_FILE: $ENV_FILE"
 echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "MAP_SIZE: $MAP_SIZE (pixels), PIX_SIZE=$PIX_SIZE (arcsec)"
@@ -268,15 +274,18 @@ generate_exec_script(){
 	echo "INFO: Creating sh file $shfile (jobindex=$jobindex, exe=$exe, exe_args=$exe_args)..."
 	( 
 			echo "#!/bin/bash"
+			echo "#PBS -N RecJob$jobindex"			
+			echo "#PBS -j oe"
   		echo "#PBS -o $BASEDIR"
     	echo "#PBS -o $BASEDIR"
+			echo "#PBS -l walltime=$JOB_WALLTIME"
     	echo '#PBS -r n'
       echo '#PBS -S /bin/bash'
-      echo "#PBS -N RecJob$jobindex"
       echo '#PBS -p 1'
 
       echo " "
       echo " "
+			echo 'echo "INFO: Running on host $HOSTNAME ..."'
 
       echo 'echo "*************************************************"'
       echo 'echo "****         PREPARE JOB                     ****"'
