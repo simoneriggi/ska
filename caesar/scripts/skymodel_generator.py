@@ -112,8 +112,8 @@ def get_args():
 	parser.add_argument('-ellipse_rmin', '--ellipse_rmin', dest='ellipse_rmin', required=False, type=float, default=0.5, action='store',help='Ellipse bmaj in arcsec (default=1)')
 	parser.add_argument('-ellipse_rmax', '--ellipse_rmax', dest='ellipse_rmax', required=False, type=float, default=10, action='store',help='Ellipse bmin in arcsec (default=10)')
 	
-	parser.add_argument('-disk_shell_ampl_ratio_min', '--disk_shell_ampl_ratio_min', dest='disk_shell_ampl_ratio_min', required=False, type=float, default=0.1, action='store',help='Disk/shell amplitude ratio min (default=0.5)')
-	parser.add_argument('-disk_shell_ampl_ratio_max', '--disk_shell_ampl_ratio_max', dest='disk_shell_ampl_ratio_max', required=False, type=float, default=0.8, action='store',help='Disk/shell amplitude ratio max (default=0.5)')
+	parser.add_argument('-disk_shell_ampl_ratio_min', '--disk_shell_ampl_ratio_min', dest='disk_shell_ampl_ratio_min', required=False, type=float, default=0.1, action='store',help='Disk/shell amplitude ratio min (default=0.1)')
+	parser.add_argument('-disk_shell_ampl_ratio_max', '--disk_shell_ampl_ratio_max', dest='disk_shell_ampl_ratio_max', required=False, type=float, default=0.8, action='store',help='Disk/shell amplitude ratio max (default=0.8)')
 	parser.add_argument('-disk_shell_radius_ratio_min', '--disk_shell_radius_ratio_min', dest='disk_shell_radius_ratio_min', required=False, type=float, default=0.6, action='store',help='Disk/shell radius ratio min (default=0.6)')
 	parser.add_argument('-disk_shell_radius_ratio_max', '--disk_shell_radius_ratio_max', dest='disk_shell_radius_ratio_max', required=False, type=float, default=0.9, action='store',help='Disk/shell radius ratio max (default=0.8)')
 		
@@ -257,6 +257,7 @@ class SkyMapSimulator(object):
 		self.beam_area= self.compute_beam_area(self.beam_bmaj,self.beam_bmin) # in pixels
 		self.zmin= 1 # in sigmas 
 		self.zmax= 30 # in sigmas
+		self.npixels_min= 5
 		
 		## Extended source parameters
 		self.simulate_ext_sources= True
@@ -562,7 +563,13 @@ class SkyMapSimulator(object):
 			# Is at edge
 			if (ix==0) or (ix==nCols-1) or (iy==0) or (iy==nRows-1):
 				source.SetEdgeFlag(True)
-				
+
+		# Retun None if npixels is too small	
+		nPix= source.GetNPixels()
+		if nPix<self.npixels_min:
+			print ('INFO: Too few pixels (%s) for this source, return None!' % str(nPix))
+			return None
+			
 		# If true info are not given compute them
 		#    - S= count integral
 		#    - baricenter of binary map
@@ -684,6 +691,10 @@ class SkyMapSimulator(object):
 			source_id= index+1
 			source_type= Caesar.Source.ePointLike
 			caesar_source= self.make_caesar_source(blob_data,source_name,source_id,source_type,Caesar.Source.eBlobLike,ampl=S,x0=x0,y0=y0,source_max_scale=source_max_scale)
+			if caesar_source is None:
+				print('Generate source has too few pixels, skip and regenerate...')
+				continue
+				
 			self.caesar_sources.append(caesar_source)
 
 			print ('INFO: Source %s: Pos(%s,%s), ix=%s, iy=%s, S=%s' % (source_name,str(x0),str(y0),str(ix),str(iy),str(S)))
@@ -849,6 +860,10 @@ class SkyMapSimulator(object):
 			source_id= ngen_sources
 			source_type= Caesar.Source.eExtended
 			caesar_source= self.make_caesar_source(source_data,source_name,source_id,source_type,source_sim_type,None,None,None,source_max_scale)
+			if caesar_source is None:
+				print('Generate source has too few pixels, skip and regenerate...')
+				continue
+
 			self.caesar_sources.append(caesar_source)
 
 			print ('INFO: Ext Source %s: Pos(%s,%s), ix=%s, iy=%s, S=%s' % (source_name,str(x0),str(y0),str(ix),str(iy),str(S)))
