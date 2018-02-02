@@ -357,7 +357,7 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 	##echo "INFO: Creating job top directory $JOB_DIR ..."
 	##mkdir -p "$JOB_DIR"
 
-
+	
 	## Define skymodel simulation files
   simmapfile='simmap-RUN'"$RUN_ID"'.fits'
 	skymodelfile='skymodel-RUN'"$RUN_ID"'.fits'
@@ -390,7 +390,7 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 		echo "#PBS -N SimJob$RUN_ID"
 		echo "#PBS -j oe"
 		echo "#PBS -o $BASEDIR"
-    echo "#PBS -o $BASEDIR"
+    echo "#PBS -l select=1:ncpus=1"
 		echo "#PBS -l walltime=$JOB_WALLTIME"
     echo '#PBS -r n'
     echo '#PBS -S /bin/bash'    

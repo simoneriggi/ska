@@ -277,7 +277,7 @@ generate_exec_script(){
 			echo "#PBS -N RecJob$jobindex"			
 			echo "#PBS -j oe"
   		echo "#PBS -o $BASEDIR"
-    	echo "#PBS -o $BASEDIR"
+			echo "#PBS -l select=1:ncpus=1"
 			echo "#PBS -l walltime=$JOB_WALLTIME"
     	echo '#PBS -r n'
       echo '#PBS -S /bin/bash'
