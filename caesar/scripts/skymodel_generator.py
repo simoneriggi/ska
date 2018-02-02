@@ -825,7 +825,7 @@ class SkyMapSimulator(object):
 				#blob_bmin= random.uniform(self.ellipse_rmin,self.ellipse_rmax)
 				blob_bmin= random.uniform(max(self.ellipse_rratiomin*blob_bmaj,self.ellipse_rmin),blob_bmaj)
 				blob_theta= random.uniform(0,360)
-				source_max_scale= 2*max(blob_bmin,blob_bmax)
+				source_max_scale= 2*max(blob_bmin,blob_bmaj)
 				source_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=blob_bmaj/self.pixsize,sigmay=blob_bmin/self.pixsize,theta=blob_theta,trunc_thr=self.zmin_ext)
 
 			else:
