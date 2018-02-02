@@ -28,6 +28,7 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
 	echo "--submit - Submit the script to the batch system using queue specified"
 	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
+	echo "--jobwalltime=[JOB_WALLTIME] - Job wall time in batch system (default=96:00:00)"
 	echo "--loglevel=[LOG_LEVEL] - Logging level string {INFO, DEBUG, WARN, ERROR, OFF} (default=INFO)"
 	echo "--maxfiles=[NMAX_PROCESSED_FILES] - Maximum number of input files processed in filelist (default=-1=all files)"
 	echo "--outdir=[OUTPUT_DIR] - Output directory where to put run output file (default=pwd)"
@@ -62,6 +63,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--saliencymaxreso - Superpixel size (in pixels) used in multi-reso saliency map highest scale (default=60 pixels)"
 	echo "--saliencyresostep - Superpixel size step (in pixels) used in multi-reso saliency map computation (default=10 pixels)"
 	echo "--saliencynn - Fraction of most similar region neighbors used in saliency map computation (default=1)"
+	echo "--wtscalemin - Minimum Wavelet Transform scale for extended source search (default=3)"
+	echo "--wtscalemax - Maximum Wavelet Transform scale for extended source search (default=6)"
 	echo "=========================="
   exit 1
 fi
@@ -86,6 +89,7 @@ TILE_STEP=1
 FILELIST=""
 NMAX_PROCESSED_FILES=-1
 BATCH_QUEUE=""
+JOB_WALLTIME="96:00:00"
 LOG_LEVEL="INFO"
 OUTPUT_DIR=$PWD
 NTHREADS=1
@@ -116,6 +120,8 @@ SALIENCY_NN_PAR="1"
 SEARCH_COMPACT_SOURCES="true"
 SEARCH_EXTENDED_SOURCES="true"
 FIT_SOURCES="false"
+WTSCALE_MIN="3"
+WTSCALE_MAX="6"
 
 for item in $*
 do
@@ -144,6 +150,9 @@ do
 		--queue=*)
     	BATCH_QUEUE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+		--jobwalltime=*)
+			JOB_WALLTIME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`	
+		;;
 		--containerimg=*)
     	CONTAINER_IMG=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -273,6 +282,13 @@ do
     	SP_MINAREA=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 
+		--wtscalemin*)
+    	WTSCALE_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--wtscalemax*)
+    	WTSCALE_MAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+
     *)
     # Unknown option
     echo "ERROR: Unknown option ($item)...exit!"
@@ -283,7 +299,7 @@ done
 
 echo ""
 echo "*****  PARSED ARGUMENTS ****"
-echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE"
+echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME"
 echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "ENV_FILE: $ENV_FILE"
 echo "INPUTFILE: $INPUTFILE"
@@ -304,6 +320,7 @@ echo "SP PARS: ($SP_SIZE, $SP_BETA, $SP_MINAREA)"
 echo "SALIENCY_THR: $SALIENCY_THR"
 echo "SALIENCY_RESO: ($SALIENCY_MIN_RESO, $SALIENCY_MAX_RESO, $SALIENCY_RESO_STEP)"
 echo "SALIENCY_NN_PAR: $SALIENCY_NN_PAR"
+echo "WTSCALE_MIN/WTSCALE_MAX: $WTSCALE_MIN/$WTSCALE_MAX"
 echo "****************************"
 echo ""
 
@@ -533,7 +550,9 @@ generate_config(){
 		echo "extendedSearchMethod = $EXT_SFINDER_METHOD					| Extended source search method (1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding)"
 		echo 'useResidualInExtendedSearch = true									| Use residual image (with selected sources dilated) as input for extended source search'
 		echo "activeContourMethod = $AC_METHOD										| Active contour method (1=Chanvese, 2=LRAC)"
-		echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search'
+		echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search (DEPRECATED)'
+		echo "wtScaleSearchMin = $WTSCALE_MIN									    | Minimum Wavelet scale to be used for extended source search"
+		echo "wtScaleSearchMax = $WTSCALE_MAX											| Maximum Wavelet scale to be used for extended source search"
 		echo '###'
 		echo '###'
 		echo '//================================'
@@ -657,11 +676,14 @@ generate_exec_script(){
 
 	echo "INFO: Creating sh file $shfile (jobindex=$jobindex, exe=$exe, exe_args=$exe_args)..."
 	( 
+			echo "#!/bin/bash"
+			echo "#PBS -N SFinderJob$jobindex"
+			echo "#PBS -j oe"
   		echo "#PBS -o $BASEDIR"
-    	echo "#PBS -o $BASEDIR"
+			echo "#PBS -l select=1:ncpus=1"
+    	echo "#PBS -l walltime=$JOB_WALLTIME"
     	echo '#PBS -r n'
-      echo '#PBS -S /bin/sh'
-      echo "#PBS -N SFinderJob$jobindex"
+      echo '#PBS -S /bin/bash' 
       echo '#PBS -p 1'
 
       echo " "
