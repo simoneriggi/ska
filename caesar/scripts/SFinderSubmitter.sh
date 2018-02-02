@@ -48,7 +48,7 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--npixmin=[NPIX_MIN] - Minimum number of pixel to consider a source (default=5 pixels)"
 	echo "--seedthr=[SEED_THR] - Seed threshold (in nsigmas) used in flood-fill (default=5 sigmas)"
 	echo "--mergethr=[MERGE_THR] - Merge threshold (in nsigmas) used in flood-fill (default=2.6 sigmas)"
-	echo "--brightseedthr=[BRIGHT_SEED_THR] - Seed threshold (in nsigmas) used in flood-fill for bright source removal (default=10 sigmas)"
+	echo "--dilatethr=[DILATE_THR] - Seed threshold (in nsigmas) used to dilate sources (default=10 sigmas)"
 	echo "--no-extendedsearch - Do not search extended sources"
 	echo "--extsfinder=[EXT_SFINDER_METHOD] - Extended source search method {1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding} (default=3)"	
 	echo "--activecontour=[AC_METHOD] - Active contour method {1=Chanvese, 2=LRAC} (default=2)"
@@ -103,7 +103,7 @@ BKG_BOXSIZE="20"
 BKG_GRIDSIZE="0.2"
 NPIX_MIN="5"
 SEED_THR="5"
-BRIGHT_SEED_THR="10"
+DILATE_THR="10"
 MERGE_THR="2.6"
 EXT_SFINDER_METHOD="3"
 AC_METHOD="2"
@@ -233,8 +233,8 @@ do
 		--seedthr=*)
     	SEED_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-		--brightseedthr=*)
-    	BRIGHT_SEED_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		--dilatethr=*)
+    	DILATE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 		--mergethr=*)
     	MERGE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
@@ -310,7 +310,7 @@ echo "HOSTFILE_GIVEN? $HOSTFILE_GIVEN, HOSTFILE: $HOSTFILE"
 echo "LOG_LEVEL: $LOG_LEVEL"
 echo "OUTPUT_DIR: $OUTPUT_DIR"
 echo "BKG BOX: $BKG_BOXSIZE, GRID: $BKG_GRID_SIZE"
-echo "NPIX_MIN: $NPIX_MIN, SEED_THR: $SEED_THR, BRIGHT_SEED_THR: $BRIGHT_SEED_THR, MERGE_THR: $MERGE_THR"
+echo "NPIX_MIN: $NPIX_MIN, SEED_THR: $SEED_THR, DILATE_THR: $DILATE_THR, MERGE_THR: $MERGE_THR"
 echo "EXT_SFINDER_METHOD: $EXT_SFINDER_METHOD"
 echo "AC_METHOD: $AC_METHOD"
 echo "SEARCH_NESTED_SOURCES: $SEARCH_NESTED_SOURCES"
@@ -498,7 +498,7 @@ generate_config(){
 		echo '//===================================='
 		echo "searchCompactSources = $SEARCH_COMPACT_SOURCES			| Search compact sources (T/F)"
 		echo "minNPix = $NPIX_MIN																	| Minimum number of pixel to consider a source"
-		echo "seedBrightThr = $BRIGHT_SEED_THR										| Seed threshold in flood-filling algo for bright sources"
+		##echo "seedBrightThr = $DILATE_THR										| Seed threshold in flood-filling algo for bright sources"
 		echo "seedThr = $SEED_THR 																| Seed threshold in flood filling algo for faint sources"
 		echo "mergeThr = $MERGE_THR																| Merge/aggregation threshold in flood filling algo"
 		echo 'mergeBelowSeed = false                              | Aggregate to seed only pixels above merge threshold but below seed threshold (T/F)'
@@ -576,6 +576,7 @@ generate_config(){
 		echo '//==  SOURCE RESIDUAL OPTIONS   =='
 		echo '//================================'
 		echo 'dilateNestedSources = true 													| Dilate sources nested inside bright sources (T/F)'
+		echo "dilateZThr = $DILATE_THR                            | Significance threshold (in sigmas) above which sources are dilated"
 		echo 'dilateKernelSize = 9																| Size of kernel (odd) to be used in dilation operation'
 		echo 'dilatedSourceType = 2																| Type of bright sources to be dilated from the input image (-1=ALL,1=COMPACT,2=POINT-LIKE,3=EXTENDED) '
 		echo 'dilateSourceModel = 1																| Dilate source model  (1=bkg,2=median)'
