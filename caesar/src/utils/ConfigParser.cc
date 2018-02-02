@@ -243,7 +243,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//REGISTER_OPTION(searchFaintSources,bool,false,false,true);
 		REGISTER_OPTION(searchNestedSources,bool,true,false,true);
 		REGISTER_OPTION(minNPix,int,10,0,10000);
-		REGISTER_OPTION(seedBrightThr,double,10,0,10000);	
+		//REGISTER_OPTION(seedBrightThr,double,10,0,10000);//DEPRECATED	
 		REGISTER_OPTION(seedThr,double,5,0,10000);
 		REGISTER_OPTION(mergeThr,double,2.6,0,10000);
 		REGISTER_OPTION(mergeBelowSeed,bool,false,false,true);
@@ -266,6 +266,8 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(extendedSearchMethod,int,2,0,10);		
 		REGISTER_OPTION(useResidualInExtendedSearch,bool,true,false,true);
 		REGISTER_OPTION(wtScaleExtended,int,6,1,10);
+		REGISTER_OPTION(wtScaleSearchMin,int,3,1,10);
+		REGISTER_OPTION(wtScaleSearchMax,int,6,1,10);
 		REGISTER_OPTION(activeContourMethod,int,2,0,3);		
 		
 		//================================
@@ -287,6 +289,7 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//================================
 		//==  Source residual options   ==
 		//================================
+		REGISTER_OPTION(dilateZThr,double,5,0,10000);
 		REGISTER_OPTION(dilateNestedSources,bool,true,false,true);		
 		REGISTER_OPTION(dilateKernelSize,int,9,1,1001);		
 		REGISTER_OPTION(dilatedSourceType,int,2,-1,3);
