@@ -349,7 +349,7 @@ class SkyMapSimulator(object):
 		""" Enable/disable bkg generation """
 		self.simulate_bkg= choice
 
-	def set_npixels_min(self,choice):
+	def set_npixels_min(self,value):
 		""" Set the minimum number of pixels for a generated source"""
 		self.npixels_min= value
 
