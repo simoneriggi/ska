@@ -66,16 +66,17 @@ struct SourceOverlapMatchPars {
 		ResetPars();
 	}
 	//Param constructor
-	SourceOverlapMatchPars(long int _index,float _fraction):
-		index(_index), overlapFraction(_fraction)
+	SourceOverlapMatchPars(long int _index,float _fraction, float _fraction_rec):
+		index(_index), overlapFraction(_fraction), overlapFraction_rec(_fraction_rec)
 	{}
 	
 	//Reset pars
-	void ResetPars(){index=-1; overlapFraction=0; overlappingSourceIndexes.clear();}
+	void ResetPars(){index=-1; overlapFraction=0; overlapFraction_rec=0; overlappingSourceIndexes.clear();}
 
 	//Pars
 	long int index;//index of match source in collection
-	float overlapFraction;//overlap fraction (>0)
+	float overlapFraction;//overlap fraction with respect to true source (>0)
+	float overlapFraction_rec;//overlap fraction with respect to rec source (>0)
 	std::vector<long int> overlappingSourceIndexes;//list of source index in collection overlapping with this source
 
 };//close SourceOverlapMatchPars struct

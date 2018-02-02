@@ -454,21 +454,25 @@ bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const st
 	}	
 
 	//Loop over sources to find matches
+	//NB: Two pixel fractions are compared (M=overlap pixels, N=pixels of true source, N_rec=pixels of rec source)
+	// 1) f= M/N<thr (to ensure rec source is not a tiny fraction of true source)  
+	// 2) f_rec= M/N_rec<thr (to ensure rec source is not encompassing by a large amount the true source) 
 	std::vector<SourceOverlapMatchPars> tmpMatchPars;
 	std::vector<long int> overlappingSourceIndexes;
 
 	for(size_t j=0;j<sources.size();j++){
-		int type= sources[j]->Type;
+		long int NPix_rec= sources[j]->GetNPixels();
 		long int NMatchingPixels= this->GetNMatchingPixels(sources[j]);
-		double matchingPixelFraction= (double)(NMatchingPixels)/(double)(NPix);
-		
+		double f= (double)(NMatchingPixels)/(double)(NPix);
+		double f_rec= (double)(NMatchingPixels)/(double)(NPix_rec);		
+
 		//Add match source to tmp matches
 		if(NMatchingPixels>0){
 			overlappingSourceIndexes.push_back(j);
-			if(matchingPixelFraction>=matchOverlapThr){
-				tmpMatchPars.push_back(SourceOverlapMatchPars(j,matchingPixelFraction));
+			if( f>=matchOverlapThr && f_rec>=matchOverlapThr ){
+				tmpMatchPars.push_back(SourceOverlapMatchPars(j,f,f_rec));
 	
-				INFO_LOG("Source "<<this->GetName()<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): found match with source "<<sources[j]->GetName()<<" (X0="<<sources[j]->X0<<", Y0="<<sources[j]->Y0<<", N="<<sources[j]->NPix<<"), NMatchingPixels="<<NMatchingPixels<<" f="<<matchingPixelFraction<<" (t="<<matchOverlapThr<<")");
+				INFO_LOG("Source "<<this->GetName()<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): found match with source "<<sources[j]->GetName()<<" (X0="<<sources[j]->X0<<", Y0="<<sources[j]->Y0<<", N="<<sources[j]->NPix<<"), NMatchingPixels="<<NMatchingPixels<<", f="<<f<<", f_rec="<<f_rec<<" (t="<<matchOverlapThr<<")");
 			}
 		}
 	}//end loop sources	
@@ -477,6 +481,8 @@ bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const st
 	if(tmpMatchPars.empty()) return false;
 
 	//Search for best overlap in case of multiple matches
+	//NB: Consider 2 rec match sources: 1st) has larger f, 2nd) has larger f_rec. Which is the best one?
+	//    It is assumed here that the best is those that covers true source with a larger fraction, e.g. the 1st)
 	if(tmpMatchPars.size()>1) {
 		INFO_LOG("#"<<tmpMatchPars.size()<<" source matches found, searching for the best one ...");
 		
@@ -484,7 +490,7 @@ bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const st
 		int best_index= 0;
 
 		for(size_t j=0;j<tmpMatchPars.size();j++){
-			double overlap= tmpMatchPars[j].overlapFraction;	
+			double overlap= tmpMatchPars[j].overlapFraction;
 			if(overlap>=overlap_best){
 				best_index= j;
 				overlap_best= overlap;

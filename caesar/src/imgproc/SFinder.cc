@@ -461,7 +461,7 @@ int SFinder::Configure(){
 	//Get source search options
 	GET_OPTION_VALUE(searchCompactSources,m_SearchCompactSources);
 	GET_OPTION_VALUE(minNPix,m_NMinPix);
-	GET_OPTION_VALUE(seedBrightThr,m_SeedBrightThr);	
+	//GET_OPTION_VALUE(seedBrightThr,m_SeedBrightThr);//DEPRECATED	
 	GET_OPTION_VALUE(seedThr,m_SeedThr);
 	GET_OPTION_VALUE(mergeThr,m_MergeThr);
 	GET_OPTION_VALUE(compactSourceSearchNIters,m_compactSourceSearchNIters);
@@ -491,6 +491,7 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(useMaxNPixCut,m_useMaxNPixCut);
 	
 	//Get source residual options
+	GET_OPTION_VALUE(dilateZThr,m_DilateZThr);
 	GET_OPTION_VALUE(dilateNestedSources,m_DilateNestedSources);
 	GET_OPTION_VALUE(dilateKernelSize,m_DilateKernelSize);
 	GET_OPTION_VALUE(dilatedSourceType,m_DilatedSourceType);
@@ -559,13 +560,25 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(saliencyDissExpFalloffPar,m_SaliencyDissExpFalloffPar);
 	GET_OPTION_VALUE(saliencySpatialDistRegPar,m_SaliencySpatialDistRegPar);
 		
+	if(m_SaliencyResoMin>m_SaliencyResoMax){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Invalid saliency reso scale min/max given (hint: max scale shall be >= min scale)!");
+		return -1;
+	}
+
 	//Get extended source options
 	GET_OPTION_VALUE(searchExtendedSources,m_SearchExtendedSources);
 	GET_OPTION_VALUE(extendedSearchMethod,m_ExtendedSearchMethod);
 	GET_OPTION_VALUE(wtScaleExtended,m_wtScaleExtended);
+	GET_OPTION_VALUE(wtScaleSearchMin,m_wtScaleSearchMin);
+	GET_OPTION_VALUE(wtScaleSearchMax,m_wtScaleSearchMax);
 	GET_OPTION_VALUE(useResidualInExtendedSearch,m_UseResidualInExtendedSearch);
 	GET_OPTION_VALUE(activeContourMethod,m_activeContourMethod);
 			
+	if(m_wtScaleSearchMin>m_wtScaleSearchMax){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Invalid wt scale min/max given (hint: wtscale max shall be >= wtscale min)!");
+		return -1;
+	}
+
 	//Get superpixel options
 	GET_OPTION_VALUE(spSize,m_spSize);
 	GET_OPTION_VALUE(spBeta,m_spBeta);
@@ -1388,7 +1401,7 @@ Image* SFinder::FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<
 			sources,
 			m_DilateKernelSize,m_DilateSourceModel,m_DilatedSourceType,m_DilateNestedSources,	
 			bkgData,m_UseLocalBkg,
-			m_DilateRandomize,m_SeedBrightThr
+			m_DilateRandomize,m_DilateZThr
 		);
 	}//close if
 	else{
@@ -1631,6 +1644,20 @@ Image* SFinder::FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,T
 		return nullptr;
 	}
 
+	
+	//## Set flux correction factor
+	double fluxCorrection= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(fluxCorrection>0 && std::isnormal(fluxCorrection)) hasBeamData= true;
+	}
+
+	if(!hasBeamData){
+		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		fluxCorrection= m_fluxCorrectionFactor;
+	}
+	
 	//## Tag found sources as extended 
 	int nSources= static_cast<int>( sources.size() );
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" extended sources detected in input image by thresholding the saliency map...");
@@ -1638,6 +1665,7 @@ Image* SFinder::FindExtendedSources_SalThr(Image* inputImg,ImgBkgData* bkgData,T
 		sources[k]->SetId(k+1);
 		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));
 		sources[k]->SetType(Source::eExtended);
+		sources[k]->SetBeamFluxIntegral(fluxCorrection);
 	}
 	
 	//## Add sources to extended sources?
@@ -1871,11 +1899,26 @@ Image* SFinder::FindExtendedSources_HClust(Image* inputImg,ImgBkgData* bkgData,T
 		WARN_LOG("[PROC "<<m_procId<<"] - Input image has no stats computed (hint: you must have computed them before!), cannot remove negative excess from sources!");
 	}	
 
+
+	//## Set flux correction factor
+	double fluxCorrection= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(fluxCorrection>0 && std::isnormal(fluxCorrection)) hasBeamData= true;
+	}
+
+	if(!hasBeamData){
+		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		fluxCorrection= m_fluxCorrectionFactor;
+	}
+	
 	//## Tag sources as extended
 	for(size_t k=0;k<sources.size();k++) {
 		sources[k]->SetId(k+1);
 		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));
 		sources[k]->SetType(Source::eExtended);
+		sources[k]->SetBeamFluxIntegral(fluxCorrection);
 	}
 	
 	//## Add sources to extended sources
@@ -2119,12 +2162,25 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 		WARN_LOG("[PROC "<<m_procId<<"] - Input image has no stats computed (hint: you must have computed them before!), cannot remove negative excess from sources!");
 	}	
 
+	//## Set flux correction factor
+	double fluxCorrection= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(fluxCorrection>0 && std::isnormal(fluxCorrection)) hasBeamData= true;
+	}
+
+	if(!hasBeamData){
+		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		fluxCorrection= m_fluxCorrectionFactor;
+	}
 
 	//## Tag sources as extended
 	for(size_t k=0;k<sources.size();k++) {
 		sources[k]->SetId(k+1);
 		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));
 		sources[k]->SetType(Source::eExtended);
+		sources[k]->SetBeamFluxIntegral(fluxCorrection);
 	}
 
 	//## Add sources to extended sources
@@ -2149,16 +2205,30 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 	if(searchedImg) img= searchedImg;
 	
 	//## Find extended sources in the scales of the residual image (with POINT-LIKE SOURCES removed)
-	INFO_LOG("[PROC "<<m_procId<<"] - Find extended sources in the residual image WT-"<<m_wtScaleExtended<<"  scale ...");
-	std::vector<Image*> wt_extended= img->GetWaveletDecomposition(m_wtScaleExtended);
+	//INFO_LOG("[PROC "<<m_procId<<"] - Find extended sources in the residual image WT-"<<m_wtScaleExtended<<"  scale ...");
+	//std::vector<Image*> wt_extended= img->GetWaveletDecomposition(m_wtScaleExtended);
+	//std::vector<Source*> sources;
+	//int status= FindSources(sources,inputImg,m_SeedThr,m_MergeThr,wt_extended[m_wtScaleExtended]);
+
+	INFO_LOG("[PROC "<<m_procId<<"] - Find extended sources in the residual image Wavelet scales min/max="<<m_wtScaleSearchMin<<"/"<<m_wtScaleSearchMax<<" ...");
+	std::vector<Image*> wt_extended= img->GetWaveletDecomposition(m_wtScaleSearchMax);
 	
-	std::vector<Source*> sources;
-	int status= FindSources(
-		sources,
-		inputImg,
-		m_SeedThr,m_MergeThr,
-		wt_extended[m_wtScaleExtended]
-	);
+	std::vector<Source*> sources_wtall;
+	int status= 0;
+	for(int scaleId=m_wtScaleSearchMin;scaleId<=m_wtScaleSearchMax;scaleId++){
+		std::vector<Source*> sources_wt;
+		status= FindSources(sources_wt,inputImg,m_SeedThr,m_MergeThr,wt_extended[scaleId]);
+		if(status==0){
+			if(!sources_wt.empty()){//Append to sources from all scales
+				sources_wtall.insert(sources_wtall.end(),sources_wt.begin(),sources_wt.end());		
+			}
+		}//close if
+		else{
+			WARN_LOG("[PROC "<<m_procId<<"] - Failed to find sources at WT scale "<<scaleId<<", exit finding ...");
+			break;	
+		}
+	}//end loop scales
+
 
 	//## Clear-up
 	for(size_t i=0;i<wt_extended.size();i++){
@@ -2168,11 +2238,77 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 		}
 	}
 
+	//## If errors occurred at one/more scales clear up sources and return
 	if(status<0){
 		ERROR_LOG("[PROC "<<m_procId<<"] - Extended source finding failed!");
+		for(size_t i=0;i<sources_wtall.size();i++){
+			if(sources_wtall[i]) {
+				delete sources_wtall[i];
+				sources_wtall[i]= 0;
+			}
+		}
+		return nullptr;
+	}//close if
+
+	//## Find image binary mask with all sources found at all scales
+	bool isBinary= true;
+	bool invert= false;
+	Image* binaryMaskImg= inputImg->GetSourceMask(sources_wtall,isBinary,invert);
+	if(!binaryMaskImg){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to found binary mask using all sources found at all WT scales!");
+		for(size_t i=0;i<sources_wtall.size();i++){
+			if(sources_wtall[i]) {
+				delete sources_wtall[i];
+				sources_wtall[i]= 0;
+			}
+		}
+		return nullptr;
+	}//close if
+
+	//## Clearup wt sources
+	for(size_t i=0;i<sources_wtall.size();i++){
+		if(sources_wtall[i]) {
+			delete sources_wtall[i];
+			sources_wtall[i]= 0;
+		}
+	}
+
+	//## Find source blobs in binary mask
+	double seedThr= 0.5;//dummy values (>0)
+	double mergeThr= 0.4;//dummy values (>0)
+	bool searchNegative= false;
+	bool searchNested= false;
+	std::vector<Source*> sources;
+	status= inputImg->FindCompactSource(
+			sources,
+			binaryMaskImg,m_BkgData,
+			seedThr,mergeThr,m_NMinPix,searchNegative,m_MergeBelowSeed,
+			searchNested
+		);
+
+	if(status<0){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to found source blobs in binary mask!");
 		return nullptr;
 	}
+
+	//## Clear binary helper mask
+	if(binaryMaskImg){
+		delete binaryMaskImg;
+		binaryMaskImg= nullptr;
+	}
 	
+	//## Set flux correction factor
+	double fluxCorrection= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(fluxCorrection>0 && std::isnormal(fluxCorrection)) hasBeamData= true;
+	}
+
+	if(!hasBeamData){
+		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		fluxCorrection= m_fluxCorrectionFactor;
+	}
 	
 	//## Tag sources as extended
 	int nSources= static_cast<int>( sources.size() );		
@@ -2182,6 +2318,7 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 		sources[k]->SetId(k+1);
 		sources[k]->SetName(Form("Sext%d",(signed)(k+1)));	
 		sources[k]->SetType(Source::eExtended);
+		sources[k]->SetBeamFluxIntegral(fluxCorrection);
 	}
 
 	//## Add sources to extended sources
@@ -2191,8 +2328,8 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 	
 
 	//## Compute segmented map
-	bool isBinary= false;
-	bool invert= false;
+	isBinary= false;
+	invert= false;
 	Image* segmMap= inputImg->GetSourceMask(sources,isBinary,invert);
 	if(!segmMap){
 		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to compute segmented map!");

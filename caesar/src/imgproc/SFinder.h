@@ -364,6 +364,7 @@ class SFinder : public TObject {
 		//Residual map
 		Image* m_ResidualImg;
 		ImgBkgData* m_ResidualBkgData;
+		double m_DilateZThr;
 		bool m_DilateNestedSources;
 		int m_DilateKernelSize;
 		int m_DilatedSourceType;
@@ -382,7 +383,7 @@ class SFinder : public TObject {
 		//Compact source search
 		bool m_SearchCompactSources;
 		int m_NMinPix;
-		double m_SeedBrightThr;
+		//double m_SeedBrightThr;
 		double m_SeedThr;
 		double m_MergeThr;
 		bool m_MergeBelowSeed;
@@ -460,6 +461,8 @@ class SFinder : public TObject {
 		bool m_SearchExtendedSources;
 		int m_ExtendedSearchMethod;
 		int m_wtScaleExtended;
+		int m_wtScaleSearchMin;
+		int m_wtScaleSearchMax;
 		int m_activeContourMethod;
 
 		//Superpixel options
