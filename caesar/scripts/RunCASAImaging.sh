@@ -21,7 +21,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--mapsize=[MAP_SIZE] - Map size (in pixels)"
 	echo ""
 	echo ""
-	echo "*** OPTIONAL ARGS ***"	
+	echo "*** OPTIONAL ARGS ***"
+	echo "--startid=[START_ID] - Run start id (default: 1)"	
 	echo "--maxfiles=[NMAX_PROCESSED_FILES] - Maximum number of input files processed in filelist (default=-1=all files)"
 	echo "--outproject=[OUTPUT_PROJECT] - Name of CASA output project (default=rec)"
 	echo "--no-mosaic - Disable mosaic generation (default=enabled)"
@@ -55,6 +56,7 @@ fi
 ##         PARSE ARGS
 #######################################
 NMAX_PROCESSED_FILES=-1
+START_ID=1
 SUBMIT=false
 BATCH_QUEUE=""
 ENV_FILE=""
@@ -114,6 +116,9 @@ do
 		
 
 		## OPTIONAL ##
+		--startid=*)
+    	START_ID=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
 		--maxfiles=*)
     	NMAX_PROCESSED_FILES=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;	
@@ -199,7 +204,7 @@ done
 echo ""
 echo "*****  PARSED ARGUMENTS ****"
 echo "INPUTFILE: $INPUTFILE"
-echo "FILELIST: $FILELIST, NMAX_PROCESSED_FILES: $NMAX_PROCESSED_FILES"
+echo "FILELIST: $FILELIST, NMAX_PROCESSED_FILES: $NMAX_PROCESSED_FILES (START_ID=$START_ID)"
 echo "PHASE_CENTER: $PHASE_CENTER"
 echo "WEIGHTING: $WEIGHTING"
 echo "DECONVOLVER: $DECONVOLVER"
@@ -363,7 +368,8 @@ if [ "$FILELIST_GIVEN" = true ]; then
 	echo "INFO: Looping over input files listed in file $FILELIST ..."
 	cd $BASEDIR
 	file_counter=0
-	index=1
+	#index=1
+	index=$START_ID
 
 	while read filename 
 	do
