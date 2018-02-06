@@ -538,6 +538,7 @@ int FindRealAndFakeSources()
 		double fluxCorrectionFactor= sources_rec[i]->GetBeamFluxIntegral();
 		HasFitInfo= sources_rec[i]->HasFitInfo();
 		bool associatedToSource= false;
+		SourceType_rec= sources_rec[i]->Type;
 		
 		if(HasFitInfo){
 			SourceFitPars fitPars= sources_rec[i]->GetFitPars();
@@ -580,6 +581,7 @@ int FindRealAndFakeSources()
 		}//close has fit info
 		else{
 			SourceName_rec= sname;
+			SourceType_rec= sources_rec[i]->Type;			
 			X0_rec= sources_rec[i]->X0;
 			Y0_rec= sources_rec[i]->Y0;
 			Smax_rec= sources_rec[i]->GetSmax();
@@ -1279,6 +1281,7 @@ void Init(){
 	//Create rec source info (useful for reliability estimation)
 	if(!recSourceInfo) recSourceInfo= new TTree("RecSourceInfo","RecSourceInfo");
 	recSourceInfo->Branch("name_rec",&SourceName_rec);
+	recSourceInfo->Branch("type_rec",&SourceType_rec,"type_rec/I");
 	recSourceInfo->Branch("HasFitInfo",&HasFitInfo,"HasFitInfo/I");	
 	recSourceInfo->Branch("X0_rec",&X0_rec,"X0_rec/D");
 	recSourceInfo->Branch("Y0_rec",&Y0_rec,"Y0_rec/D");
