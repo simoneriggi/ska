@@ -399,6 +399,10 @@ if(BUILD_APPS)
 	target_link_libraries(CorrelateSourceCatalogsExe Caesar ${LINKED_LIBS})
 	set_target_properties(CorrelateSourceCatalogsExe PROPERTIES OUTPUT_NAME CorrelateSourceCatalogs)
 	
+	add_executable(SkyModelConvolverExe ${Task_SkyModelConvolver_SRCS})
+	target_link_libraries(SkyModelConvolverExe Caesar ${LINKED_LIBS})
+	set_target_properties(SkyModelConvolverExe PROPERTIES OUTPUT_NAME SkyModelConvolver)
+	
 	include_directories(${MPI_CXX_INCLUDE_PATH})
 	add_executable(FindSourceMPIExe ${Task_FindSourceMPI_SRCS})
 	target_link_libraries(FindSourceMPIExe Caesar ${LINKED_LIBS} ${MPI_CXX_LIBRARIES})
@@ -518,6 +522,7 @@ if(BUILD_APPS)
 		ROOT2FITS
 		FindSourceMPI
 		CorrelateSourceCatalogs
+		SkyModelConvolver
 	)
 	foreach (_exeFile ${EXE_FILES})
 		install(TARGETS ${_exeFile}Exe DESTINATION ${BINARY_INSTALL_DIR})
