@@ -241,7 +241,6 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(searchCompactSources,bool,true,false,true);
 		//REGISTER_OPTION(searchBrightSources,bool,false,false,true);
 		//REGISTER_OPTION(searchFaintSources,bool,false,false,true);
-		REGISTER_OPTION(searchNestedSources,bool,true,false,true);
 		REGISTER_OPTION(minNPix,int,10,0,10000);
 		//REGISTER_OPTION(seedBrightThr,double,10,0,10000);//DEPRECATED	
 		REGISTER_OPTION(seedThr,double,5,0,10000);
@@ -255,6 +254,8 @@ int ConfigParser::RegisterPredefinedOptions(){
 		//=====================================
 		//==  Nested Source finding options  ==
 		//=====================================
+		REGISTER_OPTION(searchNestedSources,bool,true,false,true);
+		REGISTER_OPTION(sourceToBeamAreaThrToSearchNested,double,0,-0.001,100);
 		REGISTER_OPTION(nestedBlobThrFactor,double,1,0,100);
 		REGISTER_OPTION(minNestedMotherDist,double,2,0,100);
 		REGISTER_OPTION(maxMatchingPixFraction,double,0.5,0,1);
