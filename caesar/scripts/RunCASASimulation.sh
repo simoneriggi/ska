@@ -42,6 +42,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--ext-sourcedensity=[EXT_SOURCE_DENSITY] - Extended source density in sources/deg^2 (default: 100)"
 	echo "--ext-scalemin=[EXT_SCALE_MIN] - Minimum extended source size in arcsec (default: 10)"
 	echo "--ext-scalemax=[EXT_SCALE_MAX] - Maximum extended source size in arcsec (default: 100)"
+	echo "--ring-wmin=[RING_WIDTH_MIN] - Minimum source ring size in arcsec (default: 5)"
+	echo "--ring-wmax=[RING_WIDTH_MAX] - Maximum source ring size in arcsec (default: 20)"
 	echo "--simproject=[SIM_PROJECT] - Name of CASA simulation project (default: sim)"
 	echo "--visimagename=[VIS_IMAGE_NAME] - Name of CASA sim visibility image name (default: vis.ms)"
 	echo "--simtottime=[SIM_TOT_TIME] - Simulation total time in seconds (default: 43200)"
@@ -94,6 +96,8 @@ SOURCE_DENSITY=1000
 EXT_SOURCE_DENSITY=100
 EXT_SCALE_MIN=10
 EXT_SCALE_MAX=100
+RING_WIDTH_MIN=5
+RING_WIDTH_MAX=20
 SIM_PROJECT="" # "sim"
 SIM_PROJECT_GIVEN=false
 VIS_IMAGE_NAME="" # "vis.ms"
@@ -201,6 +205,12 @@ do
 		--ext-scalemax=*)
     	EXT_SCALE_MAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
+		--ring-wmin=*)
+    	RING_WIDTH_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--ring-wmax=*)
+    	RING_WIDTH_MAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
 		
 		## SUBMISSION OPTIONS
 		--queue=*)
@@ -272,6 +282,7 @@ echo "BKG_LEVEL: $BKG_LEVEL, BKG_RMS: $BKG_RMS"
 echo "ZMIN/ZMAX: $ZMIN/$ZMAX"
 echo "ZMIN_EXT/ZMAX_EXT: $ZMIN_EXT/$ZMAX_EXT"
 echo "EXT_SCALE MIN/MAX: $EXT_SCALE_MIN/$EXT_SCALE_MAX"
+echo "RING WIDTH MIN/MAX: $RING_WIDTH_MIN/$RING_WIDTH_MAX"
 echo "SOURCE_DENSITY: $SOURCE_DENSITY, EXT_SOURCE_DENSITY: $EXT_SOURCE_DENSITY"
 echo "ZMIN_MODEL: $ZMIN_MODEL"
 echo "SOURCE_GEN_MARGIN_SIZE: $SOURCE_GEN_MARGIN_SIZE (pixels)"
@@ -429,7 +440,7 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 			echo 'EXE="'"$CAESAR_SCRIPTS_DIR/skymodel_generator.py"'"'
 		fi
 
-		echo 'EXE_ARGS="'"--nx=$MAP_SIZE --ny=$MAP_SIZE --pixsize=$PIX_SIZE --marginx=$SOURCE_GEN_MARGIN_SIZE --marginy=$SOURCE_GEN_MARGIN_SIZE $GEN_SOURCE_FLAG $GEN_EXT_SOURCE_FLAG --bmaj=$BMAJ --bmin=$BMIN --bpa=$BPA --crpix1=$CRPIX --crpix2=$CRPIX --bkg --bkg_level=$BKG_LEVEL --bkg_rms=$BKG_RMS --zmin=$ZMIN --zmax=$ZMAX --zmin_ext=$ZMIN_EXT --zmax_ext=$ZMAX_EXT --source_density=$SOURCE_DENSITY --zmin_model=$ZMIN_MODEL --ext_source_density=$EXT_SOURCE_DENSITY --ext_scale_min=$EXT_SCALE_MIN --ext_scale_max=$EXT_SCALE_MAX --outputfile=$simmapfile --outputfile_model=$skymodelfile --outputfile_sources=$sourcefile --outputfile_ds9region=$ds9regionfile --outputfile_casaregion=$casaregionfile "'"'
+		echo 'EXE_ARGS="'"--nx=$MAP_SIZE --ny=$MAP_SIZE --pixsize=$PIX_SIZE --marginx=$SOURCE_GEN_MARGIN_SIZE --marginy=$SOURCE_GEN_MARGIN_SIZE $GEN_SOURCE_FLAG $GEN_EXT_SOURCE_FLAG --bmaj=$BMAJ --bmin=$BMIN --bpa=$BPA --crpix1=$CRPIX --crpix2=$CRPIX --bkg --bkg_level=$BKG_LEVEL --bkg_rms=$BKG_RMS --zmin=$ZMIN --zmax=$ZMAX --zmin_ext=$ZMIN_EXT --zmax_ext=$ZMAX_EXT --source_density=$SOURCE_DENSITY --zmin_model=$ZMIN_MODEL --ext_source_density=$EXT_SOURCE_DENSITY --ext_scale_min=$EXT_SCALE_MIN --ext_scale_max=$EXT_SCALE_MAX --ring_wmin=$RING_WIDTH_MIN --ring_wmax=$RING_WIDTH_MAX --outputfile=$simmapfile --outputfile_model=$skymodelfile --outputfile_sources=$sourcefile --outputfile_ds9region=$ds9regionfile --outputfile_casaregion=$casaregionfile "'"'
 
 		echo 'echo "Running command $EXE $EXE_ARGS"'
 		echo '$EXE $EXE_ARGS'
