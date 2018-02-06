@@ -108,8 +108,8 @@ def get_args():
 	# - SOURCE MODEL OPTIONS
 	parser.add_argument('-ring_rmin', '--ring_rmin', dest='ring_rmin', required=False, type=float, default=0.5, action='store',help='Minimum ring radius in arcsec (default=1)')
 	parser.add_argument('-ring_rmax', '--ring_rmax', dest='ring_rmax', required=False, type=float, default=10, action='store',help='Maximum ring radius in arcsec (default=10)')
-	parser.add_argument('-ring_wmin', '--ring_wmin', dest='ring_wmin', required=False, type=float, default=2, action='store',help='Minimum ring width in arcsec (default=1)')
-	parser.add_argument('-ring_wmax', '--ring_wmax', dest='ring_wmax', required=False, type=float, default=10, action='store',help='Maximum ring width in arcsec (default=10)')
+	parser.add_argument('-ring_wmin', '--ring_wmin', dest='ring_wmin', required=False, type=float, default=5, action='store',help='Minimum ring width in arcsec (default=1)')
+	parser.add_argument('-ring_wmax', '--ring_wmax', dest='ring_wmax', required=False, type=float, default=20, action='store',help='Maximum ring width in arcsec (default=10)')
 	parser.add_argument('-ellipse_rmin', '--ellipse_rmin', dest='ellipse_rmin', required=False, type=float, default=0.5, action='store',help='Ellipse bmaj in arcsec (default=1)')
 	parser.add_argument('-ellipse_rmax', '--ellipse_rmax', dest='ellipse_rmax', required=False, type=float, default=10, action='store',help='Ellipse bmin in arcsec (default=10)')
 	

@@ -65,7 +65,8 @@ def get_args():
 	parser.add_argument('-fitsout', '--fitsout', dest='fitsout', required=False, type=str, default='output.fits',action='store',help='Output FITS file (default=output.fits)')
 
 	parser.add_argument('-scales', '--scales', dest='scales', required=False, type=str, default='0',action='store',help='List of scales (in pixels) for multiscale deconvolver (comma separated) (default=0)')
-
+	parser.add_argument('-restoringbeam', '--restoringbeam', dest='restoringbeam', required=False, type=str, default='common',action='store',help='Restoring beam to be used (default=common)')
+	
 	parser.add_argument('--interactive', dest='enable_interactive', action='store_true')	
 	parser.set_defaults(enable_interactive=False)
 	
@@ -76,7 +77,7 @@ def get_args():
 	return args
 
 
-def clean_observation(vis,image_size,niter=1000,cycleniter=-1,threshold=0,mask='',imagename='',field='',cell_size='1arcsec',phase_center='',weighting='briggs',projection='SIN',deconvolver='clark',gridder='standard',scales=[0],savefits=True,fitsout='output.fits',interactive=False):
+def clean_observation(vis,image_size,niter=1000,cycleniter=-1,threshold=0,mask='',imagename='',field='',cell_size='1arcsec',phase_center='',weighting='briggs',projection='SIN',deconvolver='clark',gridder='standard',scales=[0],restoringbeam='common',savefits=True,fitsout='output.fits',interactive=False):
 	""" Clean observation """
 	
 	## Set image name if empty
@@ -156,6 +157,8 @@ def main():
 		scale_int= int(item)
 		scales.append(scale_int)
 
+	restoringbeam= args.restoringbeam
+
 	print("*** ARGS ***")
 	print 'vis: ', vis
 	print 'niter: ', niter
@@ -171,6 +174,7 @@ def main():
 	print 'weighting: ', weighting
 	print 'scales: ', scales
 	print 'projection: ', projection
+	print 'restoringbeam: ', restoringbeam
 	print 'outimage: ', outimage
 	print 'mosaicimage: ', mosaicimage
 	print 'fitsout: ', fitsout
@@ -217,7 +221,7 @@ def main():
 			projection=projection,	
 			deconvolver=deconvolver,
 			gridder=gridder,
-			restoringbeam='common',
+			restoringbeam=restoringbeam,
 			scales=scales,
 			savefits=False,
 			fitsout='tmpfield.fits',
