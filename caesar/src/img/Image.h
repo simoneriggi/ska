@@ -792,11 +792,11 @@ class Image : public TNamed {
 		/**
 		* \brief Find compact sources
 		*/
-		int FindCompactSource(std::vector<Source*>&,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,bool findNestedSources=false,double nestedBlobThrFactor=1,double minNestedMotherDist=2,double maxMatchingPixFraction=0.5,Image* curvMap=0);
+		int FindCompactSource(std::vector<Source*>&,Image* floodImg=0,ImgBkgData* bkgData=0,double seedThr=5,double mergeThr=2.6,int minPixels=10,bool findNegativeExcess=false,bool mergeBelowSeed=false,bool findNestedSources=false,double nestedBlobThrFactor=1,double minNestedMotherDist=2,double maxMatchingPixFraction=0.5,long int nPixThrToSearchNested=0,Image* curvMap=0);
 		/**
 		* \brief Find nested sources
 		*/
-		int	FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData=0,int minPixels=5,double nestedBlobThreshold=1,double minNestedMotherDist=2,double maxMatchingPixFraction=0.5);
+		int	FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData=0,int minPixels=5,double nestedBlobThreshold=1,double minNestedMotherDist=2,double maxMatchingPixFraction=0.5,long int nPixThrToSearchNested=0);
 
 		/**
 		* \brief Find extended sources with ChanVese method
@@ -907,7 +907,10 @@ class Image : public TNamed {
 		*/
 		Image* GetNormLoGImage(int size=3,double scale=1,bool invert=false);
 		
-		
+		/**
+		* \brief Get image convolved with an elliptical gaussian beam
+		*/
+		Image* GetBeamConvolvedImage(double bmaj,double bmin,double bpa,int nsigmas=5,double scale=1);	
 
 		//=========================================
 		//==   CONVERT METHODS

@@ -60,6 +60,7 @@
 #include <GradientFilter.h>
 #include <MorphFilter.h>
 #include <SaliencyFilter.h>
+#include <GausFilter.h>
 
 #include <Logger.h>
 
@@ -1448,7 +1449,7 @@ int Image::FindCompactSource(std::vector<Source*>& sources,double thr,int minPix
 }//close FindCompactSource()
 
 
-int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,bool findNestedSources,double nestedBlobThreshold,double minNestedMotherDist,double maxMatchingPixFraction,Image* curvMap)
+int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBkgData* bkgData,double seedThr,double mergeThr,int minPixels,bool findNegativeExcess,bool mergeBelowSeed,bool findNestedSources,double nestedBlobThreshold,double minNestedMotherDist,double maxMatchingPixFraction,long int nPixThrToSearchNested,Image* curvMap)
 {
 
 	//Find sources
@@ -1467,7 +1468,7 @@ int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBk
 
 	//Find nested sources?
 	if(findNestedSources && sources.size()>0){
-		int status= FindNestedSource(sources,bkgData,minPixels,nestedBlobThreshold,minNestedMotherDist,maxMatchingPixFraction);
+		int status= FindNestedSource(sources,bkgData,minPixels,nestedBlobThreshold,minNestedMotherDist,maxMatchingPixFraction,nPixThrToSearchNested);
 		if(status<0){
 			WARN_LOG("Nested source search failed!");
 		}
@@ -1478,7 +1479,7 @@ int Image::FindCompactSource(std::vector<Source*>& sources,Image* floodImg,ImgBk
 }//close FindCompactSource()
 
 
-int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,int minPixels,double nestedBlobThreshold,double minNestedMotherDist,double maxMatchingPixFraction){
+int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,int minPixels,double nestedBlobThreshold,double minNestedMotherDist,double maxMatchingPixFraction,long int nPixThrToSearchNested){
 
 	//Check if given mother source list is empty
 	int nSources= static_cast<int>(sources.size());
@@ -1608,8 +1609,9 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 		int nSelNestedSources= 0;
 		for(size_t i=0;i<MotherNestedAssociationList.size();i++){
 			long int NPix= sources[i]->GetNPixels(); 
+			bool isMotherSourceSplittableInNestedComponents= (NPix>nPixThrToSearchNested);
 			int nComponents= static_cast<int>(MotherNestedAssociationList[i].size());
-			if(nComponents<=0) continue;
+			if(nComponents<=0 || !isMotherSourceSplittableInNestedComponents) continue;
 
 			//If only one component is present select it if:
 			//  1) mother and nested distance is > thr (e.g. 
@@ -1633,9 +1635,10 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 					//Select nested?
 					bool areOffset= (centroidDistX>minNestedMotherDist || centroidDistY>minNestedMotherDist);
 					bool isNestedSmaller= (matchingPixFraction<maxMatchingPixFraction);
-					INFO_LOG("areOffset? "<<areOffset<<" (dist_x="<<centroidDistX<<", dist_y="<<centroidDistY<<"), isNestedSmaller?"<<isNestedSmaller<<" (matchingPixFraction="<<matchingPixFraction<<", maxMatchingPixFraction="<<maxMatchingPixFraction<<")");					
-
+					
 					if( areOffset || isNestedSmaller){//Add nested to mother source
+						INFO_LOG("Adding nested source to mother source (name="<<sources[i]->GetName()<<", id="<<sources[i]->Id<<", nPix="<<NPix<<"): areOffset? "<<areOffset<<" (dist_x="<<centroidDistX<<", dist_y="<<centroidDistY<<"), isNestedSmaller?"<<isNestedSmaller<<" (matchingPixFraction="<<matchingPixFraction<<", maxMatchingPixFraction="<<maxMatchingPixFraction<<", nPixThrToSearchNested="<<nPixThrToSearchNested<<")");					
+
 						sources[i]->AddNestedSource(NestedSources[nestedIndex]);
 						nSelNestedSources++;
 					}
@@ -1846,8 +1849,9 @@ Image* Image::GetSourceMask(std::vector<Source*>const& sources,bool isBinary,boo
 	long int Ny= this->GetNy();
 	bool copyMetaData= true;
 	bool resetStats= true;
-	TString imgName= Form("%s_SourceMask",m_name.c_str());	
-	Image* maskedImage= this->GetCloned(std::string(imgName),copyMetaData,resetStats);
+	TString imgName= Form("%s_SourceMask",m_name.c_str());
+	//Image* maskedImage= this->GetCloned(std::string(imgName),copyMetaData,resetStats);
+	Image* maskedImage= this->GetCloned("",copyMetaData,resetStats);
 	
 	//## Check source list
 	int nSources= static_cast<int>(sources.size());
@@ -2073,6 +2077,14 @@ Image* Image::GetNormLoGImage(int size,double scale,bool invert)
 	return normLoGImg;
 
 }//close GetNormLoGImage()
+
+Image* Image::GetBeamConvolvedImage(double bmaj,double bmin,double bpa,int nsigmas,double scale)
+{
+	//Compute image convolved with an elliptical gaussian beam
+	Image* convImg= GausFilter::GetGausFilter(this,bmaj,bmin,bpa,nsigmas,scale);
+	return convImg;
+
+}//close GetBeamConvolvedImage()
 
 Image* Image::GetLaplacianImage(bool invert)
 {
