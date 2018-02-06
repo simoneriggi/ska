@@ -22,6 +22,7 @@
 #include <ConfigParser.h>
 #include <Logger.h>
 #include <CodeUtils.h>
+#include <Graph.h>
 
 //ROOT headers
 #include <TFile.h>
@@ -51,6 +52,7 @@ void Usage(char* exeName){
 	cout<<"-t, --threshold=[THRESHOLD] \t Flux threshold below which pixels are removed from sources (default=0)"<<endl;
 	cout<<"-T, --threshold_ext=[THRESHOLD_EXT] \t Flux threshold below which pixels are removed from extended sources (default=0)"<<endl;
 	cout<<"-m, --mergeOverlappingSources \t Merge overlapping thresholds after convolution (default=no)"<<endl;
+	cout<<"-e, --enableCompactSourceMerging \t Enable merging of compact sources (default=no)"<<endl;
 	cout<<"-s, --nsigmas=[NSIGMAS] \t Number of sigmas used in convolution gaussian kernel (default=10)"<<endl;
 	cout<<"-v, --verbosity=[LEVEL] \t Log level (<=0=OFF, 1=FATAL, 2=ERROR, 3=WARN, 4=INFO, >=5=DEBUG) (default=INFO)"<<endl;
 	
@@ -69,6 +71,7 @@ static const struct option options_tab[] = {
 	{ "threshold", required_argument, 0, 't'}, //Flux threshold below which pixels are removed from convolved sources
 	{ "threshold_ext", required_argument, 0, 'T'}, //Flux threshold below which pixels are removed from convolved extended sources
 	{ "mergeOverlappingSources", no_argument, 0, 'm'},
+	{ "enableCompactSourceMerging", no_argument, 0, 'e'},
 	{ "nsigmas", required_argument, 0, 's'}, //Gaus conv kernel nsigmas (default=10)
   {(char*)0, (int)0, (int*)0, (int)0}
 };
@@ -78,12 +81,15 @@ static const struct option options_tab[] = {
 int verbosity= 4;//INFO level
 std::string fileName= "";
 std::string outputFileName= "skymodel_conv.root";
+std::string outputFileName_fits= "skymodel_conv.fits";
+std::string outputFileName_ds9regions= "ds9regions.reg";
 double Bmaj= -1;
 double Bmin= -1;
 double Bpa= -1;
 double fluxThr= -1;
 double fluxThr_ext= -1;
 bool mergeOverlappingSources= false;
+bool enableCompactSourceMerging= false;
 int nSigmas= 10;
 int minPixels= 5;
 
@@ -93,14 +99,19 @@ Image* img= 0;
 std::vector<Source*> sources;
 Image* img_conv= 0;
 std::vector<Source*> sources_conv;
+std::vector<Source*> sources_conv_merged;
 TFile* outputFile= 0;
+TTree* sourceTree= 0;
+Source* aSource= 0;	
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
 std::string GetStringLogLevel(int verbosity);
 int ReadData();
 int RunConvolver();
+int MergeSources();
 void Save();
+void SaveDS9RegionFile();
 void Init();
 
 int main(int argc, char *argv[])
@@ -164,7 +175,7 @@ int ParseOptions(int argc, char *argv[])
 	int c = 0;
   int option_index = 0;
 
-	while((c = getopt_long(argc, argv, "hi:o:v:t:T:B:b:a:s:m",options_tab, &option_index)) != -1) {
+	while((c = getopt_long(argc, argv, "hi:o:v:t:T:B:b:a:s:me",options_tab, &option_index)) != -1) {
     
     switch (c) {
 			case 0 : 
@@ -219,6 +230,11 @@ int ParseOptions(int argc, char *argv[])
 			case 'm':
 			{
 				mergeOverlappingSources= true;
+				break;
+			}
+			case 'e':
+			{
+				enableCompactSourceMerging= true;
 				break;
 			}
 			case 's':
@@ -360,17 +376,161 @@ int RunConvolver()
 	INFO_LOG("Computing stats of skymodel convolved image...");
 	img_conv->ComputeStats(true);
 
+	//Merge convolved sources
+	if(mergeOverlappingSources && MergeSources()<0){
+		ERROR_LOG("Failed to merge convolved sources!");
+		return -1;
+	}
+
 	return 0;
 
 }//close RunConvolver()
 
 
+int MergeSources()
+{
+	//## Return if there are no sources to be merged
+	if(sources_conv.empty()){
+		WARN_LOG("No sources to be merged, nothing to be done...");
+		return 0;
+	}
+
+	//## Fill source graph
+	INFO_LOG("Fill list of edge sources to be merged and fill corresponding graph data struct...");
+	Graph mergedSourceGraph;
+	for(size_t i=0;i<sources_conv.size();i++){
+		mergedSourceGraph.AddVertex();
+	}
+
+	//## Find adjacent sources	
+	INFO_LOG("Finding adjacent/overlapping sources (#"<<mergedSourceGraph.GetNVertexes()<<") ...");
+	for(size_t i=0;i<sources_conv.size()-1;i++){	
+		Source* source= sources_conv[i];
+		int type= source->Type;
+		bool isCompactSource= (type==Source::eCompact || type==Source::ePointLike);
+		
+		//Loop neighbors
+		for(size_t j=i+1;j<sources_conv.size();j++){	
+			Source* source_neighbor= sources_conv[j];
+			int type_neighbor= source_neighbor->Type;
+			bool isCompactSource_neighbor= (type_neighbor==Source::eCompact || type_neighbor==Source::ePointLike);
+		
+			//Check if both sources are compact and if they are allowed to be merged
+			if(isCompactSource && isCompactSource_neighbor && !enableCompactSourceMerging){			
+				DEBUG_LOG("Skip merging as both sources (i,j)=("<<i<<","<<j<<") are compact and merging among compact sources is disabled...");
+				continue;
+			}
+		
+			//Check is sources are adjacent
+			//NB: This is time-consuming (N1xN2 more or less)!!!
+			bool areAdjacentSources= source->IsAdjacentSource(source_neighbor);
+			if(!areAdjacentSources) continue;
+
+			//If they are adjacent add linking in graph
+			INFO_LOG("Sources (i,j)=("<<i<<","<<j<<") are adjacent and selected for merging...");
+			mergedSourceGraph.AddEdge(i,j);
+
+		}//end loop sources
+	}//end loop sources
+
+
+	//## Find all connected components in graph corresponding to 
+	//## edge sources to be merged
+	INFO_LOG("Find all connected components in graph corresponding to sources to be merged...");
+	std::vector<std::vector<int>> connected_source_indexes;
+	mergedSourceGraph.GetConnectedComponents(connected_source_indexes);
+	INFO_LOG("#"<<connected_source_indexes.size()<<"/"<<sources_conv.size()<<" sources will be left after merging...");
+		
+	//## Now merge the sources
+	std::vector<int> sourcesToBeRemoved;
+	bool copyPixels= true;//do not create memory for new pixels
+	bool checkIfAdjacent= false;//already done before
+	bool computeStatPars= false;//do not compute stats& pars at each merging
+	bool computeMorphPars= false;
+	bool computeRobustStats= true;
+	bool forceRecomputing= false;//no need to re-compute moments (already updated in AddPixel())
+
+	sources_conv_merged.clear();
+
+	INFO_LOG("Merging sources and adding them to collection...");
+	for(size_t i=0;i<connected_source_indexes.size();i++){
+		if(connected_source_indexes[i].empty()) continue;
+
+		//Get source id=0 of this component
+		int index= connected_source_indexes[i][0];
+		Source* source= sources_conv[index];
+		sourcesToBeRemoved.push_back(index);
+
+		//Create a new source which merges the two
+		Source* merged_source= new Source;
+		*merged_source= *source;
+
+		//Merge other sources in the group if any 
+		int nMerged= 0;
+		
+		for(size_t j=1;j<connected_source_indexes[i].size();j++){
+			int index_adj= connected_source_indexes[i][j];
+			Source* source_adj= sources_conv[j];
+				
+			int status= merged_source->MergeSource(source_adj,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars);
+			if(status<0){
+				WARN_LOG("Failed to merge sources (i,j)=("<<index<<","<<index_adj<<"), skip to next...");
+				continue;
+			}
+			nMerged++;
+
+			//Add this source to the list of edge sources to be removed
+			sourcesToBeRemoved.push_back(index_adj);
+
+		}//end loop of sources to be merged in this component
+
+		//If at least one was merged recompute stats & pars of merged source
+		if(nMerged>0) {
+			DEBUG_LOG("Recomputing stats & moments of merged source in merge group "<<i<<" after #"<<nMerged<<" merged source...");
+			if(merged_source->ComputeStats(computeRobustStats,forceRecomputing)<0){
+				WARN_LOG("Failed to compute stats for merged source in merge group "<<i<<"...");
+				continue;
+			}
+			if(merged_source->ComputeMorphologyParams()<0){
+				WARN_LOG("Failed to compute morph pars for merged source in merge group "<<i<<"...");
+				continue;
+			}
+		}//close if
+
+		//Add merged source to collection
+		sources_conv_merged.push_back(merged_source);
+
+	}//end loop number of components
+
+	INFO_LOG("#"<<sources_conv_merged.size()<<" sources merged...");
+	
+	return 0;
+
+}//close MergeSources()
+
+
+
 void Init()
 {
 	//Open output file
-	if(!outputFile) outputFile= new TFile(outputFileName.c_str(),"RECREATE");
+	if(!outputFile) {
+		INFO_LOG("Opening ROOT file "<<outputFileName<<" ...");
+		outputFile= new TFile(outputFileName.c_str(),"RECREATE");
+	}
 
+	//Create source Tree
+	if(!sourceTree) {
+		INFO_LOG("Creating ROOT Tree SourceInfo ...");
+		sourceTree= new TTree("SourceInfo","SourceInfo");	
+	}
+	aSource= 0;
+	sourceTree->Branch("Source",&aSource);
 	
+	//Define output FITS file name
+	std::string outputFileName_base= CodeUtils::ExtractSubString(outputFileName,".");
+	outputFileName_fits= outputFileName_base + std::string(".fits");
+	INFO_LOG("Set skymodel convolved FITS output to "<<outputFileName_fits<<" ...");
+
 }//close Init()
 
 
@@ -399,6 +559,7 @@ int ReadData()
 	}
 
 	//Read skymodel image
+	INFO_LOG("Reading skymodel image from file "<<fileName<<"...");
 	img= (Image*)inputFile->Get("img");
 	if(!img){
 		ERROR_LOG("Failed to read skymodel image from input file "<<fileName<<"!");
@@ -406,20 +567,19 @@ int ReadData()
 	}
 	
 	//Get access to source trees
-	Source* aSource= 0;
+	INFO_LOG("Get access to source tree from file "<<fileName<<"...");
 
-	TTree* sourceTree= (TTree*)inputFile->Get("SourceInfo");
-	if(!sourceTree || sourceTree->IsZombie()){
+	TTree* sourceDataTree= (TTree*)inputFile->Get("SourceInfo");
+	if(!sourceDataTree || sourceDataTree->IsZombie()){
 		ERROR_LOG("Failed to get access to source tree in file "<<fileName<<"!");	
 		return -1;
 	}
-	sourceTree->SetBranchAddress("Source",&aSource);
+	sourceDataTree->SetBranchAddress("Source",&aSource);
 
-	
 	//Read sources
-	INFO_LOG("Reading #"<<sourceTree->GetEntries()<<" sources in file "<<fileName<<"...");
-	for(int i=0;i<sourceTree->GetEntries();i++){
-		sourceTree->GetEntry(i);
+	INFO_LOG("Reading #"<<sourceDataTree->GetEntries()<<" sources in file "<<fileName<<"...");
+	for(int i=0;i<sourceDataTree->GetEntries();i++){
+		sourceDataTree->GetEntry(i);
 
 		Source* source= new Source;
 		*source= *aSource;
@@ -428,7 +588,6 @@ int ReadData()
 
 	INFO_LOG("#"<<sources.size()<<" sources read...");
 
-	
 	return 0;
 
 }//close ReadData()
@@ -438,14 +597,97 @@ void Save()
 	//Save data to file
 	if(outputFile && outputFile->IsOpen()){
 		outputFile->cd();		
+
+		//Write DS9 regions
+		SaveDS9RegionFile();
+
+		//Write fits image
+		if(img_conv){
+			INFO_LOG("Saving convolved skymodel to FITS file...");
+			if(img_conv->WriteFITS(outputFileName_fits)<0){
+				ERROR_LOG("Failed to write skymodel convolved to FITS file "<<outputFileName_fits<<"!");
+			}
+		}
+
+		//Save convolved skymodel image
 		if(img_conv) {
+			INFO_LOG("Saving convolved skymodel to ROOT file...");
 			img_conv->SetName("img");
 			img_conv->Write(); 
 		}
+
+		//Save source tree?
+		if(sourceTree){
+			INFO_LOG("Filling source ROOT TTree...");
+			if(mergeOverlappingSources){
+				for(size_t k=0;k<sources_conv_merged.size();k++){
+					aSource= sources_conv_merged[k];
+					sourceTree->Fill();
+				}
+			}//close if
+			else{
+				for(size_t k=0;k<sources_conv.size();k++){
+					aSource= sources_conv[k];
+					sourceTree->Fill();
+				}
+			}
+			INFO_LOG("Writing tree to file...");
+			sourceTree->Write();
+		}//close if save source tree
+
 		outputFile->Close();
-	}
+	}//close if file open
 
 }//close Save()
 
+
+void SaveDS9RegionFile(){
+
+	INFO_LOG("Saving "<<sources_conv_merged.size()<<" sources to DS9 region file "<<outputFileName_ds9regions<<" ...");
+	
+	//Open file
+	FILE* fout= fopen(outputFileName_ds9regions.c_str(),"w");
+
+	//Writing header
+	DEBUG_LOG("Saving DS9 region header...");
+	fprintf(fout,"global color=red font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n");
+	fprintf(fout,"image\n");
+	
+	//Writing source regions	
+	std::string colorStr_last= "white";
+	int nSources= static_cast<int>(sources_conv.size());
+	if(mergeOverlappingSources) nSources= static_cast<int>(sources_conv_merged.size());
+
+	for(int k=0;k<nSources;k++){
+		Source* aSource= 0;	
+		if(mergeOverlappingSources) aSource= sources_conv_merged[k];
+		else aSource= sources_conv[k];
+
+		int source_type= aSource->Type;
+		bool isAtEdge= aSource->IsAtEdge();
+
+		//Set source color
+		std::string colorStr= "white";
+		if(source_type==Source::eExtended) colorStr= "green";
+		else if(source_type==Source::eCompactPlusExtended) colorStr= "orange";
+		else if(source_type==Source::ePointLike) colorStr= "red";
+		else if(source_type==Source::eCompact) colorStr= "blue";
+		else colorStr= "magenta";
+		if(colorStr!=colorStr_last){
+			colorStr_last= colorStr;
+			fprintf(fout,"global color=%s font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n",colorStr.c_str());
+		}
+
+		//Get region and write to file
+		std::string regionInfo= aSource->GetDS9Region(true);
+		fprintf(fout,"%s\n",regionInfo.c_str());
+	  	
+	}//end loop sources
+		
+	//Close file
+	DEBUG_LOG("Closing DS9 file region...");
+	fclose(fout);
+
+}//close SaveDS9RegionFile()
 
 
