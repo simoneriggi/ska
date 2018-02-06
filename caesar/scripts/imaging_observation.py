@@ -217,6 +217,7 @@ def main():
 			projection=projection,	
 			deconvolver=deconvolver,
 			gridder=gridder,
+			restoringbeam='common',
 			scales=scales,
 			savefits=False,
 			fitsout='tmpfield.fits',

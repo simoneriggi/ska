@@ -125,7 +125,7 @@ def get_args():
 	# - OUTPUT FILE OPTIONS
 	parser.add_argument('-outputfile', '--outputfile', dest='outputfile', required=False, type=str, default='simmap.fits',action='store',help='Output filename')
 	parser.add_argument('-outputfile_model', '--outputfile_model', dest='outputfile_model', required=False, type=str, default='skymodel.fits', action='store',help='Model filename')
-	parser.add_argument('-outputfile_sources', '--outputfile_sources', dest='outputfile_sources', required=False, type=str, default='sources.root',action='store',help='Source ROOT Output filename')
+	parser.add_argument('-outputfile_sources', '--outputfile_sources', dest='outputfile_sources', required=False, type=str, default='sources.root',action='store',help='Skymodel source ROOT Output filename')
 	parser.add_argument('-outputfile_ds9region', '--outputfile_ds9region', dest='outputfile_ds9region', required=False, type=str, default='dsregion.reg',action='store',help='DS9 source region filename')
 	parser.add_argument('-outputfile_casaregion', '--outputfile_casaregion', dest='outputfile_casaregion', required=False, type=str, default='casa_mask.dat',action='store',help='CASA source region filename')
 	
@@ -616,8 +616,26 @@ class SkyMapSimulator(object):
 		nRows= (data.shape)[0]	
 		nCols= (data.shape)[1]	
 
+		# Set metadata
+		metadata= Caesar.ImgMetaData()
+		metadata.Nx= self.nx
+		metadata.Ny= self.ny
+		metadata.Cx= (int)(self.crpix1)
+		metadata.Cy= (int)(self.crpix2)
+		metadata.Xc= self.crval1
+		metadata.Yc= self.crval2
+		metadata.dX= -self.pixsize/3600.
+		metadata.dY= self.pixsize/3600.
+		metadata.CoordTypeX= self.ctype1
+		metadata.CoordTypeY= self.ctype2
+		metadata.BUnit= 'JY/PIXEL'
+		metadata.Bmaj= self.beam_bmaj/3600.
+		metadata.Bmin= self.beam_bmin/3600.
+		metadata.Bpa= self.beam_bpa
+
 		# Create Caesar image
 		img= Caesar.Image(nCols,nRows,"img")
+		img.SetMetaData(metadata)
 		
 		for index in img_indexes:
 			rowId= index[0]
@@ -647,6 +665,9 @@ class SkyMapSimulator(object):
 		S_max= (self.zmax*self.bkg_rms) + self.bkg_level
 		lgS_min= np.log(S_min)
 		lgS_max= np.log(S_max)
+		randomize_flux= False
+		if self.zmin<self.zmax:
+			randomize_flux= True
 
 		print 'INFO: Generating #',nsources,' compact sources in map...'
 
@@ -674,11 +695,13 @@ class SkyMapSimulator(object):
 
 			## Compute amplitude given significance level and bkg
 			## Generate flux uniform in log
-			lgS= np.random.uniform(lgS_min,lgS_max)
-			S= np.exp(lgS)
-			z= (S-self.bkg_level)/self.bkg_rms
-			#z= random.uniform(self.zmin,self.zmax)
-			#S= (z*self.bkg_rms) + self.bkg_level
+			if randomize_flux:
+				lgS= np.random.uniform(lgS_min,lgS_max)
+				S= np.exp(lgS)
+				z= (S-self.bkg_level)/self.bkg_rms
+			else:
+				S= (self.zmin*self.bkg_rms) + self.bkg_level
+				z= self.zmin
 	
 			## Generate blob
 			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta,trunc_thr=self.trunc_model_zmin)
@@ -724,6 +747,10 @@ class SkyMapSimulator(object):
 		S_max= (self.zmax_ext*self.bkg_rms) + self.bkg_level
 		lgS_min= np.log(S_min)
 		lgS_max= np.log(S_max)
+		randomize_flux= False
+		if self.zmin_ext<self.zmax_ext:
+			randomize_flux= True
+
 		print 'INFO: Generating #',nsources,' extended sources in map...'
 
 		print('INFO: zmin_ext=%s, zmax_ext=%s, Smin=%s, Smax=%s' % (str(self.zmin_ext),str(self.zmax_ext),str(S_min),str(S_max)) )
@@ -752,11 +779,15 @@ class SkyMapSimulator(object):
 
 			## Compute amplitude given significance level and bkg
 			## Generate flux uniform in log
-			lgS= np.random.uniform(lgS_min,lgS_max)
-			S= np.exp(lgS)
-			z= (S-self.bkg_level)/self.bkg_rms
-			#z= random.uniform(self.zmin_ext,self.zmax_ext)
-			#S= (z*self.bkg_rms) + self.bkg_level
+			if randomize_flux:
+				lgS= np.random.uniform(lgS_min,lgS_max)
+				S= np.exp(lgS)
+				z= (S-self.bkg_level)/self.bkg_rms
+				#z= random.uniform(self.zmin_ext,self.zmax_ext)
+				#S= (z*self.bkg_rms) + self.bkg_level
+			else:
+				S= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+				z= self.zmin_ext 			
 
 			## Generate random type (1=ring, 2=ellipse, ...)
 			if self.ext_source_type==-1:
@@ -927,10 +958,10 @@ class SkyMapSimulator(object):
 		scaleFactor= self.beam_area
 		data_casted*= scaleFactor
 
-		## Create Caesar image from data
+		## Create Caesar skymodel image from data (units= Jy/pixel)
 		print ('INFO: Creating Caesar image from data...')
-		self.caesar_img= self.make_caesar_image(data_casted)
-
+		##self.caesar_img= self.make_caesar_image(data_casted)    # set toy sim map data
+		self.caesar_img= self.make_caesar_image(mask_data_casted) # set skymodel map data
 
 		## == WRITE MAPS TO FITS FILES ==
 		print ('INFO: Writing images to FITS...')

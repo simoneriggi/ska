@@ -510,13 +510,14 @@ generate_config(){
 		echo '//==  NESTED SOURCE FINDING OPTIONS        =='
 		echo '//==========================================='
 		echo "searchNestedSources = $SEARCH_NESTED_SOURCES 			  | Search for nested sources inside candidate sources (T/F)"
+		echo "sourceToBeamAreaThrToSearchNested = 5               | Source area/beam thr to add nested sources (e.g. npix>thr*beamArea). NB: thr=0 means always if searchNestedSources is enabled (default=0)"
 		echo 'nestedBlobThrFactor = 1                             | Threshold (multiple of curvature rms) used for nested blob finding'
 		echo 'minNestedMotherDist = 2                             | Minimum distance in pixels (in x or y) between nested and parent blob below which nested is skipped'
 		echo 'maxMatchingPixFraction = 0.5                        | Maximum fraction of matching pixels between nested and parent blob above which nested is skipped'
 		echo '###'
 		echo '###'
 		echo '//=================================='
-		echo '//==  Source fitting options   =='
+		echo '//==  SOURCE FITTING OPTIONS  =='
 		echo '//=================================='
 		echo "fitSources = $FIT_SOURCES                      | Deblend point-like sources with multi-component gaus fit (T/F)"
 		echo 'fitMaxNComponents = 3                          | Maximum number of components fitted in a blob (T/F)'
