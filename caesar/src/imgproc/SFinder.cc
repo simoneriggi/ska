@@ -422,7 +422,6 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(beamBmaj,m_beamFWHMMax);
 	GET_OPTION_VALUE(beamBmin,m_beamFWHMMin);
 	GET_OPTION_VALUE(beamTheta,m_beamTheta);
-	//m_fluxCorrectionFactor= AstroUtils::GetBeamAreaInPixels(m_beamFWHM,m_beamFWHM,m_pixSize,m_pixSize);
 	m_fluxCorrectionFactor= AstroUtils::GetBeamAreaInPixels(m_beamFWHMMax,m_beamFWHMMin,m_pixSize,m_pixSize);
 	INFO_LOG("[PROC "<<m_procId<<"] - User-supplied beam info (bmaj="<<m_beamFWHMMax<<", bmin="<<m_beamFWHMMin<<", theta="<<m_beamTheta<<", dx="<<m_pixSize<<", fluxCorrFactor="<<m_fluxCorrectionFactor<<")");
 
@@ -471,6 +470,7 @@ int SFinder::Configure(){
 	
 	//Get nested source search options
 	GET_OPTION_VALUE(searchNestedSources,m_SearchNestedSources);
+	GET_OPTION_VALUE(sourceToBeamAreaThrToSearchNested,m_SourceToBeamAreaThrToSearchNested);
 	GET_OPTION_VALUE(nestedBlobThrFactor,m_NestedBlobThrFactor);
 	GET_OPTION_VALUE(minNestedMotherDist,m_minNestedMotherDist);
 	GET_OPTION_VALUE(maxMatchingPixFraction,m_maxMatchingPixFraction);
@@ -1056,13 +1056,29 @@ int SFinder::FindSources(std::vector<Source*>& sources,Image* inputImg,double se
 		return -1;
 	}
 
+	//## Compute npixel threshold to add nested sources
+	//Get beam area if available, otherwise use user-supplied beam info
+	double beamArea= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		beamArea= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(beamArea>0 && std::isnormal(beamArea)) hasBeamData= true;
+	}
+	if(!hasBeamData){
+		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		beamArea= m_fluxCorrectionFactor;
+	}
+	long int nPixThrToSearchNested= std::ceil(m_SourceToBeamAreaThrToSearchNested*beamArea);	
+	INFO_LOG("[PROC "<<m_procId<<"] - Assuming a threshold nPix>"<<nPixThrToSearchNested<<" to add nested sources...");
+		
+
 	//## Find sources
 	INFO_LOG("[PROC "<<m_procId<<"] - Finding sources...");	
 	int status= inputImg->FindCompactSource(
 		sources,
 		significanceMap,bkgData,
 		seedThr,mergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
-		m_SearchNestedSources,m_NestedBlobThrFactor, m_minNestedMotherDist, m_maxMatchingPixFraction
+		m_SearchNestedSources,m_NestedBlobThrFactor, m_minNestedMotherDist, m_maxMatchingPixFraction, nPixThrToSearchNested
 	);
 
 	//## Clear data
@@ -1094,6 +1110,22 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 		ERROR_LOG("[PROC "<<m_procId<<"] - Null ptr to input img and/or bkg/task data!");
 		return nullptr;
 	}
+
+	//## Compute npixel threshold to add nested sources
+	//Get beam area if available, otherwise use user-supplied beam info
+	double beamArea= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		beamArea= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(beamArea>0 && std::isnormal(beamArea)) hasBeamData= true;
+	}
+	if(!hasBeamData){
+		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		beamArea= m_fluxCorrectionFactor;
+	}
+	long int nPixThrToSearchNested= std::ceil(m_SourceToBeamAreaThrToSearchNested*beamArea);	
+	INFO_LOG("[PROC "<<m_procId<<"] - Assuming a threshold nPix>"<<nPixThrToSearchNested<<" to add nested sources...");
+		
 
 	//## Copy input image (this will be masked with sources at each iteration)
 	bool copyMetaData= true;
@@ -1175,7 +1207,7 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 			sources_iter,
 			significanceMap_iter,bkgData_iter,
 			seedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
-			m_SearchNestedSources,m_NestedBlobThrFactor, m_minNestedMotherDist, m_maxMatchingPixFraction,
+			m_SearchNestedSources,m_NestedBlobThrFactor, m_minNestedMotherDist, m_maxMatchingPixFraction,nPixThrToSearchNested,
 			curvMap
 		);
 
@@ -1230,10 +1262,19 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 		img->MaskSources(sources_iter,0.);		
 
 		//## Clear iter data
-		delete bkgData_iter;
-		bkgData_iter= 0;
-		delete significanceMap;
-		significanceMap= 0;	
+		if(bkgData_iter){
+			delete bkgData_iter;
+			bkgData_iter= 0;
+		}
+		if(significanceMap_iter){
+			if(k==niter-1){//store significance map at the last iteration
+				significanceMap= significanceMap_iter;
+			}
+			else{
+				delete significanceMap_iter;
+				significanceMap_iter= 0;					
+			}
+		}//close if significance map
 
 	}//end loop iterations
 
@@ -1266,23 +1307,12 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 	}//close if source selection
 
 
-	//## Set flux correction factor
-	double fluxCorrection= 1;
-	bool hasBeamData= false;
-	if(inputImg->HasMetaData()){
-		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
-		if(fluxCorrection>0 && std::isnormal(fluxCorrection)) hasBeamData= true;
-	}
-
-	if(!hasBeamData){
-		INFO_LOG("[PROC "<<m_procId<<"] - Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
-		fluxCorrection= m_fluxCorrectionFactor;
-	}
 	
+	//## Set source pars
 	for(size_t k=0;k<sources.size();k++) {
 		sources[k]->SetId(k+1);
 		sources[k]->SetName(Form("S%d",(signed)(k+1)));
-		sources[k]->SetBeamFluxIntegral(fluxCorrection);
+		sources[k]->SetBeamFluxIntegral(beamArea);
 		sources[k]->Print();
 	}//end loop sources
 			
@@ -1303,12 +1333,30 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 		return nullptr;
 	}
 
+	
 	//## Compute significance map
 	Image* significanceMap= inputImg->GetSignificanceMap(bkgData,m_UseLocalBkg);
 	if(!significanceMap){
 		ERROR_LOG("[PROC "<<m_procId<<"] - Failed to compute significance map!");
 		return nullptr;
 	}
+
+	//## Compute npixel threshold to add nested sources
+	//Get beam area if available, otherwise use user-supplied beam info
+	double beamArea= 1;
+	bool hasBeamData= false;
+	if(inputImg->HasMetaData()){
+		beamArea= inputImg->GetMetaData()->GetBeamFluxIntegral();
+		if(beamArea>0) hasBeamData= true;
+	}
+
+	if(!hasBeamData){
+		INFO_LOG("Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
+		beamArea= m_fluxCorrectionFactor;
+	}
+	long int nPixThrToSearchNested= std::ceil(m_SourceToBeamAreaThrToSearchNested*beamArea);	
+	INFO_LOG("[PROC "<<m_procId<<"] - Assuming a threshold nPix>"<<nPixThrToSearchNested<<" to add nested sources...");
+	
 
 	//## Find sources
 	INFO_LOG("[PROC "<<m_procId<<"] - Finding compact sources...");	
@@ -1317,7 +1365,7 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 		sources,
 		significanceMap,bkgData,
 		m_SeedThr,m_MergeThr,m_NMinPix,m_SearchNegativeExcess,m_MergeBelowSeed,
-		m_SearchNestedSources,m_NestedBlobThrFactor,m_minNestedMotherDist,m_maxMatchingPixFraction
+		m_SearchNestedSources,m_NestedBlobThrFactor,m_minNestedMotherDist,m_maxMatchingPixFraction,nPixThrToSearchNested
 	);
 
 	if(status<0) {
@@ -1335,8 +1383,7 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 	}
 	
 	//## Apply source selection?
-	//int nSources= static_cast<int>(taskData->sources.size());
-	
+	//int nSources= static_cast<int>(taskData->sources.size());	
 	if(m_ApplySourceSelection && nSources>0){
 		if(SelectSources(sources)<0){
 			ERROR_LOG("[PROC "<<m_procId<<"] - Failed to select sources!");
@@ -1348,23 +1395,11 @@ Image* SFinder::FindCompactSources(Image* inputImg, ImgBkgData* bkgData, TaskDat
 	}//close if source selection
 
 
-	//## Set flux correction factor
-	double fluxCorrection= 1;
-	bool hasBeamData= false;
-	if(inputImg->HasMetaData()){
-		fluxCorrection= inputImg->GetMetaData()->GetBeamFluxIntegral();
-		if(fluxCorrection>0) hasBeamData= true;
-	}
-
-	if(!hasBeamData){
-		INFO_LOG("Beam information are not available in image or invalid, using correction factor ("<<m_fluxCorrectionFactor<<") computed from user-supplied beam info ...");	
-		fluxCorrection= m_fluxCorrectionFactor;
-	}
-	
+	//## Set source pars
 	for(size_t k=0;k<sources.size();k++) {
 		sources[k]->SetId(k+1);
 		sources[k]->SetName(Form("S%d",(signed)(k+1)));
-		sources[k]->SetBeamFluxIntegral(fluxCorrection);
+		sources[k]->SetBeamFluxIntegral(beamArea);
 		sources[k]->Print();
 	}	
 			

@@ -393,6 +393,7 @@ class SFinder : public TObject {
 
 		//Nested source search
 		bool m_SearchNestedSources;
+		double m_SourceToBeamAreaThrToSearchNested;
 		double m_NestedBlobThrFactor;
 		double m_minNestedMotherDist;
 		double m_maxMatchingPixFraction;
