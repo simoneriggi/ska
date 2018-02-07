@@ -358,6 +358,7 @@ int RunConvolver()
 		//Get threshold
 		int type= sources[i]->Type;
 		int simtype= sources[i]->SimType;
+		double simmaxscale= sources[i]->SimMaxScale;
 		int flag= sources[i]->Flag;
 		double thr= fluxThr;
 		if(type==Source::eCompact || type==Source::ePointLike){
@@ -421,6 +422,7 @@ int RunConvolver()
 		csources[0]->SetId(source_counter);
 		csources[0]->Type= type;
 		csources[0]->SimType= simtype;
+		csources[0]->SimMaxScale= simmaxscale;
 		csources[0]->Flag= flag;
 		sources_conv.push_back(csources[0]);		
 
