@@ -310,7 +310,7 @@ class Source : public Blob {
 		/**
 		* \brief Merge this source with given source
 		*/
-		int MergeSource(Source* aSource,bool copyPixels=false,bool checkIfAdjacent=true,bool computeStatPars=true,bool computeMorphPars=true);
+		int MergeSource(Source* aSource,bool copyPixels=false,bool checkIfAdjacent=true,bool computeStatPars=true,bool computeMorphPars=true,bool sumMatchingPixels=false);
 
 		/**
 		* \brief Get number of matching pixels between this and another source

@@ -264,7 +264,7 @@ int BlobFinder::FindBlobs(Image* inputImg,std::vector<T*>& blobs,Image* floodImg
 		
 	}//end loop seeds
 
-	INFO_LOG("#"<<blobs.size()<<" blobs found!");
+	DEBUG_LOG("#"<<blobs.size()<<" blobs found!");
 
 	return 0;
 

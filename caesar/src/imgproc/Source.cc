@@ -365,7 +365,7 @@ bool Source::IsAdjacentSource(Source* aSource){
 	}
 
 	//Find if there are adjacent pixels
-	INFO_LOG("Finding if this source (pos=("<<X0<<","<<Y0<<"), #"<<m_Pixels.size()<<" pix) is adjacent to source (pos("<<aSource->X0<<","<<aSource->Y0<<"), #"<<(aSource->m_Pixels).size()<<" pix)");
+	DEBUG_LOG("Finding if this source (pos=("<<X0<<","<<Y0<<"), #"<<m_Pixels.size()<<" pix) is adjacent to source (pos("<<aSource->X0<<","<<aSource->Y0<<"), #"<<(aSource->m_Pixels).size()<<" pix)");
 	auto it = std::find_first_of(
 		(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
 		m_Pixels.begin(), m_Pixels.end(),
@@ -378,7 +378,7 @@ bool Source::IsAdjacentSource(Source* aSource){
   } 
 	else {
 		isAdjacent= true;
-  	INFO_LOG("Sources ("<<this->Id<<","<<aSource->Id<<") are adjacent (found a match at " << std::distance((aSource->m_Pixels).begin(), it)<<")");
+  	DEBUG_LOG("Sources ("<<this->Id<<","<<aSource->Id<<") are adjacent (found a match at " << std::distance((aSource->m_Pixels).begin(), it)<<")");
   }
 
 	return isAdjacent;
@@ -611,7 +611,7 @@ bool Source::FindSourceMatchByPos(SourcePosMatchPars& pars, const std::vector<So
 }//close FindSourceMatchByPos()
 
 
-int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,bool computeStatPars,bool computeMorphPars){
+int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,bool computeStatPars,bool computeMorphPars,bool sumMatchingPixels){
 
 	//Check input sources
 	if(!aSource){
@@ -642,16 +642,38 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 		std::back_inserter(pixelsToBeMerged),
 		PixelMatcher()
 	);
+
+	//Find and sum common pixels (if option enabled)
+	//NB: Do this before adding pixels
+	if(sumMatchingPixels){	
+		//Find common pixels
+		typedef std::vector< std::pair<long int,long int> > IndexPairs;
+		IndexPairs intersect_indexes= CodeUtils::FindIntersectionIndexes ( 
+			m_Pixels.begin(), m_Pixels.end(),
+			(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
+			PixelMatcher(),
+			true
+		);
+		
+		//Sum common pixels fluxes
+		for(size_t i=0;i<intersect_indexes.size();i++){
+			long int index1= intersect_indexes[i].first;
+			long int index2= intersect_indexes[i].second;
+			m_Pixels[index1]->AddPixelFlux( (aSource->m_Pixels)[index2] );
+		}
+	}//close if sumMatchingPixels
   	
-	//If no pixels are to be merged (e.g. all pixels overlapping) return
+	//If no pixels are to be merged (e.g. all pixels overlapping) return?
 	int nMergedPixels= (int)pixelsToBeMerged.size();
 	if(nMergedPixels<=0){
 		WARN_LOG("No pixels to be merged (perfectly overlapping sources?)!");
-		return -1;
+		//return -1;
 	}
-	INFO_LOG("# "<<nMergedPixels<<"/"<<aSource->GetNPixels()<<" pixels to be merged to this source (Npix="<<this->GetNPixels()<<")...");
+	else{
+		INFO_LOG("# "<<nMergedPixels<<"/"<<aSource->GetNPixels()<<" pixels to be merged to this source (Npix="<<this->GetNPixels()<<")...");
+	}
 
-	//Now merge the pixels
+	//Now merge the pixels (if any to be merged)
 	//Source moments will be updated in AddPixel()
 	for(int i=0;i<nMergedPixels;i++){
 		if(this->AddPixel(pixelsToBeMerged[i],copyPixels)<0){
@@ -659,6 +681,8 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 			continue;			
 		}
 	}//end loop pixels to be merged
+
+	
 	
 	//Set new source type
 	int mergedSourceType= aSource->Type;
@@ -686,6 +710,7 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 	if(computeStatPars){
 		bool computeRobustStats= true;
 		bool forceRecomputing= false;//no need to re-compute moments (already updated in AddPixel())
+		if(sumMatchingPixels) forceRecomputing= true;
 		this->ComputeStats(computeRobustStats,forceRecomputing);
 	}
 

@@ -96,6 +96,15 @@ class Pixel : public TObject {
   	}
 
 		/**
+		* \brief Sum pixel
+		*/
+		int AddPixelFlux(Pixel* aPixel){
+			if(!aPixel) return -1;	
+			S+= aPixel->S;
+			return 0;
+		}
+
+		/**
 		* \brief Copy method
 		*/
 		void Copy(TObject& pixel) const;

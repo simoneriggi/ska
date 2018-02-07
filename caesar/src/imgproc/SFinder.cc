@@ -2849,7 +2849,7 @@ int SFinder::SaveDS9RegionFile(){
 
 		//## Saving DS9 file region
 		DEBUG_LOG("[PROC "<<m_procId<<"] - Saving DS9 region header for fitted source catalog...");
-		fprintf(fout_fit,"global color=blue font=\"helvetica 12 normal\" edit=1 move=1 delete=1 include=1\n");
+		fprintf(fout_fit,"global color=blue font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n");
 		fprintf(fout_fit,"image\n");
 
 		DEBUG_LOG("[PROC "<<m_procId<<"] - Saving "<<m_SourceCollection.size()<<" sources to file...");
