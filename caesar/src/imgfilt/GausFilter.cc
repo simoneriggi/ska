@@ -72,8 +72,8 @@ Image* GausFilter::GetGausFilter(Image* image,double bmaj,double bmin,double bpa
 		ERROR_LOG("Input image has no metadata (needed to convert given bmaj/bmin/bpa into pixels)!");
 		return nullptr;
 	}
-	double dX= metadata->dX*3600;//convert to arcsec
-	double dY= metadata->dY*3600;//convert to arcsec
+	double dX= fabs(metadata->dX*3600);//convert to arcsec
+	double dY= fabs(metadata->dY*3600);//convert to arcsec
 
 	//## Check bmaj/bmin
 	if(bmin>bmaj){
@@ -98,7 +98,7 @@ Image* GausFilter::GetGausFilter(Image* image,double bmaj,double bmin,double bpa
 	int kernSizeY= (static_cast<int>(nSigmas*sigmaY + 0.5) + 1) * 2;
 	int kernSize= max(kernSizeX,kernSizeY);
 	if (kernSize%2==0) kernSize++;
-	INFO_LOG("kernSize="<<kernSize<<" pixSize="<<pixSize<<", sigmaX="<<sigmaX<<", sigmaY="<<sigmaY);
+	DEBUG_LOG("kernSize="<<kernSize<<" pixSize="<<pixSize<<", sigmaX="<<sigmaX<<", sigmaY="<<sigmaY);
 
 	//## Init kernels
 	cv::Mat kernel= BuildKernel(kernSize,sigmaX,sigmaY,theta_rad,scale);
@@ -149,19 +149,6 @@ cv::Mat GausFilter::BuildKernel(int kernSize,double sigmaX,double sigmaY,double 
 		}//end loop j
 	}//end loop i
 	
-	INFO_LOG("Kernel maxValue="<<maxValue);
-
-	//Get kernel min/max
-	//double kernelMinVal; 
-	//double kernelMaxVal; 
-	//cv::Point kernelMinLoc; 
-	//cv::Point kernelMaxLoc;
-	//cv::minMaxLoc(kernel, &kernelMinVal, &kernelMaxVal, &kernelMinLoc, &kernelMaxLoc);
-
-	//Get kernel mean
-	//cv::Scalar kernelMean= cv::mean(kernel);
-	//cv::subtract(kernel,kernelMean,kernel);
-
 	return kernel;
 
 }//close BuildKernel()
@@ -183,22 +170,6 @@ double GausFilter::Gaus2DFcn(double ampl,double x,double y,double sigmaX,double 
  	double c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2));
 
 	double fcn= ampl * exp(-((a * xdiff * xdiff) + (b * xdiff * ydiff) + (c * ydiff * ydiff)));
-
-	/*
-	cost2 = np.cos(theta) ** 2
-        sint2 = np.sin(theta) ** 2
-        sin2t = np.sin(2. * theta)
-        xstd2 = x_stddev ** 2
-        ystd2 = y_stddev ** 2
-        xdiff = x - x_mean
-        ydiff = y - y_mean
-        a = 0.5 * ((cost2 / xstd2) + (sint2 / ystd2))
-        b = 0.5 * ((sin2t / xstd2) - (sin2t / ystd2))
-        c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2))
-        return ampl * np.exp(-((a * xdiff ** 2) + (b * xdiff * ydiff) +
-                                    (c * ydiff ** 2)))
-	*/
-
 	
 	return fcn;
 

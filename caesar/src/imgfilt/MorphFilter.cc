@@ -321,7 +321,7 @@ Image* MorphFilter::GetFiltered(std::vector<long int>& peakPixelIds,Image* img,i
 		ERROR_LOG("Invalid morph operation given ("<<morphOp<<")!");
 		return nullptr;
 	}
-	
+
 	//## Compare original and filtered image
 	cv::Mat mat_cmp = cv::Mat::zeros(Ny,Nx,CV_8UC1);
 	cv::compare(mat, mat_morph, mat_cmp, cv::CMP_EQ);
@@ -339,14 +339,15 @@ Image* MorphFilter::GetFiltered(std::vector<long int>& peakPixelIds,Image* img,i
 			int colId= i;
 			double binContent= img->GetPixelValue(i,j);
 			double matrixElement= mat_morph.at<double>(rowId,colId);
+			//MorphImg->FillPixel(i,j,matrixElement);
 				
-			MorphImg->FillPixel(i,j,matrixElement);
-
 			float mat_comparison= (float)mat_cmp.at<unsigned char>(rowId,colId);
+			MorphImg->FillPixel(i,j,mat_comparison);//DEBUG
+
 			bool borderCheck= (!skipBorders || (skipBorders && i>0 && j>0 && i<Nx-1 && j<Ny-1) );
 
 			if( mat_comparison==255 && borderCheck && std::isnormal(binContent) ){
-				//INFO_LOG("Found local maximum pixel ("<<i<<","<<j<<"), check surrounding pixel to confirm...");
+				INFO_LOG("Found local maximum pixel ("<<i<<","<<j<<"), check surrounding pixel to confirm...");
 
 				//## Check surrounding pixels (do not tag as peak if the surrounding 3x3 is flat)
 				bool isFlatArea= true;
@@ -368,9 +369,9 @@ Image* MorphFilter::GetFiltered(std::vector<long int>& peakPixelIds,Image* img,i
 					peakPixelIds.push_back(gBin);
 					npeaks++;			
 				}
-				//else{
-				//	INFO_LOG("Local maximum pixel found ("<<i<<","<<j<<") not confirmed (flat surrounding)...");
-				//}
+				else{
+					INFO_LOG("Local maximum pixel found ("<<i<<","<<j<<") not confirmed (flat surrounding)...");
+				}
 			}//close if check local maximum
 		}//end loop x
 	}//end loop y

@@ -148,11 +148,11 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 	}
 
 	//## Compute dissimilarity matrix
-	TMatrixD* ColorDistMatrix= new TMatrixD(nRegions,nRegions);
-	ColorDistMatrix->Zero();
+	//TMatrixD* ColorDistMatrix= new TMatrixD(nRegions,nRegions);
+	//ColorDistMatrix->Zero();
+	//TMatrixD* SpatialDistMatrix= new TMatrixD(nRegions,nRegions);
+	//SpatialDistMatrix->Zero();
 
-	TMatrixD* SpatialDistMatrix= new TMatrixD(nRegions,nRegions);
-	SpatialDistMatrix->Zero();
 	double dist_c_min= 1.e+99;
 	double dist_c_max= -1.e+99;
 	double dist_s_min= 1.e+99;
@@ -179,11 +179,11 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 			if(useRobustPars) dist_c= fabs(median_i-median_j);
 			double dist_s= sqrt( (Xc_i-Xc_j)*(Xc_i-Xc_j) + (Yc_i-Yc_j)*(Yc_i-Yc_j) ); 
 			
-			(*ColorDistMatrix)(i,j)= dist_c;
-			(*ColorDistMatrix)(j,i)= dist_c;
+			//(*ColorDistMatrix)(i,j)= dist_c;
+			//(*ColorDistMatrix)(j,i)= dist_c;
 
-			(*SpatialDistMatrix)(i,j)= dist_s;
-			(*SpatialDistMatrix)(j,i)= dist_s;
+			//(*SpatialDistMatrix)(i,j)= dist_s;
+			//(*SpatialDistMatrix)(j,i)= dist_s;
 
 			//Find min & max
 			if(dist_c<dist_c_min) dist_c_min= dist_c;
@@ -202,6 +202,7 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 	double NormMin= 0;
 	double NormMax= 1;
 
+	/*
 	for(size_t i=0;i<nRegions;i++){
 		for(size_t j=i+1;j<nRegions;j++){
 			
@@ -220,7 +221,9 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 	}//end loop regions
 	
 	INFO_LOG("Color dist min/max: "<<ColorDistMatrix->Min()<<"/"<<ColorDistMatrix->Max()<<", Spatial dist min/max: "<<SpatialDistMatrix->Min()<<"/"<<SpatialDistMatrix->Max());
+	*/
 
+	
 	//## Create saliency image
 	TString imgName= Form("%s_saliency",img->GetName().c_str());
 	Image* saliencyImg= (Image*)img->GetCloned(std::string(imgName),true,true);
@@ -235,13 +238,37 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 
 	for(int i=0;i<nRegions;i++){
 
+		//Region pars i-th
+		double mu_i= regions[i]->Mean;
+		double median_i= regions[i]->Median;
+		double Xc_i= regions[i]->X0;
+		double Yc_i= regions[i]->Y0;
+
 		std::vector<double> dissList;
 
 		for(int j=0;j<nRegions;j++){
 			//if(i==j) continue;
-			double dist_c= (*ColorDistMatrix)(i,j);
-			double dist_s= (*SpatialDistMatrix)(i,j);
-			double dist= dist_c/(1 + distanceRegPar*dist_s);
+
+			//Region pars j-th
+			double mu_j= regions[j]->Mean;
+			double median_j= regions[j]->Median;
+			double Xc_j= regions[j]->X0;
+			double Yc_j= regions[j]->Y0;
+					
+			//Compute color & spatial distances
+			double dist_c= fabs(mu_i-mu_j);
+			if(useRobustPars) dist_c= fabs(median_i-median_j);
+			double dist_s= sqrt( (Xc_i-Xc_j)*(Xc_i-Xc_j) + (Yc_i-Yc_j)*(Yc_i-Yc_j) ); 
+
+			//Normalize color & spatial distances
+			double dist_c_norm= NormMin + (NormMax-NormMin)*(dist_c-dist_c_min)/(dist_c_max-dist_c_min);
+			double dist_s_norm= NormMin + (NormMax-NormMin)*(dist_s-dist_s_min)/(dist_s_max-dist_s_min);	
+
+			
+			//double dist_c= (*ColorDistMatrix)(i,j);
+			//double dist_s= (*SpatialDistMatrix)(i,j);
+			//double dist= dist_c/(1 + distanceRegPar*dist_s);
+			double dist= dist_c_norm/(1 + distanceRegPar*dist_s_norm);
 			double dissimilarity= exp(-expFalloffPar*dist);
 
 			dissList.push_back(dissimilarity);
@@ -271,8 +298,8 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 	DEBUG_LOG("Saliency min/max="<<Smin<<"/"<<Smax);
 	
 	//## Delete matrix		
-	if(ColorDistMatrix) ColorDistMatrix->Delete();
-	if(SpatialDistMatrix) SpatialDistMatrix->Delete();
+	//if(ColorDistMatrix) ColorDistMatrix->Delete();
+	//if(SpatialDistMatrix) SpatialDistMatrix->Delete();
 
 	
 	//## Normalize saliency and fill maps
@@ -286,9 +313,6 @@ Image* SaliencyFilter::ComputeSaliencyMap(Image* img,std::vector<Region*>const& 
 		//Fill image
 		for(size_t j=0;j<regions[i]->GetNPixels();j++){//loop on pixels inside region
 			Pixel* thisPixel= regions[i]->GetPixel(j);
-			//double x= thisPixel->x;
-			//double y= thisPixel->y;
-			//saliencyImg->FillPixel(x,y,Saliency);
 			long int ix= thisPixel->ix;
 			long int iy= thisPixel->iy;
 			saliencyImg->FillPixel(ix,iy,Saliency);
