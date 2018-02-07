@@ -661,6 +661,11 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 			long int index2= intersect_indexes[i].second;
 			m_Pixels[index1]->AddPixelFlux( (aSource->m_Pixels)[index2] );
 		}
+
+		//Sum true fluxes
+		if(m_HasTrueInfo && aSource->HasTrueInfo()){
+			m_S_true+= aSource->GetTrueFlux();
+		}
 	}//close if sumMatchingPixels
   	
 	//If no pixels are to be merged (e.g. all pixels overlapping) return?
