@@ -424,6 +424,12 @@ int RunConvolver()
 		csources[0]->SimType= simtype;
 		csources[0]->SimMaxScale= simmaxscale;
 		csources[0]->Flag= flag;
+		if(sources[i]->HasTrueInfo()){
+			double S_true= sources[i]->GetTrueFlux(); 
+			double X0_true, Y0_true;
+			sources[i]->GetTruePos(X0_true,Y0_true);
+			csources[0]->SetTrueInfo(S_true,X0_true,Y0_true);
+		}
 		sources_conv.push_back(csources[0]);		
 
 		//Add convolved image to skymodel
