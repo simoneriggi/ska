@@ -614,7 +614,7 @@ class StatsUtils : public TObject {
 
 			//Check if there are still data
 			if(vec_clipped.empty()){
-				INFO_LOG("Clipped data is empty, return.");
+				DEBUG_LOG("Clipped data is empty, return.");
 				return -1;
 			}
 

@@ -276,6 +276,10 @@ class CodeUtils : public TObject {
   		const T arr;
 		};
 
+		
+		/**
+		* \brief Reorder vector
+		*/
 		template< class T >
 			static void reorder(std::vector<T> & unordered,std::vector<size_t> const & index_map,std::vector<T> & ordered){
   			// copy for the reorder according to index_map, because unsorted may also be
@@ -286,31 +290,114 @@ class CodeUtils : public TObject {
 					ordered[i] = copy[index_map[i]];
 			}
 
+		/**
+		* \brief Sort vector
+		*/
 		template <class T>
-			static void sort(std::vector<T> & unsorted,std::vector<T> & sorted,std::vector<size_t> & index_map){
-  			// Original unsorted index map
-  			index_map.resize(unsorted.size());
- 				for(size_t i=0;i<unsorted.size();i++)
-					index_map[i] = i;
+		static void sort(std::vector<T> & unsorted,std::vector<T> & sorted,std::vector<size_t> & index_map){
+  		// Original unsorted index map
+  		index_map.resize(unsorted.size());
+ 			for(size_t i=0;i<unsorted.size();i++)
+				index_map[i] = i;
   
-  			// Sort the index map, using unsorted for comparison
-  			std::sort(index_map.begin(),index_map.end(),index_cmp<std::vector<T>& >(unsorted));
-  			sorted.resize(unsorted.size());
-  			reorder(unsorted,index_map,sorted);
-			}
+  		// Sort the index map, using unsorted for comparison
+  		std::sort(index_map.begin(),index_map.end(),index_cmp<std::vector<T>& >(unsorted));
+  		sorted.resize(unsorted.size());
+  		reorder(unsorted,index_map,sorted);
+		}
 	
+		/**
+		* \brief Sort vector in descending order
+		*/
 		template <class T>
-			static void sort_descending(std::vector<T> & unsorted,std::vector<T> & sorted,std::vector<size_t> & index_map){
-  			// Original unsorted index map
-  			index_map.resize(unsorted.size());
- 				for(size_t i=0;i<unsorted.size();i++)
-					index_map[i] = i;
+		static void sort_descending(std::vector<T> & unsorted,std::vector<T> & sorted,std::vector<size_t> & index_map){
+  		// Original unsorted index map
+  		index_map.resize(unsorted.size());
+ 			for(size_t i=0;i<unsorted.size();i++)
+				index_map[i] = i;
   
-  			// Sort the index map, using unsorted for comparison
-  			std::sort(index_map.begin(),index_map.end(),descending_index_cmp<std::vector<T>& >(unsorted));
-  			sorted.resize(unsorted.size());
-  			reorder(unsorted,index_map,sorted);
+  		// Sort the index map, using unsorted for comparison
+  		std::sort(index_map.begin(),index_map.end(),descending_index_cmp<std::vector<T>& >(unsorted));
+  		sorted.resize(unsorted.size());
+  		reorder(unsorted,index_map,sorted);
+		}
+
+		typedef std::vector< std::pair<long int,long int> > IndexPairs;
+
+		/**
+		* \brief Find index of equal elements in two vectors. 
+		*/
+		template <class Iterator,class Comparator>
+		static IndexPairs FindIntersectionIndexes(Iterator first1,Iterator last1,Iterator first2,Iterator last2,Comparator comp,bool sorted=false)
+		{			
+			//Sort vectors if not sorted
+			if(!sorted){
+				std::sort( first1, last1, comp );
+				std::sort( first2, last2, comp );
 			}
+
+			//Find intersection indexes
+			IndexPairs indexes;
+			Iterator begin1= first1;
+			Iterator begin2= first2;
+	
+			while (first1 != last1 && first2 != last2) {
+  			if (comp(*first1, *first2)) {
+    			++first1;
+    		} 
+				else if(comp(*first2, *first1)){
+					++first2;
+				}
+				else {
+					long int index1= std::distance(begin1,first1);
+					long int index2= std::distance(begin2,first2);
+					indexes.push_back( std::make_pair(index1,index2) );
+					++first1;
+					++first2;
+   			}
+ 			}//end while loop
+
+			return indexes;
+
+		}//close FindIntersectionIndexes()
+		
+
+		/*
+		template <class Iterator,class Comparator>
+		static std::vector<std::pair<long int,long int>> FindIntersectionIndexes(
+			Iterator first1,Iterator last1,
+			Iterator first2,Iterator last2,
+			Comparator comp,
+			bool sorted=false)
+		{
+			//Sort vectors if not sorted
+			if(!sorted){
+				std::sort( first1, last1, comp() );
+				std::sort( first2, last2, comp() );
+			}
+			std::vector<std::pair<long int,long int>> indexes;
+			long int i= 0;
+			long int j= 0;
+			while (i < n1 && j < n2) {
+    		//if (v1[i] > v2[j]) {
+				if ( comp(v2[j],v1[i]) ) {
+      		j++;
+    		} 
+				//else if (v2[j] > v1[i]) {
+				else if( comp(v1[i],v2[j]) ) {
+      		i++;
+    		} 
+				else {
+					indexes.push_back( std::make_pair(i,j) );
+      		i++;
+      		j++;
+    		}
+  		}//end while loop
+	
+			return indexes;
+
+		}//close FindIntersectionIndexes()
+		*/
 
 		/**
 		* \brief String find and replace
