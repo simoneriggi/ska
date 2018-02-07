@@ -45,17 +45,19 @@ void Usage(char* exeName){
 	cout<<"Options:"<<endl;
   cout<<"-h, --help \t Show help message and exit"<<endl;
 	cout<<"-i, --input=[INPUT_FILE] \t Input file name containing sources to be read in ROOT TTree (.root)"<<endl;
-	cout<<"-o, --output=[OUTPUT_FILE] \t Output file name "<<endl;
-	cout<<"-B, --bmaj=[BMAJ] \t Bmaj in arcsec (NB: Mandatory)"<<endl;
-	cout<<"-b, --bmin=[BMAJ] \t Bmin in arcsec (NB: Mandatory)"<<endl;
-	cout<<"-a, --bpa=[BMAJ] \t Bpa in degrees (NB: Mandatory)"<<endl;
+	cout<<"-I, --input-rec=[INPUT_FILE_REC] \t Input FITS file name with rec map (.fits)"<<endl;
+	cout<<"-o, --output=[OUTPUT_FILE] \t Output file name containing convolved sources (.root)"<<endl;
+	cout<<"-O, --output-map=[OUTPUT_FILE_MAP] \t Output FITS file name containing convolved map (.fits)"<<endl;
+	cout<<"-r, --output-ds9=[OUTPUT_FILE] \t Output DS9 region file name "<<endl;
+	cout<<"-B, --bmaj=[BMAJ] \t Bmaj in arcsec (NB: Overridden if --input-rec is given)"<<endl;
+	cout<<"-b, --bmin=[BMAJ] \t Bmin in arcsec (NB: Overridden if --input-rec is given)"<<endl;
+	cout<<"-a, --bpa=[BMAJ] \t Bpa in degrees (NB: Overridden if --input-rec is given)"<<endl;
 	cout<<"-t, --threshold=[THRESHOLD] \t Flux threshold below which pixels are removed from sources (default=0)"<<endl;
-	cout<<"-T, --threshold_ext=[THRESHOLD_EXT] \t Flux threshold below which pixels are removed from extended sources (default=0)"<<endl;
-	cout<<"-m, --mergeOverlappingSources \t Merge overlapping thresholds after convolution (default=no)"<<endl;
-	cout<<"-e, --enableCompactSourceMerging \t Enable merging of compact sources (default=no)"<<endl;
+	cout<<"-T, --threshold-ext=[THRESHOLD_EXT] \t Flux threshold below which pixels are removed from extended sources (default=0)"<<endl;
+	cout<<"-m, --mergesources \t Merge overlapping thresholds after convolution (default=no)"<<endl;
+	cout<<"-e, --mergecompactsources \t Enable merging of compact sources (default=no)"<<endl;
 	cout<<"-s, --nsigmas=[NSIGMAS] \t Number of sigmas used in convolution gaussian kernel (default=10)"<<endl;
 	cout<<"-v, --verbosity=[LEVEL] \t Log level (<=0=OFF, 1=FATAL, 2=ERROR, 3=WARN, 4=INFO, >=5=DEBUG) (default=INFO)"<<endl;
-	
 	cout<<"=============================="<<endl;
 }//close Usage()
 
@@ -63,15 +65,18 @@ static const struct option options_tab[] = {
   /* name, has_arg, &flag, val */
   { "help", no_argument, 0, 'h' },
 	{ "verbosity", required_argument, 0, 'v'},
-	{ "input", required_argument, 0, 'i' },	
-	{ "output", optional_argument, 0, 'o' },
+	{ "input", required_argument, 0, 'i' },
+	{ "input-rec", required_argument, 0, 'I' },	
+	{ "output", required_argument, 0, 'o' },
+	{ "output-map", required_argument, 0, 'O' },
+	{ "output-ds9", required_argument, 0, 'r' },
 	{ "bmaj", required_argument, 0, 'B'}, //Bmaj
 	{ "bmin", required_argument, 0, 'b'}, //Bmin
 	{ "bpa", required_argument, 0, 'a'}, //Pos angle
 	{ "threshold", required_argument, 0, 't'}, //Flux threshold below which pixels are removed from convolved sources
-	{ "threshold_ext", required_argument, 0, 'T'}, //Flux threshold below which pixels are removed from convolved extended sources
-	{ "mergeOverlappingSources", no_argument, 0, 'm'},
-	{ "enableCompactSourceMerging", no_argument, 0, 'e'},
+	{ "threshold-ext", required_argument, 0, 'T'}, //Flux threshold below which pixels are removed from convolved extended sources
+	{ "mergesources", no_argument, 0, 'm'},
+	{ "mergecompactsources", no_argument, 0, 'e'},
 	{ "nsigmas", required_argument, 0, 's'}, //Gaus conv kernel nsigmas (default=10)
   {(char*)0, (int)0, (int*)0, (int)0}
 };
@@ -80,9 +85,18 @@ static const struct option options_tab[] = {
 //Options
 int verbosity= 4;//INFO level
 std::string fileName= "";
+std::string fileName_recmap= "";
+bool recMapGiven= false;
 std::string outputFileName= "skymodel_conv.root";
+bool outputFileNameGiven= false;
 std::string outputFileName_fits= "skymodel_conv.fits";
+bool outputFileNameGiven_fits= false;
 std::string outputFileName_ds9regions= "ds9regions.reg";
+bool outputFileNameGiven_ds9regions= false;
+
+bool bmajGiven= false;
+bool bminGiven= false;
+bool bpaGiven= false;
 double Bmaj= -1;
 double Bmin= -1;
 double Bpa= -1;
@@ -92,7 +106,6 @@ bool mergeOverlappingSources= false;
 bool enableCompactSourceMerging= false;
 int nSigmas= 10;
 int minPixels= 5;
-
 
 //Vars
 Image* img= 0;
@@ -175,7 +188,7 @@ int ParseOptions(int argc, char *argv[])
 	int c = 0;
   int option_index = 0;
 
-	while((c = getopt_long(argc, argv, "hi:o:v:t:T:B:b:a:s:me",options_tab, &option_index)) != -1) {
+	while((c = getopt_long(argc, argv, "hi:I:o:O:r:v:t:T:B:b:a:s:me",options_tab, &option_index)) != -1) {
     
     switch (c) {
 			case 0 : 
@@ -192,10 +205,29 @@ int ParseOptions(int argc, char *argv[])
 				fileName= std::string(optarg);	
 				break;	
 			}
+			case 'I':	
+			{
+				fileName_recmap= std::string(optarg);	
+				recMapGiven= true;
+				break;	
+			}
 			case 'o':	
 			{
 				outputFileName= std::string(optarg);	
+				outputFileNameGiven= true;
 				break;	
+			}
+			case 'O':	
+			{
+				outputFileName_fits= std::string(optarg);
+				outputFileNameGiven_fits= true;
+				break;
+			}
+			case 'r':	
+			{
+				outputFileName_ds9regions= std::string(optarg);
+				outputFileNameGiven_ds9regions= true;
+				break;
 			}
 			case 'v':	
 			{
@@ -215,16 +247,19 @@ int ParseOptions(int argc, char *argv[])
 			case 'B':
 			{
 				Bmaj= atof(optarg);
+				bmajGiven= true;
 				break;
 			}
 			case 'b':
 			{
 				Bmin= atof(optarg);
+				bminGiven= true;
 				break;
 			}
 			case 'a':
 			{
 				Bpa= atof(optarg);
+				bpaGiven= true;
 				break;
 			}
 			case 'm':
@@ -261,14 +296,32 @@ int ParseOptions(int argc, char *argv[])
 	//=======================
 	//== Check args 
 	//=======================
-	if(Bmin<0 || Bmaj<0 || Bpa<0){
-		ERROR_LOG("Invalid beam parameters given (hint: beam pars are mandatory and shall be >0)");
-		return -1;
-	}
+	//Check input file
 	if(fileName==""){
 		ERROR_LOG("Invalid/empty input file name given!");
 		return -1;
 	}
+
+	//Check rec map (if given)
+	if(recMapGiven){
+		if(fileName_recmap==""){
+			ERROR_LOG("Empty rec map filename given!");	
+			return -1;
+		}
+	}
+	else{
+		bool userBeamGiven= (bmajGiven && bminGiven && bpaGiven);
+		if(!userBeamGiven){
+			ERROR_LOG("No or incomplete beam parameters given (hint: when recmap is not given as argument all beam pars must be specified!)");
+			return -1;
+		}
+		if(Bmin<0 || Bmaj<0 || Bpa<0){
+			ERROR_LOG("Invalid beam parameters given (hint: beam pars are mandatory and shall be >0)");
+			return -1;
+		}
+	}//close else
+
+	//Check nsigmas
 	if(nSigmas<=0){
 		ERROR_LOG("Invalid nsigma arg given (hint: shall be >0)!");
 		return -1;
@@ -297,9 +350,15 @@ int RunConvolver()
 	img_conv= img->GetCloned("",true,true);
 	img_conv->Reset();
 
+	int source_counter= 0;
+
 	for(size_t i=0;i<sources.size();i++){
+		if(i%100==0) INFO_LOG("#"<<i+1<<"/"<<sources.size()<<" sources convolved...");
+
 		//Get threshold
 		int type= sources[i]->Type;
+		int simtype= sources[i]->SimType;
+		int flag= sources[i]->Flag;
 		double thr= fluxThr;
 		if(type==Source::eCompact || type==Source::ePointLike){
 			thr= fluxThr;
@@ -342,7 +401,6 @@ int RunConvolver()
 			return -1;
 		}
 	
-		
 		if(csources.size()>1){
 			ERROR_LOG("More than 1 source found in convolved image (this should not occur...)!");
 			delete sourceImg_conv;
@@ -357,6 +415,13 @@ int RunConvolver()
 		}
 
 		//Add convolved source to list
+		source_counter++;
+		TString sourceName= Form("S%d",source_counter);
+		csources[0]->SetName(std::string(sourceName));	
+		csources[0]->SetId(source_counter);
+		csources[0]->Type= type;
+		csources[0]->SimType= simtype;
+		csources[0]->Flag= flag;
 		sources_conv.push_back(csources[0]);		
 
 		//Add convolved image to skymodel
@@ -367,10 +432,18 @@ int RunConvolver()
 		delete sourceImg_conv;
 		sourceImg_conv= 0;
 
-		
 	}//end loop sources
 
 	INFO_LOG("#"<<sources_conv.size()<<" sources present after convolution...");
+
+	//Set header
+	ImgMetaData* metadata= img_conv->GetMetaData();
+	if(metadata){
+		metadata->BUnit= "Jy/beam"; 
+		metadata->Bmaj= Bmaj/3600.;
+		metadata->Bmin= Bmin/3600.;
+		metadata->Bpa= Bpa;
+	}
 
 	//Compute stats of skymodel convolved image
 	INFO_LOG("Computing stats of skymodel convolved image...");
@@ -396,15 +469,18 @@ int MergeSources()
 	}
 
 	//## Fill source graph
-	INFO_LOG("Fill list of edge sources to be merged and fill corresponding graph data struct...");
+	INFO_LOG("Fill list of sources to be merged and fill corresponding graph data struct...");
 	Graph mergedSourceGraph;
+	std::vector<bool> isMergeableSource;
 	for(size_t i=0;i<sources_conv.size();i++){
 		mergedSourceGraph.AddVertex();
+		isMergeableSource.push_back(false);
 	}
 
 	//## Find adjacent sources	
 	INFO_LOG("Finding adjacent/overlapping sources (#"<<mergedSourceGraph.GetNVertexes()<<") ...");
-	for(size_t i=0;i<sources_conv.size()-1;i++){	
+	
+	for(size_t i=0;i<sources_conv.size()-1;i++){
 		Source* source= sources_conv[i];
 		int type= source->Type;
 		bool isCompactSource= (type==Source::eCompact || type==Source::ePointLike);
@@ -429,13 +505,23 @@ int MergeSources()
 			//If they are adjacent add linking in graph
 			INFO_LOG("Sources (i,j)=("<<i<<","<<j<<") are adjacent and selected for merging...");
 			mergedSourceGraph.AddEdge(i,j);
-
+			isMergeableSource[i]= true;
+			isMergeableSource[j]= true;
 		}//end loop sources
 	}//end loop sources
 
 
-	//## Find all connected components in graph corresponding to 
-	//## edge sources to be merged
+	//## Add to merged collection all sources not mergeable
+	for(size_t i=0;i<sources_conv.size();i++){
+		bool isMergeable= isMergeableSource[i];
+		if(isMergeable) continue;
+		Source* merged_source= new Source;
+		*merged_source= *(sources_conv[i]);
+		sources_conv_merged.push_back(merged_source);
+	}
+
+
+	//## Find all connected components in graph corresponding to sources to be merged
 	INFO_LOG("Find all connected components in graph corresponding to sources to be merged...");
 	std::vector<std::vector<int>> connected_source_indexes;
 	mergedSourceGraph.GetConnectedComponents(connected_source_indexes);
@@ -445,11 +531,12 @@ int MergeSources()
 	std::vector<int> sourcesToBeRemoved;
 	bool copyPixels= true;//do not create memory for new pixels
 	bool checkIfAdjacent= false;//already done before
+	bool sumMatchingPixels= true;
 	bool computeStatPars= false;//do not compute stats& pars at each merging
 	bool computeMorphPars= false;
 	bool computeRobustStats= true;
-	bool forceRecomputing= false;//no need to re-compute moments (already updated in AddPixel())
-
+	bool forceRecomputing= true;//need to re-compute moments because pixel flux of merged sources are summed up
+	
 	sources_conv_merged.clear();
 
 	INFO_LOG("Merging sources and adding them to collection...");
@@ -470,9 +557,9 @@ int MergeSources()
 		
 		for(size_t j=1;j<connected_source_indexes[i].size();j++){
 			int index_adj= connected_source_indexes[i][j];
-			Source* source_adj= sources_conv[j];
+			Source* source_adj= sources_conv[index_adj];
 				
-			int status= merged_source->MergeSource(source_adj,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars);
+			int status= merged_source->MergeSource(source_adj,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars,sumMatchingPixels);
 			if(status<0){
 				WARN_LOG("Failed to merge sources (i,j)=("<<index<<","<<index_adj<<"), skip to next...");
 				continue;
@@ -502,7 +589,7 @@ int MergeSources()
 
 	}//end loop number of components
 
-	INFO_LOG("#"<<sources_conv_merged.size()<<" sources merged...");
+	INFO_LOG("#"<<sources_conv_merged.size()<<" sources present in merged collection...");
 	
 	return 0;
 
@@ -528,8 +615,16 @@ void Init()
 	
 	//Define output FITS file name
 	std::string outputFileName_base= CodeUtils::ExtractSubString(outputFileName,".");
-	outputFileName_fits= outputFileName_base + std::string(".fits");
-	INFO_LOG("Set skymodel convolved FITS output to "<<outputFileName_fits<<" ...");
+	if(!outputFileNameGiven_fits){		
+		outputFileName_fits= outputFileName_base + std::string(".fits");
+		INFO_LOG("Set skymodel convolved FITS output to "<<outputFileName_fits<<" ...");
+	}
+
+	//Define output FITS file name
+	if(!outputFileNameGiven_ds9regions){
+		outputFileName_ds9regions= outputFileName_base + std::string(".reg");
+		INFO_LOG("Set DS9 output regions file to "<<outputFileName_ds9regions<<" ...");
+	}
 
 }//close Init()
 
@@ -551,6 +646,29 @@ std::string GetStringLogLevel(int verbosity){
 
 int ReadData()
 {
+	//Read recmap and get beam info (if option is given)
+	if(recMapGiven){
+		Image* img_rec= new Image();
+		if(img_rec->ReadFITS(fileName_recmap)<0){
+			ERROR_LOG("Failed to read rec map FITS file "<<fileName_recmap<<"!");
+			return -1;
+		}
+		
+		//Get beam info
+		ImgMetaData* metadata= img_rec->GetMetaData();	
+		if(!metadata){
+			ERROR_LOG("Rec map has no metadata!");
+			delete img_rec;
+			img_rec= 0;
+		}
+		Bmaj= metadata->Bmaj*3600;
+		Bmin= metadata->Bmin*3600;
+		Bpa= metadata->Bpa;
+		INFO_LOG("Read beam info from recmap: {Bmaj,Bmin,Bpa}={"<<Bmaj<<","<<Bmin<<","<<Bpa<<"}");
+
+	}//close if
+
+	
 	//Open file with source collection
 	TFile* inputFile= new TFile(fileName.c_str(),"READ");
 	if(!inputFile){
@@ -588,6 +706,7 @@ int ReadData()
 
 	INFO_LOG("#"<<sources.size()<<" sources read...");
 
+	
 	return 0;
 
 }//close ReadData()
