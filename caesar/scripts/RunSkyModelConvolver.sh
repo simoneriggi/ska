@@ -226,7 +226,7 @@ generate_exec_script(){
 	echo "INFO: Creating sh file $shfile (jobindex=$jobindex, exe=$exe, exe_args=$exe_args)..."
 	( 
 			echo "#!/bin/bash"
-			echo "#PBS -N RecJob$jobindex"			
+			echo "#PBS -N ConvJob$jobindex"			
 			echo "#PBS -j oe"
   		echo "#PBS -o $BASEDIR"
 			echo "#PBS -l select=1:ncpus=1"
