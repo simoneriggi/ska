@@ -993,7 +993,7 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels,b
 	
 	auto end_stats = chrono::steady_clock::now();
 	double dt_stats= chrono::duration <double, milli> (end_stats-start_stats).count();
-	INFO_LOG("Image standard stats computed in "<<dt_stats<<" ms");
+	DEBUG_LOG("Image standard stats computed in "<<dt_stats<<" ms");
   
 	//## End if no robust stats are to be computed
 	if(!computeRobustStats) return;
@@ -1025,7 +1025,7 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels,b
 	m_Stats->medianRMS= medianRMS;
 	auto end_median = chrono::steady_clock::now();
 	double dt_median= chrono::duration <double, milli> (end_median-start_median).count();
-	INFO_LOG("Image median pars computed in "<<dt_median<<" ms");
+	DEBUG_LOG("Image median pars computed in "<<dt_median<<" ms");
   
 	//## Compute biweight robust estimators	
 	/*
@@ -1054,11 +1054,11 @@ void Image::ComputeStatsParams(bool computeRobustStats,bool skipNegativePixels,b
 	m_Stats->clippedRMS= clipped_stats.stddev;
 	auto end_clipped = chrono::steady_clock::now();
 	double dt_clipped= chrono::duration <double, milli> (end_clipped-start_clipped).count();
-	INFO_LOG("Image clipped stats pars computed in "<<dt_clipped<<" ms");
+	DEBUG_LOG("Image clipped stats pars computed in "<<dt_clipped<<" ms");
 
 	auto end_robuststats = chrono::steady_clock::now();
 	double dt_robuststats= chrono::duration <double, milli> (end_robuststats-start_robuststats).count();
-	INFO_LOG("Image robust stats computed in "<<dt_robuststats<<" ms");	
+	DEBUG_LOG("Image robust stats computed in "<<dt_robuststats<<" ms");	
 	
 }//close ComputeStatsParams()
 
