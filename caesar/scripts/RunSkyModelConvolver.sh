@@ -20,15 +20,16 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--inputfile=[FILENAME] - Skymodel root filename. If the --filelist option is given this option is skipped."
 	echo "--inputfile-rec=[FILENAME_REC] - FITS rec map filename. If the --filelist-rec option is given this option is skipped."
 	echo "--envfile=[ENV_FILE] - File (.sh) with list of environment variables to be loaded by each processing node"
-	echo "--bmaj=[BMAJ] - Convolution beam bmaj in arcsec. NB: Ineffective if filelist-rec or inputfile-rec are given."
-	echo "--bmin=[BMIN] - Convolution beam bmin in arcsec. NB: Ineffective if filelist-rec or inputfile-rec are given."
-	echo "--bpa=[BMIN] - Convolution beam position angle in degrees. NB: Ineffective if filelist-rec or inputfile-rec are given."
-	echo "--threshold=[THRESHOLD] - Flux threshold in Jy below which pixels are removed from compact sources "
-	echo "--threshold-ext=[THRESHOLD_EXT] - Flux threshold in Jy below which pixels are removed from extended sources "
-	
 	echo ""
 	echo ""
 	echo "*** OPTIONAL ARGS ***"
+	echo "--bmaj=[BMAJ] - Convolution beam bmaj in arcsec. NB: Ineffective if filelist-rec or inputfile-rec are given."
+	echo "--bmin=[BMIN] - Convolution beam bmin in arcsec. NB: Ineffective if filelist-rec or inputfile-rec are given."
+	echo "--bpa=[BMIN] - Convolution beam position angle in degrees. NB: Ineffective if filelist-rec or inputfile-rec are given."
+	echo "--truncthreshold=[TRUNC_THRESHOLD] - Flux loss threshold for source truncation (default=0.001) "
+	echo "--userthreshold - Use fixed thresholds for all sources provided by options --threshold/--threshold-ext (default=no)"
+	echo "--threshold=[THRESHOLD] - Flux threshold in Jy below which pixels are removed from compact sources (default=0)"
+	echo "--threshold-ext=[THRESHOLD_EXT] - Flux threshold in Jy below which pixels are removed from extended sources (default=0)"
 	echo "--mergesources - Merge overlapping sources (default=no)"
 	echo "--mergecompactsources - Merge compact sources (default=no)"
 	echo "--nsigmas=[NSIGMAS] - Number of gaussian sgmas used in convolution kernel (default=10)"
@@ -63,8 +64,10 @@ INPUTFILE_GIVEN=false
 INPUTFILE_REC=""
 INPUTFILE_REC_GIVEN=false
 RECMAP_GIVEN=false
+TRUNC_THRESHOLD=0.001
 THRESHOLD=0
 THRESHOLD_EXT=0
+USER_THRESHOLD_OPTION=""
 BMAJ=""
 BMIN=""
 BPA=""
@@ -119,6 +122,12 @@ do
     ;;
 
 		## OPTIONAL ##
+		--truncthreshold=*)
+    	TRUNC_THRESHOLD=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--userthreshold*)
+    	USER_THRESHOLD_OPTION="--userthreshold"
+    ;;
 		--threshold=*)
     	THRESHOLD=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
@@ -192,10 +201,12 @@ echo "*****  PARSED ARGUMENTS ****"
 echo "INPUTFILE: $INPUTFILE"
 echo "FILELIST: $FILELIST, NMAX_PROCESSED_FILES: $NMAX_PROCESSED_FILES (START_ID=$START_ID)"
 echo "INPUTFILE_REC: $INPUTFILE_REC, FILELIST_REC: $FILELIST_REC"
-echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME"
-echo "ENV_FILE: $ENV_FILE"
-echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "BEAM ($BMAJ,$BMIN,$BPA), BEAM_GIVEN? $BEAM_GIVEN"
+echo "USER_THRESHOLD_OPTION: $USER_THRESHOLD_OPTION, THRESHOLD: $THRESHOLD, THRESHOLD_EXT=$THRESHOLD_EXT"
+echo "TRUNC_THRESHOLD: $TRUNC_THRESHOLD"
+echo "ENV_FILE: $ENV_FILE"
+echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME"
+echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "****************************"
 echo ""
 
@@ -336,7 +347,7 @@ if [ "$FILELIST_GIVEN" = true ]; then
 				EXE="$CAESAR_DIR/bin/SkyModelConvolver"
 			fi
 
-			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
+			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
 
 			echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 			generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$JOB_DIR"
@@ -398,7 +409,7 @@ if [ "$FILELIST_GIVEN" = true ]; then
 				EXE="$CAESAR_DIR/bin/SkyModelConvolver"
 			fi
 
-			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
+			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
 
 			echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 			generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$JOB_DIR"
@@ -461,7 +472,7 @@ else
 		EXE="$CAESAR_DIR/bin/SkyModelConvolver"
 	fi
 
-	EXE_ARGS="--input=$INPUTFILE $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
+	EXE_ARGS="--input=$INPUTFILE $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
 
 	echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 	jobId=" "
