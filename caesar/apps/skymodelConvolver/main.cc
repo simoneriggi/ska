@@ -115,11 +115,15 @@ int minPixels= 5;
 Image* img= 0;
 std::vector<Source*> sources;
 Image* img_conv= 0;
-std::vector<Source*> sources_conv;
-std::vector<Source*> sources_conv_merged;
+Image* img_rec= 0;
+std::vector<Source*> sources_conv;//true source convolved with beam
+std::vector<Source*> sources_conv_merged;//true source convolved with beam and merged if overlapping
+std::vector<Source*> sources_rec;//rec source formed from true convolved source mask
 TFile* outputFile= 0;
 TTree* sourceTree= 0;
 Source* aSource= 0;	
+TFile* outputFile_rec= 0;
+TTree* sourceTree_rec= 0;
 
 //Functions
 int ParseOptions(int argc, char *argv[]);
@@ -487,6 +491,63 @@ int RunConvolver()
 		return -1;
 	}
 
+	//If rec map is given create rec sources from conv source mask
+	if(recMapGiven && img_rec){
+		std::vector<Source*>::iterator it_start= sources_conv.begin();
+		std::vector<Source*>::iterator it_end= sources_conv.end();
+		if(mergeOverlappingSources){
+			it_start= sources_conv_merged.begin();	
+			it_end= sources_conv_merged.end();	
+		}
+		
+		for(std::vector<Source*>::iterator it= it_start; it != it_end; ++it) {
+			Source* aSource= *it;
+    	
+			//Get source data
+			std::string sourceName= aSource->GetName();
+			long int id= aSource->Id;
+			int type= aSource->Type;
+			int simtype= aSource->SimType;
+			int flag= aSource->Flag;
+			double simmaxscale= aSource->SimMaxScale;
+			double X0= aSource->X0;
+			double Y0= aSource->Y0;
+			double S= aSource->GetS();
+			std::vector<Pixel*> pixels= aSource->GetPixels();
+		
+			//Make rec source using pixels present in true convolved source
+			Source* rec_source= new Source;
+			rec_source->SetName(sourceName);
+			rec_source->Id= id;
+			rec_source->Type= type;	
+			rec_source->Flag= flag;	
+			rec_source->SimType= simtype;	
+			rec_source->SimMaxScale= simmaxscale;
+			rec_source->SetTrueInfo(S,X0,Y0);
+
+			for(size_t k=0;k<pixels.size();k++){	
+				long int gBin= pixels[k]->id;
+				long int ix= pixels[k]->ix;
+				long int iy= pixels[k]->iy;
+				double x= pixels[k]->x;
+				double y= pixels[k]->y;
+				double flux= img_rec->GetPixelValue(gBin);
+				rec_source->AddPixel( new Pixel(gBin,ix,iy,x,y,flux) );
+			}//end loop pixels
+		
+			// Compute stats
+			rec_source->ComputeStats();
+		
+			//Compute morphology parameters
+			rec_source->ComputeMorphologyParams();
+	
+			//Add rec source to collection
+			sources_rec.push_back(rec_source);
+
+		}//end loop sources
+
+	}//close if
+
 	return 0;
 
 }//close RunConvolver()
@@ -644,7 +705,7 @@ void Init()
 	}
 	aSource= 0;
 	sourceTree->Branch("Source",&aSource);
-	
+
 	//Define output FITS file name
 	std::string outputFileName_base= CodeUtils::ExtractSubString(outputFileName,".");
 	if(!outputFileNameGiven_fits){		
@@ -657,6 +718,23 @@ void Init()
 		outputFileName_ds9regions= outputFileName_base + std::string(".reg");
 		INFO_LOG("Set DS9 output regions file to "<<outputFileName_ds9regions<<" ...");
 	}
+
+	//Create file & source Tree with rec sources (if rec map given)
+	if(recMapGiven){
+		std::string outputFileName_rec= outputFileName_base + std::string("_rec.root");
+		if(!outputFile_rec) {
+			INFO_LOG("Opening ROOT file "<<outputFileName_rec<<" ...");
+			outputFile_rec= new TFile(outputFileName_rec.c_str(),"RECREATE");
+		}
+
+		if(!sourceTree_rec) {
+			INFO_LOG("Creating ROOT Tree SourceInfo for rec sources...");
+			sourceTree_rec= new TTree("SourceInfo","SourceInfo");	
+		}
+		aSource= 0;
+		sourceTree_rec->Branch("Source",&aSource);
+	}
+
 
 }//close Init()
 
@@ -680,7 +758,7 @@ int ReadData()
 {
 	//Read recmap and get beam info (if option is given)
 	if(recMapGiven){
-		Image* img_rec= new Image();
+		img_rec= new Image();
 		if(img_rec->ReadFITS(fileName_recmap)<0){
 			ERROR_LOG("Failed to read rec map FITS file "<<fileName_recmap<<"!");
 			return -1;
@@ -745,20 +823,20 @@ int ReadData()
 
 void Save()
 {
-	//Save data to file
+	//Write DS9 regions
+	SaveDS9RegionFile();
+	
+	//Write fits image
+	if(img_conv){
+		INFO_LOG("Saving convolved skymodel to FITS file...");
+		if(img_conv->WriteFITS(outputFileName_fits)<0){
+			ERROR_LOG("Failed to write skymodel convolved to FITS file "<<outputFileName_fits<<"!");
+		}
+	}
+
+	//Save data to ROOT file
 	if(outputFile && outputFile->IsOpen()){
 		outputFile->cd();		
-
-		//Write DS9 regions
-		SaveDS9RegionFile();
-
-		//Write fits image
-		if(img_conv){
-			INFO_LOG("Saving convolved skymodel to FITS file...");
-			if(img_conv->WriteFITS(outputFileName_fits)<0){
-				ERROR_LOG("Failed to write skymodel convolved to FITS file "<<outputFileName_fits<<"!");
-			}
-		}
 
 		//Save convolved skymodel image
 		if(img_conv) {
@@ -787,6 +865,24 @@ void Save()
 		}//close if save source tree
 
 		outputFile->Close();
+	}//close if file open
+
+	//Save rec source data to ROOT file
+	if(recMapGiven && outputFile_rec && outputFile_rec->IsOpen()){
+		outputFile_rec->cd();		
+
+		//Save source tree?
+		if(sourceTree_rec){
+			INFO_LOG("Filling rec source ROOT TTree...");
+			for(size_t k=0;k<sources_rec.size();k++){
+				aSource= sources_rec[k];
+				sourceTree->Fill();
+			}
+			INFO_LOG("Writing source rec tree to file...");
+			sourceTree_rec->Write();
+		}//close if save source tree
+
+		outputFile_rec->Close();
 	}//close if file open
 
 }//close Save()
