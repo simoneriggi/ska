@@ -361,43 +361,52 @@ class CodeUtils : public TObject {
 
 		}//close FindIntersectionIndexes()
 		
-
-		/*
-		template <class Iterator,class Comparator>
-		static std::vector<std::pair<long int,long int>> FindIntersectionIndexes(
-			Iterator first1,Iterator last1,
-			Iterator first2,Iterator last2,
-			Comparator comp,
-			bool sorted=false)
-		{
-			//Sort vectors if not sorted
-			if(!sorted){
-				std::sort( first1, last1, comp() );
-				std::sort( first2, last2, comp() );
-			}
-			std::vector<std::pair<long int,long int>> indexes;
-			long int i= 0;
-			long int j= 0;
-			while (i < n1 && j < n2) {
-    		//if (v1[i] > v2[j]) {
-				if ( comp(v2[j],v1[i]) ) {
-      		j++;
-    		} 
-				//else if (v2[j] > v1[i]) {
-				else if( comp(v1[i],v2[j]) ) {
-      		i++;
-    		} 
-				else {
-					indexes.push_back( std::make_pair(i,j) );
-      		i++;
-      		j++;
-    		}
-  		}//end while loop
-	
-			return indexes;
-
-		}//close FindIntersectionIndexes()
+		/**
+		* \brief Find vector index at which the cumulative sum is smaller then given value (comparator version)
 		*/
+		template <class T,class Comparator>
+		static T FindCumulativeSumFractionThr(std::vector<T>& data,Comparator comp,double thr, bool sorted=false)
+		{			
+			//Sort vector if not sorted
+			if(!sorted){
+				std::sort( data.begin(), data.end(), comp );
+			}
+
+			//Fill vector of cumulative sum
+			std::vector<T> cdf;
+			std::partial_sum(data.begin(),data.end(),std::back_inserter(cdf));
+			double sum= cdf[cdf.size()-1];
+	
+			//Find element at which the cumulative sum is smaller than the given thr 
+			size_t pos= std::lower_bound (cdf.begin(), cdf.end(),thr*sum, comp ) - cdf.begin();
+
+			return data[pos];
+
+		}//close FindCumulativeSumFractionThr()
+		
+		/**
+		* \brief Find vector index at which the cumulative sum is smaller then given value 
+		*/
+		template <class T>
+		static T FindCumulativeSumFractionThr(std::vector<T>& data,double thr, bool sorted=false)
+		{			
+			//Sort vector if not sorted
+			if(!sorted){
+				std::sort( data.begin(), data.end() );
+			}
+
+			//Fill vector of cumulative sum
+			std::vector<T> cdf;
+			std::partial_sum(data.begin(),data.end(),std::back_inserter(cdf));
+			double sum= cdf[cdf.size()-1];
+	
+			//Find element at which the cumulative sum is smaller than the given thr 
+			size_t pos= std::lower_bound (cdf.begin(), cdf.end(),thr*sum ) - cdf.begin();
+
+			return data[pos];
+
+		}//close FindCumulativeSumFractionThr()
+		
 
 		/**
 		* \brief String find and replace
