@@ -781,6 +781,10 @@ class Image : public TNamed {
 		*/
 		Image* GetBinarizedImage(double threshold,double fgValue=1,bool isLowerThreshold=false);
 
+		/**
+		* \brief Find image threshold at which the cumulative pixel sum (scaled to image sum) is lower than desired threshold 
+		*/
+		double FindCumulativeSumThr(double threshold,bool skipNegativePixels=false);
 
 		//=========================================
 		//==    SOURCE FINDING METHODS           ==

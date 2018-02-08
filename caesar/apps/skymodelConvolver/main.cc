@@ -73,9 +73,11 @@ static const struct option options_tab[] = {
 	{ "bmaj", required_argument, 0, 'B'}, //Bmaj
 	{ "bmin", required_argument, 0, 'b'}, //Bmin
 	{ "bpa", required_argument, 0, 'a'}, //Pos angle
+	{ "fluxtruncthr", required_argument, 0, 'f'},
 	{ "threshold", required_argument, 0, 't'}, //Flux threshold below which pixels are removed from convolved sources
 	{ "threshold-ext", required_argument, 0, 'T'}, //Flux threshold below which pixels are removed from convolved extended sources
 	{ "mergesources", no_argument, 0, 'm'},
+	{ "userthreshold", no_argument, 0, 'u'},
 	{ "mergecompactsources", no_argument, 0, 'e'},
 	{ "nsigmas", required_argument, 0, 's'}, //Gaus conv kernel nsigmas (default=10)
   {(char*)0, (int)0, (int*)0, (int)0}
@@ -100,6 +102,8 @@ bool bpaGiven= false;
 double Bmaj= -1;
 double Bmin= -1;
 double Bpa= -1;
+double fluxTruncThr= 0.001;//max 0.1% flux loss when truncating source
+bool useUserThreshold= false;
 double fluxThr= -1;
 double fluxThr_ext= -1;
 bool mergeOverlappingSources= false;
@@ -188,7 +192,7 @@ int ParseOptions(int argc, char *argv[])
 	int c = 0;
   int option_index = 0;
 
-	while((c = getopt_long(argc, argv, "hi:I:o:O:r:v:t:T:B:b:a:s:me",options_tab, &option_index)) != -1) {
+	while((c = getopt_long(argc, argv, "hi:I:o:O:r:v:f:t:T:B:b:a:s:meu",options_tab, &option_index)) != -1) {
     
     switch (c) {
 			case 0 : 
@@ -233,6 +237,16 @@ int ParseOptions(int argc, char *argv[])
 			{
 				verbosity= atoi(optarg);	
 				break;	
+			}
+			case 'u':	
+			{
+				useUserThreshold= true;
+				break;	
+			}
+			case 'f':
+			{
+				fluxTruncThr= atof(optarg);
+				break;
 			}
 			case 't':
 			{
@@ -355,21 +369,7 @@ int RunConvolver()
 	for(size_t i=0;i<sources.size();i++){
 		if(i%100==0) INFO_LOG("#"<<i+1<<"/"<<sources.size()<<" sources convolved...");
 
-		//Get threshold
-		int type= sources[i]->Type;
-		int simtype= sources[i]->SimType;
-		double simmaxscale= sources[i]->SimMaxScale;
-		int flag= sources[i]->Flag;
-		double thr= fluxThr;
-		if(type==Source::eCompact || type==Source::ePointLike){
-			thr= fluxThr;
-		}
-		else if(type==Source::eExtended || type==Source::eCompactPlusExtended){
-			thr= fluxThr_ext;
-		}
-		else{
-			thr= fluxThr;
-		}
+		
 	
 		//Get image source mask
 		bool isBinary= false;	
@@ -392,6 +392,30 @@ int RunConvolver()
 		//Delete source image
 		delete sourceImg;
 		sourceImg= 0;
+
+		//Find truncation threshold (user-supplied or found from image)
+		int type= sources[i]->Type;
+		int simtype= sources[i]->SimType;
+		double simmaxscale= sources[i]->SimMaxScale;
+		int flag= sources[i]->Flag;
+			
+		double thr= 0;//no threshold
+		if(useUserThreshold){
+			if(type==Source::eCompact || type==Source::ePointLike){
+				thr= fluxThr;
+			}
+			else if(type==Source::eExtended || type==Source::eCompactPlusExtended){
+				thr= fluxThr_ext;
+			}
+			else{
+				thr= fluxThr;
+			}
+		}//close if
+		else{
+			//Find threshold
+			bool skipNegativePixels= true;
+			thr= sourceImg_conv->FindCumulativeSumThr(fluxTruncThr,skipNegativePixels);
+		}
 
 		//Find convolved source
 		std::vector<Source*> csources;

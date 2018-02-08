@@ -2571,6 +2571,33 @@ double Image::FindValleyThreshold(int nbins,bool smooth){
 
 }//close FindValleyThreshold()
 
+
+double Image::FindCumulativeSumThr(double threshold,bool skipNegativePixels)
+{
+	//Check if image has pixels
+	if(m_pixels.empty()){
+		WARN_LOG("Image has no pixels stored, returning 0!");
+		return 0;
+	}
+
+	//Copy pixel list
+	//NB: This is required because of sorting
+	std::vector<float> pixels;
+	for(size_t i=0;i<m_pixels.size();i++){
+		float w= m_pixels[i];
+		if( w==0 || (skipNegativePixels && w<0) ) continue;
+		pixels.push_back(w);
+	}
+
+	//Find pixel value at which cumulative threshold is below desired threshold
+	bool sorted= false;
+	double thr= CodeUtils::FindCumulativeSumFractionThr(pixels,threshold,sorted);
+
+	return thr;
+
+}//close FindCumulativeSumThr()
+
+
 Image* Image::GetBinarizedImage(double threshold,double fgValue,bool isLowerThreshold){
 
 	TString imgName= Form("%s_Binarized",m_name.c_str());	
