@@ -33,7 +33,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--no-sources - Do not generate compact sources in skymodel. NB: If not given compact sources are generated."
 	echo "--zmin=[ZMIN] - Min generated compact source significance level wrt to bkg level & rms (default: 1)"
 	echo "--zmax=[ZMAX] - Max generated compact source significance level wrt to bkg level & rms (default: 10000)"
-	echo "--zmin-model=[ZMIN_MODEL] - Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default: 1)"
+	##echo "--zmin-model=[ZMIN_MODEL] - Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default: 1)"
+	echo "--truncthr=[TRUNC_THRESHOLD] - Flux loss with respect to total at which model is truncated (default: 0.001)"
 	echo "--extsources - Generate extended sources in skymodel (default=no)"
 	echo "--no-extsources - Do not generate extended sources in skymodel. NB: By default extended sources are not generated."
 	echo "--sourcedensity=[SOURCE_DENSITY] - Compact source density in sources/deg^2 (default: 1000)"
@@ -91,7 +92,8 @@ ZMIN=1
 ZMAX=10000
 ZMIN_EXT=1
 ZMAX_EXT=5
-ZMIN_MODEL=1
+##ZMIN_MODEL=1
+TRUNC_THRESHOLD=0.001
 SOURCE_DENSITY=1000
 EXT_SOURCE_DENSITY=100
 EXT_SCALE_MIN=10
@@ -176,8 +178,9 @@ do
 		--zmax=*)
     	ZMAX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
-		--zmin-model=*)
-    	ZMIN_MODEL=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+			
+		--truncthr=*)
+    	TRUNC_THRESHOLD=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
 		--sourcedensity=*)
     	SOURCE_DENSITY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
@@ -284,7 +287,7 @@ echo "ZMIN_EXT/ZMAX_EXT: $ZMIN_EXT/$ZMAX_EXT"
 echo "EXT_SCALE MIN/MAX: $EXT_SCALE_MIN/$EXT_SCALE_MAX"
 echo "RING WIDTH MIN/MAX: $RING_WIDTH_MIN/$RING_WIDTH_MAX"
 echo "SOURCE_DENSITY: $SOURCE_DENSITY, EXT_SOURCE_DENSITY: $EXT_SOURCE_DENSITY"
-echo "ZMIN_MODEL: $ZMIN_MODEL"
+echo "TRUNC_THRESHOLD: $TRUNC_THRESHOLD"
 echo "SOURCE_GEN_MARGIN_SIZE: $SOURCE_GEN_MARGIN_SIZE (pixels)"
 echo "GEN_SOURCES? $GEN_EXT_SOURCES, GEN_EXT_SOURCES? $GEN_EXT_SOURCES"
 echo "SIM_PROJECT: $SIM_PROJECT, VIS: $VIS_IMAGE_NAME"
@@ -440,7 +443,7 @@ for ((index=1; index<=$NRUNS; index=$index+1))
 			echo 'EXE="'"$CAESAR_SCRIPTS_DIR/skymodel_generator.py"'"'
 		fi
 
-		echo 'EXE_ARGS="'"--nx=$MAP_SIZE --ny=$MAP_SIZE --pixsize=$PIX_SIZE --marginx=$SOURCE_GEN_MARGIN_SIZE --marginy=$SOURCE_GEN_MARGIN_SIZE $GEN_SOURCE_FLAG $GEN_EXT_SOURCE_FLAG --bmaj=$BMAJ --bmin=$BMIN --bpa=$BPA --crpix1=$CRPIX --crpix2=$CRPIX --bkg --bkg_level=$BKG_LEVEL --bkg_rms=$BKG_RMS --zmin=$ZMIN --zmax=$ZMAX --zmin_ext=$ZMIN_EXT --zmax_ext=$ZMAX_EXT --source_density=$SOURCE_DENSITY --zmin_model=$ZMIN_MODEL --ext_source_density=$EXT_SOURCE_DENSITY --ext_scale_min=$EXT_SCALE_MIN --ext_scale_max=$EXT_SCALE_MAX --ring_wmin=$RING_WIDTH_MIN --ring_wmax=$RING_WIDTH_MAX --outputfile=$simmapfile --outputfile_model=$skymodelfile --outputfile_sources=$sourcefile --outputfile_ds9region=$ds9regionfile --outputfile_casaregion=$casaregionfile "'"'
+		echo 'EXE_ARGS="'"--nx=$MAP_SIZE --ny=$MAP_SIZE --pixsize=$PIX_SIZE --marginx=$SOURCE_GEN_MARGIN_SIZE --marginy=$SOURCE_GEN_MARGIN_SIZE $GEN_SOURCE_FLAG $GEN_EXT_SOURCE_FLAG --bmaj=$BMAJ --bmin=$BMIN --bpa=$BPA --crpix1=$CRPIX --crpix2=$CRPIX --bkg --bkg_level=$BKG_LEVEL --bkg_rms=$BKG_RMS --zmin=$ZMIN --zmax=$ZMAX --zmin_ext=$ZMIN_EXT --zmax_ext=$ZMAX_EXT --source_density=$SOURCE_DENSITY --trunc_thr=$TRUNC_THRESHOLD --ext_source_density=$EXT_SOURCE_DENSITY --ext_scale_min=$EXT_SCALE_MIN --ext_scale_max=$EXT_SCALE_MAX --ring_wmin=$RING_WIDTH_MIN --ring_wmax=$RING_WIDTH_MAX --outputfile=$simmapfile --outputfile_model=$skymodelfile --outputfile_sources=$sourcefile --outputfile_ds9region=$ds9regionfile --outputfile_casaregion=$casaregionfile "'"'
 
 		echo 'echo "Running command $EXE $EXE_ARGS"'
 		echo '$EXE $EXE_ARGS'
