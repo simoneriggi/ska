@@ -52,6 +52,8 @@ void Usage(char* exeName){
 	cout<<"-B, --bmaj=[BMAJ] \t Bmaj in arcsec (NB: Overridden if --input-rec is given)"<<endl;
 	cout<<"-b, --bmin=[BMAJ] \t Bmin in arcsec (NB: Overridden if --input-rec is given)"<<endl;
 	cout<<"-a, --bpa=[BMAJ] \t Bpa in degrees (NB: Overridden if --input-rec is given)"<<endl;
+	cout<<"-f, --fluxtruncthr=[FLUX_TRUNC_THRESHOLD] \t Flux loss threshold for source truncation (default=0.001)"<<endl;
+	cout<<"-u, --userthreshold \t Use fixed threshold (provided in option -t/-T) (default=no)"<<endl;
 	cout<<"-t, --threshold=[THRESHOLD] \t Flux threshold below which pixels are removed from sources (default=0)"<<endl;
 	cout<<"-T, --threshold-ext=[THRESHOLD_EXT] \t Flux threshold below which pixels are removed from extended sources (default=0)"<<endl;
 	cout<<"-m, --mergesources \t Merge overlapping thresholds after convolution (default=no)"<<endl;
