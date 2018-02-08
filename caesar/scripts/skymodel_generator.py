@@ -120,7 +120,7 @@ def get_args():
 		
 	parser.add_argument('-zmin_model', '--zmin_model', dest='model_trunc_zmin', required=False, type=float, default=1, action='store',help='Minimum source significance level in sigmas above the bkg below which source data are set to 0 (default=1)')
 	parser.add_argument('-mask_boxsize', '--mask_boxsize', dest='mask_boxsize', required=False, type=float, default=10, action='store',help='Mask box size in pixels (default=10)')
-	
+	parser.add_argument('-trunc_thr', '--trunc_thr', dest='trunc_thr', required=False, type=float, default=0.01, action='store',help='Source model truncation thr (default=0.01)')
 
 	# - OUTPUT FILE OPTIONS
 	parser.add_argument('-outputfile', '--outputfile', dest='outputfile', required=False, type=str, default='simmap.fits',action='store',help='Output filename')
@@ -239,6 +239,7 @@ class SkyMapSimulator(object):
 
 		## Source model
 		self.truncate_models= True
+		self.trunc_thr= 0.01 # 1% flux truncation at maximum
 		self.trunc_model_zmin= 1
 
 		## Mask box size
@@ -361,6 +362,10 @@ class SkyMapSimulator(object):
 		""" Set the significance level below which source model data are truncated """
 		self.trunc_model_zmin= value
 
+	def set_model_trunc_thr(self,value):
+		""" Set the flux percentage level for source model truncation """
+		self.trunc_thr= value
+
 	def set_ext_source_type(self,value):
 		""" Set the extended source type to be generated (-1=all, 1=ring, 2=ellipse, 3=bubble+shell, 4=airy)"""
 		self.ext_source_type= value
@@ -464,7 +469,7 @@ class SkyMapSimulator(object):
 		bkg_data = make_noise_image(shape, type='gaussian', mean=self.bkg_level, stddev=self.bkg_rms)
 		return bkg_data
     
-	def generate_blob(self,ampl,x0,y0,sigmax,sigmay,theta,trunc_thr):
+	def generate_blob(self,ampl,x0,y0,sigmax,sigmay,theta,trunc_thr=0.01):
 		""" Generate a blob 
 				Arguments: 
 					ampl: peak flux in Jy
@@ -473,15 +478,24 @@ class SkyMapSimulator(object):
 					theta: rotation in degrees
 					trunc_thr: truncation significance threshold
 		"""
+		#modelFcn= Gaussian2D(ampl,x0,y0,sigmax,sigmay,theta=math.radians(theta)) 
 		data= Gaussian2D(ampl,x0,y0,sigmax,sigmay,theta=math.radians(theta))(self.gridx, self.gridy)
+		totFlux= (float)(np.sum(data,axis=None))
+		print('totFlux=%s' % str(totFlux))
+
+		## Truncate data such that sum(data)_trunc/sum(data)<f
+		f= trunc_thr 
+		if self.truncate_models:
+			data_vect_sorted= np.ravel(data)
+			data_csum= np.cumsum(data_vect_sorted)/totFlux
+			fluxThr= data_vect_sorted[np.argmin(data_csum<f)]
+			print('fluxThr=%s' % str(fluxThr))
+			data[data<fluxThr] = 0		
 
 		## Truncate data at minimum significance
-		#ampl_min= (self.trunc_model_zmin*self.bkg_rms) + self.bkg_level ## For compact sources
-		#ampl_min= (self.zmin*self.bkg_rms) + self.bkg_level  # OLD
-		#ampl_min= self.bkg_level # OLD
-		ampl_min= (trunc_thr*self.bkg_rms) + self.bkg_level
-		if self.truncate_models:
-			data[data<ampl_min] = 0		
+		#ampl_min= (trunc_thr*self.bkg_rms) + self.bkg_level
+		#if self.truncate_models:
+		#	data[data<ampl_min] = 0		
 
 		return data
 
@@ -521,26 +535,43 @@ class SkyMapSimulator(object):
 		data= Ellipse2D(ampl,x0,y0,a,b,math.radians(theta))(self.gridx, self.gridy) 
 		return data
 
-	def generate_airy_disk(self,ampl,x0,y0,radius):
+	def generate_airy_disk(self,ampl,x0,y0,radius,trunc_thr=0.01):
 		""" Generate Airy disk """
 		data= AiryDisk2D(amplitude=ampl,x_0=x0,y_0=y0,radius=radius)(self.gridx, self.gridy) 
-		
-		## Truncate data at minimum significance
-		ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
-		#ampl_min= self.bkg_level
+		totFlux= (float)(np.sum(data,axis=None))
+
+		## Truncate data such that sum(data)_trunc/sum(data)<f
+		f= trunc_thr 
 		if self.truncate_models:
-			data[data<ampl_min] = 0			
+			data_vect_sorted= np.ravel(data)
+			data_csum= np.cumsum(data_vect_sorted)/totFlux
+			fluxThr= data_vect_sorted[np.argmin(data_csum<f)]
+			data[data<fluxThr] = 0
+
+		## Truncate data at minimum significance
+		#ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		#if self.truncate_models:
+		#	data[data<ampl_min] = 0			
 
 		return data
 
-	def generate_sersic(self,ampl,x0,y0,radius,ell,index,theta):
+	def generate_sersic(self,ampl,x0,y0,radius,ell,index,theta,trunc_thr=0.01):
 		""" Generate Sersic model """
 		data= Sersic2D(amplitude=ampl,x_0=x0,y_0=y0,r_eff=radius,n=index,ellip=ell,theta=math.radians(theta))(self.gridx, self.gridy) 
-			
-		## Truncate data at minimum significance
-		ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		totFlux= (float)(np.sum(data,axis=None))
+
+		## Truncate data such that sum(data)_trunc/sum(data)<f
+		f= trunc_thr 
 		if self.truncate_models:
-			data[data<ampl_min] = 0			
+			data_vect_sorted= np.ravel(data)
+			data_csum= np.cumsum(data_vect_sorted)/totFlux
+			fluxThr= data_vect_sorted[np.argmin(data_csum<f)]
+			data[data<fluxThr] = 0	
+
+		## Truncate data at minimum significance
+		#ampl_min= (self.zmin_ext*self.bkg_rms) + self.bkg_level
+		#if self.truncate_models:
+		#	data[data<ampl_min] = 0			
 
 		return data
 
@@ -704,7 +735,12 @@ class SkyMapSimulator(object):
 				z= self.zmin
 	
 			## Generate blob
-			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta,trunc_thr=self.trunc_model_zmin)
+			#blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta,trunc_thr=self.trunc_model_zmin)
+			blob_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=sigmax/self.pixsize,sigmay=sigmay/self.pixsize,theta=theta,trunc_thr=self.trunc_thr)
+			if blob_data is None:
+				print('Failed to generate blob (hint: too large trunc threshold), skip and regenerate...')
+				continue
+
 			sources_data+= blob_data
 
 			## Set model map
@@ -848,7 +884,8 @@ class SkyMapSimulator(object):
 				sersic_theta= random.uniform(0,360)
 				sersic_ell= random.uniform(0,1)
 				source_max_scale= 2*sersic_r
-				source_data= self.generate_sersic(S,x0,y0,sersic_r,sersic_ell,self.sersic_index,sersic_theta)
+				##source_data= self.generate_sersic(S,x0,y0,sersic_r,sersic_ell,self.sersic_index,sersic_theta)
+				source_data= self.generate_sersic(S,x0,y0,sersic_r,sersic_ell,self.sersic_index,sersic_theta,trunc_thr=self.trunc_thr)
 
 			elif source_sim_type==5: # Gaussian Blob like
 				source_sim_type= Caesar.Source.eBlobLike
@@ -857,7 +894,11 @@ class SkyMapSimulator(object):
 				blob_bmin= random.uniform(max(self.ellipse_rratiomin*blob_bmaj,self.ellipse_rmin),blob_bmaj)
 				blob_theta= random.uniform(0,360)
 				source_max_scale= 2*max(blob_bmin,blob_bmaj)
-				source_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=blob_bmaj/self.pixsize,sigmay=blob_bmin/self.pixsize,theta=blob_theta,trunc_thr=self.zmin_ext)
+				#source_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=blob_bmaj/self.pixsize,sigmay=blob_bmin/self.pixsize,theta=blob_theta,trunc_thr=self.zmin_ext)
+				source_data= self.generate_blob(ampl=S,x0=x0,y0=y0,sigmax=blob_bmaj/self.pixsize,sigmay=blob_bmin/self.pixsize,theta=blob_theta,trunc_thr=self.trunc_thr)
+				if source_data is None:
+					print('Failed to generate blob (hint: too large trunc threshold), skip and regenerate...')
+					continue
 
 			else:
 				print('ERROR: Invalid source type given!')
@@ -1153,6 +1194,7 @@ def main():
 
 	#- Source model
 	model_trunc_zmin= args.model_trunc_zmin
+	trunc_thr= args.trunc_thr
 	npixels_min= args.npixels_min
 
 	# - Bkg info args
@@ -1217,6 +1259,7 @@ def main():
 	print("Extended source density (deg^-2): %s" % ext_source_density)
 	print("Extended source scale min/max: (%s,%s)" % (ext_scale_min, ext_scale_max))
 	print("Output filename: %s " % outputfile)
+	print("Model trunc thr: %s " % str(trunc_thr))
 	print("Mask output filename: %s " % mask_outputfile)
 	print("Mask box size: %s " % mask_boxsize)
 	print("************")
@@ -1229,6 +1272,7 @@ def main():
 	simulator.set_ref_pix_coords(crval1,crval2)
 	simulator.set_coord_system_type(ctype1,ctype2)
 
+	simulator.set_model_trunc_thr(trunc_thr)
 	simulator.set_model_trunc_significance(model_trunc_zmin)
 	simulator.set_npixels_min(npixels_min)
 	simulator.set_map_filename(outputfile)

@@ -666,6 +666,8 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 		if(m_HasTrueInfo && aSource->HasTrueInfo()){
 			m_S_true+= aSource->GetTrueFlux();
 		}
+
+		
 	}//close if sumMatchingPixels
   	
 	//If no pixels are to be merged (e.g. all pixels overlapping) return?
@@ -709,6 +711,9 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 	else{
 		this->Type= eUnknown; 
 	}
+
+	//Set sim max scale to max of the two sources
+	SimMaxScale= max(SimMaxScale,aSource->SimMaxScale);
 
 	//At this stage stats (mean/median/etc...) are invalid and need to be recomputed if desired
 	this->SetHasStats(false);//set stats to false to remember that current stats are not valid anymore and need to be recomputed
