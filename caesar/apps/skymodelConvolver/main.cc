@@ -878,7 +878,7 @@ void Save()
 			INFO_LOG("Filling rec source ROOT TTree...");
 			for(size_t k=0;k<sources_rec.size();k++){
 				aSource= sources_rec[k];
-				sourceTree->Fill();
+				sourceTree_rec->Fill();
 			}
 			INFO_LOG("Writing source rec tree to file...");
 			sourceTree_rec->Write();
