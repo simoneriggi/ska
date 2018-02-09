@@ -61,7 +61,6 @@ if [ "$NARGS" -lt 2 ]; then
 
 	echo "=== SFINDER COMPACT SOURCE OPTIONS ==="
 	echo "--no-compactsearch - Do not search compact sources"
-	echo "--no-nestedsearch - Do not search nested sources (default=search)"		
 	echo "--selectsources - Apply selection to compact sources found (default=false)"	
 	echo "--npixmin=[NPIX_MIN] - Minimum number of pixel to form a compact source (default=5 pixels)"
 	echo "--seedthr=[SEED_THR] - Seed threshold (in nsigmas) used in flood-fill (default=5 sigmas)"
@@ -75,6 +74,14 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--extsfinder=[EXT_SFINDER_METHOD] - Extended source search method {1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding} (default=3)"	
 	echo "--activecontour=[AC_METHOD] - Active contour method {1=Chanvese, 2=LRAC} (default=2)"
 	echo ""
+
+	echo "=== SFINDER COMPACT NESTED SOURCE OPTIONS ==="
+	echo "--no-nestedsearch - Do not search nested sources (default=search)"		
+	echo "--nested-sourcetobeamthr=[NESTED_SOURCE_TO_BEAM_THR] - Source area/beam thr to add nested sources (e.g. npix>thr*beamArea). NB: thr=0 means always if searchNestedSources is enabled (default=5)"
+	echo "--nested-blobthr=[NESTED_BLOB_THR] - Threshold (multiple of curvature rms) used for nested blob finding (default=0)"
+	echo "--nested-minmotherdist=[NESTED_MIN_MOTHER_DIST] - Minimum distance in pixels (in x or y) between nested and parent blob below which nested is skipped (default=2)"
+	echo "--nested-maxmotherpixmatch=[NESTED_MAX_MOTHER_PIX_MATCH] - Maximum fraction of matching pixels between nested and parent blob above which nested is skipped (default=0.5)"
+	echo ""
 	
 	echo "=== SFINDER SOURCE RESIDUAL OPTIONS ==="
 	echo "--dilatenested - When a source has nested sources perform the dilation only on nested (default=false)"
@@ -84,7 +91,22 @@ if [ "$NARGS" -lt 2 ]; then
 	echo ""
 
 	echo "=== SFINDER SOURCE FITTING OPTIONS ==="
-	echo "--fitsources - Fit compact point-like sources found (default=false)"	
+	echo "--fitsources - Fit compact point-like sources found (default=false)"
+	echo "--fit-maxcomponents=[FIT_MAX_COMPONENTS] - Maximum number of components fitted in a blob (default=3)"	
+	echo "--fit-freebkg - Fit with bkg offset parameter free to vary (default=fixed)"
+	echo "--fit-estimatedbkg - Set bkg par starting value to estimated bkg (average over source pixels) (default=use fixed bkg start value)"
+	echo "--fit-bkg=[FIT_BKG] - Bkg par starting value (NB: ineffective when -fit-estimatedbkg is enabled) (default=0)"
+	echo "--fit-noampllimits - Do not apply limits in Gaussian amplitude parameters in fit (default=fit with limits)"
+	echo "--fit-nosigmalimits - Do not apply limits in Gaussian sigma parameters in fit (default=fit with limits)"	
+	echo "--fit-noposlimits - Do not apply limits in Gaussian mean parameters in fit (default=fit with limits)"
+	echo "--fit-nothetalimits - Do not apply limits in Gaussian ellipse pos angle parameters in fit (default=fit with limits)"
+	echo "--fit-fixsigma - Fit with sigma parameters fixed to start value (beam bmaj/bmin) (default=fit with sigma free and constrained)"
+	echo "--fit-fixtheta - Fit with theta parameters fixed to start value (beam bpa) (default=fit with theta free and constrained)"
+	echo "--fit-peakminkern=[PEAK_MIN_KERNEL_SIZE] - Minimum dilation kernel size (in pixels) used to detect peaks (default=3)"
+	echo "--fit-peakmaxkern=[PEAK_MAX_KERNEL_SIZE] - Maximum dilation kernel size (in pixels) used to detect peaks (default=7)"
+	echo "--fit-peakmultiplicitythr=[PEAK_KERNEL_MULTIPLICITY_THR] - Requested peak multiplicity across different dilation kernels (-1=peak found in all given kernels,1=only in one kernel, etc) (default=1)"
+	echo "--fit-peakshifttol=[PEAK_SHIFT_TOLERANCE] - Shift tolerance (in pixels) used to compare peaks in different dilation kernels (default=2 pixels)"
+	echo "--fit-peakzthrmin=[PEAK_ZTHR_MIN] - Minimum peak flux significance (in nsigmas above avg source bkg & noise) below which peak is skipped (default=1)"
 	echo ""
 
 	echo "=== SFINDER SMOOTHING FILTER OPTIONS ==="
@@ -174,10 +196,17 @@ GUIDED_FILTER_RADIUS="12"
 GUIDED_FILTER_EPS="0.04"
 EXT_SFINDER_METHOD="3"
 AC_METHOD="2"
-SEARCH_NESTED_SOURCES="true"
+
 SELECT_SOURCES="false"
 COMPACT_SOURCE_SEARCH_NITERS="5"
 SEED_THR_STEP="1"
+
+SEARCH_NESTED_SOURCES="true"
+NESTED_SOURCE_TO_BEAM_THR="5"
+NESTED_BLOB_THR="0"
+NESTED_MIN_MOTHER_DIST="2"
+NESTED_MAX_MOTHER_PIX_MATCH="0.5"
+
 SP_SIZE="20"
 SP_BETA="1"
 SP_MINAREA="10"
@@ -188,7 +217,25 @@ SALIENCY_RESO_STEP="10"
 SALIENCY_NN_PAR="1"
 SEARCH_COMPACT_SOURCES="true"
 SEARCH_EXTENDED_SOURCES="true"
+
 FIT_SOURCES="false"
+FIT_MAX_COMPONENTS="3"
+FIT_WITH_FIXED_BKG="true"
+FIT_WITH_ESTIMATED_BKG="false"
+FIT_BKG="0"
+FIT_WITH_AMPL_LIMITS="true"
+FIT_WITH_POS_LIMITS="true"
+FIT_WITH_SIGMA_LIMITS="true"
+FIT_WITH_THETA_LIMITS="true"
+FIT_WITH_SIGMA_FIXED="false"
+FIT_WITH_THETA_FIXED="false"
+PEAK_MIN_KERN_SIZE="3"
+PEAK_MAX_KERN_SIZE="7"
+PEAK_KERNEL_MULTIPLICITY_THR="1"
+PEAK_SHIFT_TOLERANCE="2"
+PEAK_ZTHR_MIN="1"
+
+
 WTSCALE_MIN="3"
 WTSCALE_MAX="6"
 MERGE_EDGE_SOURCES="false"
@@ -317,6 +364,7 @@ do
     ;;
 		
 		
+		## BKG OPTIONS
 		--globalbkg*)
     	USE_LOCAL_BKG="false"
     ;;
@@ -339,13 +387,11 @@ do
 		;;
 
 		
-
+		## COMPACT SOURCE OPTIONS
 		--no-compactsearch*)
     	SEARCH_COMPACT_SOURCES="false"
     ;;
-		--no-nestedsearch*)
-    	SEARCH_NESTED_SOURCES="false"
-    ;;
+		
 		--compactsearchiters*)
 			COMPACT_SOURCE_SEARCH_NITERS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
 		;;
@@ -368,7 +414,28 @@ do
 		--mergethr=*)
     	MERGE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+		--selectsources*)
+    	SELECT_SOURCES="true"
+    ;;
 
+		## NESTED OPTIONS
+		--no-nestedsearch*)
+    	SEARCH_NESTED_SOURCES="false"
+    ;;
+		--nested-sourcetobeamthr*)
+    	NESTED_SOURCE_TO_BEAM_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--nested-blobthr*)
+    	NESTED_BLOB_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--nested-minmotherdist*)
+    	NESTED_MIN_MOTHER_DIST=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--nested-maxmotherpixmatch*)
+    	NESTED_MAX_MOTHER_PIX_MATCH=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+
+		## RESIDUAL OPTIONS
 		--dilatethr=*)
     	DILATE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -382,6 +449,7 @@ do
 			DILATE_KERNEL_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
 		;;
 
+		## SMOOTHING FILTER OPTIONS
 		--no-presmoothing*)
     	USE_PRESMOOTHING="false"
     ;;
@@ -396,6 +464,7 @@ do
 		;;
 		
 
+		## EXTENDED SOURCE OPTIONS
 		--no-extendedsearch*)
     	SEARCH_EXTENDED_SOURCES="false"
     ;;
@@ -406,13 +475,59 @@ do
 		--activecontour=*)
     	AC_METHOD=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-		--selectsources*)
-    	SELECT_SOURCES="true"
-    ;;
+		
+
+		## SOURCE FITTING OPTIONS
 		--fitsources*)
     	FIT_SOURCES="true"
+    ;;	
+		--fit-maxcomponents*)
+    	FIT_MAX_COMPONENTS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-
+		--fit-freebkg*)
+    	FIT_WITH_FIXED_BKG="false"
+    ;;
+		--fit-estimatedbkg*)
+    	FIT_WITH_ESTIMATED_BKG="true"
+    ;;
+		--fit-bkg*)
+    	FIT_BKG=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--fit-noampllimits*)
+    	FIT_WITH_AMPL_LIMITS="false"
+    ;;	
+		--fit-nosigmalimits*)
+    	FIT_WITH_SIGMA_LIMITS="false"
+    ;;
+		--fit-noposlimits*)
+    	FIT_WITH_POS_LIMITS="false"
+    ;;
+		--fit-nothetalimits*)
+    	FIT_WITH_THETA_LIMITS="false"
+    ;;	
+		--fit-fixsigma*)
+    	FIT_WITH_SIGMA_FIXED="true"
+    ;;
+		--fit-fixtheta*)
+    	FIT_WITH_THETA_FIXED="true"
+    ;;
+		--fit-peakminkern*)
+    	PEAK_MIN_KERN_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--fit-peakmaxkern*)
+    	PEAK_MAX_KERN_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--fit-peakmultiplicitythr*)
+    	PEAK_KERNEL_MULTIPLICITY_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--fit-peakshifttol*)
+    	PEAK_SHIFT_TOLERANCE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--fit-peakzthrmin*)
+    	PEAK_ZTHR_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+	
+		## SALIENCY FILTER OPTIONS
 		--saliencythr*)
     	SALIENCY_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -438,6 +553,7 @@ do
     	SP_MINAREA=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 
+		## WAVELET TRANSFORM FILTER OPTIONS
 		--wtscalemin*)
     	WTSCALE_MIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -475,6 +591,7 @@ echo "GUIDED_FILTER PARS: ($GUIDED_FILTER_RADIUS, $GUIDED_FILTER_EPS)"
 echo "EXT_SFINDER_METHOD: $EXT_SFINDER_METHOD"
 echo "AC_METHOD: $AC_METHOD"
 echo "SEARCH_NESTED_SOURCES: $SEARCH_NESTED_SOURCES"
+echo "NESTED_SOURCE_TO_BEAM_THR: $NESTED_SOURCE_TO_BEAM_THR, NESTED_BLOB_THR: $NESTED_BLOB_THR, NESTED_MIN_MOTHER_DIST: $NESTED_MIN_MOTHER_DIST, NESTED_MAX_MOTHER_PIX_MATCH: $NESTED_MAX_MOTHER_PIX_MATCH"
 echo "SELECT_SOURCES: $SELECT_SOURCES"
 echo "MERGE_EDGE_SOURCES: $MERGE_EDGE_SOURCES"
 echo "FIT_SOURCES: $FIT_SOURCES"
@@ -671,39 +788,40 @@ generate_config(){
 		echo '//==========================================='
 		echo '//==  NESTED SOURCE FINDING OPTIONS        =='
 		echo '//==========================================='
-		echo "searchNestedSources = $SEARCH_NESTED_SOURCES 			  | Search for nested sources inside candidate sources (T/F)"
-		echo "sourceToBeamAreaThrToSearchNested = 5               | Source area/beam thr to add nested sources (e.g. npix>thr*beamArea). NB: thr=0 means always if searchNestedSources is enabled (default=0)"
-		echo 'nestedBlobThrFactor = 1                             | Threshold (multiple of curvature rms) used for nested blob finding'
-		echo 'minNestedMotherDist = 2                             | Minimum distance in pixels (in x or y) between nested and parent blob below which nested is skipped'
-		echo 'maxMatchingPixFraction = 0.5                        | Maximum fraction of matching pixels between nested and parent blob above which nested is skipped'
+		echo "searchNestedSources = $SEARCH_NESTED_SOURCES 			                 | Search for nested sources inside candidate sources (T/F)"
+		echo "sourceToBeamAreaThrToSearchNested = $NESTED_SOURCE_TO_BEAM_THR     | Source area/beam thr to add nested sources (e.g. npix>thr*beamArea). NB: thr=0 means always if searchNestedSources is enabled (default=0)"
+		echo "nestedBlobThrFactor = $NESTED_BLOB_THR                             | Threshold (multiple of curvature rms) used for nested blob finding"
+		echo "minNestedMotherDist = $NESTED_MIN_MOTHER_DIST                      | Minimum distance in pixels (in x or y) between nested and parent blob below which nested is skipped"
+		echo "maxMatchingPixFraction = $NESTED_MAX_MOTHER_PIX_MATCH              | Maximum fraction of matching pixels between nested and parent blob above which nested is skipped"
 		echo '###'
 		echo '###'
+
 		echo '//=================================='
 		echo '//==  SOURCE FITTING OPTIONS  =='
 		echo '//=================================='
-		echo "fitSources = $FIT_SOURCES                      | Deblend point-like sources with multi-component gaus fit (T/F)"
-		echo 'fitMaxNComponents = 3                          | Maximum number of components fitted in a blob (T/F)'
-		echo 'fitWithCentroidLimits = true 									 | Use limits when fitting gaussian centroid (T/F)'
-		echo 'fitWithBkgLimits = true												 | Use limits when fitting bkg offset (T/F)'
-		echo 'fitWithFixedBkg = true                         | Fix bkg level parameter in fit (T/F)'
-		echo 'fitUseEstimatedBkgLevel = true                 | Use estimated (avg bkg) as bkg level par in fit (T/F)'
-		echo 'fitBkgLevel = 0                                | Fixed bkg level used when fitWithFixedBkg=true'
-		echo 'fitWithAmplLimits = true                       | Use limits when fitting gaussian amplitude (T/F)'
-		echo 'fitAmplLimit = 0.3                             | Flux amplitude limit around source peak (e.g. Speak*(1+-fitAmplLimit))'
-		echo 'fixSigmaInPreFit = true                        | Fix sigma in prefit (T/F)'
-		echo 'fitWithFixedSigma = false                      | Fix sigmas in fit (T/F)'
-		echo 'fitWithSigmaLimits = true                      | Use limits when fitting gaussian sigmas (T/F)'
-		echo 'fitSigmaLimit = 0.3                            | Gaussian sigma limit around psf or beam (e.g. Bmaj*(1+-fitSigmaLimit))'
-		echo 'fitWithFixedTheta = false                      | Fix gaussian ellipse theta par in fit (T/F)'
-		echo 'fitWithThetaLimits = true                      | Use limits when fitting gaussian theta par (T/F)'
-		echo 'fitThetaLimit = 5                              | Gaussian theta limit around psf or beam in degrees (e.g. Bpa +- fitThetaLimit)'
-		echo 'useFluxZCutInFit = false                       | Include in fit only source pixels above a given flux significance level (T/F)'
-		echo 'fitZCutMin = 2.5                               | Flux significance below which source pixels are not included in the fit'
-		echo 'peakMinKernelSize = 3                          | Minimum dilation kernel size (in pixels) used to detect peaks (default=3)'
-		echo 'peakMaxKernelSize = 7                          | Maximum dilation kernel size (in pixels) used to detect peaks (default=7)'
-		echo 'peakKernelMultiplicityThr = 1                  | Requested peak multiplicity across different dilation kernels (-1=peak found in all given kernels,1=only in one kernel, etc)'
-		echo 'peakShiftTolerance = 1                         | Shift tolerance (in pixels) used to compare peaks in different dilation kernels (default=1 pixel)'
-		echo 'peakZThrMin = 1                                | Minimum peak flux significance (in nsigmas above avg source bkg & noise) below which peak is skipped (default=1)'
+		echo "fitSources = $FIT_SOURCES                             | Deblend point-like sources with multi-component gaus fit (T/F)"
+		echo "fitMaxNComponents = $FIT_MAX_COMPONENTS               | Maximum number of components fitted in a blob"
+		echo "fitWithCentroidLimits = $FIT_WITH_POS_LIMITS          | Use limits when fitting gaussian centroid (T/F)"
+		echo 'fitWithBkgLimits = true												        | Use limits when fitting bkg offset (T/F)'
+		echo "fitWithFixedBkg = $FIT_WITH_FIXED_BKG                 | Fix bkg level parameter in fit (T/F)"
+		echo "fitUseEstimatedBkgLevel = $FIT_WITH_ESTIMATED_BKG     | Use estimated (avg bkg) as bkg level par in fit (T/F)"
+		echo "fitBkgLevel = $FIT_BKG                                | Fixed bkg level used when fitWithFixedBkg=true"
+		echo "fitWithAmplLimits = $FIT_WITH_AMPL_LIMITS             | Use limits when fitting gaussian amplitude (T/F)"
+		echo 'fitAmplLimit = 0.3                                    | Flux amplitude limit around source peak (e.g. Speak*(1+-fitAmplLimit))'
+		echo 'fixSigmaInPreFit = true                               | Fix sigma in prefit (T/F)'
+		echo "fitWithFixedSigma = $FIT_WITH_SIGMA_FIXED             | Fix sigmas in fit (T/F)"
+		echo "fitWithSigmaLimits = $FIT_WITH_SIGMA_LIMITS           | Use limits when fitting gaussian sigmas (T/F)"
+		echo 'fitSigmaLimit = 0.3                                   | Gaussian sigma limit around psf or beam (e.g. Bmaj*(1+-fitSigmaLimit))'
+		echo "fitWithFixedTheta = $FIT_WITH_THETA_FIXED             | Fix gaussian ellipse theta par in fit (T/F)"
+		echo "fitWithThetaLimits = $FIT_WITH_THETA_LIMITS           | Use limits when fitting gaussian theta par (T/F)"
+		echo 'fitThetaLimit = 5                                     | Gaussian theta limit around psf or beam in degrees (e.g. Bpa +- fitThetaLimit)'
+		echo 'useFluxZCutInFit = false                              | Include in fit only source pixels above a given flux significance level (T/F)'
+		echo 'fitZCutMin = 2.5                                      | Flux significance below which source pixels are not included in the fit'
+		echo "peakMinKernelSize = $PEAK_MIN_KERN_SIZE               | Minimum dilation kernel size (in pixels) used to detect peaks (default=3)"
+		echo "peakMaxKernelSize = $PEAK_MAX_KERN_SIZE               | Maximum dilation kernel size (in pixels) used to detect peaks (default=7)"
+		echo "peakKernelMultiplicityThr = $PEAK_KERNEL_MULTIPLICITY_THR  | Requested peak multiplicity across different dilation kernels (-1=peak found in all given kernels,1=only in one kernel, etc)"
+		echo "peakShiftTolerance = $PEAK_SHIFT_TOLERANCE            | Shift tolerance (in pixels) used to compare peaks in different dilation kernels (default=1 pixel)"
+		echo "peakZThrMin = $PEAK_ZTHR_MIN                          | Minimum peak flux significance (in nsigmas above avg source bkg & noise) below which peak is skipped (default=1)"
 		echo '###'
 		echo '###'
 		echo '//============================================='
@@ -713,7 +831,6 @@ generate_config(){
 		echo "extendedSearchMethod = $EXT_SFINDER_METHOD					| Extended source search method (1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding)"
 		echo 'useResidualInExtendedSearch = true									| Use residual image (with selected sources dilated) as input for extended source search'
 		echo "activeContourMethod = $AC_METHOD										| Active contour method (1=Chanvese, 2=LRAC)"
-		##echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search (DEPRECATED)'
 		echo "wtScaleSearchMin = $WTSCALE_MIN									    | Minimum Wavelet scale to be used for extended source search"
 		echo "wtScaleSearchMax = $WTSCALE_MAX											| Maximum Wavelet scale to be used for extended source search"
 		echo '###'
