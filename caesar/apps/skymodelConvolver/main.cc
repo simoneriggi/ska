@@ -376,6 +376,22 @@ int RunConvolver()
 		if(i%100==0) INFO_LOG("#"<<i+1<<"/"<<sources.size()<<" sources convolved...");
 
 		//Get image source mask
+		std::vector<Pixel*> pixels= sources[i]->GetPixels();
+		Image* sourceImg= img->GetCloned("",true,true);
+		if(!sourceImg){
+			ERROR_LOG("Failed to create image mask for source "<<i+1<<"!");
+			return -1;
+		}
+		sourceImg->Reset();
+		
+		for(size_t k=0;k<pixels.size();k++){	
+			long int gBin= pixels[k]->id;
+			double S= pixels[k]->S;
+			sourceImg->SetPixelValue(gBin,S);
+		}//end loop pixels
+
+		/*
+		//This is wrong!!!!
 		bool isBinary= false;	
 		bool invert= false;
 		Image* sourceImg= img->GetSourceMask({sources[i]},isBinary,invert);
@@ -383,6 +399,7 @@ int RunConvolver()
 			ERROR_LOG("Failed to compute image mask for source "<<i+1<<"!");
 			return -1;
 		}
+		*/
 
 		//Convolve source image with beam
 		Image* sourceImg_conv= sourceImg->GetBeamConvolvedImage(Bmaj,Bmin,Bpa,nSigmas);
