@@ -22,39 +22,79 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--inputfile=[FILENAME] - Input file name to be searched (.fits/.root). If the --filelist option is given this option is skipped."
 	echo "--envfile=[ENV_FILE] - File (.sh) with list of environment variables to be loaded by each processing node"
 	echo ""
+
+	echo "*** OPTIONAL ARGS ***"
+	echo "=== SFINDER OUTPUT OPTIONS ==="
+	echo "--save-inputmap - Save input map in output ROOT file (default=no)"
+	echo "--save-bkgmap - Save bkg map in output ROOT file (default=no)"
+	echo "--save-rmsmap - Save rms map in output ROOT file (default=no)"	
+	echo "--save-significancemap - Save significance map in output ROOT file (default=no)"
+	echo "--save-residualmap - Save residual map in output ROOT file (default=no)"
+	echo "--save-saliencymap - Save saliency map in output ROOT file (default=no)"
+	echo "--save-segmentedmap - Save segmented map in output ROOT file (default=no)"
 	echo ""
-	echo "*** OPTIONAL ARGS ***"	
-	echo "--containerrun - Run inside Caesar container"
-	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
-	echo "--submit - Submit the script to the batch system using queue specified"
-	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
-	echo "--jobwalltime=[JOB_WALLTIME] - Job wall time in batch system (default=96:00:00)"
-	echo "--loglevel=[LOG_LEVEL] - Logging level string {INFO, DEBUG, WARN, ERROR, OFF} (default=INFO)"
-	echo "--maxfiles=[NMAX_PROCESSED_FILES] - Maximum number of input files processed in filelist (default=-1=all files)"
-	echo "--outdir=[OUTPUT_DIR] - Output directory where to put run output file (default=pwd)"
-	echo "--nproc=[NPROC] - Number of processors to be used in MPI run (default=1)"
-	echo "--hostfile=[HOSTFILE] - Ascii file with list of hosts used by MPI (default=no hostfile used)"
-	echo "--nthreads=[NTHREADS] - Number of threads to be used in OpenMP (default=-1=all available)"
+
+	echo "=== SFINDER IMG READ OPTIONS ==="
 	echo "--tilesize=[TILE_SIZE] - Size (in pixels) of tile used to partition input image in distributed processing (default=0=no tile split)"		
 	echo "--tilestep=[TILE_STEP] - Tile step size (range 0-1) expressed as tile fraction used in tile overlap (default=1=no overlap)"
 	echo "--xmin=[XMIN] - Read sub-image of input image starting from pixel x=xmin (default=0=read full image)"
 	echo "--xmax=[XMAX] - Read sub-image of input image up to pixel x=xmax (default=0=read full image)"
 	echo "--ymin=[YMIN] - Read sub-image of input image starting from pixel y=xmin (default=0=read full image)"
-	echo "--ymax=[YMAX] - Read sub-image of input image up to pixel y=ymax (default=0=read full image)"	
+	echo "--ymax=[YMAX] - Read sub-image of input image up to pixel y=ymax (default=0=read full image)"
+	echo ""
+
+	echo "=== SFINDER BKG OPTIONS ==="
+	echo "--bmaj=[BMAJ] - User-supplied beam Bmaj in arcsec (NB: used only when beam info is not available in input map) (default: 10 arcsec)"
+	echo "--bmin=[BMIN] - User-supplied beam Bmin in arcsec (NB: used only when beam info is not available in input map) (default: 5 arcsec)"
+	echo "--bpa=[BMIN] - User-supplied beam position angle in degrees (NB: used only when beam info is not available in input map) (default: 0 deg)"
 	echo "--globalbkg - Use global bkg (default=use local bkg)"
+	echo "--bkgestimator=[BKG_ESTIMATOR] - Stat estimator used for bkg (1=Mean,2=Median,3=BiWeight,4=ClippedMedian) (default=2)"
 	echo "--bkgbox=[BKG_BOXSIZE] - Box size (muliple of beam size) used to compute local bkg (default=20 x beam)"
 	echo "--bkggrid=[BKG_GRIDSIZE] - Grid size (fraction of bkg box) used to compute local bkg (default=0.2 x box)"
+	echo "--no-bkg2ndpass - Do not perform a 2nd pass in bkg estimation (default=true)"
+	echo "--bkgskipoutliers - Remove bkg outliers (blobs above seed thr) when estimating bkg (default=no)"
+	echo ""
+
+	echo "=== SFINDER SOURCE FINDING OPTIONS ==="
+	echo "--mergeedgesources - Merge sources at tile edges. NB: Used for multitile processing. (default=no)"
+	echo ""
+
+	echo "=== SFINDER COMPACT SOURCE OPTIONS ==="
 	echo "--no-compactsearch - Do not search compact sources"
-	echo "--npixmin=[NPIX_MIN] - Minimum number of pixel to consider a source (default=5 pixels)"
+	echo "--no-nestedsearch - Do not search nested sources (default=search)"		
+	echo "--selectsources - Apply selection to compact sources found (default=false)"	
+	echo "--npixmin=[NPIX_MIN] - Minimum number of pixel to form a compact source (default=5 pixels)"
 	echo "--seedthr=[SEED_THR] - Seed threshold (in nsigmas) used in flood-fill (default=5 sigmas)"
 	echo "--mergethr=[MERGE_THR] - Merge threshold (in nsigmas) used in flood-fill (default=2.6 sigmas)"
-	echo "--dilatethr=[DILATE_THR] - Seed threshold (in nsigmas) used to dilate sources (default=10 sigmas)"
+	echo "--compactsearchiters=[COMPACT_SOURCE_SEARCH_NITERS] - Maximum number of compact source search iterations (default=5)"	
+	echo "--seedthrstep=[SEED_THR_STEP] - Seed thr decrease step across iterations (default=1)"
+	echo ""
+
+	echo "=== SFINDER EXTENDED SOURCE OPTIONS ==="
 	echo "--no-extendedsearch - Do not search extended sources"
 	echo "--extsfinder=[EXT_SFINDER_METHOD] - Extended source search method {1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding} (default=3)"	
 	echo "--activecontour=[AC_METHOD] - Active contour method {1=Chanvese, 2=LRAC} (default=2)"
-	echo "--no-nestedsearch - Do not search nested sources (default=search)"		
-	echo "--selectsources - Apply selection to compact sources found (default=false)"
+	echo ""
+	
+	echo "=== SFINDER SOURCE RESIDUAL OPTIONS ==="
+	echo "--dilatenested - When a source has nested sources perform the dilation only on nested (default=false)"
+	echo "--dilatethr=[DILATE_THR] - Seed threshold (in nsigmas) used to dilate sources (default=10 sigmas)"	
+	echo "--dilatekernsize=[DILATE_KERNEL_SIZE] - Size of dilating kernel in pixels (default=9)"
+	echo "--dilatedsource=[DILATED_SOURCE] - Type of source dilated from the input image (-1=ALL,1=COMPACT,2=POINT-LIKE,3=EXTENDED) (default=2)"
+	echo ""
+
+	echo "=== SFINDER SOURCE FITTING OPTIONS ==="
 	echo "--fitsources - Fit compact point-like sources found (default=false)"	
+	echo ""
+
+	echo "=== SFINDER SMOOTHING FILTER OPTIONS ==="
+	echo "--no-presmoothing - Do not smooth input/residual map before extended source search (default=yes)"
+	echo "--smoothfilter=[SMOOTH_FILTER] - Smoothing filter to be used (1=gaussian, 2=guided filter) (default=2)"
+	echo "--guidedfilter-radius=[GUIDED_FILTER_RADIUS] - Guided filter radius par (default=12)"
+	echo "--guidedfilter-eps=[GUIDED_FILTER_EPS] - Guided filter eps par (default=0.04)"
+	echo ""
+	
+	echo "=== SFINDER SALIENCY FILTER OPTIONS ==="
   echo "--spsize - Superpixel size (in pixels) used in hierarchical clustering (default=20)"	
 	echo "--spbeta - Superpixel regularization par (beta) used in hierarchical clustering (default=1)"	
 	echo "--spminarea - Superpixel min area (in pixels) used in hierarchical clustering (default=10)"	
@@ -63,8 +103,25 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--saliencymaxreso - Superpixel size (in pixels) used in multi-reso saliency map highest scale (default=60 pixels)"
 	echo "--saliencyresostep - Superpixel size step (in pixels) used in multi-reso saliency map computation (default=10 pixels)"
 	echo "--saliencynn - Fraction of most similar region neighbors used in saliency map computation (default=1)"
+	echo ""
+
+	echo "=== SFINDER WAVELET TRANSFORM FILTER OPTIONS ==="
 	echo "--wtscalemin - Minimum Wavelet Transform scale for extended source search (default=3)"
 	echo "--wtscalemax - Maximum Wavelet Transform scale for extended source search (default=6)"
+	echo ""
+	
+	echo "=== SFINDER RUN OPTIONS ==="	
+	echo "--loglevel=[LOG_LEVEL] - Logging level string {INFO, DEBUG, WARN, ERROR, OFF} (default=INFO)"
+	echo "--maxfiles=[NMAX_PROCESSED_FILES] - Maximum number of input files processed in filelist (default=-1=all files)"
+	echo "--outdir=[OUTPUT_DIR] - Output directory where to put run output file (default=pwd)"
+	echo "--nproc=[NPROC] - Number of processors to be used in MPI run (default=1)"
+	echo "--nthreads=[NTHREADS] - Number of threads to be used in OpenMP (default=-1=all available)"
+	echo "--hostfile=[HOSTFILE] - Ascii file with list of hosts used by MPI (default=no hostfile used)"
+	echo "--containerrun - Run inside Caesar container"
+	echo "--containerimg=[CONTAINER_IMG] - Singularity container image file (.simg) with CAESAR installed software"
+	echo "--submit - Submit the script to the batch system using queue specified"
+	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
+	echo "--jobwalltime=[JOB_WALLTIME] - Job wall time in batch system (default=96:00:00)"
 	echo "=========================="
   exit 1
 fi
@@ -99,16 +156,28 @@ XMAX=0
 YMIN=0
 YMAX=0
 USE_LOCAL_BKG="true"
+BKG_ESTIMATOR="2"
 BKG_BOXSIZE="20"
 BKG_GRIDSIZE="0.2"
+BKG_USE_2ND_PASS="true"
+BKG_SKIP_OUTLIERS="false"
 NPIX_MIN="5"
 SEED_THR="5"
+DILATE_NESTED="false"
 DILATE_THR="10"
+DILATED_SOURCE="2"
+DILATE_KERNEL_SIZE="9"
 MERGE_THR="2.6"
+USE_PRESMOOTHING="true"
+SMOOTH_FILTER="2"
+GUIDED_FILTER_RADIUS="12"
+GUIDED_FILTER_EPS="0.04"
 EXT_SFINDER_METHOD="3"
 AC_METHOD="2"
 SEARCH_NESTED_SOURCES="true"
 SELECT_SOURCES="false"
+COMPACT_SOURCE_SEARCH_NITERS="5"
+SEED_THR_STEP="1"
 SP_SIZE="20"
 SP_BETA="1"
 SP_MINAREA="10"
@@ -122,6 +191,17 @@ SEARCH_EXTENDED_SOURCES="true"
 FIT_SOURCES="false"
 WTSCALE_MIN="3"
 WTSCALE_MAX="6"
+MERGE_EDGE_SOURCES="false"
+SAVE_INPUT_MAP="false"
+SAVE_BKG_MAP="false"
+SAVE_RMS_MAP="false"
+SAVE_SIGNIFICANCE_MAP="false"
+SAVE_RESIDUAL_MAP="false"
+SAVE_SALIENCY_MAP="false"
+SAVE_SEGMENTED_MAP="false"
+BMAJ=10
+BMIN=5
+BPA=0
 
 for item in $*
 do
@@ -180,6 +260,37 @@ do
     	NTHREADS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 			
+		--save-inputmap*)
+    	SAVE_INPUT_MAP="true"
+    ;;
+		--save-bkgmap*)
+    	SAVE_BKG_MAP="true"
+    ;;
+		--save-rmsmap*)
+    	SAVE_RMS_MAP="true"
+    ;;
+		--save-significancemap*)
+    	SAVE_SIGNIFICANCE_MAP="true"
+    ;;
+		--save-residualmap*)
+    	SAVE_RESIDUAL_MAP="true"
+    ;;
+		--save-saliencymap*)
+    	SAVE_SALIENCY_MAP="true"
+    ;;
+		--save-segmentedmap*)
+    	SAVE_SEGMENTED_MAP="true"
+    ;;
+		--bmaj=*)
+    	BMAJ=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--bmin=*)
+    	BMIN=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+		--bpa=*)
+    	BPA=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
+    ;;
+
     --tilesize=*)
     	TILE_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
 			SPLIT_IN_TILES="true"
@@ -217,13 +328,33 @@ do
     	BKG_GRIDSIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
 			USE_LOCAL_BKG="true"
     ;;
+		--bkgestimator=*)
+			BKG_ESTIMATOR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+		--no-bkg2ndpass=*)
+			BKG_USE_2ND_PASS="false"
+		;;
+		--bkgskipoutliers=*)
+			BKG_SKIP_OUTLIERS="true"
+		;;
 
+		
 
 		--no-compactsearch*)
     	SEARCH_COMPACT_SOURCES="false"
     ;;
 		--no-nestedsearch*)
     	SEARCH_NESTED_SOURCES="false"
+    ;;
+		--compactsearchiters*)
+			COMPACT_SOURCE_SEARCH_NITERS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+		--seedthrstep*)		
+			SEED_THR_STEP=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+
+		--mergeedgesources*)
+    	MERGE_EDGE_SOURCES="true"
     ;;
 
 		--npixmin=*)
@@ -233,13 +364,38 @@ do
 		--seedthr=*)
     	SEED_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-		--dilatethr=*)
-    	DILATE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
-    ;;
+
 		--mergethr=*)
     	MERGE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
-	
+
+		--dilatethr=*)
+    	DILATE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--dilatenested=*)
+			DILATE_NESTED="true"		
+		;;
+		--dilatedsource=*)
+			DILATED_SOURCE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+		--dilatekernsize=*)
+			DILATE_KERNEL_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+
+		--no-presmoothing*)
+    	USE_PRESMOOTHING="false"
+    ;;
+		--smoothfilter*)
+			SMOOTH_FILTER=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+		--guidedfilter-radius*)
+			GUIDED_FILTER_RADIUS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+		--guidedfilter-eps*)
+			GUIDED_FILTER_EPS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+		;;
+		
+
 		--no-extendedsearch*)
     	SEARCH_EXTENDED_SOURCES="false"
     ;;
@@ -304,17 +460,23 @@ echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "ENV_FILE: $ENV_FILE"
 echo "INPUTFILE: $INPUTFILE"
 echo "FILELIST: $FILELIST, NMAX_PROCESSED_FILES: $NMAX_PROCESSED_FILES"
+echo "SAVE_INPUT_MAP? $SAVE_INPUT_MAP, SAVE_BKG_MAP: $SAVE_BKG_MAP, SAVE_RMS_MAP? $SAVE_RMS_MAP, SAVE_SIGNIFICANCE_MAP? $SAVE_SIGNIFICANCE_MAP, SAVE_RESIDUAL_MAP: $SAVE_RESIDUAL_MAP"
+echo "SAVE_SALIENCY_MAP? $SAVE_SALIENCY_MAP, SAVE_SEGMENTED_MAP? $SAVE_SEGMENTED_MAP"
 echo "SPLIT_IN_TILES? $SPLIT_IN_TILES, TILE_SIZE: $TILE_SIZE, TILE_STEP: $TILE_STEP"
 echo "NPROC: $NPROC, NTHREADS: $NTHREADS"
 echo "HOSTFILE_GIVEN? $HOSTFILE_GIVEN, HOSTFILE: $HOSTFILE"
 echo "LOG_LEVEL: $LOG_LEVEL"
 echo "OUTPUT_DIR: $OUTPUT_DIR"
-echo "BKG BOX: $BKG_BOXSIZE, GRID: $BKG_GRID_SIZE"
-echo "NPIX_MIN: $NPIX_MIN, SEED_THR: $SEED_THR, DILATE_THR: $DILATE_THR, MERGE_THR: $MERGE_THR"
+echo "BKG BOX: $BKG_BOXSIZE, GRID: $BKG_GRID_SIZE, BKG_ESTIMATOR: $BKG_ESTIMATOR, BKG_USE_2ND_PASS: $BKG_USE_2ND_PASS, BKG_SKIP_OUTLIERS: $BKG_SKIP_OUTLIERS"
+echo "NPIX_MIN: $NPIX_MIN, SEED_THR: $SEED_THR, MERGE_THR: $MERGE_THR, NITERS: $COMPACT_SOURCE_SEARCH_NITERS. SEED_THR_STEP=$SEED_THR_STEP"
+echo "DILATE_NESTED? $DILATE_NESTED, DILATE_THR: $DILATE_THR, DILATED_SOURCE: $DILATED_SOURCE, DILATE_KERNEL_SIZE: $DILATE_KERNEL_SIZE"
+echo "USE_PRESMOOTHING? $USE_PRESMOOTHING, SMOOTH_FILTER: $SMOOTH_FILTER"
+echo "GUIDED_FILTER PARS: ($GUIDED_FILTER_RADIUS, $GUIDED_FILTER_EPS)"
 echo "EXT_SFINDER_METHOD: $EXT_SFINDER_METHOD"
 echo "AC_METHOD: $AC_METHOD"
 echo "SEARCH_NESTED_SOURCES: $SEARCH_NESTED_SOURCES"
 echo "SELECT_SOURCES: $SELECT_SOURCES"
+echo "MERGE_EDGE_SOURCES: $MERGE_EDGE_SOURCES"
 echo "FIT_SOURCES: $FIT_SOURCES"
 echo "SP PARS: ($SP_SIZE, $SP_BETA, $SP_MINAREA)"
 echo "SALIENCY_THR: $SALIENCY_THR"
@@ -406,9 +568,9 @@ generate_config(){
 		echo '//============================'
 		echo 'pixSize = 1.0   												| User-supplied map pixel area in arcsec (pixSize=CDELT, default=1 arcsec)'
 		echo 'beamFWHM = 6.5                          | User-supplied circular beam FWHM in arcsec (beamFWHM=BMAJ=BMIN, default=6.5 arcsec)'
-		echo 'beamBmaj = 10                                     | User-supplied elliptical beam bmaj FWHM in arcsec (default=10 arcsec)'
-		echo 'beamBmin = 5                                     | User-supplied elliptical beam bmin FWHM in arcsec (default=5 arcsec)'
-		echo 'beamTheta = 0.0                         | User-supplied beam theta in deg (default=0)'
+		echo "beamBmaj = $BMAJ                        | User-supplied elliptical beam bmaj FWHM in arcsec (default=10 arcsec)"
+		echo "beamBmin = $BMIN                        | User-supplied elliptical beam bmin FWHM in arcsec (default=5 arcsec)"
+		echo "beamTheta = $BPA                        | User-supplied beam theta in deg (default=0)"
 		echo '###'
 		echo '###'
 		echo '//============================================='
@@ -421,7 +583,7 @@ generate_config(){
 		echo "useTileOverlap = $TILE_OVERLAP                     | Allow for tile overlap"
     echo "tileStepSizeX = $TILE_STEP                         | Tile step size fraction X to partition the input image (1=no overlap,0.5=half overlap, ...)"
     echo "tileStepSizeY = $TILE_STEP												 | Tile step size fraction Y to partition the input image (1=no overlap,0.5=half overlap, ...)"
-		echo "mergeSourcesAtEdge = true 							           | Merge sources found at tile edge by each workers (default=true)"
+		echo "mergeSourcesAtEdge = $MERGE_EDGE_SOURCES           | Merge sources found at tile edge by each workers (default=true)"
     echo '###'
     echo '###'
     echo '//=============================='
@@ -442,7 +604,7 @@ generate_config(){
     echo '//==      OUTPUT             =='
     echo '//============================='
     echo 'isInteractiveRun = false                          | Is interactive run (graph plots enabled) (T/F)'
-    echo "outputFile = $outputfile                         | Output filename (.root)"
+    echo "outputFile = $outputfile                          | Output filename (.root)"
     echo "ds9RegionFile = $ds9region_file					          | DS9 region file (.reg) where to store source catalog"	
 		echo "ds9FitRegionFile = $ds9fitregion_file					    | DS9 region file (.reg) where to store fitted source catalog"
     echo 'DS9RegionFormat = 2                               | DS9 region format (1=ellipse, 2=polygon)'
@@ -454,56 +616,56 @@ generate_config(){
     echo 'significanceMapFITSFile = significance_map.fits	  | Output filename where to store significance map in FITS format (.fits)' 
     echo 'saveToFile = true																	| Save results & maps to output ROOT file (T/F)'
     echo 'saveToFITSFile = false														| Save results to output FITS file(s) (T/F)'
-    echo 'saveInputMap = false															| Save input map to ROOT file (T/F)'
     echo 'saveConfig = true																	| Save config options to ROOT file (T/F)'
-    echo 'saveResidualMap = false														| Save residual map to ROOT file (T/F)'
-    echo 'saveBkgMap = false																| Save bkg map to ROOT file (T/F)'
-    echo 'saveNoiseMap = false															| Save noise map to ROOT file (T/F)'
-    echo 'saveSignificanceMap = false												| Save significance map to ROOT file (T/F)'
-    echo 'saveSaliencyMap = false														| Save saliency map to ROOT file (T/F)'
-    echo 'saveSources = true																| Save sources to ROOT file (T/F)'
+		echo 'saveSources = true																| Save sources to ROOT file (T/F)'
+		echo "saveInputMap = $SAVE_INPUT_MAP										| Save input map to ROOT file (T/F)"
+		echo "saveBkgMap = $SAVE_BKG_MAP												| Save bkg map to ROOT file (T/F)"
+    echo "saveNoiseMap = $SAVE_RMS_MAP											| Save noise map to ROOT file (T/F)"
+    echo "saveResidualMap = $SAVE_RESIDUAL_MAP  						| Save residual map to ROOT file (T/F)"
+    echo "saveSignificanceMap = $SAVE_SIGNIFICANCE_MAP  		| Save significance map to ROOT file (T/F)"
+    echo "saveSaliencyMap = $SAVE_SALIENCY_MAP							| Save saliency map to ROOT file (T/F)"
+    echo "saveSegmentedMap = $SAVE_SEGMENTED_MAP            | Save segmented map computed in extended source search to ROOT file (T/F)"
     echo 'saveEdgenessMap = false                           | Save edgeness map computed in extended source search to ROOT file (T/F)'
     echo 'saveCurvatureMap = false                          | Save curvature map to ROOT file (T/F)'
-    echo 'saveSegmentedMap = false                          | Save segmented map computed in extended source search to ROOT file (T/F)'
     echo '###'
     echo '###'
 		echo '//==========================='
 		echo '//==   BKG OPTIONS         =='
 		echo '//==========================='
-    echo "useLocalBkg = $USE_LOCAL_BKG							| Use local background calculation instead of global bkg (T/F)"
-    echo 'localBkgMethod = 1												| Local background method (1=Grid, 2=Superpixel)'
-    echo 'use2ndPassInLocalBkg = true								| Use 2nd pass to refine noise calculation in local bkg (T/F)'
-		echo 'skipOutliersInLocalBkg = false						| Skip outliers (e.g. bright point sources) in local bkg computation (T/F)'
-		echo 'bkgEstimator = 2													| Background estimator (1=Mean,2=Median,3=BiWeight,4=ClippedMedian)'
-    echo 'useBeamInfoInBkg = true                   | Use beam information in bkg box definition (if available) (T/F)'
-		echo "boxSizeX = $BKG_BOXSIZE										| X Size of local background box in #pixels"
-		echo "boxSizeY = $BKG_BOXSIZE										| Y Size of local background box in #pixels"
-		echo "gridSizeX = $BKG_GRIDSIZE									| X Size of local background grid used for bkg interpolation"
-		echo "gridSizeY = $BKG_GRIDSIZE									| Y Size of local background grid used for bkg interpolation"
+    echo "useLocalBkg = $USE_LOCAL_BKG							        | Use local background calculation instead of global bkg (T/F)"
+    echo 'localBkgMethod = 1												        | Local background method (1=Grid, 2=Superpixel)'
+    echo "use2ndPassInLocalBkg = $BKG_USE_2ND_PASS	        | Use 2nd pass to refine noise calculation in local bkg (T/F)"
+		echo "skipOutliersInLocalBkg = $BKG_SKIP_OUTLIERS				| Skip outliers (e.g. bright point sources) in local bkg computation (T/F)"
+		echo "bkgEstimator = $BKG_ESTIMATOR                     | Background estimator (1=Mean,2=Median,3=BiWeight,4=ClippedMedian)"
+    echo 'useBeamInfoInBkg = true                           | Use beam information in bkg box definition (if available) (T/F)'
+		echo "boxSizeX = $BKG_BOXSIZE										        | X Size of local background box in #pixels"
+		echo "boxSizeY = $BKG_BOXSIZE										        | Y Size of local background box in #pixels"
+		echo "gridSizeX = $BKG_GRIDSIZE									        | X Size of local background grid used for bkg interpolation"
+		echo "gridSizeY = $BKG_GRIDSIZE									        | Y Size of local background grid used for bkg interpolation"
 		echo '###'
 		echo '###'
 		echo '//==============================='
 		echo '//==  FILTERING OPTIONS        =='
 		echo '//==============================='
-		echo 'usePreSmoothing = true										          | Use a pre-smoothing stage to filter input image for extended source search (T/F)'
-		echo 'smoothFilter = 2													          | Smoothing filter (1=gaus,2=guided)'
+		echo "usePreSmoothing = $USE_PRESMOOTHING								  | Use a pre-smoothing stage to filter input image for extended source search (T/F)"
+		echo "smoothFilter = $SMOOTH_FILTER												| Smoothing filter (1=gaus,2=guided)"
 		echo 'gausFilterKernSize = 5										          | Gaussian filter kernel size'
 		echo 'gausFilterSigma = 1																	| Gaussian filter sigma'
-		echo 'guidedFilterRadius = 12															| Guided filter radius par'
-		echo 'guidedFilterColorEps = 0.04													| Guided filter color epsilon parameter'
+		echo "guidedFilterRadius = $GUIDED_FILTER_RADIUS					| Guided filter radius par"
+		echo "guidedFilterColorEps = $GUIDED_FILTER_EPS						| Guided filter color epsilon parameter"
 		echo '###'
 		echo '###'
 		echo '//===================================='
 		echo '//==  SOURCE FINDING OPTIONS        =='
 		echo '//===================================='
-		echo "searchCompactSources = $SEARCH_COMPACT_SOURCES			| Search compact sources (T/F)"
-		echo "minNPix = $NPIX_MIN																	| Minimum number of pixel to consider a source"
-		##echo "seedBrightThr = $DILATE_THR										| Seed threshold in flood-filling algo for bright sources"
-		echo "seedThr = $SEED_THR 																| Seed threshold in flood filling algo for faint sources"
-		echo "mergeThr = $MERGE_THR																| Merge/aggregation threshold in flood filling algo"
-		echo 'mergeBelowSeed = false                              | Aggregate to seed only pixels above merge threshold but below seed threshold (T/F)'
-		echo 'searchNegativeExcess = false												| Search negative excess together with positive in compact source search'
-		echo "compactSourceSearchNIters = 10                      | Number of iterations to be performed in compact source search (default=10)"
+		echo "searchCompactSources = $SEARCH_COMPACT_SOURCES			            | Search compact sources (T/F)"
+		echo "minNPix = $NPIX_MIN																	            | Minimum number of pixel to consider a source"
+		echo "seedThr = $SEED_THR 																            | Seed threshold in flood filling algo for faint sources"
+		echo "mergeThr = $MERGE_THR																            | Merge/aggregation threshold in flood filling algo"
+		echo 'mergeBelowSeed = false                                          | Aggregate to seed only pixels above merge threshold but below seed threshold (T/F)'
+		echo 'searchNegativeExcess = false												            | Search negative excess together with positive in compact source search'
+		echo "compactSourceSearchNIters = $COMPACT_SOURCE_SEARCH_NITERS       | Number of iterations to be performed in compact source search (default=10)"
+		echo "seedThrStep = $SEED_THR_STEP                                    | Seed threshold decrease step size between iteration (default=1)"
 		echo '###'
 		echo '###'
 		echo '//==========================================='
@@ -551,7 +713,7 @@ generate_config(){
 		echo "extendedSearchMethod = $EXT_SFINDER_METHOD					| Extended source search method (1=WT-thresholding,2=SPSegmentation,3=ActiveContour,4=Saliency thresholding)"
 		echo 'useResidualInExtendedSearch = true									| Use residual image (with selected sources dilated) as input for extended source search'
 		echo "activeContourMethod = $AC_METHOD										| Active contour method (1=Chanvese, 2=LRAC)"
-		echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search (DEPRECATED)'
+		##echo 'wtScaleExtended = 6																	| Wavelet scale to be used for extended source search (DEPRECATED)'
 		echo "wtScaleSearchMin = $WTSCALE_MIN									    | Minimum Wavelet scale to be used for extended source search"
 		echo "wtScaleSearchMax = $WTSCALE_MAX											| Maximum Wavelet scale to be used for extended source search"
 		echo '###'
@@ -576,10 +738,10 @@ generate_config(){
 		echo '//================================'
 		echo '//==  SOURCE RESIDUAL OPTIONS   =='
 		echo '//================================'
-		echo 'dilateNestedSources = true 													| Dilate sources nested inside bright sources (T/F)'
+		echo "dilateNestedSources = $DILATE_NESTED								| Dilate sources nested inside bright sources (T/F)"
 		echo "dilateZThr = $DILATE_THR                            | Significance threshold (in sigmas) above which sources are dilated"
-		echo 'dilateKernelSize = 9																| Size of kernel (odd) to be used in dilation operation'
-		echo 'dilatedSourceType = 2																| Type of bright sources to be dilated from the input image (-1=ALL,1=COMPACT,2=POINT-LIKE,3=EXTENDED) '
+		echo "dilateKernelSize = $DILATE_KERNEL_SIZE							| Size of kernel (odd) to be used in dilation operation"
+		echo "dilatedSourceType = $DILATED_SOURCE									| Type of bright sources to be dilated from the input image (-1=ALL,1=COMPACT,2=POINT-LIKE,3=EXTENDED)"
 		echo 'dilateSourceModel = 1																| Dilate source model  (1=bkg,2=median)'
 		echo 'dilateRandomize = false															| Randomize dilated values (T/F)'
 		echo '###'
