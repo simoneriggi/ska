@@ -1609,6 +1609,7 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 		int nSelNestedSources= 0;
 		for(size_t i=0;i<MotherNestedAssociationList.size();i++){
 			long int NPix= sources[i]->GetNPixels(); 
+			double beamArea= sources[i]->GetBeamFluxIntegral();
 			bool isMotherSourceSplittableInNestedComponents= (NPix>nPixThrToSearchNested);
 			int nComponents= static_cast<int>(MotherNestedAssociationList[i].size());
 			if(nComponents<=0 || !isMotherSourceSplittableInNestedComponents) continue;
@@ -1618,6 +1619,9 @@ int Image::FindNestedSource(std::vector<Source*>& sources,ImgBkgData* bkgData,in
 			//  2) mother and nested pix superposition is <thr (e.g. 50%)
 			for(int j=0;j<nComponents;j++){
 				int nestedIndex= MotherNestedAssociationList[i][j];
+
+				//Set pars
+				NestedSources[nestedIndex]->SetBeamFluxIntegral(beamArea);
 
 				//Compute nested source stats & pars
 				NestedSources[nestedIndex]->ComputeStats();
@@ -1938,7 +1942,13 @@ Image* Image::GetSourceMask(std::vector<Source*>const& sources,bool isBinary,boo
 
 }//close GetSourceMask()
 
-Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
+Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr,double zBrightThr){
+
+	//Check thresholds
+	if(zBrightThr<zThr){
+		ERROR_LOG("Invalid z threshold given (hint: zBrightThr shall be >= than zThr)!");
+		return nullptr;
+	}
 
 	//Clone input image	
 	TString imgName= Form("%s_Residual",m_name.c_str());	
@@ -1949,7 +1959,7 @@ Image* Image::GetSourceResidual(std::vector<Source*>const& sources,int KernSize,
 	}
 
 	//Dilate source pixels
-	int status= MorphFilter::DilateAroundSources(residualImg,sources,KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
+	int status= MorphFilter::DilateAroundSources(residualImg,sources,KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr,zBrightThr);
 
 	if(status<0){
 		ERROR_LOG("Failed to dilate sources!");

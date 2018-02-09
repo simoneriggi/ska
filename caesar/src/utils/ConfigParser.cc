@@ -286,10 +286,13 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(psEllipseAreaRatioMaxThr,double,1.4,0,10);
 		REGISTER_OPTION(useMaxNPixCut,bool,false,false,true);
 		REGISTER_OPTION(psMaxNPix,double,1000,0,1.e+7);
+		REGISTER_OPTION(useNBeamsCut,bool,false,false,true);
+		REGISTER_OPTION(psNBeamsThr,double,5,-0.0001,1000);
 				
 		//================================
 		//==  Source residual options   ==
 		//================================
+		REGISTER_OPTION(dilateZBrightThr,double,10,0,10000);
 		REGISTER_OPTION(dilateZThr,double,5,0,10000);
 		REGISTER_OPTION(dilateNestedSources,bool,true,false,true);		
 		REGISTER_OPTION(dilateKernelSize,int,9,1,1001);		

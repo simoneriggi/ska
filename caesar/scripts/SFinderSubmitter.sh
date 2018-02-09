@@ -85,7 +85,8 @@ if [ "$NARGS" -lt 2 ]; then
 	
 	echo "=== SFINDER SOURCE RESIDUAL OPTIONS ==="
 	echo "--dilatenested - When a source has nested sources perform the dilation only on nested (default=false)"
-	echo "--dilatethr=[DILATE_THR] - Seed threshold (in nsigmas) used to dilate sources (default=10 sigmas)"	
+	echo "--dilatethr=[DILATE_THR] - Seed threshold (in nsigmas) used to dilate sources (default=5 sigmas)"	
+	echo "--dilatebrightthr=[DILATE_BRIGHT_THR] - Seed threshold (in nsigmas) used to dilate sources (even if they have nested components or different dilation type) (default=10 sigmas)"	
 	echo "--dilatekernsize=[DILATE_KERNEL_SIZE] - Size of dilating kernel in pixels (default=9)"
 	echo "--dilatedsource=[DILATED_SOURCE] - Type of source dilated from the input image (-1=ALL,1=COMPACT,2=POINT-LIKE,3=EXTENDED) (default=2)"
 	echo ""
@@ -96,6 +97,10 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--fit-freebkg - Fit with bkg offset parameter free to vary (default=fixed)"
 	echo "--fit-estimatedbkg - Set bkg par starting value to estimated bkg (average over source pixels) (default=use fixed bkg start value)"
 	echo "--fit-bkg=[FIT_BKG] - Bkg par starting value (NB: ineffective when -fit-estimatedbkg is enabled) (default=0)"
+	echo "--fit-ampllimit=[FIT_AMPL_LIMIT] - Limit amplitude range par (Speak*(1+-FIT_AMPL_LIMIT)) (default=0.3)"
+	echo "--fit-sigmalimit=[FIT_SIGMA_LIMIT] - Gaussian sigma limit around psf or beam (Bmaj*(1+-FIT_SIGMA_LIMIT)) (default=0.3)"
+	echo "--fit-thetalimit=[FIT_THETA_LIMIT] - Gaussian theta limit around psf or beam in degrees (e.g. Bpa +- FIT_THETA_LIMIT) (default=5)"
+	echo "--fit-nobkglimits - Do not apply limits in bkg offset parameter in fit (default=fit with limits when par is free)"
 	echo "--fit-noampllimits - Do not apply limits in Gaussian amplitude parameters in fit (default=fit with limits)"
 	echo "--fit-nosigmalimits - Do not apply limits in Gaussian sigma parameters in fit (default=fit with limits)"	
 	echo "--fit-noposlimits - Do not apply limits in Gaussian mean parameters in fit (default=fit with limits)"
@@ -186,7 +191,8 @@ BKG_SKIP_OUTLIERS="false"
 NPIX_MIN="5"
 SEED_THR="5"
 DILATE_NESTED="false"
-DILATE_THR="10"
+DILATE_BRIGHT_THR="10"
+DILATE_THR="5"
 DILATED_SOURCE="2"
 DILATE_KERNEL_SIZE="9"
 MERGE_THR="2.6"
@@ -223,10 +229,14 @@ FIT_MAX_COMPONENTS="3"
 FIT_WITH_FIXED_BKG="true"
 FIT_WITH_ESTIMATED_BKG="false"
 FIT_BKG="0"
+FIT_WITH_BKG_LIMITS="true"
 FIT_WITH_AMPL_LIMITS="true"
+FIT_AMPL_LIMIT="0.3"
 FIT_WITH_POS_LIMITS="true"
 FIT_WITH_SIGMA_LIMITS="true"
+FIT_SIGMA_LIMIT="0.3"
 FIT_WITH_THETA_LIMITS="true"
+FIT_THETA_LIMIT="5"
 FIT_WITH_SIGMA_FIXED="false"
 FIT_WITH_THETA_FIXED="false"
 PEAK_MIN_KERN_SIZE="3"
@@ -234,7 +244,6 @@ PEAK_MAX_KERN_SIZE="7"
 PEAK_KERNEL_MULTIPLICITY_THR="1"
 PEAK_SHIFT_TOLERANCE="2"
 PEAK_ZTHR_MIN="1"
-
 
 WTSCALE_MIN="3"
 WTSCALE_MAX="6"
@@ -439,6 +448,9 @@ do
 		--dilatethr=*)
     	DILATE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+		--dilatebrightthr=*)
+    	DILATE_BRIGHT_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
 		--dilatenested=*)
 			DILATE_NESTED="true"		
 		;;
@@ -493,14 +505,26 @@ do
 		--fit-bkg*)
     	FIT_BKG=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+		--fit-nobkglimits*)
+    	FIT_WITH_BKG_LIMITS="false"
+    ;;
+		--fit-ampllimit*)
+    	FIT_AMPL_LIMIT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;	
 		--fit-noampllimits*)
     	FIT_WITH_AMPL_LIMITS="false"
     ;;	
+		--fit-sigmalimit*)
+    	FIT_SIGMA_LIMIT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
 		--fit-nosigmalimits*)
     	FIT_WITH_SIGMA_LIMITS="false"
     ;;
 		--fit-noposlimits*)
     	FIT_WITH_POS_LIMITS="false"
+    ;;
+		--fit-thetalimit*)
+    	FIT_THETA_LIMIT=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
 		--fit-nothetalimits*)
     	FIT_WITH_THETA_LIMITS="false"
@@ -585,7 +609,7 @@ echo "LOG_LEVEL: $LOG_LEVEL"
 echo "OUTPUT_DIR: $OUTPUT_DIR"
 echo "BKG BOX: $BKG_BOXSIZE, GRID: $BKG_GRID_SIZE, BKG_ESTIMATOR: $BKG_ESTIMATOR, BKG_USE_2ND_PASS: $BKG_USE_2ND_PASS, BKG_SKIP_OUTLIERS: $BKG_SKIP_OUTLIERS"
 echo "NPIX_MIN: $NPIX_MIN, SEED_THR: $SEED_THR, MERGE_THR: $MERGE_THR, NITERS: $COMPACT_SOURCE_SEARCH_NITERS. SEED_THR_STEP=$SEED_THR_STEP"
-echo "DILATE_NESTED? $DILATE_NESTED, DILATE_THR: $DILATE_THR, DILATED_SOURCE: $DILATED_SOURCE, DILATE_KERNEL_SIZE: $DILATE_KERNEL_SIZE"
+echo "DILATE_NESTED? $DILATE_NESTED, DILATE_BRIGHT_THR: $DILATE_BRIGHT_THR, DILATE_THR: $DILATE_THR, DILATED_SOURCE: $DILATED_SOURCE, DILATE_KERNEL_SIZE: $DILATE_KERNEL_SIZE"
 echo "USE_PRESMOOTHING? $USE_PRESMOOTHING, SMOOTH_FILTER: $SMOOTH_FILTER"
 echo "GUIDED_FILTER PARS: ($GUIDED_FILTER_RADIUS, $GUIDED_FILTER_EPS)"
 echo "EXT_SFINDER_METHOD: $EXT_SFINDER_METHOD"
@@ -802,19 +826,19 @@ generate_config(){
 		echo "fitSources = $FIT_SOURCES                             | Deblend point-like sources with multi-component gaus fit (T/F)"
 		echo "fitMaxNComponents = $FIT_MAX_COMPONENTS               | Maximum number of components fitted in a blob"
 		echo "fitWithCentroidLimits = $FIT_WITH_POS_LIMITS          | Use limits when fitting gaussian centroid (T/F)"
-		echo 'fitWithBkgLimits = true												        | Use limits when fitting bkg offset (T/F)'
+		echo "fitWithBkgLimits = $FIT_WITH_BKG_LIMITS			          | Use limits when fitting bkg offset (T/F)"
 		echo "fitWithFixedBkg = $FIT_WITH_FIXED_BKG                 | Fix bkg level parameter in fit (T/F)"
 		echo "fitUseEstimatedBkgLevel = $FIT_WITH_ESTIMATED_BKG     | Use estimated (avg bkg) as bkg level par in fit (T/F)"
 		echo "fitBkgLevel = $FIT_BKG                                | Fixed bkg level used when fitWithFixedBkg=true"
 		echo "fitWithAmplLimits = $FIT_WITH_AMPL_LIMITS             | Use limits when fitting gaussian amplitude (T/F)"
-		echo 'fitAmplLimit = 0.3                                    | Flux amplitude limit around source peak (e.g. Speak*(1+-fitAmplLimit))'
+		echo "fitAmplLimit = $FIT_AMPL_LIMIT                        | Flux amplitude limit around source peak (e.g. Speak*(1+-fitAmplLimit))"
 		echo 'fixSigmaInPreFit = true                               | Fix sigma in prefit (T/F)'
 		echo "fitWithFixedSigma = $FIT_WITH_SIGMA_FIXED             | Fix sigmas in fit (T/F)"
 		echo "fitWithSigmaLimits = $FIT_WITH_SIGMA_LIMITS           | Use limits when fitting gaussian sigmas (T/F)"
-		echo 'fitSigmaLimit = 0.3                                   | Gaussian sigma limit around psf or beam (e.g. Bmaj*(1+-fitSigmaLimit))'
+		echo "fitSigmaLimit = $FIT_SIGMA_LIMIT                      | Gaussian sigma limit around psf or beam (e.g. Bmaj*(1+-fitSigmaLimit))"
 		echo "fitWithFixedTheta = $FIT_WITH_THETA_FIXED             | Fix gaussian ellipse theta par in fit (T/F)"
 		echo "fitWithThetaLimits = $FIT_WITH_THETA_LIMITS           | Use limits when fitting gaussian theta par (T/F)"
-		echo 'fitThetaLimit = 5                                     | Gaussian theta limit around psf or beam in degrees (e.g. Bpa +- fitThetaLimit)'
+		echo "fitThetaLimit = $FIT_THETA_LIMIT                      | Gaussian theta limit around psf or beam in degrees (e.g. Bpa +- fitThetaLimit)"
 		echo 'useFluxZCutInFit = false                              | Include in fit only source pixels above a given flux significance level (T/F)'
 		echo 'fitZCutMin = 2.5                                      | Flux significance below which source pixels are not included in the fit'
 		echo "peakMinKernelSize = $PEAK_MIN_KERN_SIZE               | Minimum dilation kernel size (in pixels) used to detect peaks (default=3)"
@@ -850,6 +874,8 @@ generate_config(){
 		echo 'psEllipseAreaRatioMaxThr = 1.4											| Ellipse area ratio max threshold'
 		echo 'useMaxNPixCut = true																| Use max npixels cut (T/F)'
 		echo 'psMaxNPix = 1000																		| Max number of pixels for point-like sources (source passes point-like cut if below this threshold)'
+		echo 'useNBeamsCut = true                                 | Use nBeams cut (T/F)'
+		echo 'psNBeamsThr = 3                                     | nBeams threshold (sources passes point-like cut if nBeams<thr)'
 		echo '###'
 		echo '###'
 		echo '//================================'
@@ -857,6 +883,7 @@ generate_config(){
 		echo '//================================'
 		echo "dilateNestedSources = $DILATE_NESTED								| Dilate sources nested inside bright sources (T/F)"
 		echo "dilateZThr = $DILATE_THR                            | Significance threshold (in sigmas) above which sources are dilated"
+		echo "dilateZBrightThr = $DILATE_BRIGHT_THR               | Significance threshold (in sigmas) above which sources are always dilated (even if they have nested or different type)"
 		echo "dilateKernelSize = $DILATE_KERNEL_SIZE							| Size of kernel (odd) to be used in dilation operation"
 		echo "dilatedSourceType = $DILATED_SOURCE									| Type of bright sources to be dilated from the input image (-1=ALL,1=COMPACT,2=POINT-LIKE,3=EXTENDED)"
 		echo 'dilateSourceModel = 1																| Dilate source model  (1=bkg,2=median)'

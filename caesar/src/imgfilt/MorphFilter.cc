@@ -443,7 +443,7 @@ int MorphFilter::FindDilatedSourcePixels(Image* img,Source* source,int KernSize,
 }//close FindDilatedSourcePixels()
 
 
-int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
+int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr,double zBrightThr){
 
 	//## Check input source
 	if(!source) {
@@ -462,7 +462,7 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 	
 	//## Skip faint sources
 	//Get pixel seeds
-	bool isFaintSource= false;
+	bool isBrightSource= false;
 	std::vector<int> seedPixelIndexes= source->GetSeedPixelIndexes();
 	DEBUG_LOG("#"<<seedPixelIndexes.size()<<" seed pixels...");
 
@@ -488,6 +488,7 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 		DEBUG_LOG("Source is below significance threshold for dilation (Z="<<Zmax<<"<"<<zThr<<"), skip it!");
 		return 0;	
 	}
+	isBrightSource= (Zmax>=zBrightThr);
 	
 	//## Check R interface
 	double sigmaTrunc= 1;//trunc random gaussian to +-sigmaTrunc	
@@ -518,13 +519,43 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 
 
 	//## Find pixels to be dilated
+	//## NB: If Z>Zthr_bright ==> dilate mother source always no matter what source type, ignore all nested
+	//##     If Zth<Z<Zthr_bright ==> dilate mother source is there are no nested and type match, otherwise dilate nested
+
+	std::vector<long int> pixelsToBeDilated;
+	if(isBrightSource){//MOTHER SOURCE
+		DEBUG_LOG("Selecting entire mother source for dilation (bright source) ...");
+		FindDilatedSourcePixels(img,source,KernSize,pixelsToBeDilated);
+	}
+	else{
+		if(hasNestedSources && skipToNested){//NESTED SOURCES
+			DEBUG_LOG("Dilating nested sources...");
+			std::vector<Source*> nestedSources= source->GetNestedSources();
+			for(size_t k=0;k<nestedSources.size();k++){
+				int nestedSourceType= nestedSources[k]->Type;
+				if(dilateSourceType==-1 || nestedSourceType==sourceType){
+					FindDilatedSourcePixels(img,nestedSources[k],KernSize,pixelsToBeDilated);
+				}
+			}//end loop nested sources
+		}//close if
+		else{//MOTHER SOURCE
+			if(dilateSourceType==-1 || sourceType==dilateSourceType){
+				DEBUG_LOG("Dilating entire mother source (no nested sources present + match source type) ...");
+				FindDilatedSourcePixels(img,source,KernSize,pixelsToBeDilated);
+			}
+		}
+	}//close else
+
+
+
+	/*
 	//== MOTHER SOURCE
 	std::vector<long int> pixelsToBeDilated;
-	DEBUG_LOG("hasNestedSources="<<hasNestedSources);
 	if(!hasNestedSources && (dilateSourceType==-1 || sourceType==dilateSourceType) ){
 		DEBUG_LOG("Dilating mother sources...");
 		FindDilatedSourcePixels(img,source,KernSize,pixelsToBeDilated);	
 	}
+
 	//== NESTED SOURCES
 	if(skipToNested && hasNestedSources){
 		DEBUG_LOG("Dilating nested sources...");
@@ -536,6 +567,9 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 			}
 		}//end loop nested sources
 	}//close if dilate nested
+	*/
+
+
 
 	//## Replace dilated pixels with model		
 	if(dilateModel==eDilateWithSourceMedian){
@@ -641,7 +675,7 @@ int MorphFilter::DilateAroundSource(Image* img,Source* source,int KernSize,int d
 }//close DilateAroundSource()
 
 
-int MorphFilter::DilateAroundSources(Image* img,std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr){
+int MorphFilter::DilateAroundSources(Image* img,std::vector<Source*>const& sources,int KernSize,int dilateModel,int dilateSourceType,bool skipToNested,ImgBkgData* bkgData,bool useLocalBkg,bool randomize,double zThr,double zBrightThr){
 	
 	//## Check input image
 	if(!img){
@@ -668,8 +702,8 @@ int MorphFilter::DilateAroundSources(Image* img,std::vector<Source*>const& sourc
 	}
 
 	//## Start dilating sources
-	for(unsigned int k=0;k<sources.size();k++){	
-		int status= DilateAroundSource(img,sources[k],KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr);
+	for(size_t k=0;k<sources.size();k++){	
+		int status= DilateAroundSource(img,sources[k],KernSize,dilateModel,dilateSourceType,skipToNested,bkgData,useLocalBkg,randomize,zThr,zBrightThr);
 		if(status<0){
 			WARN_LOG("Source dilation failed for source no. "<<k<<" ...");
 		}
