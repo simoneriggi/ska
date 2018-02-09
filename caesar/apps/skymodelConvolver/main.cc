@@ -375,8 +375,6 @@ int RunConvolver()
 	for(size_t i=0;i<sources.size();i++){
 		if(i%100==0) INFO_LOG("#"<<i+1<<"/"<<sources.size()<<" sources convolved...");
 
-		
-	
 		//Get image source mask
 		bool isBinary= false;	
 		bool invert= false;
@@ -433,7 +431,7 @@ int RunConvolver()
 		}
 	
 		if(csources.size()>1){
-			ERROR_LOG("More than 1 source found in convolved image (this should not occur...)!");
+			ERROR_LOG("More than 1 source found in convolved image for source no. "<<i+1<<" (name="<<sources[i]->GetName()<<", id="<<sources[i]->Id<<", type="<<sources[i]->Type<<"), this should not occur!");
 			delete sourceImg_conv;
 			sourceImg_conv= 0;
 			return -1;
