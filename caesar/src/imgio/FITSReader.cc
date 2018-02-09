@@ -298,7 +298,7 @@ int FITSReader::ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile*
 		ss<<filename<<"["<<ix_min+1<<":"<<ix_max+1<<","<<iy_min+1<<":"<<iy_max+1<<"]";
 		filename_wfilter= ss.str();
 	}
-	INFO_LOG("Reading image data (Nx x Ny)=("<<ImgSizeX<<","<<ImgSizeY<<")");
+	DEBUG_LOG("Reading image data (Nx x Ny)=("<<ImgSizeX<<","<<ImgSizeY<<")");
 	
 	//Set image size (Allocate memory for image pixels)	
 	if(img.SetSize(ImgSizeX,ImgSizeY,xlow,ylow)<0){
@@ -334,7 +334,7 @@ int FITSReader::ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile*
 	{
 		int thread_id= omp_get_thread_num();
 		int nthreads= SysUtils::GetOMPThreads();
-		INFO_LOG("Starting multithread image data reading (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
+		DEBUG_LOG("Starting multithread image data reading (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
 
 		//Open file (each thread should open its own)
 		DEBUG_LOG("Opening FITS file ptr (thread_id="<<thread_id<<", nthreads="<<nthreads<<")");
@@ -395,7 +395,7 @@ int FITSReader::ReadImageMT(Image& img,Caesar::FITSFileInfo& fits_info,fitsfile*
 	*/
 
 	//Compute moments	
-	INFO_LOG("Computing image moments after pixel read...");
+	DEBUG_LOG("Computing image moments after pixel read...");
 	bool skipNegativePixels= false;
 	if(img.ComputeMoments()<0){
 		ERROR_LOG("Failed to compute image moments!");
