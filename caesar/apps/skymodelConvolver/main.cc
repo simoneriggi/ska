@@ -447,12 +447,6 @@ int RunConvolver()
 			return -1;
 		}
 	
-		if(csources.size()>1){
-			ERROR_LOG("More than 1 source found in convolved image for source no. "<<i+1<<" (name="<<sources[i]->GetName()<<", id="<<sources[i]->Id<<", type="<<sources[i]->Type<<"), this should not occur!");
-			delete sourceImg_conv;
-			sourceImg_conv= 0;
-			return -1;
-		}
 		if(csources.empty()){
 			WARN_LOG("Source "<<i+1<<" not found after convolution (below npix/flux threshold?) will be removed...");
 			delete sourceImg_conv;
@@ -460,22 +454,38 @@ int RunConvolver()
 			continue;
 		}
 
+		int csourceIndex= 0;
+		if(csources.size()>1){
+			WARN_LOG("More than 1 source found in convolved image for source no. "<<i+1<<" (name="<<sources[i]->GetName()<<", id="<<sources[i]->Id<<", type="<<sources[i]->Type<<"), this should not occur normally (could be one extended source broke up at image edge), will take the larger one...");
+			long int nPix_max= -1.e+99;
+			for(size_t k=0;k<csources.size();k++){
+				long int nPix= csources[k]->NPix;
+				if(nPix>=nPix_max){
+					nPix_max= nPix;
+					csourceIndex= k;
+				}
+			}
+			//delete sourceImg_conv;
+			//sourceImg_conv= 0;
+			//return -1;
+		}
+
 		//Add convolved source to list
 		source_counter++;
 		TString sourceName= Form("S%d",source_counter);
-		csources[0]->SetName(std::string(sourceName));	
-		csources[0]->SetId(source_counter);
-		csources[0]->Type= type;
-		csources[0]->SimType= simtype;
-		csources[0]->SimMaxScale= simmaxscale;
-		csources[0]->Flag= flag;
+		csources[csourceIndex]->SetName(std::string(sourceName));	
+		csources[csourceIndex]->SetId(source_counter);
+		csources[csourceIndex]->Type= type;
+		csources[csourceIndex]->SimType= simtype;
+		csources[csourceIndex]->SimMaxScale= simmaxscale;
+		csources[csourceIndex]->Flag= flag;
 		if(sources[i]->HasTrueInfo()){
 			double S_true= sources[i]->GetTrueFlux(); 
 			double X0_true, Y0_true;
 			sources[i]->GetTruePos(X0_true,Y0_true);
-			csources[0]->SetTrueInfo(S_true,X0_true,Y0_true);
+			csources[csourceIndex]->SetTrueInfo(S_true,X0_true,Y0_true);
 		}
-		sources_conv.push_back(csources[0]);		
+		sources_conv.push_back(csources[csourceIndex]);		
 
 		//Add convolved image to skymodel
 		bool computeStats= false;
