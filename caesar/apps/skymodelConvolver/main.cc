@@ -375,20 +375,44 @@ int RunConvolver()
 	for(size_t i=0;i<sources.size();i++){
 		if(i%100==0) INFO_LOG("#"<<i+1<<"/"<<sources.size()<<" sources convolved...");
 
-		//Get image source mask
-		std::vector<Pixel*> pixels= sources[i]->GetPixels();
+		//Get true source info
+		int type= sources[i]->Type;
+		int simtype= sources[i]->SimType;
+		double simmaxscale= sources[i]->SimMaxScale;
+		int flag= sources[i]->Flag;
+		bool hasTrueInfo= sources[i]->HasTrueInfo();
+		if(!hasTrueInfo){
+			WARN_LOG("Source no. "<<i<<" has no true info stored, skip it!");
+			continue;
+		}
+		double S_true= sources[i]->GetTrueFlux(); 
+		double X0_true, Y0_true;
+		sources[i]->GetTruePos(X0_true,Y0_true);
+
+		//Fill image source mask
+		//NB: For compact source use true info and fill pixel, for extended source use pixel list
 		Image* sourceImg= img->GetCloned("",true,true);
 		if(!sourceImg){
 			ERROR_LOG("Failed to create image mask for source "<<i+1<<"!");
 			return -1;
 		}
 		sourceImg->Reset();
-		
-		for(size_t k=0;k<pixels.size();k++){	
-			long int gBin= pixels[k]->id;
-			double S= pixels[k]->S;
-			sourceImg->SetPixelValue(gBin,S);
-		}//end loop pixels
+
+		if(type==Source::eCompact || type==Source::ePointLike){
+			sourceImg->Fill(X0_true, Y0_true, S_true);
+		}
+		else if(type==Source::eExtended || type==Source::eCompactPlusExtended){
+			std::vector<Pixel*> pixels= sources[i]->GetPixels();
+			for(size_t k=0;k<pixels.size();k++){	
+				long int gBin= pixels[k]->id;
+				double S= pixels[k]->S;
+				sourceImg->SetPixelValue(gBin,S);
+			}//end loop pixels
+		}//close else
+		else{
+			WARN_LOG("Unknown type for source no. "<<i+1<<", skip it...");
+			continue;
+		}
 
 		/*
 		//This is wrong!!!!
@@ -415,11 +439,6 @@ int RunConvolver()
 		sourceImg= 0;
 
 		//Find truncation threshold (user-supplied or found from image)
-		int type= sources[i]->Type;
-		int simtype= sources[i]->SimType;
-		double simmaxscale= sources[i]->SimMaxScale;
-		int flag= sources[i]->Flag;
-			
 		double thr= 0;//no threshold
 		if(useUserThreshold){
 			if(type==Source::eCompact || type==Source::ePointLike){
@@ -479,12 +498,7 @@ int RunConvolver()
 		csources[csourceIndex]->SimType= simtype;
 		csources[csourceIndex]->SimMaxScale= simmaxscale;
 		csources[csourceIndex]->Flag= flag;
-		if(sources[i]->HasTrueInfo()){
-			double S_true= sources[i]->GetTrueFlux(); 
-			double X0_true, Y0_true;
-			sources[i]->GetTruePos(X0_true,Y0_true);
-			csources[csourceIndex]->SetTrueInfo(S_true,X0_true,Y0_true);
-		}
+		csources[csourceIndex]->SetTrueInfo(S_true,X0_true,Y0_true);
 		sources_conv.push_back(csources[csourceIndex]);		
 
 		//Add convolved image to skymodel
