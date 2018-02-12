@@ -81,6 +81,7 @@ static const struct option options_tab[] = {
 	{ "mergesources", no_argument, 0, 'm'},
 	{ "userthreshold", no_argument, 0, 'u'},
 	{ "mergecompactsources", no_argument, 0, 'e'},
+	{ "mergeextsources", no_argument, 0, 'E'},
 	{ "nsigmas", required_argument, 0, 's'}, //Gaus conv kernel nsigmas (default=10)
   {(char*)0, (int)0, (int*)0, (int)0}
 };
@@ -109,6 +110,7 @@ bool useUserThreshold= false;
 double fluxThr= -1;
 double fluxThr_ext= -1;
 bool mergeOverlappingSources= false;
+bool enableExtendedSourceMerging= false;
 bool enableCompactSourceMerging= false;
 int nSigmas= 10;
 int minPixels= 5;
@@ -198,7 +200,7 @@ int ParseOptions(int argc, char *argv[])
 	int c = 0;
   int option_index = 0;
 
-	while((c = getopt_long(argc, argv, "hi:I:o:O:r:v:f:t:T:B:b:a:s:meu",options_tab, &option_index)) != -1) {
+	while((c = getopt_long(argc, argv, "hi:I:o:O:r:v:f:t:T:B:b:a:s:meEu",options_tab, &option_index)) != -1) {
     
     switch (c) {
 			case 0 : 
@@ -292,6 +294,11 @@ int ParseOptions(int argc, char *argv[])
 				enableCompactSourceMerging= true;
 				break;
 			}
+			case 'E':
+			{
+				enableExtendedSourceMerging= true;
+				break;
+			}
 			case 's':
 			{
 				nSigmas= atoi(optarg);
@@ -361,14 +368,29 @@ int RunConvolver()
 	//    - Read source i-th
 	//    - Create mask image with source i-th
 	//    - Convolve mask image with given beam
-	//    - Apply threshold to convolved image (e.g. set to zero all pixels below a given significance)
-	//    - Find source in thresholded convolved image and add to smoothed source list
-	//3) Make a mask image with all smooothed sources --> write to fits & root
+	//    - Apply threshold to convolved image (e.g. set to zero all pixels below a given flux threshold)
+	//    - Find source in thresholded convolved image and add to convolved source list
+	//3) Make a mask image with all convolved sources --> write to fits & root
 	//4) Merge sources sharing pixels (if enabled) --> write to root
 	//=================================================
 
+
+	//Copy input map
 	img_conv= img->GetCloned("",true,true);
 	img_conv->Reset();
+
+	//Compute flux correction factor
+	ImgMetaData* metadata= img->GetMetaData();	
+	double dX= 1;
+	double dY= 1;
+	if(metadata){
+		dX= fabs(metadata->dX*3600);//convert to arcsec
+		dY= fabs(metadata->dY*3600);//convert to arcsec
+	}
+	else{
+		WARN_LOG("Input map has no metadata, assuming pixel sizes=1...");
+	}
+	double beamArea= AstroUtils::GetBeamAreaInPixels(Bmaj,Bmin,dX,dY);
 
 	int source_counter= 0;
 
@@ -499,6 +521,7 @@ int RunConvolver()
 		csources[csourceIndex]->SimMaxScale= simmaxscale;
 		csources[csourceIndex]->Flag= flag;
 		csources[csourceIndex]->SetTrueInfo(S_true,X0_true,Y0_true);
+		csources[csourceIndex]->SetBeamFluxIntegral(beamArea);
 		sources_conv.push_back(csources[csourceIndex]);		
 
 		//Add convolved image to skymodel
@@ -513,13 +536,13 @@ int RunConvolver()
 
 	INFO_LOG("#"<<sources_conv.size()<<" sources present after convolution...");
 
-	//Set header
-	ImgMetaData* metadata= img_conv->GetMetaData();
-	if(metadata){
-		metadata->BUnit= "Jy/beam"; 
-		metadata->Bmaj= Bmaj/3600.;
-		metadata->Bmin= Bmin/3600.;
-		metadata->Bpa= Bpa;
+	//Set metadata in skymodel convolved image
+	ImgMetaData* metadata_conv= img_conv->GetMetaData();
+	if(metadata_conv){
+		metadata_conv->BUnit= "Jy/beam"; 
+		metadata_conv->Bmaj= Bmaj/3600.;
+		metadata_conv->Bmin= Bmin/3600.;
+		metadata_conv->Bpa= Bpa;
 	}
 
 	//Compute stats of skymodel convolved image
@@ -534,6 +557,21 @@ int RunConvolver()
 
 	//If rec map is given create rec sources from conv source mask
 	if(recMapGiven && img_rec){
+
+		//Compute flux correction factor for rec sources
+		ImgMetaData* metadata_rec= img_rec->GetMetaData();	
+		double dX_rec= 1;
+		double dY_rec= 1;
+		if(metadata_rec){
+			dX_rec= fabs(metadata_rec->dX*3600);//convert to arcsec
+			dY_rec= fabs(metadata_rec->dY*3600);//convert to arcsec
+		}
+		else{
+			WARN_LOG("Rec map has no metadata, assuming pixel sizes=1...");
+		}
+		double beamArea_rec= AstroUtils::GetBeamAreaInPixels(Bmaj,Bmin,dX_rec,dY_rec);
+
+		//Get true convolved source collection to be iterated
 		std::vector<Source*>::iterator it_start= sources_conv.begin();
 		std::vector<Source*>::iterator it_end= sources_conv.end();
 		if(mergeOverlappingSources){
@@ -541,6 +579,7 @@ int RunConvolver()
 			it_end= sources_conv_merged.end();	
 		}
 		
+		//Iterate over true convolved sources
 		for(std::vector<Source*>::iterator it= it_start; it != it_end; ++it) {
 			Source* aSource= *it;
     	
@@ -553,7 +592,9 @@ int RunConvolver()
 			double simmaxscale= aSource->SimMaxScale;
 			double X0= aSource->X0;
 			double Y0= aSource->Y0;
-			double S= aSource->GetS();
+			double S= aSource->GetS();//in Jy/beam
+			double beamIntegral= aSource->GetBeamFluxIntegral(); 
+			double S_true_estimated= S/beamIntegral;//convert to Jy/pixel
 			std::vector<Pixel*> pixels= aSource->GetPixels();
 		
 			//Make rec source using pixels present in true convolved source
@@ -564,7 +605,9 @@ int RunConvolver()
 			rec_source->Flag= flag;	
 			rec_source->SimType= simtype;	
 			rec_source->SimMaxScale= simmaxscale;
-			rec_source->SetTrueInfo(S,X0,Y0);
+			//rec_source->SetTrueInfo(S,X0,Y0);
+			rec_source->SetTrueInfo(S_true_estimated,X0,Y0);
+			rec_source->SetBeamFluxIntegral(beamArea_rec);
 
 			for(size_t k=0;k<pixels.size();k++){	
 				long int gBin= pixels[k]->id;
@@ -618,16 +661,28 @@ int MergeSources()
 		Source* source= sources_conv[i];
 		int type= source->Type;
 		bool isCompactSource= (type==Source::eCompact || type==Source::ePointLike);
-		
+		bool isExtendedSource= (type==Source::eExtended || type==Source::eCompactPlusExtended);
+
 		//Loop neighbors
 		for(size_t j=i+1;j<sources_conv.size();j++){	
 			Source* source_neighbor= sources_conv[j];
 			int type_neighbor= source_neighbor->Type;
 			bool isCompactSource_neighbor= (type_neighbor==Source::eCompact || type_neighbor==Source::ePointLike);
-		
+			bool isExtendedSource_neighbor= (type_neighbor==Source::eExtended || type_neighbor==Source::eCompactPlusExtended);
+
 			//Check if both sources are compact and if they are allowed to be merged
 			if(isCompactSource && isCompactSource_neighbor && !enableCompactSourceMerging){			
 				DEBUG_LOG("Skip merging as both sources (i,j)=("<<i<<","<<j<<") are compact and merging among compact sources is disabled...");
+				continue;
+			}
+	
+			//Check if both sources are extended or if one is extended and the other compact and if they are allowed to be merged
+			if(isExtendedSource && isExtendedSource_neighbor && !enableExtendedSourceMerging){			
+				DEBUG_LOG("Skip merging as both sources (i,j)=("<<i<<","<<j<<") are extended and merging among extended sources is disabled...");
+				continue;
+			}
+			if( ((isCompactSource && isExtendedSource_neighbor) || (isExtendedSource && isCompactSource_neighbor)) && !enableExtendedSourceMerging){			
+				DEBUG_LOG("Skip merging between sources (i,j)=("<<i<<","<<j<<") as merging among extended and compact sources is disabled...");
 				continue;
 			}
 		
@@ -646,9 +701,16 @@ int MergeSources()
 
 
 	//## Add to merged collection all sources not mergeable
+	//## NB: If sources are not to be merged each other, add to merged collection 
 	for(size_t i=0;i<sources_conv.size();i++){
+		int type= sources_conv[i]->Type;
 		bool isMergeable= isMergeableSource[i];
-		if(isMergeable) continue;
+		bool isCompactSource= (type==Source::eCompact || type==Source::ePointLike);
+		bool isExtendedSource= (type==Source::eExtended || type==Source::eCompactPlusExtended);		
+		if(isMergeable) {	
+			if(enableCompactSourceMerging && isCompactSource) continue;
+			if(enableExtendedSourceMerging && isExtendedSource) continue;
+		}
 		Source* merged_source= new Source;
 		*merged_source= *(sources_conv[i]);
 		sources_conv_merged.push_back(merged_source);
@@ -663,7 +725,7 @@ int MergeSources()
 		
 	//## Now merge the sources
 	std::vector<int> sourcesToBeRemoved;
-	bool copyPixels= true;//do not create memory for new pixels
+	bool copyPixels= true;//create memory for new pixels
 	bool checkIfAdjacent= false;//already done before
 	bool sumMatchingPixels= true;
 	bool computeStatPars= false;//do not compute stats& pars at each merging
@@ -811,6 +873,7 @@ int ReadData()
 			ERROR_LOG("Rec map has no metadata!");
 			delete img_rec;
 			img_rec= 0;
+			return -1;
 		}
 		Bmaj= metadata->Bmaj*3600;
 		Bmin= metadata->Bmin*3600;
