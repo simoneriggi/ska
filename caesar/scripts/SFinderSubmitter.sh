@@ -165,6 +165,7 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--submit - Submit the script to the batch system using queue specified"
 	echo "--queue=[BATCH_QUEUE] - Name of queue in batch system" 
 	echo "--jobwalltime=[JOB_WALLTIME] - Job wall time in batch system (default=96:00:00)"
+	echo "--jobmemory=[JOB_MEMORY] - Memory in GB required for the job (default=4)"
 	echo "=========================="
   exit 1
 fi
@@ -190,6 +191,7 @@ FILELIST=""
 NMAX_PROCESSED_FILES=-1
 BATCH_QUEUE=""
 JOB_WALLTIME="96:00:00"
+JOB_MEMORY="4"
 LOG_LEVEL="INFO"
 OUTPUT_DIR=$PWD
 NTHREADS=1
@@ -318,6 +320,9 @@ do
     ;;
 		--jobwalltime=*)
 			JOB_WALLTIME=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`	
+		;;	
+		--jobmemory=*)
+			JOB_MEMORY=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`	
 		;;
 		--containerimg=*)
     	CONTAINER_IMG=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
@@ -667,7 +672,7 @@ done
 
 echo ""
 echo "*****  PARSED ARGUMENTS ****"
-echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME"
+echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME, JOB_MEMORY: $JOB_MEMORY"
 echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
 echo "ENV_FILE: $ENV_FILE"
 echo "INPUTFILE: $INPUTFILE"
@@ -1054,6 +1059,7 @@ generate_exec_script(){
 	local jobindex=$2
 	local exe=$3
 	local exe_args=$4
+	local logfile=$5
 
 	echo "INFO: Creating sh file $shfile (jobindex=$jobindex, exe=$exe, exe_args=$exe_args)..."
 	( 
@@ -1061,8 +1067,9 @@ generate_exec_script(){
 			echo "#PBS -N SFinderJob$jobindex"
 			echo "#PBS -j oe"
   		echo "#PBS -o $BASEDIR"
-			echo "#PBS -l select=1:ncpus=1"
+			echo "#PBS -l select=1:ncpus=1:mpiprocs=$NPROC:mem=$JOB_MEMORY"'GB'
     	echo "#PBS -l walltime=$JOB_WALLTIME"
+			echo "#PBS -l place=scatter"
     	echo '#PBS -r n'
       echo '#PBS -S /bin/bash' 
       echo '#PBS -p 1'
@@ -1100,7 +1107,7 @@ generate_exec_script(){
       echo 'echo ""'
       echo '  cd $JOBDIR'
 
-      echo "  $exe $exe_args"
+      echo "  $exe $exe_args > $logfile"
       
       echo '  echo ""'
 
@@ -1153,6 +1160,9 @@ if [ "$FILELIST_GIVEN" = true ]; then
  		ds9region_file="DS9_$filename_base_noext"'.reg'
 		ds9fitregion_file="DS9_FittedSources_$filename_base_noext"'.reg'
 
+		## Define output log filename
+		logfile="output_$filename_base_noext"'.log'
+
 		## Define and generate config file
 		configfile="config_$filename_base_noext"'_'"$index.cfg"
   	echo "INFO: Creating config file $configfile for input file: $inputfile ..."
@@ -1168,7 +1178,7 @@ if [ "$FILELIST_GIVEN" = true ]; then
 		fi
 		
 		echo "INFO: Creating script file $shfile for input file: $inputfile ..."
-		generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS"
+		generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$logfile"
 
 
 		# Submits the job to batch system
@@ -1207,6 +1217,9 @@ else
  	ds9region_file="DS9_$filename_base_noext"'.reg'
 	ds9fitregion_file="DS9_FittedSources_$filename_base_noext"'.reg'
 
+	## Define output log filename
+	logfile="output_$filename_base_noext"'.log'
+
 	## Define and generate config file
 	configfile="config_$filename_base_noext"'.cfg'
   echo "INFO: Creating config file $configfile for input file: $inputfile ..."
@@ -1223,7 +1236,7 @@ else
 
 	echo "INFO: Creating script file $shfile for input file: $inputfile ..."
 	jobId=" "
-	generate_exec_script "$shfile" "$jobId" "$EXE" "$EXE_ARGS"
+	generate_exec_script "$shfile" "$jobId" "$EXE" "$EXE_ARGS" "$logfile"
 
 	# Submits the job to batch system
 	if [ "$SUBMIT" = true ] ; then
