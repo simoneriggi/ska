@@ -7,11 +7,22 @@
 #include <TFile.h>
 #include <TStyle.h>
 #include <TH2D.h>
+#include <TLine.h>
 
+#include <Image.h>
+#include <BkgData.h>
+#include <Logger.h>
+#include <Source.h>
 #include <MathUtils.h>
 #include <AstroUtils.h>
-#include <Logger.h>
+#include <StatsUtils.h>
+
 using namespace Caesar;
+
+//Bkg options
+int bkgEstimator= eMedianClippedBkg;
+int bkgBoxBeamFactor= 30;
+double bkgGridStepSize= 0.2;
 
 //Vars
 std::string outputFileName= "Output.root";
@@ -20,6 +31,7 @@ TTree* outputTree= 0;
 std::string filename= "";
 std::string filename_rec= "";
 std::string SourceName;
+double Npix;
 int type;
 int simtype;
 double simmaxscale;
@@ -28,12 +40,16 @@ double Y0;
 double S;
 double Smax;
 double S_true;
+double S_true_estimated;
+double Npix_rec;
 double X0_rec;
 double Y0_rec;
 double S_rec;
 double Smax_rec;
 bool correctRecFlux=false;
 double beamArea;
+double BkgAvg;
+double S_bkg;
 
 //Methods
 void Init();
@@ -137,14 +153,20 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 
 	//Get beam area
 	ImgMetaData* metadata= img_rec->GetMetaData();
+	int pixelWidthInBeam= 1;
 	if(metadata){
 		beamArea= metadata->GetBeamFluxIntegral();
+		pixelWidthInBeam= metadata->GetBeamWidthInPixel();
 	}
 	else{
-		WARN_LOG("Rec map has no metadata stored, cannot get beam information needed for correction!");
+		ERROR_LOG("Rec map has no metadata stored, cannot get beam information needed for correction!");
 		beamArea= 1;
+		delete img_rec;
+		img_rec= 0;
+		return -1;
 	}
-	INFO_LOG("Beam area="<<beamArea);
+	INFO_LOG("Beam area="<<beamArea<<", pixelWidthInBeam="<<pixelWidthInBeam);
+
 
 	//## Read true source data
 	//Open file with source collection
@@ -183,26 +205,56 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 
 	INFO_LOG("#"<<sources.size()<<" true sources read...");
 
+	//## Compute bkg map in reconstructed data
+	INFO_LOG("Computing image stats...");
+	img_rec->ComputeStats(true);
+
+	INFO_LOG("Computing image bkg");
+	double bkgBoxSize= pixelWidthInBeam*bkgBoxBeamFactor;
+	double bkgGridSize= bkgGridStepSize*bkgBoxSize;
+	ImgBkgData* bkgData= img_rec->ComputeBkg(bkgEstimator,true,bkgBoxSize,bkgBoxSize,bkgGridSize,bkgGridSize);
+	if(!bkgData){
+		ERROR_LOG("Failed to compute rec image bkg!");
+		if(img_rec){
+			delete img_rec;
+			img_rec= 0;
+		}
+		for(size_t i=0;i<sources.size();i++){
+			if(sources[i]){
+				delete sources[i];		
+				sources[i]= 0;
+			}
+		}
+		sources.clear();
+		return -1;
+	}
 	
 	//## Compare sources
 	for(size_t i=0;i<sources.size();i++){
 		if(i%100==0) INFO_LOG("#"<<i+1<<"/"<<sources.size()<<" true sources read...");
 
 		//Get source data
-		SourceName= sources[i]->GetName();
+		Npix= sources[i]->GetNPixels();
+		SourceName= sources[i]->GetName();	
 		type= sources[i]->Type;
 		simtype= sources[i]->SimType;
 		int flag= sources[i]->Flag;
 		simmaxscale= sources[i]->SimMaxScale;
 		X0= sources[i]->X0;
 		Y0= sources[i]->Y0;
-		S= sources[i]->GetS();
+		S= sources[i]->GetS();//in Jy/beam
 		Smax= sources[i]->GetSmax();
 		S_true= sources[i]->GetTrueFlux();
+		double beamIntegral= sources[i]->GetBeamFluxIntegral(); 
+		S_true_estimated= S/beamIntegral;//convert to Jy/pixel
 		std::vector<Pixel*> pixels= sources[i]->GetPixels();
-		
+	
+
 		//Get rec source 
 		Source* rec_source= new Source;
+		Pixel* aPixel= 0;
+		std::vector<double> bkgValues;
+		S_bkg= 0;
 		for(size_t k=0;k<pixels.size();k++){	
 			long int gBin= pixels[k]->id;
 			long int ix= pixels[k]->ix;
@@ -210,7 +262,15 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 			double x= pixels[k]->x;
 			double y= pixels[k]->y;
 			double flux= img_rec->GetPixelValue(gBin);
-			rec_source->AddPixel( new Pixel(gBin,ix,iy,x,y,flux) );
+			double bkgLevel= (bkgData->BkgMap)->GetPixelValue(gBin);
+			double bkgRMS= (bkgData->NoiseMap)->GetPixelValue(gBin);
+			S_bkg+= bkgLevel;
+
+			bkgValues.push_back(bkgLevel);
+
+			aPixel= new Pixel(gBin,ix,iy,x,y,flux);
+			aPixel->SetBkg(bkgLevel,bkgRMS);
+			rec_source->AddPixel(aPixel);
 		}
 
 		//## Compute stats
@@ -222,11 +282,13 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 		rec_source->ComputeMorphologyParams();
 
 		//Get rec source pars
+		Npix_rec= rec_source->GetNPixels();
 		X0_rec= rec_source->X0;
 		Y0_rec= rec_source->Y0;
 		S_rec= rec_source->GetS();
 		Smax_rec= rec_source->GetSmax();
-		
+		BkgAvg= StatsUtils::GetMedianFast(bkgValues);		
+
 		//Correct flux from Jy/beam to Jy
 		if(correctRecFlux){
 			S_rec/= beamArea;
@@ -234,7 +296,7 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 		}
 		
 		//Store/compare data
-		INFO_LOG("True source no. "<<i+1<<" (type="<<type<<", pos("<<X0<<","<<Y0<<"), S="<<S<<"), Rec source: pos("<<X0_rec<<","<<Y0_rec<<"), S_rec="<<S_rec<<")");
+		INFO_LOG("True source no. "<<i+1<<" (type="<<type<<", pos("<<X0<<","<<Y0<<"), S="<<S<<"), Rec source: pos("<<X0_rec<<","<<Y0_rec<<"), S_rec="<<S_rec<<", BkgAvg="<<BkgAvg<<", S_bkg="<<S_bkg<<")");
 		outputTree->Fill();
 	
 	}//end loop sources
@@ -252,6 +314,10 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 	}
 	sources.clear();
 	
+	if(bkgData){
+		delete bkgData;
+		bkgData= 0;
+	}
 
 	return 0;
 
@@ -264,6 +330,7 @@ void Init(){
 
 	if(!outputTree) outputTree= new TTree("data","data");
 	outputTree->Branch("filename",&filename);
+	outputTree->Branch("Npix",&Npix,"Npix/D");
 	outputTree->Branch("name",&SourceName);
 	outputTree->Branch("type",&type,"type/I");
 	outputTree->Branch("simtype",&simtype,"simtype/I");
@@ -275,11 +342,14 @@ void Init(){
 	outputTree->Branch("Y0",&Y0,"Y0/D");
 
 	outputTree->Branch("filename_rec",&filename_rec);
+	outputTree->Branch("Npix_rec",&Npix_rec,"Npix_rec/D");
 	outputTree->Branch("S_rec",&S_rec,"S_rec/D");
 	outputTree->Branch("Smax_rec",&Smax_rec,"Smax_rec/D");
 	outputTree->Branch("X0_rec",&X0_rec,"X0_rec/D");
 	outputTree->Branch("Y0_rec",&Y0_rec,"Y0_rec/D");
 	outputTree->Branch("beamArea",&beamArea,"beamArea/D");
+	outputTree->Branch("BkgAvg",&BkgAvg,"BkgAvg/D");
+	outputTree->Branch("S_bkg",&S_bkg,"S_bkg/D");
 
 }//close Init()
 

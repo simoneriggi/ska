@@ -61,12 +61,28 @@ if [ "$NARGS" -lt 2 ]; then
 
 	echo "=== SFINDER COMPACT SOURCE OPTIONS ==="
 	echo "--no-compactsearch - Do not search compact sources"
-	echo "--selectsources - Apply selection to compact sources found (default=false)"	
 	echo "--npixmin=[NPIX_MIN] - Minimum number of pixel to form a compact source (default=5 pixels)"
 	echo "--seedthr=[SEED_THR] - Seed threshold (in nsigmas) used in flood-fill (default=5 sigmas)"
 	echo "--mergethr=[MERGE_THR] - Merge threshold (in nsigmas) used in flood-fill (default=2.6 sigmas)"
 	echo "--compactsearchiters=[COMPACT_SOURCE_SEARCH_NITERS] - Maximum number of compact source search iterations (default=5)"	
 	echo "--seedthrstep=[SEED_THR_STEP] - Seed thr decrease step across iterations (default=1)"
+	echo ""
+
+	echo "=== SFINDER COMPACT SOURCE SELECTION OPTIONS ==="
+	echo "--selectsources - Apply selection to compact sources found (default=false)"	
+	echo "--no-boundingboxcut - Do not apply bounding box cut (default=apply)"
+	echo "--minboundingbox=[MIN_BOUNDING_BOX] - Minimum bounding box cut in pixels (NB: source tagged as bad if below this threshold) (default=2)"
+	echo "--no-circratiocut - Do not apply circular ratio parameter cut (default=apply)"
+	echo "--circratiothr=[CIRC_RATIO_THR] - Circular ratio threshold (0=line, 1=circle) (source passes point-like cut if above this threshold) (default=0.4)"
+	echo "--no-elongationcut - Do not apply elongation parameter cut (default=apply)"
+	echo "--elongationthr=[ELONGATION_THR] - Elongation threshold (source passes point-like cut if below this threshold (default=0.7)"
+	echo "--ellipsearearatiocut - Apply ellipse area ratio parameter cut (default=not applied)"	
+	echo "--ellipsearearatiominthr=[ELLIPSE_AREA_RATIO_MIN_THR] - Ellipse area ratio min threshold (default=0.6)"	
+	echo "--ellipsearearatiomaxthr=[ELLIPSE_AREA_RATIO_MAX_THR] - Ellipse area ratio max threshold (default=1.4)"	
+	echo "--maxnpixcut - Apply max pixels cut (NB: source below this thr passes the point-like cut) (default=not applied)"	
+	echo "--maxnpix=[MAX_NPIX] - Max number of pixels for point-like sources (source passes point-like cut if below this threshold) (default=1000)"
+	echo "--no-nbeamscut - Use number of beams in source cut (default=applied)"
+	echo "--nbeamsthr=[NBEAMS_THR] - nBeams threshold (sources passes point-like cut if nBeams<thr) (default=3)"
 	echo ""
 
 	echo "=== SFINDER EXTENDED SOURCE OPTIONS ==="
@@ -190,12 +206,15 @@ BKG_USE_2ND_PASS="true"
 BKG_SKIP_OUTLIERS="false"
 NPIX_MIN="5"
 SEED_THR="5"
+MERGE_THR="2.6"
+COMPACT_SOURCE_SEARCH_NITERS="5"
+SEED_THR_STEP="1"
+
 DILATE_NESTED="false"
 DILATE_BRIGHT_THR="10"
 DILATE_THR="5"
 DILATED_SOURCE="2"
 DILATE_KERNEL_SIZE="9"
-MERGE_THR="2.6"
 USE_PRESMOOTHING="true"
 SMOOTH_FILTER="2"
 GUIDED_FILTER_RADIUS="12"
@@ -204,8 +223,19 @@ EXT_SFINDER_METHOD="3"
 AC_METHOD="2"
 
 SELECT_SOURCES="false"
-COMPACT_SOURCE_SEARCH_NITERS="5"
-SEED_THR_STEP="1"
+USE_BOUNDING_BOX_CUT="true"
+USE_ELONGATION_CUT="true"
+USE_CIRC_RATIO_CUT="true"
+USE_ELLIPSE_AREA_RATIO_CUT="false"
+USE_NMAXPIX_CUT="false"
+USE_NBEAMS_CUT="true"
+MIN_BOUNDING_BOX="2"
+CIRC_RATIO_THR="0.4"
+ELONGATION_THR="0.7"
+ELLIPSE_AREA_RATIO_MIN_THR="0.6"
+ELLIPSE_AREA_RATIO_MAX_THR="1.4"
+MAX_NPIX="1000"
+NBEAMS_THR="3"
 
 SEARCH_NESTED_SOURCES="true"
 NESTED_SOURCE_TO_BEAM_THR="5"
@@ -423,10 +453,52 @@ do
 		--mergethr=*)
     	MERGE_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+
+		## SOURCE SELECTION
 		--selectsources*)
     	SELECT_SOURCES="true"
     ;;
-
+		--no-boundingboxcut*)
+    	USE_BOUNDING_BOX_CUT="false"
+    ;;
+		--no-circratiocut*)
+    	USE_CIRC_RATIO_CUT="false"
+    ;;
+		--no-elongationcut*)
+    	USE_ELONGATION_CUT="false"
+    ;;
+		--ellipsearearatiocut*)
+    	USE_ELLIPSE_AREA_RATIO_CUT="true"
+    ;;
+		--maxnpixcut*)
+    	USE_NMAXPIX_CUT="true"
+    ;;
+		--no-nbeamscut*)
+    	USE_NBEAMS_CUT="false"
+    ;;
+		
+		--minboundingbox*)
+    	MIN_BOUNDING_BOX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--circratiothr*)
+    	CIRC_RATIO_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--elongationthr*)
+    	ELONGATION_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--ellipsearearatiominthr*)
+    	ELLIPSE_AREA_RATIO_MIN_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--ellipsearearatiomaxthr*)
+    	ELLIPSE_AREA_RATIO_MAX_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+		--maxnpix*)
+    	MAX_NPIX=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;	
+		--nbeamsthr*)
+    	NBEAMS_THR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
+	
 		## NESTED OPTIONS
 		--no-nestedsearch*)
     	SEARCH_NESTED_SOURCES="false"
@@ -862,22 +934,23 @@ generate_config(){
 		echo '//================================'
 		echo '//==  SOURCE SELECTION OPTIONS  =='
 		echo '//================================'
-		echo "applySourceSelection = $SELECT_SOURCES  						| Apply selection cuts to sources (T/F)"
-		echo 'useMinBoundingBoxCut = true													| Use bounding box cut (T(F)'
-		echo 'sourceMinBoundingBox = 2														| Minimum bounding box cut (source tagged as bad if below this threshold)'
-		echo 'useCircRatioCut = false															| Use circularity ratio cut (T/F)'
-		echo 'psCircRatioThr = 0.4																| Circular ratio threshold (source passes point-like cut if above this threshold)'
-		echo 'useElongCut = false																	| Use elongation cut (T/F)'
-		echo 'psElongThr = 0.7																		| Elongation threshold (source passes point-like cut if below this threshold'
-		echo 'useEllipseAreaRatioCut = false											| Use Ellipse area ratio cut (T/F)'
-		echo 'psEllipseAreaRatioMinThr = 0.6											| Ellipse area ratio min threshold'
-		echo 'psEllipseAreaRatioMaxThr = 1.4											| Ellipse area ratio max threshold'
-		echo 'useMaxNPixCut = true																| Use max npixels cut (T/F)'
-		echo 'psMaxNPix = 1000																		| Max number of pixels for point-like sources (source passes point-like cut if below this threshold)'
-		echo 'useNBeamsCut = true                                 | Use nBeams cut (T/F)'
-		echo 'psNBeamsThr = 3                                     | nBeams threshold (sources passes point-like cut if nBeams<thr)'
+		echo "applySourceSelection = $SELECT_SOURCES  						    | Apply selection cuts to sources (T/F)"
+		echo "useMinBoundingBoxCut = $USE_BOUNDING_BOX_CUT				    | Use bounding box cut (T/F)"
+		echo "sourceMinBoundingBox = $MIN_BOUNDING_BOX  					    | Minimum bounding box cut (source tagged as bad if below this threshold)"
+		echo "useCircRatioCut = $USE_CIRC_RATIO_CUT 							    | Use circularity ratio cut (T/F)"
+		echo "psCircRatioThr = $CIRC_RATIO_THR										    | Circular ratio threshold (source passes point-like cut if above this threshold)"
+		echo "useElongCut = $USE_ELONGATION_CUT										    | Use elongation cut (T/F)"
+		echo "psElongThr = $ELONGATION_THR												    | Elongation threshold (source passes point-like cut if below this threshold"
+		echo "useEllipseAreaRatioCut = $USE_ELLIPSE_AREA_RATIO_CUT	  | Use Ellipse area ratio cut (T/F)"
+		echo "psEllipseAreaRatioMinThr = $ELLIPSE_AREA_RATIO_MIN_THR	| Ellipse area ratio min threshold"
+		echo "psEllipseAreaRatioMaxThr = $ELLIPSE_AREA_RATIO_MAX_THR  | Ellipse area ratio max threshold"
+		echo "useMaxNPixCut = $USE_NMAXPIX_CUT  										  | Use max npixels cut (T/F)"
+		echo "psMaxNPix = $MAX_NPIX   															  | Max number of pixels for point-like sources (source passes point-like cut if below this threshold)"
+		echo "useNBeamsCut = $USE_NBEAMS_CUT                          | Use nBeams cut (T/F)"
+		echo "psNBeamsThr = $NBEAMS_THR                               | nBeams threshold (sources passes point-like cut if nBeams<thr)"
 		echo '###'
 		echo '###'
+
 		echo '//================================'
 		echo '//==  SOURCE RESIDUAL OPTIONS   =='
 		echo '//================================'
