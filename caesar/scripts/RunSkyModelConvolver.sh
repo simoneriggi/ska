@@ -31,7 +31,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--threshold=[THRESHOLD] - Flux threshold in Jy below which pixels are removed from compact sources (default=0)"
 	echo "--threshold-ext=[THRESHOLD_EXT] - Flux threshold in Jy below which pixels are removed from extended sources (default=0)"
 	echo "--mergesources - Merge overlapping sources (default=no)"
-	echo "--mergecompactsources - Merge compact sources (default=no)"
+	echo "--mergecompactsources - Merge compact to compact sources (default=no)"
+	echo "--mergeextsources - Merge extended to extended or compact sources (default=no)"
 	echo "--nsigmas=[NSIGMAS] - Number of gaussian sgmas used in convolution kernel (default=10)"
 	echo "--startid=[START_ID] - Run start id (default: 1)"	
 	echo "--maxfiles=[NMAX_PROCESSED_FILES] - Maximum number of input files processed in filelist (default=-1=all files)"		
@@ -74,8 +75,10 @@ BPA=""
 BEAM_GIVEN=false
 MERGE_SOURCES=false
 MERGE_COMPACT_SOURCES=false
+MERGE_EXTENDED_SOURCES=false
 MERGE_SOURCES_OPTION=""
 MERGE_COMPACT_SOURCES_OPTION=""
+MERGE_EXTENDED_SOURCES_OPTION=""
 NSIGMAS=10
 
 for item in "$@"
@@ -142,6 +145,10 @@ do
     	MERGE_COMPACT_SOURCES=true
 			MERGE_COMPACT_SOURCES_OPTION="--mergecompactsources"
     ;;
+		--mergeextsources*)
+    	MERGE_EXTENDED_SOURCES=true
+			MERGE_EXTENDED_SOURCES_OPTION="--mergeextsources"
+    ;;
 		--nsigmas=*)
     	NSIGMAS=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`		
     ;;
@@ -204,6 +211,7 @@ echo "INPUTFILE_REC: $INPUTFILE_REC, FILELIST_REC: $FILELIST_REC"
 echo "BEAM ($BMAJ,$BMIN,$BPA), BEAM_GIVEN? $BEAM_GIVEN"
 echo "USER_THRESHOLD_OPTION: $USER_THRESHOLD_OPTION, THRESHOLD: $THRESHOLD, THRESHOLD_EXT=$THRESHOLD_EXT"
 echo "TRUNC_THRESHOLD: $TRUNC_THRESHOLD"
+echo "MERGE_SOURCES? $MERGE_SOURCES, MERGE_COMPACT_SOURCES? $MERGE_COMPACT_SOURCES, MERGE_EXTENDED_SOURCES? $MERGE_EXTENDED_SOURCES"
 echo "ENV_FILE: $ENV_FILE"
 echo "SUBMIT? $SUBMIT, QUEUE=$BATCH_QUEUE, JOB_WALLTIME: $JOB_WALLTIME"
 echo "RUN_IN_CONTAINER? $RUN_IN_CONTAINER, CONTAINER_IMG=$CONTAINER_IMG"
@@ -347,7 +355,7 @@ if [ "$FILELIST_GIVEN" = true ]; then
 				EXE="$CAESAR_DIR/bin/SkyModelConvolver"
 			fi
 
-			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
+			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION $MERGE_EXTENDED_SOURCES_OPTION"
 
 			echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 			generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$JOB_DIR"
@@ -409,7 +417,7 @@ if [ "$FILELIST_GIVEN" = true ]; then
 				EXE="$CAESAR_DIR/bin/SkyModelConvolver"
 			fi
 
-			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
+			EXE_ARGS="--input=$filename $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION $MERGE_EXTENDED_SOURCES_OPTION"
 
 			echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 			generate_exec_script "$shfile" "$index" "$EXE" "$EXE_ARGS" "$JOB_DIR"
@@ -472,7 +480,7 @@ else
 		EXE="$CAESAR_DIR/bin/SkyModelConvolver"
 	fi
 
-	EXE_ARGS="--input=$INPUTFILE $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION"
+	EXE_ARGS="--input=$INPUTFILE $INPUTFILE_REC_OPTION --output=$outputfile --output-ds9=$outputfile_ds9 --output-map=$outputfile_map $BEAM_OPTIONS --fluxtruncthr=$TRUNC_THRESHOLD $USER_THRESHOLD_OPTION --threshold=$THRESHOLD --threshold-ext=$THRESHOLD_EXT $MERGE_SOURCES_OPTION $MERGE_COMPACT_SOURCES_OPTION $MERGE_EXTENDED_SOURCES_OPTION"
 
 	echo "INFO: Creating script file $shfile for input file: $filename_base ..."
 	jobId=" "
