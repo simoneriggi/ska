@@ -194,7 +194,9 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(tileStepSizeX,double,1,0.001,1);
 		REGISTER_OPTION(tileStepSizeY,double,1,0.001,1);
 		REGISTER_OPTION(mergeSourcesAtEdge,bool,true,false,true);
-		
+		REGISTER_OPTION(mergeSources,bool,false,false,true);
+		REGISTER_OPTION(mergeCompactSources,bool,false,false,true);
+		REGISTER_OPTION(mergeExtendedSources,bool,false,false,true);
 
 		//======================
 		//==  Logger options  ==
@@ -234,23 +236,18 @@ int ConfigParser::RegisterPredefinedOptions(){
 		REGISTER_OPTION(guidedFilterRadius,double,12,0,1000);
 		REGISTER_OPTION(guidedFilterColorEps,double,0.04,0,1000);
 		
-
 		//==============================
 		//==  Source finding options  ==
 		//==============================
 		REGISTER_OPTION(searchCompactSources,bool,true,false,true);
-		//REGISTER_OPTION(searchBrightSources,bool,false,false,true);
-		//REGISTER_OPTION(searchFaintSources,bool,false,false,true);
 		REGISTER_OPTION(minNPix,int,10,0,10000);
-		//REGISTER_OPTION(seedBrightThr,double,10,0,10000);//DEPRECATED	
 		REGISTER_OPTION(seedThr,double,5,0,10000);
 		REGISTER_OPTION(mergeThr,double,2.6,0,10000);
 		REGISTER_OPTION(mergeBelowSeed,bool,false,false,true);
 		REGISTER_OPTION(searchNegativeExcess,bool,false,false,true);
 		REGISTER_OPTION(compactSourceSearchNIters,int,10,0,100);
 		REGISTER_OPTION(seedThrStep,double,1,0,10);
-		//REGISTER_OPTION(wtScaleFaint,int,1,1,10);
-
+		
 		//=====================================
 		//==  Nested Source finding options  ==
 		//=====================================
