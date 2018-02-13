@@ -53,7 +53,10 @@ int DrawImagingPerformances(std::string fileName){
 	double S_true;
 	double S_rec;
 	double BkgAvg;
+	double S_bkg;
 	double beamArea;
+	double Npix_true;
+	double Npix_rec;
 
 	//data->SetBranchAddress("name",&name);
 	data->SetBranchAddress("type",&type);
@@ -63,7 +66,10 @@ int DrawImagingPerformances(std::string fileName){
 	data->SetBranchAddress("S_true",&S_true);
 	data->SetBranchAddress("S_rec",&S_rec);
 	data->SetBranchAddress("beamArea",&beamArea);
-	data->SetBranchAddress("BkgAvg",&BkgAvg);
+	data->SetBranchAddress("BkgAvg",&BkgAvg);	
+	data->SetBranchAddress("S_bkg",&S_bkg);
+	data->SetBranchAddress("Npix_true",&Npix_true);
+	data->SetBranchAddress("Npix_rec",&Npix_rec);
 
 	//## Define histos
 	int nBins= (int)(LgFluxBins.size()-1);
@@ -108,6 +114,7 @@ int DrawImagingPerformances(std::string fileName){
 		double fluxDensity_true= S/beamArea;
 		double lgFlux_true= log10(fluxDensity_true);
 		double fluxRatio= S_rec/S;
+		//double fluxRatio= (S_rec-S_bkg)/S;	
 		int gBin= dummyHisto->FindBin(lgFlux_true);
 		if(dummyHisto->IsBinOverflow(gBin) || dummyHisto->IsBinUnderflow(gBin)){
 			WARN_LOG("Overflow/underflow flux bin (S_true="<<S_true<<", S="<<S<<", S_rec="<<S_rec<<", fluxDensity_true="<<fluxDensity_true<<"), skip entry...");

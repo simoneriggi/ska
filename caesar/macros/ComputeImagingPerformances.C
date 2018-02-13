@@ -21,8 +21,14 @@ using namespace Caesar;
 
 //Bkg options
 int bkgEstimator= eMedianClippedBkg;
+//int bkgEstimator= eMedianBkg;
 int bkgBoxBeamFactor= 30;
 double bkgGridStepSize= 0.2;
+bool use2ndPass= true;
+bool skipOutliers= true;
+double seedThr= 5;
+double mergeThr= 2.5;
+int minPixels= 5;
 
 //Vars
 std::string outputFileName= "Output.root";
@@ -212,7 +218,10 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 	INFO_LOG("Computing image bkg");
 	double bkgBoxSize= pixelWidthInBeam*bkgBoxBeamFactor;
 	double bkgGridSize= bkgGridStepSize*bkgBoxSize;
-	ImgBkgData* bkgData= img_rec->ComputeBkg(bkgEstimator,true,bkgBoxSize,bkgBoxSize,bkgGridSize,bkgGridSize);
+	ImgBkgData* bkgData= img_rec->ComputeBkg(
+		bkgEstimator,true,bkgBoxSize,bkgBoxSize,bkgGridSize,bkgGridSize,
+		use2ndPass,skipOutliers,seedThr,mergeThr,minPixels
+	);
 	if(!bkgData){
 		ERROR_LOG("Failed to compute rec image bkg!");
 		if(img_rec){
