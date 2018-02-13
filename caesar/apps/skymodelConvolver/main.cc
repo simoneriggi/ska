@@ -702,6 +702,8 @@ int MergeSources()
 
 	//## Add to merged collection all sources not mergeable
 	//## NB: If sources are not to be merged each other, add to merged collection 
+	sources_conv_merged.clear();
+
 	for(size_t i=0;i<sources_conv.size();i++){
 		int type= sources_conv[i]->Type;
 		bool isMergeable= isMergeableSource[i];
@@ -733,8 +735,6 @@ int MergeSources()
 	bool computeRobustStats= true;
 	bool forceRecomputing= true;//need to re-compute moments because pixel flux of merged sources are summed up
 	
-	sources_conv_merged.clear();
-
 	INFO_LOG("Merging sources and adding them to collection...");
 	for(size_t i=0;i<connected_source_indexes.size();i++){
 		if(connected_source_indexes[i].empty()) continue;
