@@ -415,6 +415,10 @@ int SFinder::Configure(){
 	}
 
 	GET_OPTION_VALUE(mergeSourcesAtEdge,m_mergeSourcesAtEdge);
+	GET_OPTION_VALUE(mergeSources,m_mergeSources);
+	GET_OPTION_VALUE(mergeCompactSources,m_mergeCompactSources);
+	GET_OPTION_VALUE(mergeExtendedSources,m_mergeExtendedSources);
+	
 	
 	//Get user-supplied map & beam options
 	GET_OPTION_VALUE(pixSize,m_pixSize);
@@ -489,8 +493,11 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(useEllipseAreaRatioCut,m_useEllipseAreaRatioCut);
 	GET_OPTION_VALUE(psMaxNPix,m_psMaxNPix);
 	GET_OPTION_VALUE(useMaxNPixCut,m_useMaxNPixCut);
+	GET_OPTION_VALUE(useNBeamsCut,m_useNBeamsCut);
+	GET_OPTION_VALUE(psNBeamsThr,m_psNBeamsThr);
 	
 	//Get source residual options
+	GET_OPTION_VALUE(dilateZBrightThr,m_DilateZBrightThr);
 	GET_OPTION_VALUE(dilateZThr,m_DilateZThr);
 	GET_OPTION_VALUE(dilateNestedSources,m_DilateNestedSources);
 	GET_OPTION_VALUE(dilateKernelSize,m_DilateKernelSize);
@@ -523,9 +530,6 @@ int SFinder::Configure(){
 	GET_OPTION_VALUE(peakShiftTolerance,m_peakShiftTolerance);	
 	GET_OPTION_VALUE(peakZThrMin,m_peakZThrMin);
 
-	//GET_OPTION_VALUE(deblendCurvThr,m_deblendCurvThr);
-	//GET_OPTION_VALUE(deblendComponentMinNPix,m_deblendComponentMinNPix);
-	
 	if(m_peakMinKernelSize>m_peakMaxKernelSize){
 		ERROR_LOG("[PROC "<<m_procId<<"] - Invalid peak kernel size option given (hint: min kernel must be larger or equal to max kernel size)!");
 		return -1;
@@ -657,10 +661,6 @@ int SFinder::RunTask(TaskData* taskData,bool storeData){
 		double xmax= taskImg->GetXmax();
 		double ymin= taskImg->GetYmin();
 		double ymax= taskImg->GetYmax();
-		//taskData->x_min= xmin;
-		//taskData->x_max= xmax;
-		//taskData->y_min= ymin;
-		//taskData->y_max= ymax;
 	}	
 	else{
 		ERROR_LOG("[PROC "<<m_procId<<"] - Reading of input image failed, skip to next task...");
@@ -716,6 +716,17 @@ int SFinder::RunTask(TaskData* taskData,bool storeData){
 		extendedSourceTime+= chrono::duration <double, milli> (t1_extsfinder-t0_extsfinder).count();
 
 	}//close if search extended sources
+
+	//============================
+	//== Merge task sources
+	//============================
+	if(!stopTask && m_mergeSources){
+		INFO_LOG("[PROC "<<m_procId<<"] - Merging task sources ...");
+		if(MergeTaskSources(taskData)<0){
+			ERROR_LOG("[PROC "<<m_procId<<"] - Merging task sources failed!");
+			status= -1;
+		}
+	}
 
 	//============================
 	//== Find edge sources
@@ -899,136 +910,6 @@ int SFinder::Run(){
 }//close Run()
 
 
-/*
-int SFinder::Run(){
-
-	//Start timer
-	auto t0 = chrono::steady_clock::now();	
-
-	//===========================
-	//== Init options & data
-	//===========================
-	INFO_LOG("Initializing source finder...");
-	auto t0_init = chrono::steady_clock::now();	
-	if(Init()<0){
-		ERROR_LOG("Initialization failed!");
-		return -1;
-	}
-	auto t1_init = chrono::steady_clock::now();	
-	initTime= chrono::duration <double, milli> (t1_init-t0_init).count();
-	
-	//===========================
-	//== Read image
-	//===========================
-	INFO_LOG("Reading input image...");
-	auto t0_read = chrono::steady_clock::now();
-
-	FileInfo info;
-	if(m_ReadTile) m_InputImg= ReadImage(info,m_InputFileName,m_InputImgName,m_TileMinX,m_TileMaxX,m_TileMinY,m_TileMaxY);	
-	else m_InputImg= ReadImage(info,m_InputFileName,m_InputImgName);
-	
-	//if(ReadImage()<0){
-	if(!m_InputImg){
-		ERROR_LOG("Reading of input image failed!");
-		return -1;
-	}
-	m_InputFileExtension= info.extension;
-
-	auto t1_read = chrono::steady_clock::now();	
-	readImageTime= chrono::duration <double, milli> (t1_read-t0_read).count();
-
-	//============================
-	//== Find compact sources
-	//============================
-	INFO_LOG("Searching compact sources...");
-	auto t0_sfinder = chrono::steady_clock::now();	
-	if(m_SearchCompactSources && FindCompactSources()<0){
-		ERROR_LOG("Compact source search failed!");
-		return -1;
-	}
-	auto t1_sfinder = chrono::steady_clock::now();	
-	compactSourceTime= chrono::duration <double, milli> (t1_sfinder-t0_sfinder).count();
-
-
-	//============================
-	//== Find extended sources
-	//============================
-	if(m_SearchExtendedSources){
-		INFO_LOG("Searching extended sources...");
-
-		// Find residual map
-		INFO_LOG("Computing residual image ...");
-		auto t0_res = chrono::steady_clock::now();	
-		if(FindResidualMap()<0){
-			ERROR_LOG("Residual map computation failed!");
-			return -1;
-		}
-		auto t1_res = chrono::steady_clock::now();	
-		imgResidualTime= chrono::duration <double, milli> (t1_res-t0_res).count();
-
-		
-		//Find extended sources
-		auto t0_extsfinder = chrono::steady_clock::now();
-		if(FindExtendedSources(m_ResidualImg)<0){
-			ERROR_LOG("Extended source search failed!");
-			return -1;
-		}
-		auto t1_extsfinder = chrono::steady_clock::now();	
-		extendedSourceTime= chrono::duration <double, milli> (t1_extsfinder-t0_extsfinder).count();
-
-	}//close if search extended sources
-
-	
-	//============================
-	//== Fit sources
-	//============================
-	if(m_fitSources) {
-		auto t0_sfit = chrono::steady_clock::now();	
-		if(FitSources(m_SourceCollection)<0){
-			ERROR_LOG("Failed to fit sources!");
-			return -1;
-		}
-		auto t1_sfit = chrono::steady_clock::now();	
-		sourceFitTime= chrono::duration <double, milli> (t1_sfit-t0_sfit).count();
-	}
-
-	//============================
-	//== Draw images
-	//============================
-	if(m_IsInteractiveRun) {
-		DrawSources(m_InputImg,m_SourceCollection);
-	}
-
-	//Stop timer
-	auto t1 = chrono::steady_clock::now();	
-	totTime= chrono::duration <double, milli> (t1-t0).count();
-
-	//============================
-	//== Save to file
-	//============================
-	if(m_saveToFile) {	
-		auto t0_save = chrono::steady_clock::now();	
-		Save();	
-		auto t1_save = chrono::steady_clock::now();	
-		saveTime= chrono::duration <double, milli> (t1_save-t0_save).count();
-	}
-
-	//===============================
-	//== Print performance stats
-	//===============================
-	PrintPerformanceStats();
-
-	//==========================================
-	//== Run TApplication (interactive run)
-	//==========================================
-	if(m_Application && m_IsInteractiveRun) {
-		m_Application->Run();
-	}
-	
-	return 0;
-
-}//close Run()
-*/
 
 
 int SFinder::FindSources(std::vector<Source*>& sources,Image* inputImg,double seedThr,double mergeThr,Image* searchedImg){
@@ -1291,7 +1172,10 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 	//## Tag found sources as compact 
 	int nSources= static_cast<int>( sources.size() );
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<nSources<<" compact sources detected in input image after #"<<iterations_done<<" iterations ...");
-	for(size_t k=0;k<sources.size();k++) {
+	for(size_t k=0;k<sources.size();k++) {	
+		sources[k]->SetId(k+1);
+		sources[k]->SetName(Form("S%d",(signed)(k+1)));
+		sources[k]->SetBeamFluxIntegral(beamArea);
 		sources[k]->SetType(Source::eCompact);
 	}
 	
@@ -1307,7 +1191,6 @@ Image* SFinder::FindCompactSourcesRobust(Image* inputImg,ImgBkgData* bkgData,Tas
 	}//close if source selection
 
 
-	
 	//## Set source pars
 	for(size_t k=0;k<sources.size();k++) {
 		sources[k]->SetId(k+1);
@@ -1436,7 +1319,7 @@ Image* SFinder::FindResidualMap(Image* inputImg,ImgBkgData* bkgData,std::vector<
 			sources,
 			m_DilateKernelSize,m_DilateSourceModel,m_DilatedSourceType,m_DilateNestedSources,	
 			bkgData,m_UseLocalBkg,
-			m_DilateRandomize,m_DilateZThr
+			m_DilateRandomize,m_DilateZThr,m_DilateZBrightThr
 		);
 	}//close if
 	else{
@@ -2392,7 +2275,7 @@ int SFinder::SelectSources(std::vector<Source*>& sources){
 		long int NPix= sources[i]->NPix;
 		double X0= sources[i]->X0;
 		double Y0= sources[i]->Y0;
-
+		
 		//Is bad source (i.e. line-like blob, etc...)?
 		if(!IsGoodSource(sources[i])) {
 			INFO_LOG("[PROC "<<m_procId<<"] - Source no. "<<i<<" (name="<<sourceName<<",id="<<sourceId<<", n="<<NPix<<"("<<X0<<","<<Y0<<")) tagged as bad source, skipped!");
@@ -2479,6 +2362,8 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 
 	std::string sourceName= aSource->GetName();
 	int sourceId= aSource->Id;
+	long int NPix= aSource->NPix;
+	
 
 	//Loop over contours and check if all of them have circular features
 	bool isPointLike= true;
@@ -2513,10 +2398,21 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 
 	}//end contour loop
 	
+	
+	//Check number of beams contained in source
+	double beamArea= aSource->GetBeamFluxIntegral();
+	if(m_useNBeamsCut && beamArea>0){	
+		double nBeams= (double)(NPix)/beamArea;
+		if(nBeams>m_psNBeamsThr){
+			INFO_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nBeams cut (beamArea="<<beamArea<<", NPix="<<NPix<<", nBeams="<<nBeams<<">"<<m_psNBeamsThr<<")");
+			isPointLike= false;
+		}
+	}
+
 	//Check number of pixels
-	DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") (NPix="<<aSource->NPix<<">"<<m_psMaxNPix<<")");
-	if(m_useMaxNPixCut && aSource->NPix>m_psMaxNPix){
-		DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nMaxPix cut (NPix="<<aSource->NPix<<">"<<m_psMaxNPix<<")");
+	DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") (NPix="<<NPix<<">"<<m_psMaxNPix<<")");
+	if(m_useMaxNPixCut && NPix>m_psMaxNPix){
+		DEBUG_LOG("[PROC "<<m_procId<<"] - Source (name="<<sourceName<<","<<"id="<<sourceId<<") does not pass nMaxPix cut (NPix="<<NPix<<">"<<m_psMaxNPix<<")");
 		isPointLike= false;
 	}
 
@@ -3115,18 +3011,11 @@ int SFinder::PrepareWorkerTasks()
 			INFO_LOG("[PROC "<<m_procId<<"] - Assign task ("<<i<<","<<j<<") to worker no. "<<workerCounter<<"...");
 				
 			aTaskData= new TaskData;
-			///aTaskData->filename= m_InputFileName;
-			//aTaskData->jobId= jobId;
 			aTaskData->workerId= workerCounter;
-			//aTaskData->taskId= workerCounter;
 			aTaskData->SetTile(
 				ix_min[i] + m_TileMinX, ix_max[i] + m_TileMinX,
 				iy_min[j] + m_TileMinY, iy_max[j] + m_TileMinY
 			);
-			//aTaskData->ix_min= ix_min[i] + m_TileMinX;
-			//aTaskData->ix_max= ix_max[i] + m_TileMinX;
-			//aTaskData->iy_min= iy_min[j] + m_TileMinY;
-			//aTaskData->iy_max= iy_max[j] + m_TileMinY;
 			m_taskDataPerWorkers[workerCounter].push_back(aTaskData);
 
 			if(workerCounter>=m_nProc-1) workerCounter= 0;
@@ -3150,13 +3039,6 @@ int SFinder::PrepareWorkerTasks()
 		for(int j=0;j<nTasksInWorker;j++){
 			TaskData* task= m_taskDataPerWorkers[i][j];
 
-			/*
-			long int ix_min= m_taskDataPerWorkers[i][j]->ix_min;
-			long int ix_max= m_taskDataPerWorkers[i][j]->ix_max;
-			long int iy_min= m_taskDataPerWorkers[i][j]->iy_min;
-			long int iy_max= m_taskDataPerWorkers[i][j]->iy_max;
-			*/
-
 			//Find first neighbors among tasks inside the same worker
 			for(int k=j+1;k<nTasksInWorker;k++){
 				if(j==k) continue;
@@ -3166,31 +3048,6 @@ int SFinder::PrepareWorkerTasks()
 					task->AddNeighborInfo(k,i);
 					task_N->AddNeighborInfo(j,i);
 				}
-	
-				/*
-				long int next_ix_min= m_taskDataPerWorkers[i][k]->ix_min;
-				long int next_ix_max= m_taskDataPerWorkers[i][k]->ix_max;
-				long int next_iy_min= m_taskDataPerWorkers[i][k]->iy_min;
-				long int next_iy_max= m_taskDataPerWorkers[i][k]->iy_max;
-				
-				bool isAdjacentInX= (ix_max==next_ix_min-1 || ix_min==next_ix_max+1 || (ix_min==next_ix_min && ix_max==next_ix_max));
-				bool isAdjacentInY= (iy_max==next_iy_min-1 || iy_min==next_iy_max+1 || (iy_min==next_iy_min && iy_max==next_iy_max));
-				bool isOverlappingInX= ( (next_ix_min>=ix_min && next_ix_min<=ix_max) || (next_ix_max>=ix_min && next_ix_max<=ix_max) );
-				bool isOverlappingInY= ( (next_iy_min>=iy_min && next_iy_min<=iy_max) || (next_iy_max>=iy_min && next_iy_max<=iy_max) );
-				bool isAdjacent= isAdjacentInX && isAdjacentInY;
-				bool isOverlapping= isOverlappingInX && isOverlappingInY;
-				
-				std::stringstream ss;	
-				ss<<"[PROC "<<m_procId<<"] - Worker no. "<<i<<", Task "<<j<<"["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"], NextTask "<<k<<"["<<next_ix_min<<","<<next_ix_max<<"] ["<<next_iy_min<<","<<next_iy_max<<"] ==> isAdjacentInX? "<<isAdjacentInX<<", isAdjacentInY? "<<isAdjacentInY;
-				if(m_procId==MASTER_ID) INFO_LOG(ss.str());
-				
-				if(isAdjacent || isOverlapping) {
-					(m_taskDataPerWorkers[i][j]->neighborTaskId).push_back(k);
-					(m_taskDataPerWorkers[i][k]->neighborTaskId).push_back(j);
-					(m_taskDataPerWorkers[i][j]->neighborWorkerId).push_back(i);
-					(m_taskDataPerWorkers[i][k]->neighborWorkerId).push_back(i);
-				}
-				*/
 			}//end loop next task in worker
 
 
@@ -3203,31 +3060,6 @@ int SFinder::PrepareWorkerTasks()
 						task->AddNeighborInfo(t,s);
 						task_N->AddNeighborInfo(j,i);
 					}
-
-					/*
-					long int next_ix_min= m_taskDataPerWorkers[s][t]->ix_min;
-					long int next_ix_max= m_taskDataPerWorkers[s][t]->ix_max;
-					long int next_iy_min= m_taskDataPerWorkers[s][t]->iy_min;
-					long int next_iy_max= m_taskDataPerWorkers[s][t]->iy_max;
-				
-					bool isAdjacentInX= (ix_max==next_ix_min-1 || ix_min==next_ix_max+1 || (ix_min==next_ix_min && ix_max==next_ix_max));
-					bool isAdjacentInY= (iy_max==next_iy_min-1 || iy_min==next_iy_max+1 || (iy_min==next_iy_min && iy_max==next_iy_max));
-					bool isOverlappingInX= ( (next_ix_min>=ix_min && next_ix_min<=ix_max) || (next_ix_max>=ix_min && next_ix_max<=ix_max) );
-					bool isOverlappingInY= ( (next_iy_min>=iy_min && next_iy_min<=iy_max) || (next_iy_max>=iy_min && next_iy_max<=iy_max) );
-					bool isAdjacent= isAdjacentInX && isAdjacentInY;
-					bool isOverlapping= isOverlappingInX && isOverlappingInY;
-
-					std::stringstream ss;	
-					ss<<"[PROC "<<m_procId<<"] - Worker no. "<<i<<", Task "<<j<<", NextWorker no. "<<s<<", NextTask "<<t<<"["<<next_ix_min<<","<<next_ix_max<<"] ["<<next_iy_min<<","<<next_iy_max<<"] ==> isAdjacentInX? "<<isAdjacentInX<<", isAdjacentInY? "<<isAdjacentInY;
-					if(m_procId==MASTER_ID) INFO_LOG(ss.str());
-
-					if(isAdjacent || isOverlapping) {
-						(m_taskDataPerWorkers[i][j]->neighborTaskId).push_back(t);
-						(m_taskDataPerWorkers[s][t]->neighborTaskId).push_back(j);
-						(m_taskDataPerWorkers[i][j]->neighborWorkerId).push_back(s);
-						(m_taskDataPerWorkers[s][t]->neighborWorkerId).push_back(i);
-					}
-					*/
 
 				}//end loop tasks in next worker
 			}//end loop workers 
@@ -3507,19 +3339,8 @@ int SFinder::MergeTaskData()
 				m_ymin= iy_min;
 				m_ymax= iy_max;
 
-				//double x_min= m_taskDataPerWorkers[i][j]->x_min;
-				//double x_max= m_taskDataPerWorkers[i][j]->x_max;
-				//double y_min= m_taskDataPerWorkers[i][j]->y_min;
-				//double y_max= m_taskDataPerWorkers[i][j]->y_max;
-				//m_xmin= x_min;
-				//m_xmax= x_max;
-				//m_ymin= y_min;
-				//m_ymax= y_max;
-
-				
 				if(m_TaskInfoTree) m_TaskInfoTree->Fill();
 
-				//ss<<"Task no. "<<j<<", PixelRange["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"], PhysCoordRange["<<x_min<<","<<x_max<<"] ["<<y_min<<","<<y_max<<"], ";
 				ss<<"Task no. "<<j<<", PixelRange["<<ix_min<<","<<ix_max<<"] ["<<iy_min<<","<<iy_max<<"], ";
 			}//end loop tasks
 			INFO_LOG(ss.str());			
@@ -3572,6 +3393,168 @@ int SFinder::MergeTaskData()
 	return 0;
 
 }//close MergeTaskData()
+
+
+int SFinder::MergeTaskSources(TaskData* taskData)
+{
+	//Check task data
+	if(!taskData){
+		ERROR_LOG("[PROC "<<m_procId<<"] - Null ptr to task data given!");
+		return -1;
+	}
+
+	//## Return if there are no sources to be merged
+	if( (taskData->sources).empty() ){
+		DEBUG_LOG("[PROC "<<m_procId<<"] - No task sources to be merged, nothing to be done...");
+		return 0;
+	}
+
+	INFO_LOG("[PROC "<<m_procId<<"] - Fill list of sources to be merged and fill corresponding graph data struct...");
+	Graph mergedSourceGraph;
+	std::vector<bool> isMergeableSource;
+	for(size_t i=0;i<(taskData->sources).size();i++){
+		mergedSourceGraph.AddVertex();
+		isMergeableSource.push_back(false);
+	}
+
+	
+	//## Find adjacent sources	
+	INFO_LOG("[PROC "<<m_procId<<"] - Finding adjacent/overlapping sources (#"<<mergedSourceGraph.GetNVertexes()<<") ...");
+	
+	for(size_t i=0;i<(taskData->sources).size()-1;i++){
+		Source* source= (taskData->sources)[i];
+		int type= source->Type;
+		bool isCompactSource= (type==Source::eCompact || type==Source::ePointLike);
+		bool isExtendedSource= (type==Source::eExtended || type==Source::eCompactPlusExtended);
+
+		//Loop neighbors
+		for(size_t j=i+1;j<(taskData->sources).size();j++){	
+			Source* source_neighbor= (taskData->sources)[j];
+			int type_neighbor= source_neighbor->Type;
+			bool isCompactSource_neighbor= (type_neighbor==Source::eCompact || type_neighbor==Source::ePointLike);
+			bool isExtendedSource_neighbor= (type_neighbor==Source::eExtended || type_neighbor==Source::eCompactPlusExtended);
+
+			//Check if both sources are compact and if they are allowed to be merged
+			if(isCompactSource && isCompactSource_neighbor && !m_mergeCompactSources){			
+				DEBUG_LOG("[PROC "<<m_procId<<"] - Skip merging as both sources (i,j)=("<<i<<","<<j<<") are compact and merging among compact sources is disabled...");
+				continue;
+			}
+	
+			//Check if both sources are extended or if one is extended and the other compact and if they are allowed to be merged
+			if(isExtendedSource && isExtendedSource_neighbor && !m_mergeExtendedSources){			
+				DEBUG_LOG("[PROC "<<m_procId<<"] - Skip merging as both sources (i,j)=("<<i<<","<<j<<") are extended and merging among extended sources is disabled...");
+				continue;
+			}
+			if( ((isCompactSource && isExtendedSource_neighbor) || (isExtendedSource && isCompactSource_neighbor)) && !m_mergeExtendedSources){			
+				DEBUG_LOG("[PROC "<<m_procId<<"] - Skip merging between sources (i,j)=("<<i<<","<<j<<") as merging among extended and compact sources is disabled...");
+				continue;
+			}
+		
+			//Check is sources are adjacent
+			//NB: This is time-consuming (N1xN2 more or less)!!!
+			bool areAdjacentSources= source->IsAdjacentSource(source_neighbor);
+			if(!areAdjacentSources) continue;
+
+			//If they are adjacent add linking in graph
+			INFO_LOG("[PROC "<<m_procId<<"] - Sources (i,j)=("<<i<<","<<j<<") are adjacent and selected for merging...");
+			mergedSourceGraph.AddEdge(i,j);
+			isMergeableSource[i]= true;
+			isMergeableSource[j]= true;
+		}//end loop sources
+	}//end loop sources
+
+	//## Add to merged collection all sources not mergeable
+	//## NB: If sources are not to be merged each other, add to merged collection 
+	std::vector<Source*> sources_merged;
+	for(size_t i=0;i<(taskData->sources).size();i++){
+		int type= (taskData->sources)[i]->Type;
+		bool isMergeable= isMergeableSource[i];
+		bool isCompactSource= (type==Source::eCompact || type==Source::ePointLike);
+		bool isExtendedSource= (type==Source::eExtended || type==Source::eCompactPlusExtended);		
+		if(isMergeable) {	
+			if(m_mergeCompactSources && isCompactSource) continue;
+			if(m_mergeExtendedSources && isExtendedSource) continue;
+		}
+		Source* merged_source= new Source;
+		*merged_source= *((taskData->sources)[i]);
+		sources_merged.push_back(merged_source);
+	}
+
+	//## Find all connected components in graph corresponding to sources to be merged
+	INFO_LOG("[PROC "<<m_procId<<"] - Find all connected components in graph corresponding to sources to be merged...");
+	std::vector<std::vector<int>> connected_source_indexes;
+	mergedSourceGraph.GetConnectedComponents(connected_source_indexes);
+	INFO_LOG("[PROC "<<m_procId<<"] - #"<<connected_source_indexes.size()<<"/"<<(taskData->sources).size()<<" sources will be left after merging...");
+		
+	//## Now merge the sources
+	std::vector<int> sourcesToBeRemoved;
+	bool copyPixels= true;//create memory for new pixels
+	bool checkIfAdjacent= false;//already done before
+	bool sumMatchingPixels= false;
+	bool computeStatPars= false;//do not compute stats& pars at each merging
+	bool computeMorphPars= false;
+	bool computeRobustStats= true;
+	bool forceRecomputing= true;//need to re-compute moments because pixel flux of merged sources are summed up
+	
+	INFO_LOG("[PROC "<<m_procId<<"] - Merging sources and adding them to collection...");
+	for(size_t i=0;i<connected_source_indexes.size();i++){
+		if(connected_source_indexes[i].empty()) continue;
+
+		//Get source id=0 of this component
+		int index= connected_source_indexes[i][0];
+		Source* source= (taskData->sources)[index];
+		sourcesToBeRemoved.push_back(index);
+
+		//Create a new source which merges the two
+		Source* merged_source= new Source;
+		*merged_source= *source;
+
+		//Merge other sources in the group if any 
+		int nMerged= 0;
+		
+		for(size_t j=1;j<connected_source_indexes[i].size();j++){
+			int index_adj= connected_source_indexes[i][j];
+			Source* source_adj= (taskData->sources)[index_adj];
+				
+			int status= merged_source->MergeSource(source_adj,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars,sumMatchingPixels);
+			if(status<0){
+				WARN_LOG("[PROC "<<m_procId<<"] - Failed to merge sources (i,j)=("<<index<<","<<index_adj<<"), skip to next...");
+				continue;
+			}
+			nMerged++;
+
+			//Add this source to the list of edge sources to be removed
+			sourcesToBeRemoved.push_back(index_adj);
+
+		}//end loop of sources to be merged in this component
+
+		//If at least one was merged recompute stats & pars of merged source
+		if(nMerged>0) {
+			DEBUG_LOG("[PROC "<<m_procId<<"] - Recomputing stats & moments of merged source in merge group "<<i<<" after #"<<nMerged<<" merged source...");
+			if(merged_source->ComputeStats(computeRobustStats,forceRecomputing)<0){
+				WARN_LOG("[PROC "<<m_procId<<"] - Failed to compute stats for merged source in merge group "<<i<<"...");
+				continue;
+			}
+			if(merged_source->ComputeMorphologyParams()<0){
+				WARN_LOG("[PROC "<<m_procId<<"] - Failed to compute morph pars for merged source in merge group "<<i<<"...");
+				continue;
+			}
+		}//close if
+
+		//Add merged source to collection
+		sources_merged.push_back(merged_source);
+
+	}//end loop number of components
+
+	INFO_LOG("[PROC "<<m_procId<<"] - #"<<sources_merged.size()<<" sources present in merged collection...");
+	
+	//## Clear task collection and replace with merged collection
+	taskData->ClearSources();
+	(taskData->sources).insert( (taskData->sources).end(),sources_merged.begin(),sources_merged.end());		
+	
+	return 0;
+
+}//close MergeTaskSources()
 
 
 int SFinder::MergeSourcesAtEdge()

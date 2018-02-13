@@ -265,6 +265,11 @@ class SFinder : public TObject {
 		*/
 		int MergeSourcesAtEdge();
 
+		/**
+		* \brief Merge task sources
+		*/
+		int MergeTaskSources(TaskData* taskData);
+
 	public:
 		
 		
@@ -346,6 +351,9 @@ class SFinder : public TObject {
 		double m_TileStepSizeX;
 		double m_TileStepSizeY;
 		bool m_mergeSourcesAtEdge;
+		bool m_mergeSources;
+		bool m_mergeExtendedSources;
+		bool m_mergeCompactSources;	
 
 		//Bkg computation
 		ImgBkgData* m_BkgData;
@@ -364,6 +372,7 @@ class SFinder : public TObject {
 		//Residual map
 		Image* m_ResidualImg;
 		ImgBkgData* m_ResidualBkgData;
+		double m_DilateZBrightThr;
 		double m_DilateZThr;
 		bool m_DilateNestedSources;
 		int m_DilateKernelSize;
@@ -383,7 +392,6 @@ class SFinder : public TObject {
 		//Compact source search
 		bool m_SearchCompactSources;
 		int m_NMinPix;
-		//double m_SeedBrightThr;
 		double m_SeedThr;
 		double m_MergeThr;
 		bool m_MergeBelowSeed;
@@ -411,6 +419,8 @@ class SFinder : public TObject {
 		double m_psEllipseAreaRatioMaxThr;
 		bool m_useMaxNPixCut;
 		double m_psMaxNPix;
+		bool m_useNBeamsCut;
+		double m_psNBeamsThr;
 
 		//Source fitting
 		bool m_fitSources;
@@ -437,9 +447,7 @@ class SFinder : public TObject {
 		int m_peakShiftTolerance;
 		double m_peakZThrMin;
 		
-		//double m_deblendCurvThr;
-		//double m_deblendComponentMinNPix;
-		
+
 		//Saliency computation
 		Image* m_SaliencyImg;
 		double m_SaliencyThrFactor;
@@ -465,6 +473,7 @@ class SFinder : public TObject {
 		int m_wtScaleSearchMin;
 		int m_wtScaleSearchMax;
 		int m_activeContourMethod;
+		
 
 		//Superpixel options
 		int m_spSize;

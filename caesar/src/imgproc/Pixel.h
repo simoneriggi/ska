@@ -229,6 +229,12 @@ struct PixelMatcher {
 	}
 };//close PixelMatcher()
 
+struct PixelCompareByFlux {
+	bool operator()(const Pixel* lhs, const Pixel* rhs) const { 
+		return lhs->S < rhs->S;
+	}
+};//close PixelCompareByFlux()
+
 
 
 #ifdef __MAKECINT__
