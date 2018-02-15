@@ -54,6 +54,7 @@ int DrawImagingPerformances(std::string fileName){
 	double S_rec;
 	double BkgAvg;
 	double S_bkg;
+	double S_bkg_mean;
 	double beamArea;
 	double Npix_true;
 	double Npix_rec;
@@ -68,6 +69,7 @@ int DrawImagingPerformances(std::string fileName){
 	data->SetBranchAddress("beamArea",&beamArea);
 	data->SetBranchAddress("BkgAvg",&BkgAvg);	
 	data->SetBranchAddress("S_bkg",&S_bkg);
+	data->SetBranchAddress("S_bkg_mean",&S_bkg_mean);
 	data->SetBranchAddress("Npix_true",&Npix_true);
 	data->SetBranchAddress("Npix_rec",&Npix_rec);
 
@@ -110,11 +112,25 @@ int DrawImagingPerformances(std::string fileName){
 		data->GetEntry(i);
 
 		//Get info
-		//double fluxDensity_true= S_true;
 		double fluxDensity_true= S/beamArea;
 		double lgFlux_true= log10(fluxDensity_true);
-		double fluxRatio= S_rec/S;
-		//double fluxRatio= (S_rec-S_bkg)/S;	
+		
+		double bkg= 0;
+		if(type==Source::eCompact || type==Source::ePointLike) {
+			bkg= S_bkg;
+		}
+		else if(type==Source::eExtended){
+			bkg= S_bkg;
+		}
+		else if(type==Source::eCompactPlusExtended){
+			bkg= Npix_rec*BkgAvg;
+		}	
+		else{
+			bkg= 0;
+		}
+			
+		//double fluxRatio= (S_rec-bkg)/S;
+		double fluxRatio= (S_rec-bkg-S)/S;				
 		int gBin= dummyHisto->FindBin(lgFlux_true);
 		if(dummyHisto->IsBinOverflow(gBin) || dummyHisto->IsBinUnderflow(gBin)){
 			WARN_LOG("Overflow/underflow flux bin (S_true="<<S_true<<", S="<<S<<", S_rec="<<S_rec<<", fluxDensity_true="<<fluxDensity_true<<"), skip entry...");
@@ -221,7 +237,7 @@ int DrawImagingPerformances(std::string fileName){
 	double fluxRatio_max= 10;
 
 	//Reference line
-	TLine* refLine_fluxAccuracy= new TLine(LgFluxBins[0],1,LgFluxBins[LgFluxBins.size()-1],1);
+	TLine* refLine_fluxAccuracy= new TLine(LgFluxBins[0],0,LgFluxBins[LgFluxBins.size()-1],0);
 	refLine_fluxAccuracy->SetLineColor(kBlack);
 	refLine_fluxAccuracy->SetLineStyle(kDashed);
 
@@ -230,20 +246,20 @@ int DrawImagingPerformances(std::string fileName){
 
 	TH2D* FluxAccuracyPlotBkg= new TH2D("FluxAccuracyPlotBkg","",100,LgFluxBins[0]-0.5,LgFluxBins[LgFluxBins.size()-1]+0.5,100,fluxRatio_min,fluxRatio_max);
 	FluxAccuracyPlotBkg->GetXaxis()->SetTitle("log_{10}(S_{true}/Jy)");
-	FluxAccuracyPlotBkg->GetYaxis()->SetTitle("S_{rec}/S_{true}");
+	FluxAccuracyPlotBkg->GetYaxis()->SetTitle("S_{rec}/S_{true}-1");
 	FluxAccuracyPlotBkg->SetStats(0);
 	FluxAccuracyPlotBkg->Draw();
 
 	fluxPoints_compact->SetMarkerSize(1);
 	fluxPoints_compact->SetMarkerStyle(1);
-	fluxPoints_compact->SetMarkerColor(kBlack);
-	fluxPoints_compact->SetLineColor(kBlack);
+	fluxPoints_compact->SetMarkerColor(kRed-10);
+	fluxPoints_compact->SetLineColor(kRed-10);
 	fluxPoints_compact->Draw("P same");
 	
 	fluxAccuracy_compact->SetMarkerSize(1.3);
 	fluxAccuracy_compact->SetMarkerStyle(8);
-	fluxAccuracy_compact->SetMarkerColor(kBlack);
-	fluxAccuracy_compact->SetLineColor(kBlack);
+	fluxAccuracy_compact->SetMarkerColor(kRed);
+	fluxAccuracy_compact->SetLineColor(kRed);
 	fluxAccuracy_compact->Draw("ep same");
 
 	refLine_fluxAccuracy->Draw("same");
@@ -254,20 +270,20 @@ int DrawImagingPerformances(std::string fileName){
 
 	TH2D* FluxAccuracyPlotBkg_extended= new TH2D("FluxAccuracyPlotBkg_extended","",100,LgFluxBins[0]-0.5,LgFluxBins[LgFluxBins.size()-1]+0.5,100,fluxRatio_min,fluxRatio_max);
 	FluxAccuracyPlotBkg_extended->GetXaxis()->SetTitle("log_{10}(S_{true}/Jy)");
-	FluxAccuracyPlotBkg_extended->GetYaxis()->SetTitle("S_{rec}/flux");
+	FluxAccuracyPlotBkg_extended->GetYaxis()->SetTitle("S_{rec}/S_{true}-1");
 	FluxAccuracyPlotBkg_extended->SetStats(0);
 	FluxAccuracyPlotBkg_extended->Draw();
 
 	fluxPoints_extended->SetMarkerSize(1);
 	fluxPoints_extended->SetMarkerStyle(1);
-	fluxPoints_extended->SetMarkerColor(kBlack);
-	fluxPoints_extended->SetLineColor(kBlack);
+	fluxPoints_extended->SetMarkerColor(kGreen+1);
+	fluxPoints_extended->SetLineColor(kGreen+1);
 	fluxPoints_extended->Draw("P same");
 
 	fluxAccuracy_extended->SetMarkerSize(1.3);
 	fluxAccuracy_extended->SetMarkerStyle(8);
-	fluxAccuracy_extended->SetMarkerColor(kBlack);
-	fluxAccuracy_extended->SetLineColor(kBlack);
+	fluxAccuracy_extended->SetMarkerColor(kGreen+1);
+	fluxAccuracy_extended->SetLineColor(kGreen+1);
 	fluxAccuracy_extended->Draw("ep same");
 
 	refLine_fluxAccuracy->Draw("same");
@@ -278,20 +294,20 @@ int DrawImagingPerformances(std::string fileName){
 
 	TH2D* FluxAccuracyPlotBkg_compactextended= new TH2D("FluxAccuracyPlotBkg_compactextended","",100,LgFluxBins[0]-0.5,LgFluxBins[LgFluxBins.size()-1]+0.5,100,fluxRatio_min,fluxRatio_max);
 	FluxAccuracyPlotBkg_compactextended->GetXaxis()->SetTitle("log_{10}(S_{true}/Jy)");
-	FluxAccuracyPlotBkg_compactextended->GetYaxis()->SetTitle("S_{rec}/S_{true}");
+	FluxAccuracyPlotBkg_compactextended->GetYaxis()->SetTitle("S_{rec}/S_{true}-1");
 	FluxAccuracyPlotBkg_compactextended->SetStats(0);
 	FluxAccuracyPlotBkg_compactextended->Draw();
 
 	fluxPoints_compactextended->SetMarkerSize(1);
 	fluxPoints_compactextended->SetMarkerStyle(1);
-	fluxPoints_compactextended->SetMarkerColor(kBlack);
-	fluxPoints_compactextended->SetLineColor(kBlack);
+	fluxPoints_compactextended->SetMarkerColor(kBlue);
+	fluxPoints_compactextended->SetLineColor(kBlue);
 	fluxPoints_compactextended->Draw("P same");
 
 	fluxAccuracy_compactextended->SetMarkerSize(1.3);
 	fluxAccuracy_compactextended->SetMarkerStyle(8);
-	fluxAccuracy_compactextended->SetMarkerColor(kBlack);
-	fluxAccuracy_compactextended->SetLineColor(kBlack);
+	fluxAccuracy_compactextended->SetMarkerColor(kBlue);
+	fluxAccuracy_compactextended->SetLineColor(kBlue);
 	fluxAccuracy_compactextended->Draw("ep same");
 
 	refLine_fluxAccuracy->Draw("same");
@@ -309,8 +325,8 @@ int DrawImagingPerformances(std::string fileName){
 	
 	fluxPoints_compact->SetMarkerSize(1);
 	fluxPoints_compact->SetMarkerStyle(1);
-	fluxPoints_compact->SetMarkerColor(kBlack);
-	fluxPoints_compact->SetLineColor(kBlack);
+	fluxPoints_compact->SetMarkerColor(kRed-10);
+	fluxPoints_compact->SetLineColor(kRed-10);
 	//fluxPoints_compact->Draw("P same");
 
 	fluxPoints_extended->SetMarkerSize(1);
@@ -328,8 +344,8 @@ int DrawImagingPerformances(std::string fileName){
 
 	fluxAccuracy_compact->SetMarkerSize(1.3);
 	fluxAccuracy_compact->SetMarkerStyle(8);
-	fluxAccuracy_compact->SetMarkerColor(kBlack);
-	fluxAccuracy_compact->SetLineColor(kBlack);
+	fluxAccuracy_compact->SetMarkerColor(kRed);
+	fluxAccuracy_compact->SetLineColor(kRed);
 	fluxAccuracy_compact->Draw("ep same");
 
 

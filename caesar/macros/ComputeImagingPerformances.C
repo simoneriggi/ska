@@ -20,8 +20,8 @@
 using namespace Caesar;
 
 //Bkg options
-int bkgEstimator= eMedianClippedBkg;
-//int bkgEstimator= eMedianBkg;
+//int bkgEstimator= eMedianClippedBkg;
+int bkgEstimator= eMedianBkg;
 int bkgBoxBeamFactor= 30;
 double bkgGridStepSize= 0.2;
 bool use2ndPass= true;
@@ -56,6 +56,7 @@ bool correctRecFlux=false;
 double beamArea;
 double BkgAvg;
 double S_bkg;
+double S_bkg_mean;
 
 //Methods
 void Init();
@@ -237,7 +238,11 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 		sources.clear();
 		return -1;
 	}
-	
+
+	//## Compute bkg stats
+	(bkgData->BkgMap)->ComputeStats(true);
+	BkgAvg= (bkgData->BkgMap)->GetPixelStats()->median;
+
 	//## Compare sources
 	for(size_t i=0;i<sources.size();i++){
 		if(i%100==0) INFO_LOG("#"<<i+1<<"/"<<sources.size()<<" true sources read...");
@@ -296,7 +301,7 @@ int AnalyzeData(std::string fileName,std::string fileName_rec){
 		Y0_rec= rec_source->Y0;
 		S_rec= rec_source->GetS();
 		Smax_rec= rec_source->GetSmax();
-		BkgAvg= StatsUtils::GetMedianFast(bkgValues);		
+		S_bkg_mean= StatsUtils::GetMedianFast(bkgValues);		
 
 		//Correct flux from Jy/beam to Jy
 		if(correctRecFlux){
@@ -359,6 +364,7 @@ void Init(){
 	outputTree->Branch("beamArea",&beamArea,"beamArea/D");
 	outputTree->Branch("BkgAvg",&BkgAvg,"BkgAvg/D");
 	outputTree->Branch("S_bkg",&S_bkg,"S_bkg/D");
+	outputTree->Branch("S_bkg_mean",&S_bkg_mean,"S_bkg_mean/D");
 
 }//close Init()
 
