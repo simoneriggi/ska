@@ -372,7 +372,8 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 
 		//Normalize saliency map
 		INFO_LOG("Normalizing saliency map @ reso "<<reso<<" (step="<<resoStep<<"/"<<nReso<<")");
-		Image* salMap_norm= salMap->GetNormalizedImage("LINEAR",NormMin,NormMax);
+		bool skipEmptyBins= false;
+		Image* salMap_norm= salMap->GetNormalizedImage("LINEAR",NormMin,NormMax,skipEmptyBins);
 		if(salMap) {
 			delete salMap;	
 			salMap= 0;
@@ -385,17 +386,24 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 		//Compute stats		
 		INFO_LOG("Computing stats for normalized saliency map @ reso "<<reso<<" (step="<<resoStep<<")");
 		salMap_norm->ComputeStats(true,false,false);
-		double salMedian= (salMap_norm->GetPixelStats())->median;
+		ImgStats* stats= salMap_norm->GetPixelStats();
+		double salMedian= stats->median;	
+		double salMin= salMap_norm->GetMinimum();
+		double salMax= salMap_norm->GetMaximum();
 		double medianThr= saliencyThrFactor*salMedian;
 		double salThr= medianThr;
 		salMapsThresholds.push_back(salThr);
 
-		INFO_LOG("Saliency map norm stats @ reso "<<reso<<" (median="<<salMedian<<", salThr="<<salThr<<")");
+		INFO_LOG("Saliency map norm stats @ reso "<<reso<<" (median="<<salMedian<<", min/max="<<salMin<<"/"<<salMax<<", salThr="<<salThr<<")");
 		//salMap_norm->PrintStats();
 
 	}//end loop reso
 	
 	//Normalize final saliency
+	if(!saliencyImg_mean->HasStats()){
+		INFO_LOG("Computing stats of mean saliency map...");
+		saliencyImg_mean->ComputeStats(true,false,true);
+	}
 	if(nReso>1){
 		saliencyImg_mean->Scale(1./(double)nReso);
 	}
@@ -417,12 +425,17 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 			double imgBinContent= img->GetBinContent(i,j);	
 			if(imgBinContent==0) continue;
 			bool isPositiveExcess= (imgBinContent>imgMedianThr);
-			double wmin= TMath::Infinity();//1.e+99;
-			double wmax= -TMath::Infinity();//-1.e+99;
+			double wmin= TMath::Infinity();
+			double wmax= -TMath::Infinity();
 			int saliencyMultiplicity= 0;
 			for(size_t k=0;k<salMaps.size();k++){
 				double thisw= salMaps[k]->GetBinContent(i,j);
 				double thisThreshold= salMapsThresholds[k];
+
+				if(fabs(thisw)==0){
+					WARN_LOG("Saliency for pixel ("<<i<<","<<j<<") is 0!");
+				}
+
 				if(thisw>thisThreshold) saliencyMultiplicity++;
 				if(thisw<wmin) wmin= thisw;
 				if(thisw>=wmax) wmax= thisw;
@@ -431,6 +444,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 			if(fabs(wmin)==TMath::Infinity() || fabs(wmax)==TMath::Infinity()){
 				WARN_LOG("Saliency min/max over scales for pixel ("<<i<<","<<j<<") is inf!");
 			}
+			
 
 			if(saliencyMultiplicity>=salientMultiplicityThr){
 				if(isPositiveExcess) saliencyImg->SetBinContent(i,j,wmax);
@@ -491,6 +505,7 @@ Image* SaliencyFilter::ComputeMultiResoSaliencyMap(Image* img,int resoMin,int re
 		for(long int j=0;j<saliencyMap->GetNy();j++){
 			double imgBinContent= img->GetBinContent(i,j);
 			if(imgBinContent==0){
+				WARN_LOG("Image pixel ("<<i<<","<<j<<") is empty, setting 0 in saliency...");
 				saliencyMap->SetBinContent(i,j,0.);
 			}
 		}

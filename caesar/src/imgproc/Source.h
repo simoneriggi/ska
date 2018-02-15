@@ -65,18 +65,32 @@ struct SourceOverlapMatchPars {
 	SourceOverlapMatchPars(){
 		ResetPars();
 	}
+
 	//Param constructor
 	SourceOverlapMatchPars(long int _index,float _fraction, float _fraction_rec):
 		index(_index), overlapFraction(_fraction), overlapFraction_rec(_fraction_rec)
 	{}
 	
 	//Reset pars
-	void ResetPars(){index=-1; overlapFraction=0; overlapFraction_rec=0; overlappingSourceIndexes.clear();}
+	void ResetPars(){
+		index=-1; 
+		overlapFraction=0; 
+		overlapFraction_rec=0; 
+		overlappingSourceIndexes.clear();
+		Sratio= 0;
+		Sratio_rec= 0;
+		dX= 0;
+		dY= 0;
+	}
 
 	//Pars
 	long int index;//index of match source in collection
 	float overlapFraction;//overlap fraction with respect to true source (>0)
 	float overlapFraction_rec;//overlap fraction with respect to rec source (>0)
+	float Sratio;//ratio of integrated flux of overlap pixels over total flux of true source
+	float Sratio_rec;//ratio of integrated flux of overlap pixels over total flux of rec source
+	float dX;//difference (in pixels) between signal-weighted centroids of true and rec sources in x coordinate (rec-true)
+	float dY;//difference (in pixels) between signal-weighted centroids of true and rec sources in y coordinate (rec-true)
 	std::vector<long int> overlappingSourceIndexes;//list of source index in collection overlapping with this source
 
 };//close SourceOverlapMatchPars struct
@@ -313,9 +327,17 @@ class Source : public Blob {
 		int MergeSource(Source* aSource,bool copyPixels=false,bool checkIfAdjacent=true,bool computeStatPars=true,bool computeMorphPars=true,bool sumMatchingPixels=false);
 
 		/**
+		* \brief Get collection of matching pixels between this and another source
+		*/
+		long int GetNMatchingPixels(std::vector<Pixel*>& matching_pixels,Source* aSource,bool sorted=false);
+
+		/**
 		* \brief Get number of matching pixels between this and another source
 		*/
-		long int GetNMatchingPixels(Source* aSource);
+		long int GetNMatchingPixels(Source* aSource,bool sorted=false){
+			std::vector<Pixel*> matching_pixels;
+			return GetNMatchingPixels(matching_pixels,aSource,sorted);
+		}
 
 		/**
 		* \brief Find source match in a collection by overlapping area

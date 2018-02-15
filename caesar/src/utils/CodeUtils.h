@@ -429,6 +429,23 @@ class CodeUtils : public TObject {
 			else return s.substr(pos+1,s.length()-pos);
 		}
 
+		/**
+		* \brief Extract filename from path
+		*/
+		static std::string ExtractFileNameFromPath(const std::string& s,bool strip_extension=false){
+			char sep = '/';
+   		size_t pos = s.rfind(sep, s.length());
+			std::string filename= "";
+   		if (pos != string::npos) {
+      	filename= s.substr(pos+1, s.length() - pos);
+				if(strip_extension) {
+					std::string filename_noext= ExtractSubString(filename,".");
+					filename= filename_noext;
+				}
+   		}
+   		return filename;
+		}
+
 		// return an evenly spaced 1-d grid of doubles.
 		template <typename T>
 			static std::vector<T> linspace(T first,T last,int len){

@@ -2709,15 +2709,33 @@ int SFinder::SaveDS9RegionFile(){
 		int source_type= m_SourceCollection[k]->Type;
 		bool isAtEdge= m_SourceCollection[k]->IsAtEdge();
 
-		//Set source color
+		//Set source color/tag/...
 		std::string colorStr= "white";
-		if(source_type==Source::eExtended) colorStr= "green";
-		else if(source_type==Source::ePointLike) colorStr= "red";
-		else if(source_type==Source::eCompact) colorStr= "blue";
-		else colorStr= "magenta";
+		std::string tagStr= "unknown";
+		if(source_type==Source::eExtended) {
+			colorStr= "green";
+			tagStr= "extended";
+		}
+		else if(source_type==Source::eCompactPlusExtended) {
+			colorStr= "magenta";
+			tagStr= "extended-compact";
+		}
+		else if(source_type==Source::ePointLike) {
+			colorStr= "red";
+			tagStr= "point-like";
+		}
+		else if(source_type==Source::eCompact) {
+			colorStr= "blue";
+			tagStr= "compact";
+		}
+		else {
+			colorStr= "white";
+			tagStr= "unknown";
+		}
+
 		if(colorStr!=colorStr_last){
 			colorStr_last= colorStr;
-			fprintf(fout,"global color=%s font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n",colorStr.c_str());
+			//fprintf(fout,"global color=%s font=\"helvetica 8 normal\" edit=1 move=1 delete=1 include=1\n",colorStr.c_str());
 		}
 
 		DEBUG_LOG("[PROC "<<m_procId<<"] - Dumping DS9 region info for source no. "<<k<<" ...");
@@ -2729,6 +2747,11 @@ int SFinder::SaveDS9RegionFile(){
 			return -1;
 		}
 
+		//Set source color & tag
+		regionInfo+= std::string(" color=") + colorStr;
+		regionInfo+= std::string(" tag={") + tagStr + std::string("}");
+		
+		//Write source region to file
 		fprintf(fout,"%s\n",regionInfo.c_str());
 	  	
 	}//end loop sources
@@ -3409,7 +3432,7 @@ int SFinder::MergeTaskSources(TaskData* taskData)
 		return 0;
 	}
 
-	INFO_LOG("[PROC "<<m_procId<<"] - Fill list of sources to be merged and fill corresponding graph data struct...");
+	INFO_LOG("[PROC "<<m_procId<<"] - #"<<(taskData->sources).size()<<" sources will be searched for merging ...");
 	Graph mergedSourceGraph;
 	std::vector<bool> isMergeableSource;
 	for(size_t i=0;i<(taskData->sources).size();i++){
@@ -3484,7 +3507,7 @@ int SFinder::MergeTaskSources(TaskData* taskData)
 	INFO_LOG("[PROC "<<m_procId<<"] - Find all connected components in graph corresponding to sources to be merged...");
 	std::vector<std::vector<int>> connected_source_indexes;
 	mergedSourceGraph.GetConnectedComponents(connected_source_indexes);
-	INFO_LOG("[PROC "<<m_procId<<"] - #"<<connected_source_indexes.size()<<"/"<<(taskData->sources).size()<<" sources will be left after merging...");
+	INFO_LOG("[PROC "<<m_procId<<"] - #"<<connected_source_indexes.size()<<"/"<<(taskData->sources).size()<<" selected for merging...");
 		
 	//## Now merge the sources
 	std::vector<int> sourcesToBeRemoved;
@@ -3497,14 +3520,15 @@ int SFinder::MergeTaskSources(TaskData* taskData)
 	bool forceRecomputing= true;//need to re-compute moments because pixel flux of merged sources are summed up
 	
 	INFO_LOG("[PROC "<<m_procId<<"] - Merging sources and adding them to collection...");
-	for(size_t i=0;i<connected_source_indexes.size();i++){
-		if(connected_source_indexes[i].empty()) continue;
 
+	for(size_t i=0;i<connected_source_indexes.size();i++){
+		//Skip empty or single-sources
+		if(connected_source_indexes[i].size()<=1) continue;
+		
 		//Get source id=0 of this component
 		int index= connected_source_indexes[i][0];
 		Source* source= (taskData->sources)[index];
-		sourcesToBeRemoved.push_back(index);
-
+		
 		//Create a new source which merges the two
 		Source* merged_source= new Source;
 		*merged_source= *source;
@@ -3523,18 +3547,23 @@ int SFinder::MergeTaskSources(TaskData* taskData)
 			}
 			nMerged++;
 
-			//Add this source to the list of edge sources to be removed
-			sourcesToBeRemoved.push_back(index_adj);
-
 		}//end loop of sources to be merged in this component
 
 		//If at least one was merged recompute stats & pars of merged source
 		if(nMerged>0) {
+			//Set name
+			TString sname= Form("Smerg%d",i+1);
+			merged_source->SetId(i+1);
+			merged_source->SetName(std::string(sname));
+
+			//Compute stats of merged source
 			DEBUG_LOG("[PROC "<<m_procId<<"] - Recomputing stats & moments of merged source in merge group "<<i<<" after #"<<nMerged<<" merged source...");
 			if(merged_source->ComputeStats(computeRobustStats,forceRecomputing)<0){
 				WARN_LOG("[PROC "<<m_procId<<"] - Failed to compute stats for merged source in merge group "<<i<<"...");
 				continue;
 			}
+
+			//Compute morphology pars of merged source
 			if(merged_source->ComputeMorphologyParams()<0){
 				WARN_LOG("[PROC "<<m_procId<<"] - Failed to compute morph pars for merged source in merge group "<<i<<"...");
 				continue;
@@ -3545,6 +3574,62 @@ int SFinder::MergeTaskSources(TaskData* taskData)
 		sources_merged.push_back(merged_source);
 
 	}//end loop number of components
+
+	/*
+	for(size_t i=0;i<connected_source_indexes.size();i++){
+		//Skip empty or single-sources
+		if(connected_source_indexes[i].empty()) continue;
+		
+		//Get source id=0 of this component
+		int index= connected_source_indexes[i][0];
+		Source* source= (taskData->sources)[index];
+		
+		//Create a new source which merges the two
+		Source* merged_source= new Source;
+		*merged_source= *source;
+
+		//Merge other sources in the group if any 
+		int nMerged= 0;
+		
+		for(size_t j=1;j<connected_source_indexes[i].size();j++){
+			int index_adj= connected_source_indexes[i][j];
+			Source* source_adj= (taskData->sources)[index_adj];
+				
+			int status= merged_source->MergeSource(source_adj,copyPixels,checkIfAdjacent,computeStatPars,computeMorphPars,sumMatchingPixels);
+			if(status<0){
+				WARN_LOG("[PROC "<<m_procId<<"] - Failed to merge sources (i,j)=("<<index<<","<<index_adj<<"), skip to next...");
+				continue;
+			}
+			nMerged++;
+
+		}//end loop of sources to be merged in this component
+
+		//If at least one was merged recompute stats & pars of merged source
+		if(nMerged>0) {
+			//Set name
+			TString sname= Form("Smerg%d",i+1);
+			merged_source->SetId(i+1);
+			merged_source->SetName(std::string(sname));
+
+			//Compute stats of merged source
+			DEBUG_LOG("[PROC "<<m_procId<<"] - Recomputing stats & moments of merged source in merge group "<<i<<" after #"<<nMerged<<" merged source...");
+			if(merged_source->ComputeStats(computeRobustStats,forceRecomputing)<0){
+				WARN_LOG("[PROC "<<m_procId<<"] - Failed to compute stats for merged source in merge group "<<i<<"...");
+				continue;
+			}
+
+			//Compute morphology pars of merged source
+			if(merged_source->ComputeMorphologyParams()<0){
+				WARN_LOG("[PROC "<<m_procId<<"] - Failed to compute morph pars for merged source in merge group "<<i<<"...");
+				continue;
+			}
+		}//close if
+
+		//Add merged source to collection
+		sources_merged.push_back(merged_source);
+
+	}//end loop number of components
+	*/
 
 	INFO_LOG("[PROC "<<m_procId<<"] - #"<<sources_merged.size()<<" sources present in merged collection...");
 	

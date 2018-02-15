@@ -936,6 +936,10 @@ void Image::ResetImgStats(bool resetMoments,bool clearStats){
 
 int Image::ComputeMoments(bool skipNegativePixels){
 
+	//#### DEBUG ####
+	DEBUG_LOG("m_StatMoments min/max (before): "<<m_StatMoments.minVal<<"/"<<m_StatMoments.maxVal);
+	//###############
+
 	//## Recompute stat moments
 	//## NB: If OMP is enabled this is done in parallel and moments are aggregated to return the correct cumulative estimate 
 	bool maskNanInfValues= true;
@@ -943,6 +947,11 @@ int Image::ComputeMoments(bool skipNegativePixels){
 	if(status<0){
 		ERROR_LOG("Failed to compute stat moments!");
 	}
+
+	//#### DEBUG ####
+	DEBUG_LOG("m_StatMoments min/max (after): "<<m_StatMoments.minVal<<"/"<<m_StatMoments.maxVal);
+	//###############
+
 
 	return status;
 
@@ -1086,7 +1095,7 @@ int Image::ComputeStats(bool computeRobustStats,bool skipNegativePixels,bool for
 		
 		auto stop = chrono::steady_clock::now();
 		double elapsed_time= chrono::duration <double, milli> (stop-start).count();
-		INFO_LOG("Image stats computed in "<<elapsed_time<<" ms");
+		DEBUG_LOG("Image stats computed in "<<elapsed_time<<" ms");
 		return 0;
 	}
 

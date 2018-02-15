@@ -237,7 +237,8 @@ const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 			//sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
 		}
 	}
-	sstream<<"# text={S"<<Id<<"}";
+	//sstream<<"# text={S"<<Id<<"}";
+	sstream<<"# text={"<<this->GetName()<<"}";
 
 	if(dumpNestedSourceInfo && m_HasNestedSources){			
 		sstream<<endl;
@@ -253,7 +254,8 @@ const std::string Source::GetDS9Region(bool dumpNestedSourceInfo){
 					//sstream<<(int)contPnt->X()<<" "<<(int)contPnt->Y()<<" ";
 				}
 			}//end loop contours
-			sstream<<"# text={S"<<Id<<"_Nest"<<k<<"}";
+			//sstream<<"# text={S"<<Id<<"_Nest"<<k<<"}";
+			sstream<<"# text={"<<this->GetName()<<"_Nest"<<k<<"}";
 			if(k!=m_NestedSources.size()-1) sstream<<endl;
 		}//end loop nested sources
 	}//close dumpNestedSourceInfo
@@ -285,7 +287,8 @@ const std::string Source::GetDS9FittedEllipseRegion(bool useFWHM)
 		double R2= ellipses[i]->GetR2();
 		double theta= ellipses[i]->GetTheta();
 		//theta-= 90;//DS9 format
-		sstream<<"ellipse "<<x0+1<<" "<<y0+1<<" "<<R1<<" "<<R2<<" "<<theta<<" # text={S"<<Id<<"_"<<i+1<<"}";
+		//sstream<<"ellipse "<<x0+1<<" "<<y0+1<<" "<<R1<<" "<<R2<<" "<<theta<<" # text={S"<<Id<<"_"<<i+1<<"}";
+		sstream<<"ellipse "<<x0+1<<" "<<y0+1<<" "<<R1<<" "<<R2<<" "<<theta<<" # text={"<<this->GetName()<<"_"<<i+1<<"}";
 		if(i!=ellipses.size()-1) sstream<<endl;
 	}//end loop ellipses
 	
@@ -332,7 +335,8 @@ const std::string Source::GetDS9EllipseRegion(bool dumpNestedSourceInfo){
 				//double BBoxAngle= nestedContours[i]->BoundingBoxAngle;	
 				sstream<<EllX+1<<" "<<EllY+1<<" "<<(EllMajAxis/2)<<" "<<(EllMinAxis/2)<<" "<<(EllRotAxis)<<" ";
 			}//end loop contours
-			sstream<<"# text={S"<<Id<<"_Nest"<<k<<"}";
+			//sstream<<"# text={S"<<Id<<"_Nest"<<k<<"}";
+			sstream<<"# text={"<<this->GetName()<<"_Nest"<<k<<"}";
 			if(k!=m_NestedSources.size()-1) sstream<<endl;
 		}//end loop nested sources
 	}//close dumpNestedSourceInfo
@@ -385,7 +389,10 @@ bool Source::IsAdjacentSource(Source* aSource){
 
 }//close IsAdjacentSource()
 
-long int Source::GetNMatchingPixels(Source* aSource){
+long int Source::GetNMatchingPixels(std::vector<Pixel*>& matching_pixels,Source* aSource,bool sorted)
+{
+	//Initialize empty list of matching pixels
+	matching_pixels.clear();
 
 	//Check input sources
 	if(!aSource){
@@ -398,9 +405,8 @@ long int Source::GetNMatchingPixels(Source* aSource){
 		DEBUG_LOG("This or given source have no pixels, return 0.");
 		return 0;
 	}	
-
 	
-	//Check if bouding boxes are overlapping
+	//Check if bounding boxes are overlapping
 	//NB: If not skip the adjacency check
 	bool areBoundingBoxesOverlapping= CheckBoxOverlapping(aSource);
 	if(!areBoundingBoxesOverlapping){
@@ -408,24 +414,23 @@ long int Source::GetNMatchingPixels(Source* aSource){
 		return 0;		
 	}
 
-	//Find differences in pixel collections
-	//Pixel found in both collections are not merged to this source
-	//First sort pixel collections (MANDATORY FOR set_difference() routine)
-	std::sort(m_Pixels.begin(), m_Pixels.end(),PixelMatcher());
-	std::sort((aSource->m_Pixels).begin(), (aSource->m_Pixels).end(),PixelMatcher());
-	
-	std::vector<Pixel*> pixelsToBeMerged;
+	//Find intersection in pixel collections
+	//NB: Sort pixel collections is mandatory for set_intersection()
+	if(!sorted){
+		std::sort(m_Pixels.begin(), m_Pixels.end(),PixelMatcher());
+		std::sort((aSource->m_Pixels).begin(), (aSource->m_Pixels).end(),PixelMatcher());
+	}
+
 	std::set_intersection (
 		(aSource->m_Pixels).begin(), (aSource->m_Pixels).end(), 
 		m_Pixels.begin(), m_Pixels.end(),
-		std::back_inserter(pixelsToBeMerged),
+		std::back_inserter(matching_pixels),
 		PixelMatcher()
 	);
   	
-	//If no pixels are to be merged (e.g. all pixels overlapping) return
-	long int nMergedPixels= static_cast<long int>(pixelsToBeMerged.size());
+	long int nMatchingPixels= static_cast<long int>(matching_pixels.size());
 
-	return nMergedPixels;
+	return nMatchingPixels;
 
 }//close GetNMatchingPixels()
 
@@ -462,19 +467,48 @@ bool Source::FindSourceMatchByOverlapArea(SourceOverlapMatchPars& pars, const st
 
 	for(size_t j=0;j<sources.size();j++){
 		long int NPix_rec= sources[j]->GetNPixels();
-		long int NMatchingPixels= this->GetNMatchingPixels(sources[j]);
+		double S_rec= sources[j]->GetS();	
+		double Sx_rec= sources[j]->GetSx(); 
+		double Sy_rec= sources[j]->GetSy();		
+
+		std::vector<Pixel*> matching_pixels;
+		long int NMatchingPixels= this->GetNMatchingPixels(matching_pixels,sources[j]);
 		double f= (double)(NMatchingPixels)/(double)(NPix);
 		double f_rec= (double)(NMatchingPixels)/(double)(NPix_rec);		
 
-		//Add match source to tmp matches
-		if(NMatchingPixels>0){
-			overlappingSourceIndexes.push_back(j);
-			if( f>=matchOverlapThr && f_rec>=matchOverlapThr ){
-				tmpMatchPars.push_back(SourceOverlapMatchPars(j,f,f_rec));
+		//Skip if no match is found
+		if(NMatchingPixels<=0) continue;
+
+		//Store overlapping source index
+		overlappingSourceIndexes.push_back(j);
+			
+		//Check if overlap is above required threshold.
+		//If so compute and store overlap info
+		if( f>=matchOverlapThr && f_rec>=matchOverlapThr ){
+			
+			//Compute flux sum of overlapping pixels
+			double S_match= 0.;
+			for (auto item : matching_pixels) S_match+= item->S;	
+
+			//Compute flux ratio overlapping/tot
+			double Sratio= S_match/m_S;	
+			double Sratio_rec= S_match/S_rec;	
 	
-				INFO_LOG("Source "<<this->GetName()<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): found match with source "<<sources[j]->GetName()<<" (X0="<<sources[j]->X0<<", Y0="<<sources[j]->Y0<<", N="<<sources[j]->NPix<<"), NMatchingPixels="<<NMatchingPixels<<", f="<<f<<", f_rec="<<f_rec<<" (t="<<matchOverlapThr<<")");
-			}
+			//Compute difference in position
+			double dX= Sx_rec - m_Sx;
+			double dY= Sy_rec - m_Sy;
+
+			//Add match source pars to tmp list
+			SourceOverlapMatchPars overlapPars(j,f,f_rec);
+			overlapPars.Sratio= Sratio;
+			overlapPars.Sratio_rec= Sratio_rec;
+			overlapPars.dX= dX;
+			overlapPars.dY= dY;		
+			tmpMatchPars.push_back(overlapPars);
+	
+			INFO_LOG("Source "<<this->GetName()<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): found match with source "<<sources[j]->GetName()<<" (X0="<<sources[j]->X0<<", Y0="<<sources[j]->Y0<<", N="<<sources[j]->NPix<<"), NMatchingPixels="<<NMatchingPixels<<", f="<<f<<", f_rec="<<f_rec<<" (t="<<matchOverlapThr<<"), Sratio="<<Sratio<<", Sratio_rec="<<Sratio_rec<<", dX="<<dX<<", dY="<<dY);
 		}
+		
 	}//end loop sources	
 
 	//Check if match is found
@@ -714,6 +748,16 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 
 	//Set sim max scale to max of the two sources
 	SimMaxScale= max(SimMaxScale,aSource->SimMaxScale);
+
+	//Set sim type if different to combination of both types
+	if(SimType!=aSource->SimType){
+		std::stringstream ss;
+		ss<<SimType<<aSource->SimType;
+		std::istringstream buffer(ss.str());
+		int mergedSimType= 0;	
+		buffer >> mergedSimType;
+		SimType= mergedSimType;
+	}
 
 	//At this stage stats (mean/median/etc...) are invalid and need to be recomputed if desired
 	this->SetHasStats(false);//set stats to false to remember that current stats are not valid anymore and need to be recomputed
