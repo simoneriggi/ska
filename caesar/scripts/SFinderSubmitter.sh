@@ -146,6 +146,8 @@ if [ "$NARGS" -lt 2 ]; then
 	echo "--saliencymaxreso - Superpixel size (in pixels) used in multi-reso saliency map highest scale (default=60 pixels)"
 	echo "--saliencyresostep - Superpixel size step (in pixels) used in multi-reso saliency map computation (default=10 pixels)"
 	echo "--saliencynn - Fraction of most similar region neighbors used in saliency map computation (default=1)"
+	echo "--saliency-usebkgmap - Use bkg map in saliency computation (default=not used)"
+	echo "--saliency-usermsmap - Use noise map in saliency computation (default=not used)"
 	echo ""
 
 	echo "=== SFINDER WAVELET TRANSFORM FILTER OPTIONS ==="
@@ -209,6 +211,7 @@ BKG_SKIP_OUTLIERS="false"
 NPIX_MIN="5"
 SEED_THR="5"
 MERGE_THR="2.6"
+SEARCH_COMPACT_SOURCES="true"
 COMPACT_SOURCE_SEARCH_NITERS="5"
 SEED_THR_STEP="1"
 
@@ -253,7 +256,9 @@ SALIENCY_MIN_RESO="20"
 SALIENCY_MAX_RESO="60"
 SALIENCY_RESO_STEP="10"
 SALIENCY_NN_PAR="1"
-SEARCH_COMPACT_SOURCES="true"
+USE_BKG_MAP_IN_SALIENCY="false"
+USE_RMS_MAP_IN_SALIENCY="false"
+
 SEARCH_EXTENDED_SOURCES="true"
 
 FIT_SOURCES="false"
@@ -644,6 +649,13 @@ do
 		--saliencynn=*)
     	SALIENCY_NN_PAR=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+		--saliency-usebkgmap*)
+    	USE_BKG_MAP_IN_SALIENCY="true"
+    ;;
+		--saliency-usermsmap*)
+    	USE_RMS_MAP_IN_SALIENCY="true"
+    ;;
+
 		--spsize=*)
     	SP_SIZE=`echo $item | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
@@ -802,6 +814,9 @@ generate_config(){
     echo "tileStepSizeX = $TILE_STEP                         | Tile step size fraction X to partition the input image (1=no overlap,0.5=half overlap, ...)"
     echo "tileStepSizeY = $TILE_STEP												 | Tile step size fraction Y to partition the input image (1=no overlap,0.5=half overlap, ...)"
 		echo "mergeSourcesAtEdge = $MERGE_EDGE_SOURCES           | Merge sources found at tile edge by each workers (default=true)"
+		echo "mergeSources = true 												       | Merge overlapping sources found by each workers (default=false)"
+		echo "mergeCompactSources = false									       | Merge overlapping compact sources found by each workers (default=false)"
+		echo "mergeExtendedSources = true									       | Merge overlapping extended/compact sources found by each workers (default=false)"
     echo '###'
     echo '###'
     echo '//=============================='
@@ -1003,8 +1018,8 @@ generate_config(){
 		echo "saliencyResoStep = $SALIENCY_RESO_STEP							| Saliency reso step par"
 		echo 'saliencyUseCurvInDiss = false 											| Use curvature parameter in dissimilarity estimation (T/F)'
 		echo 'saliencyUseRobustPars = false												| Use robust pars in saliency map computation (T/F)'
-		echo 'saliencyUseBkgMap = true														| Use bkg map in saliency map computation (T/F)'
-		echo 'saliencyUseNoiseMap = true					 								| Use noise map in saliency map computation (T/F)'
+		echo "saliencyUseBkgMap = $USE_BKG_MAP_IN_SALIENCY    		| Use bkg map in saliency map computation (T/F)"
+		echo "saliencyUseNoiseMap = $USE_RMS_MAP_IN_SALIENCY					 								| Use noise map in saliency map computation (T/F)"
 		echo "saliencyNNFactor = $SALIENCY_NN_PAR   							| Fraction of most similar neighbors used in saliency map computation"
 		echo 'saliencySpatialRegFactor = 6												| Spatial regularization factor (ruling exp decay in saliency spatial weighting)'
 		echo 'saliencyMultiResoCombThrFactor = 0.7								| Fraction of combined salient multi-resolution maps to consider global saliency'

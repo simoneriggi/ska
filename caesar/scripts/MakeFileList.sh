@@ -99,13 +99,13 @@ process_filename(){
 	local outputfile=$5
 	
 	# Strip path?
-	if [ "$strippath" = true ]; then
+	if [ $strippath = true ]; then
 		filename_base=$(basename $filename)
 		filename=$filename_base
 	fi
 		
 	# Strip extension?
-	if [ "$stripext" = true ]; then
+	if [ $stripext = true ]; then
 		filename_noext="${filename//.$fileext/}"
 		filename=$filename_noext
 	fi
