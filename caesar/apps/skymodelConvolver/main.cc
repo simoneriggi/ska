@@ -723,10 +723,9 @@ int MergeSources()
 	INFO_LOG("Find all connected components in graph corresponding to sources to be merged...");
 	std::vector<std::vector<int>> connected_source_indexes;
 	mergedSourceGraph.GetConnectedComponents(connected_source_indexes);
-	INFO_LOG("#"<<connected_source_indexes.size()<<"/"<<sources_conv.size()<<" sources will be left after merging...");
+	INFO_LOG("#"<<connected_source_indexes.size()<<"/"<<sources_conv.size()<<" selected for merging...");
 		
 	//## Now merge the sources
-	std::vector<int> sourcesToBeRemoved;
 	bool copyPixels= true;//create memory for new pixels
 	bool checkIfAdjacent= false;//already done before
 	bool sumMatchingPixels= true;
@@ -737,13 +736,13 @@ int MergeSources()
 	
 	INFO_LOG("Merging sources and adding them to collection...");
 	for(size_t i=0;i<connected_source_indexes.size();i++){
-		if(connected_source_indexes[i].empty()) continue;
+		//Skip empty or single sources
+		if(connected_source_indexes[i].size()<=1) continue;
 
 		//Get source id=0 of this component
 		int index= connected_source_indexes[i][0];
 		Source* source= sources_conv[index];
-		sourcesToBeRemoved.push_back(index);
-
+		
 		//Create a new source which merges the two
 		Source* merged_source= new Source;
 		*merged_source= *source;
@@ -762,18 +761,23 @@ int MergeSources()
 			}
 			nMerged++;
 
-			//Add this source to the list of edge sources to be removed
-			sourcesToBeRemoved.push_back(index_adj);
-
 		}//end loop of sources to be merged in this component
 
 		//If at least one was merged recompute stats & pars of merged source
 		if(nMerged>0) {
+			//Set name
+			TString sname= Form("Smerg%d",i+1);
+			merged_source->SetId(i+1);
+			merged_source->SetName(std::string(sname));
+
+			//Compute stats
 			DEBUG_LOG("Recomputing stats & moments of merged source in merge group "<<i<<" after #"<<nMerged<<" merged source...");
 			if(merged_source->ComputeStats(computeRobustStats,forceRecomputing)<0){
 				WARN_LOG("Failed to compute stats for merged source in merge group "<<i<<"...");
 				continue;
 			}
+	
+			//Compute morph params
 			if(merged_source->ComputeMorphologyParams()<0){
 				WARN_LOG("Failed to compute morph pars for merged source in merge group "<<i<<"...");
 				continue;

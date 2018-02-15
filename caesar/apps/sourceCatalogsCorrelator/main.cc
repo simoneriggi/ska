@@ -44,14 +44,17 @@ void Usage(char* exeName){
 	cout<<"Options:"<<endl;
   cout<<"-h, --help \t Show help message and exit"<<endl;
 	cout<<"-i, --input=[INPUT_FILE] \t Input file name containing sources to be read in ROOT TTree (.root)"<<endl;
-	cout<<"-I, --input_rec=[INPUT_REC_FILE] \t Input file name containing reconstructed/detected sources to be read in ROOT TTree (.root)"<<endl;
+	cout<<"-I, --input-rec=[INPUT_REC_FILE] \t Input file name containing reconstructed/detected sources to be read in ROOT TTree (.root)"<<endl;
 	cout<<"-o, --output=[OUTPUT_FILE] \t Output file name "<<endl;
-	cout<<"-t, --threshold=[THESHOLD] \t Fraction of matching pixels to consider sources equal (default=0.9)"<<endl;
-	cout<<"-T, --posThreshold=[POS_THESHOLD] \t Pixel dustance below which two sources are matched (default=2.5)"<<endl;
+	cout<<"-t, --overlapThr=[THESHOLD] \t Fraction of matching pixels to consider sources equal (default=0.9)"<<endl;
+	cout<<"-T, --posThr=[POS_THESHOLD] \t Pixel dustance below which two sources are matched (default=2.5)"<<endl;
 	cout<<"-f, --filterByType \t Consider only true sources with given type when searching the match (default=no)"<<endl;
 	cout<<"-s, --selectedType=[TYPE] \t True source types to be crossmatched (1=COMPACT, 2=POINT-LIKE, 3=EXTENDED, 4=COMPACT_WITH_EXTENDED) (default=-1)"<<endl;
 	cout<<"-F, --filterBySimType \t Consider only true sources with given sim type when searching the match (default=no)"<<endl;
 	cout<<"-S, --selectedSimType=[TYPE] \t True source sim types to be crossmatched (eRingLike=1,eBubbleLike=2,eEllipseLike=3,eDiskLike=4,eBlobLike=5) (default=-1)"<<endl;
+	cout<<"-e, --no-compactSourceCorrelation \t Disable correlation search for compact sources (default=enabled)"<<endl;
+	cout<<"-E, --no-extendedSourceCorrelation \t Disable correlation search for extended sources (default=enabled)"<<endl;
+	cout<<"-c, --correctFlux \t Correct rec integrated flux by beam area (default=no correction)"<<endl;
 	cout<<"-v, --verbosity=[LEVEL] \t Log level (<=0=OFF, 1=FATAL, 2=ERROR, 3=WARN, 4=INFO, >=5=DEBUG) (default=INFO)"<<endl;
 	
 	cout<<"=============================="<<endl;
@@ -61,7 +64,7 @@ static const struct option options_tab[] = {
   /* name, has_arg, &flag, val */
   { "help", no_argument, 0, 'h' },
 	{ "input", required_argument, 0, 'i' },
-	{ "input_rec", required_argument, 0, 'I' },
+	{ "input-rec", required_argument, 0, 'I' },
 	{ "verbosity", required_argument, 0, 'v'},
 	{ "output", optional_argument, 0, 'o' },
 	{ "overlapThr", required_argument, 0, 't'},
@@ -70,7 +73,9 @@ static const struct option options_tab[] = {
 	{ "filterByType", no_argument, 0, 'f'},
 	{ "filterBySimType", no_argument, 0, 'F'},
 	{ "selectedType", required_argument, 0, 's'},	
-	{ "selectedSimType", required_argument, 0, 'S'},	
+	{ "selectedSimType", required_argument, 0, 'S'},
+	{ "no-compactSourceCorrelation", no_argument, 0, 'e'},
+	{ "no-extendedSourceCorrelation", no_argument, 0, 'E'},	
   {(char*)0, (int)0, (int*)0, (int)0}
 };
 
@@ -86,6 +91,8 @@ bool selectTrueSourceByType= false;//default=all true sources searched
 int selectedTrueSourceType= -1;
 bool selectTrueSourceBySimType= false;//default=all true sources searched 
 int selectedTrueSourceSimType= -1;
+bool enableCompactSourceCorrelation= true;
+bool enableExtendedSourceCorrelation= true;
 
 //Globar vars
 TFile* outputFile= 0;
@@ -93,12 +100,14 @@ std::string outputFileName= "MatchOutput.root";
 TTree* matchedSourceInfo= 0;
 TTree* matchedExtSourceInfo= 0;
 TTree* recSourceInfo= 0;
+TTree* recExtSourceInfo= 0;
 std::vector<Source*> sources;
 std::vector<Source*> sources_rec;
 int SourceFoundFlag;
 std::string SourceName;
 int SourceType;
 int SourceSimType;
+long int NPix;
 double X0;
 double Y0;
 double S;
@@ -117,6 +126,10 @@ double Smax_rec;
 double fluxDensity_rec;
 double MatchFraction;
 double MatchFraction_rec;
+double Sratio;
+double Sratio_rec;
+double dX;
+double dY;
 int HasFitInfo;
 int FitStatus;
 double S_fit;
@@ -171,6 +184,8 @@ bool FindPointSourceMatch(int source_true_index);
 bool FindExtendedSourceMatch(int source_true_index);
 int FindSourceMatches();
 int FindRealAndFakeSources();
+int FindPointSourceRealAndFakeSources(int source_rec_index);
+int FindExtendedRealAndFakeSources(int source_rec_index);
 int ReadSourceData();
 void Save();
 void Init();
@@ -237,7 +252,7 @@ int ParseOptions(int argc, char *argv[])
 	int c = 0;
   int option_index = 0;
 
-	while((c = getopt_long(argc, argv, "hi:I:o:v:t:T:cfFs:S:",options_tab, &option_index)) != -1) {
+	while((c = getopt_long(argc, argv, "hi:I:o:v:t:T:cfFs:S:eE",options_tab, &option_index)) != -1) {
     
     switch (c) {
 			case 0 : 
@@ -304,6 +319,16 @@ int ParseOptions(int argc, char *argv[])
 				selectedTrueSourceSimType= atoi(optarg);
 				break;
 			}	
+			case 'e':
+			{
+				enableCompactSourceCorrelation= false;
+				break;
+			}	
+			case 'E':
+			{
+				enableExtendedSourceCorrelation= false;
+				break;
+			}
 			default:
 			{
       	Usage(argv[0]);	
@@ -347,133 +372,6 @@ int CorrelateSourceCatalogs()
 		return -1;
 	}
 
-	/*
-	INFO_LOG("Correlating ("<<sources.size()<<","<<sources_rec.size()<<") sources...");
-	long int nFoundSources= 0;
-	long int nCompactSources= 0;
-	long int nCompactSources_found= 0;	
-	long int nExtendedSources= 0;
-	long int nExtendedSources_found= 0;	
-
-	//Loop over first catalogue (e.g. simulated/true sources)
-	for(size_t i=0;i<sources.size();i++){
-		
-		if(i%100==0) INFO_LOG("Finding cross-match for source no. "<<i<<"/"<<sources.size()<<"...");
-
-		//Find source match according to source type (e.g. compact/point-like vs extended)
-		int sourceType= sources[i]->Type;
-		if(sourceType==Source::eCompact || sourceType==Source::ePointLike){
-			nCompactSources++;
-			bool isCompactSourceFound= FindPointSourceMatch(i);
-			if(isCompactSourceFound) nCompactSources_found++;
-		}
-		else if(sourceType==Source::eExtended || sourceType==Source::eCompactPlusExtended){
-			nExtendedSources++;
-			bool isExtendedSourceFound= FindExtendedSourceMatch(i);
-			if(isExtendedSourceFound) nExtendedSources_found++;
-		}
-		else{
-			WARN_LOG("No method implemented to search cross-match for source type "<<sourceType<<", skip source match search...");
-			continue;
-		}
-
-	}//end loop collection
-
-	INFO_LOG("#"<<nCompactSources_found<<"/"<<nCompactSources<<" compact sources found...");
-	INFO_LOG("#"<<nExtendedSources_found<<"/"<<nExtendedSources<<" extended sources found...");
-
-	//## Store rec-true tree data
-	for(size_t i=0;i<sources_rec.size();i++){
-
-		if(i%100==0) INFO_LOG("Finding associations for rec source no. "<<i<<"/"<<sources_rec.size()<<"...");
-
-		int sourceIndex= (int)(i);
-		int componentIndex= -1;
-		std::string sname= std::string(sources_rec[i]->GetName());
-		double fluxCorrectionFactor= sources_rec[i]->GetBeamFluxIntegral();
-		HasFitInfo= sources_rec[i]->HasFitInfo();
-		bool associatedToSource= false;
-		
-		if(HasFitInfo){
-			SourceFitPars fitPars= sources_rec[i]->GetFitPars();
-			for(int k=0;k<fitPars.GetNComponents();k++){
-				SourceName_rec= sname + std::string(Form("_%d",k+1));
-				X0_rec= fitPars.GetParValue(k,"x0");	
-				Y0_rec= fitPars.GetParValue(k,"y0");
-				Smax_rec= fitPars.GetParValue(k,"A");
-				fluxDensity_rec= fitPars.GetComponentFluxDensity(k);
-				if(correctFlux){
-					Smax_rec/= fluxCorrectionFactor;
-					fluxDensity_rec/= fluxCorrectionFactor;
-				}
-
-				nTrueMatchedSources= 0;
-				SourceNameList_true.clear();
-				PosXList_true.clear();
-				PosYList_true.clear();
-
-				//Find true sources associated to rec source
-				
-				std::map<MatchingSourceInfo,std::vector<int>>::iterator it= RecSourceAssociationMap.find(MatchingSourceInfo(sourceIndex,k));
-				if(it!=RecSourceAssociationMap.end()){
-					std::vector<int> true_source_indexes= it->second;
-					nTrueMatchedSources= static_cast<int>(true_source_indexes.size());
-					for(size_t j=0;j<true_source_indexes.size();j++){
-						int index= true_source_indexes[j];
-						SourceName= std::string(sources[index]->GetName());
-						X0_true= sources[index]->X0;
-						Y0_true= sources[index]->Y0;
-						bool hasTrueInfo= sources[index]->HasTrueInfo();
-						if(hasTrueInfo) sources[index]->GetTruePos(X0_true,Y0_true);
-						SourceNameList_true.push_back(SourceName);
-					}//end loop associated true sources
-				}//close if found true source association
-
-				//Fill tree
-				recSourceInfo->Fill();
-				
-			}//end loop fitted components	
-		}//close has fit info
-		else{
-			SourceName_rec= sname;
-			X0_rec= sources_rec[i]->X0;
-			Y0_rec= sources_rec[i]->Y0;
-			Smax_rec= sources_rec[i]->GetSmax();
-			fluxDensity_rec= sources_rec[i]->GetS();
-			if(correctFlux){
-				Smax_rec/= fluxCorrectionFactor;
-				fluxDensity_rec/= fluxCorrectionFactor;
-			}
-
-			nTrueMatchedSources= 0;
-			SourceNameList_true.clear();
-			PosXList_true.clear();
-			PosYList_true.clear();
-			
-			//Find true sources associated to rec source
-			std::map<MatchingSourceInfo,std::vector<int>>::iterator it= RecSourceAssociationMap.find(MatchingSourceInfo(sourceIndex,-1));
-			if(it!=RecSourceAssociationMap.end()){
-				std::vector<int> true_source_indexes= it->second;
-				nTrueMatchedSources= static_cast<int>(true_source_indexes.size());
-				for(size_t j=0;j<true_source_indexes.size();j++){
-					int index= true_source_indexes[j];
-					SourceName= std::string(sources[index]->GetName());
-					X0_true= sources[index]->X0;
-					Y0_true= sources[index]->Y0;
-					bool hasTrueInfo= sources[index]->HasTrueInfo();
-					if(hasTrueInfo) sources[index]->GetTruePos(X0_true,Y0_true);
-					SourceNameList_true.push_back(SourceName);
-				}//end loop associated true sources
-			}//close if found true source association
-
-			//Fill tree
-			recSourceInfo->Fill();	
-
-		}//close !hasFitInfo
-
-	}//end loop rec sources
-	*/
-
 	return 0;
 
 }//close CorrelateSourceCatalogs()
@@ -501,25 +399,21 @@ int FindSourceMatches()
 
 		//Find source match according to source type (e.g. compact/point-like vs extended)
 		int sourceType= sources[i]->Type;
-		if(sourceType==Source::eCompact || sourceType==Source::ePointLike){
+		if(enableCompactSourceCorrelation && (sourceType==Source::eCompact || sourceType==Source::ePointLike) ){
 			nCompactSources++;
 			bool isCompactSourceFound= FindPointSourceMatch(i);
 			if(isCompactSourceFound) nCompactSources_found++;
 		}
-		else if(sourceType==Source::eExtended || sourceType==Source::eCompactPlusExtended){
+		if(enableExtendedSourceCorrelation && (sourceType==Source::eExtended || sourceType==Source::eCompactPlusExtended) ){
 			nExtendedSources++;
 			bool isExtendedSourceFound= FindExtendedSourceMatch(i);
 			if(isExtendedSourceFound) nExtendedSources_found++;
 		}
-		else{
-			WARN_LOG("No method implemented to search cross-match for source type "<<sourceType<<", skip source match search...");
-			continue;
-		}
 
 	}//end loop collection
 
-	INFO_LOG("#"<<nCompactSources_found<<"/"<<nCompactSources<<" compact sources found...");
-	INFO_LOG("#"<<nExtendedSources_found<<"/"<<nExtendedSources<<" extended sources found...");
+	INFO_LOG("#"<<nCompactSources_found<<"/"<<nCompactSources<<" compact sources found (search enabled? "<<enableCompactSourceCorrelation<<") ...");
+	INFO_LOG("#"<<nExtendedSources_found<<"/"<<nExtendedSources<<" extended sources found (search enabled? "<<enableExtendedSourceCorrelation<<") ...");
 
   return 0;
 
@@ -527,6 +421,27 @@ int FindSourceMatches()
 
 int FindRealAndFakeSources()
 {
+	//Loop over rec sources and find associations to true
+	for(size_t i=0;i<sources_rec.size();i++){
+
+		if(i%100==0) INFO_LOG("Finding associations for rec source no. "<<i<<"/"<<sources_rec.size()<<"...");
+
+		int sourceType= sources_rec[i]->Type;
+		if(enableCompactSourceCorrelation && (sourceType==Source::eCompact || sourceType==Source::ePointLike) ){
+			if(FindPointSourceRealAndFakeSources(i)<0){
+				WARN_LOG("Failed to find true associations to rec source "<<i<<"!");
+			}
+		}
+		if(enableExtendedSourceCorrelation && (sourceType==Source::eExtended || sourceType==Source::eCompactPlusExtended) ){
+			if(FindExtendedRealAndFakeSources(i)<0){
+				WARN_LOG("Failed to find true associations to rec source "<<i<<"!");
+			}
+		}
+
+	}//end loop rec sources
+
+
+	/*
 	//Loop over rec sources and find associations to true
 	for(size_t i=0;i<sources_rec.size();i++){
 
@@ -618,244 +533,19 @@ int FindRealAndFakeSources()
 		}//close !hasFitInfo
 
 	}//end loop rec sources
-	
+	*/
 
 	return 0;
 
 }//close FindRealAndFakeSources()
 
-/*
-bool FindPointSourceMatch(int source_true_index){
 
-	//## Search for point source associations
-	bool foundSource= false;
-	Source* source_true= sources[source_true_index]; 
-
-	//Set true info
-	long int NPix= source_true->GetNPixels();
-	SourceFoundFlag= 0;
-	SourceName= std::string(source_true->GetName());
-	SourceType= source_true->Type;
-	SourceSimType= source_true->SimType;
-	X0= source_true->X0;
-	Y0= source_true->Y0;
-	S= source_true->GetS();
-	Smax= source_true->GetSmax();
-	S_true= S;
-	X0_true= X0;
-	Y0_true= Y0;
-	bool hasTrueInfo= source_true->HasTrueInfo();
-	if(hasTrueInfo){
-		S_true= source_true->GetTrueFlux();
-		source_true->GetTruePos(X0_true,Y0_true);
-		fluxDensity_true= -1;//to be fixed
-	}		
-
-	//Loop over all reconstructed sources and match them in position
-	std::vector<MatchingSourceInfo> matched_info;	
-	
-	for(size_t j=0;j<sources_rec.size();j++){
-
-		//If source has fit info loop over fitted components to find best match
-		bool hasFitInfo= sources_rec[j]->HasFitInfo();
-		if(hasFitInfo){
-			SourceFitPars fitPars= sources_rec[j]->GetFitPars();
-			double dist_best= 1.e+99;
-			int best_component= -1;
-			for(int k=0;k<fitPars.GetNComponents();k++){
-				double X0_fitcomp= fitPars.GetParValue(k,"x0");	
-				double Y0_fitcomp= fitPars.GetParValue(k,"y0");
-				double dx= fabs(X0_fitcomp-X0_true);
-				double dy= fabs(Y0_fitcomp-Y0_true);
-				double dist= sqrt(dx*dx+dy*dy);
-				if(dx<=matchPosThr && dy<=matchPosThr && dist<dist_best){//match found
-					best_component= k;
-					dist_best= dist;
-				}
-			}//end loop fitted components	
-			
-			if(best_component!=-1){
-				matched_info.push_back(MatchingSourceInfo(j,best_component));	
-			}
-	
-		}//close if has fit info
-		else{
-			//No fit info available so compute offset using source barycenter 
-			double dx= fabs(sources_rec[j]->X0 - X0_true);
-			double dy= fabs(sources_rec[j]->Y0 - Y0_true);
-			if(dx<=matchPosThr && dy<=matchPosThr){//match found
-				matched_info.push_back(MatchingSourceInfo(j));
-			}
-		}//close else !has fit info
-	}//end loop rec sources
-
-	//Check if a match has been found
-	if(matched_info.empty()){
-
-		SourceFoundFlag= 0;
-		SourceName_rec= "";
-		S_rec= -1;
-		Smax_rec= -1;
-		X0_rec= -1;
-		Y0_rec= -1;
-		SourceType_rec= -1;
-		MatchFraction= 0.;
-		HasFitInfo= 0;
-		FitStatus= SourceFitter::eFitUnknownStatus;
-		S_fit= -1;
-		X0_fit= -1;
-		Y0_fit= -1;
-		sigmaX_fit= -1;
-		sigmaY_fit= -1;
-		offset_fit= -1;
-		fluxDensity_fit= -1;
-		residualMin_fit= -1;
-		residualMax_fit= -1;
-		residualMean_fit= -1;
-		residualRMS_fit= -1;
-		residualMedian_fit= -1;
-		residualMAD_fit= -1;
-		chi2_fit= -1;
-		ndf_fit= -1;
-		ncomponents_fit= -1;
-
-	}//close if no match
-	else{
-		foundSource= true;
-		SourceFoundFlag= 1;	
-
-		//Loop over all matched sources found and find the best
-		double dist_best= 1.e+99;
-		int best_index= -1;
-
-		for(size_t j=0;j<matched_info.size();j++){
-			size_t source_index= matched_info[j].sourceIndex;
-			int componentIndex= matched_info[j].fitComponentIndex;
-			double dx= 0;
-			double dy= 0;
-			if(componentIndex==-1){//no fit component available
-				dx= fabs(sources_rec[source_index]->X0 - X0_true);
-				dy= fabs(sources_rec[source_index]->Y0 - Y0_true);
-			}//close if
-			else{
-				SourceFitPars fitPars= sources_rec[source_index]->GetFitPars();
-				double X0_fitcomp= fitPars.GetParValue(componentIndex,"x0");	
-				double Y0_fitcomp= fitPars.GetParValue(componentIndex,"y0");
-				dx= fabs(X0_fitcomp-X0_true);
-				dy= fabs(Y0_fitcomp-Y0_true);		
-			}	
-
-			double dist= sqrt(dx*dx+dy*dy);
-			if(dist<dist_best){
-				best_index= j;
-				dist_best= dist;
-			}
-		}//end loop matched sources
-
-		//Store rec info
-		size_t source_index_best= matched_info[best_index].sourceIndex;
-		int componentIndex_best= matched_info[best_index].fitComponentIndex;
-
-		SourceName_rec= std::string(sources_rec[source_index_best]->GetName());
-		SourceType_rec= sources_rec[source_index_best]->Type;
-		X0_rec= sources_rec[source_index_best]->X0;
-		Y0_rec= sources_rec[source_index_best]->Y0;
-		double fluxCorrectionFactor= sources_rec[source_index_best]->GetBeamFluxIntegral();
-		S_rec= sources_rec[source_index_best]->GetS();
-		Smax_rec= sources_rec[source_index_best]->GetSmax();
-		
-		long int NMatchingPixels= source_true->GetNMatchingPixels(sources_rec[source_index_best]);
-		MatchFraction= (double)(NMatchingPixels)/(double)(NPix);
-			
-		//Correct flux from Jy/beam to Jy
-		if(correctFlux){
-			S_rec/= fluxCorrectionFactor;
-			Smax_rec/= fluxCorrectionFactor;
-		}
-
-		//Store fit info
-		if(componentIndex_best==-1){
-			HasFitInfo= 0;
-			FitStatus= SourceFitter::eFitUnknownStatus;
-			S_fit= -1;
-			X0_fit= -1;
-			Y0_fit= -1;
-			sigmaX_fit= -1;
-			sigmaY_fit= -1;
-			offset_fit= -1;
-			fluxDensity_fit= -1;
-			residualMin_fit= -1;
-			residualMax_fit= -1;
-			residualMean_fit= -1;
-			residualRMS_fit= -1;
-			residualMedian_fit= -1;
-			residualMAD_fit= -1;
-			chi2_fit= -1;
-			ndf_fit= -1;
-			ncomponents_fit= -1;
-		}
-		else{
-			HasFitInfo= 1;
-			SourceFitPars fitPars= sources_rec[source_index_best]->GetFitPars();
-			FitStatus= fitPars.GetStatus();
-			X0_fit= fitPars.GetParValue(componentIndex_best,"x0");	
-			Y0_fit= fitPars.GetParValue(componentIndex_best,"y0");	
-			S_fit= fitPars.GetParValue(componentIndex_best,"A");
-			sigmaX_fit= fitPars.GetParValue(componentIndex_best,"sigmaX");
-			sigmaY_fit= fitPars.GetParValue(componentIndex_best,"sigmaY");
-			offset_fit= fitPars.GetOffsetPar();
-			fluxDensity_fit= fitPars.GetComponentFluxDensity(componentIndex_best);
-			residualMin_fit= fitPars.GetResidualMin();
-			residualMax_fit= fitPars.GetResidualMax();
-			residualMean_fit= fitPars.GetResidualMean();
-			residualRMS_fit= fitPars.GetResidualRMS();
-			residualMedian_fit= fitPars.GetResidualMedian();
-			residualMAD_fit= fitPars.GetResidualMAD();
-			chi2_fit= fitPars.GetChi2();
-			ndf_fit= fitPars.GetNDF();
-			ncomponents_fit= fitPars.GetNComponents();
-
-			//Correct flux from Jy/beam to Jy
-			if(correctFlux){
-				S_fit/= fluxCorrectionFactor;
-				fluxDensity_fit/= fluxCorrectionFactor;
-			}
-		}
-
-		//## Store rec-true association map
-		INFO_LOG("True source "<<SourceName<<" (index="<<source_true_index<<") reconstructed by source "<<SourceName_rec<<" (index="<<source_index_best<<", fitComponent="<<componentIndex_best<<")");
-		//Find if this rec source was already associated to other true sources
-		std::map<MatchingSourceInfo,std::vector<int>>::iterator it= RecSourceAssociationMap.find(matched_info[best_index]);
-		if(RecSourceAssociationMap.empty() || it==RecSourceAssociationMap.end()){//item not found
-			//Find if true source was already associated to this source
-			std::vector<int>::iterator vIt= std::find(RecSourceAssociationMap[matched_info[best_index]].begin(),RecSourceAssociationMap[matched_info[best_index]].end(),source_true_index);
-			bool itemAlreadyPresent= (
-				!RecSourceAssociationMap[matched_info[best_index]].empty() && 
-				vIt!=RecSourceAssociationMap[matched_info[best_index]].end()
-			);
-			if(!itemAlreadyPresent){
-				RecSourceAssociationMap[matched_info[best_index]].push_back(source_true_index);
-			}
-		}
-		else{//item found, append
-			RecSourceAssociationMap[matched_info[best_index]].push_back(source_true_index);
-		}
-		
-	}//close else
-
-	//Fill ROOT tree with match info
-	matchedSourceInfo->Fill();
-
-	return foundSource;
-
-}//close FindPointSourceMatch()
-*/
 
 bool FindPointSourceMatch(int source_true_index)
 {
 	//## Set true source info
 	Source* source_true= sources[source_true_index]; 
-	long int NPix= source_true->GetNPixels();
+	NPix= source_true->GetNPixels();
 	SourceFoundFlag= 0;
 	SourceName= std::string(source_true->GetName());
 	SourceType= source_true->Type;
@@ -1000,7 +690,7 @@ bool FindExtendedSourceMatch(int source_true_index)
 {
 	//## Set true source info
 	Source* source_true= sources[source_true_index]; 
-	long int NPix= source_true->GetNPixels();
+	NPix= source_true->GetNPixels();
 	SourceName= std::string(source_true->GetName());
 	SourceType= source_true->Type;
 	SourceSimType= source_true->SimType;
@@ -1029,6 +719,10 @@ bool FindExtendedSourceMatch(int source_true_index)
 	SourceType_rec= -1;
 	MatchFraction= 0.;
 	MatchFraction_rec= 0.;
+	Sratio= 0.;
+	Sratio_rec= 0.;
+	dX= 0;
+	dY= 0;
 
 	//## Search for extended source associations by matching pixels
 	SourceOverlapMatchPars match_info;
@@ -1041,6 +735,10 @@ bool FindExtendedSourceMatch(int source_true_index)
 		long int match_source_index= match_info.index;
 		MatchFraction= static_cast<double>(match_info.overlapFraction);
 		MatchFraction_rec= static_cast<double>(match_info.overlapFraction_rec);
+		Sratio= static_cast<double>(match_info.Sratio);
+		Sratio_rec= static_cast<double>(match_info.Sratio_rec);
+		dX= static_cast<double>(match_info.dX);
+		dY= static_cast<double>(match_info.dY);
 		NPix_rec= sources_rec[match_source_index]->GetNPixels();
 		SourceName_rec= std::string(sources_rec[match_source_index]->GetName());
 		SourceType_rec= sources_rec[match_source_index]->Type;
@@ -1056,7 +754,7 @@ bool FindExtendedSourceMatch(int source_true_index)
 		//Correct flux from Jy/beam to Jy
 		if(correctFlux){
 			S_rec/= fluxCorrectionFactor;
-			Smax_rec/= fluxCorrectionFactor;
+			//Smax_rec/= fluxCorrectionFactor;
 		}
 
 		INFO_LOG("True source "<<SourceName<<" (index="<<source_true_index<<", X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<") reconstructed by source "<<SourceName_rec<<" (index="<<match_source_index<<", X0="<<X0_rec<<", Y0="<<Y0_rec<<", N="<<NPix_rec<<"), NMatchingPixels="<<MatchFraction*NPix<<" f="<<MatchFraction<<" f_rec="<<MatchFraction_rec<<" (t="<<matchOverlapThr<<")");
@@ -1090,123 +788,150 @@ bool FindExtendedSourceMatch(int source_true_index)
 
 }//close FindExtendedSourceMatch()
 
-/*
-//bool FindExtendedSourceMatch(Source* source_true){
-bool FindExtendedSourceMatch(int source_true_index){
-
-	//## Search for extended source associations
-	bool foundSource= false;	
-	Source* source_true= sources[source_true_index]; 
-
-	//Set true info
-	long int NPix= source_true->GetNPixels();
-	SourceFoundFlag= 0;
-	SourceName= std::string(source_true->GetName());
-	SourceType= source_true->Type;
-	SourceSimType= source_true->SimType;
-	X0= source_true->X0;
-	Y0= source_true->Y0;
-	S= source_true->GetS();
-	Smax= source_true->GetSmax();
-	S_true= S;
-	X0_true= X0;
-	Y0_true= Y0;
-	bool hasTrueInfo= source_true->HasTrueInfo();
-	if(hasTrueInfo){
-		S_true= source_true->GetTrueFlux();
-		source_true->GetTruePos(X0_true,Y0_true);
-		fluxDensity_true= -1;//to be fixed
-	}		
-
-	//Loop over all reconstructed sources and match them in pixel overlap
-	struct MatchingExtSourceInfo{	
-		MatchingExtSourceInfo(size_t index,float f)
-			: sourceIndex(index), matchedPixelFraction(f)
-		{}
-		size_t sourceIndex;
-		float matchedPixelFraction;
-	};
-	std::vector<MatchingExtSourceInfo> matched_info;	
+int FindPointSourceRealAndFakeSources(int source_rec_index)
+{
+	//Get rec source info
+	int sourceIndex= source_rec_index;
+	Source* source_rec= sources_rec[source_rec_index]; 
+	std::string sname= std::string(source_rec->GetName());
+	SourceName_rec= std::string(source_rec->GetName());
+	SourceType_rec= source_rec->Type;			
+	X0_rec= source_rec->X0;
+	Y0_rec= source_rec->Y0;
+	Smax_rec= source_rec->GetSmax();
+	fluxDensity_rec= source_rec->GetS();
+	double fluxCorrectionFactor= source_rec->GetBeamFluxIntegral();
+	if(correctFlux){
+		//Smax_rec/= fluxCorrectionFactor;
+		fluxDensity_rec/= fluxCorrectionFactor;
+	}
 	
-	for(size_t j=0;j<sources_rec.size();j++){
-		NPix_rec= sources_rec[j]->GetNPixels();
-		long int NMatchingPixels= source_true->GetNMatchingPixels(sources_rec[j]);
-		double matchingPixelFraction= (double)(NMatchingPixels)/(double)(NPix);
-			
-		DEBUG_LOG("Source "<<SourceName<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): finding matching with source "<<SourceName_rec<<" (X0="<<X0_rec<<", Y0="<<Y0_rec<<", N="<<NPix_rec<<"), NMatchingPixels="<<NMatchingPixels<<" f="<<matchingPixelFraction<<" (t="<<matchOverlapThr<<")");
-			
-		if(NMatchingPixels<=0 || matchingPixelFraction<matchOverlapThr) continue;
+	//Init association info
+	nTrueMatchedSources= 0;
+	SourceNameList_true.clear();
+	PosXList_true.clear();
+	PosYList_true.clear();
 
-		INFO_LOG("Source "<<SourceName<<" (X0="<<X0<<", Y0="<<Y0<<", N="<<NPix<<"): found match with source "<<SourceName_rec<<" (X0="<<X0_rec<<", Y0="<<Y0_rec<<", N="<<NPix_rec<<"), NMatchingPixels="<<NMatchingPixels<<" f="<<matchingPixelFraction<<" (t="<<matchOverlapThr<<")");
-
-		matched_info.push_back(MatchingExtSourceInfo(matchingPixelFraction,j));
-
-	}//end loop rec sources
-
-
-	//Check if a match has been found
-	if(matched_info.empty()){
-
-		SourceFoundFlag= 0;
-		SourceName_rec= "";
-		NPix_rec= 0;
-		S_rec= -1;
-		Smax_rec= -1;
-		X0_rec= -1;
-		Y0_rec= -1;
-		SourceType_rec= -1;
-		MatchFraction= 0.;
-
-	}//close if no match
-	else{
-		foundSource= true;
-		SourceFoundFlag= 1;	
-
-		//Loop over all matched sources found and find the best
-		double overlap_best= 1.e+99;
-		int best_index= -1;
-
-		for(size_t j=0;j<matched_info.size();j++){
-			double source_overlap= matched_info[j].matchedPixelFraction;
-			
-			if(source_overlap<overlap_best){
-				best_index= j;
-				overlap_best= source_overlap;
+	//Find association to true sources
+	if(HasFitInfo){
+		SourceFitPars fitPars= source_rec->GetFitPars();
+		for(int k=0;k<fitPars.GetNComponents();k++){
+			SourceName_rec= sname + std::string(Form("_%d",k+1));
+			X0_rec= fitPars.GetParValue(k,"x0");	
+			Y0_rec= fitPars.GetParValue(k,"y0");
+			Smax_rec= fitPars.GetParValue(k,"A");
+			fluxDensity_rec= fitPars.GetComponentFluxDensity(k);
+			if(correctFlux){
+				//Smax_rec/= fluxCorrectionFactor;
+				fluxDensity_rec/= fluxCorrectionFactor;
 			}
-		}//end loop matched sources
 
-		//Store rec info
-		size_t source_index_best= matched_info[best_index].sourceIndex;
-		MatchFraction= static_cast<double>(matched_info[best_index].matchedPixelFraction);
+			nTrueMatchedSources= 0;
+			SourceNameList_true.clear();
+			PosXList_true.clear();
+			PosYList_true.clear();
 
-		NPix_rec= sources_rec[source_index_best]->GetNPixels();
-		SourceName_rec= std::string(sources_rec[source_index_best]->GetName());
-		SourceType_rec= sources_rec[source_index_best]->Type;
-		X0_rec= sources_rec[source_index_best]->X0;
-		Y0_rec= sources_rec[source_index_best]->Y0;
-		double fluxCorrectionFactor= sources_rec[source_index_best]->GetBeamFluxIntegral();
-		S_rec= sources_rec[source_index_best]->GetS();
-		Smax_rec= sources_rec[source_index_best]->GetSmax();
+			//Find true sources associated to rec source
+			std::map<MatchingSourceInfo,std::vector<int>>::iterator it= RecSourceAssociationMap.find(MatchingSourceInfo(sourceIndex,k));
+			if(it!=RecSourceAssociationMap.end()){
+				std::vector<int> true_source_indexes= it->second;
+				nTrueMatchedSources= static_cast<int>(true_source_indexes.size());
+				for(size_t j=0;j<true_source_indexes.size();j++){
+					int index= true_source_indexes[j];
+					SourceName= std::string(sources[index]->GetName());
+					X0_true= sources[index]->X0;
+					Y0_true= sources[index]->Y0;
+					bool hasTrueInfo= sources[index]->HasTrueInfo();
+					if(hasTrueInfo) sources[index]->GetTruePos(X0_true,Y0_true);
+					SourceNameList_true.push_back(SourceName);
+					PosXList_true.push_back(X0_true);
+					PosYList_true.push_back(Y0_true);
+				}//end loop associated true sources
+			}//close if found true source association
+
+			//Fill tree
+			recSourceInfo->Fill();
+				
+		}//end loop fitted components	
+	}//close has fit info
+	else{
+			
+		//Find true sources associated to rec source
+		std::map<MatchingSourceInfo,std::vector<int>>::iterator it= RecSourceAssociationMap.find(MatchingSourceInfo(sourceIndex,-1));
+		if(it!=RecSourceAssociationMap.end()){
+			std::vector<int> true_source_indexes= it->second;
+			nTrueMatchedSources= static_cast<int>(true_source_indexes.size());
+			for(size_t j=0;j<true_source_indexes.size();j++){
+				int index= true_source_indexes[j];
+				SourceName= std::string(sources[index]->GetName());
+				X0_true= sources[index]->X0;
+				Y0_true= sources[index]->Y0;
+				bool hasTrueInfo= sources[index]->HasTrueInfo();
+				if(hasTrueInfo) sources[index]->GetTruePos(X0_true,Y0_true);
+				SourceNameList_true.push_back(SourceName);
+				PosXList_true.push_back(X0_true);
+				PosYList_true.push_back(Y0_true);
+			}//end loop associated true sources
+		}//close if found true source association
+
+		//Fill tree
+		recSourceInfo->Fill();	
+
+	}//close !hasFitInfo
+
+
+	return 0;
+
+}//close FindPointSourceRealAndFakeSources()
+
+int FindExtendedRealAndFakeSources(int source_rec_index)
+{
+	//Get rec source info
+	int sourceIndex= source_rec_index;
+	Source* source_rec= sources_rec[source_rec_index]; 
+	SourceName_rec= std::string(source_rec->GetName());
+	SourceType_rec= source_rec->Type;			
+	X0_rec= source_rec->X0;
+	Y0_rec= source_rec->Y0;
+	Smax_rec= source_rec->GetSmax();
+	fluxDensity_rec= source_rec->GetS();
+	double fluxCorrectionFactor= source_rec->GetBeamFluxIntegral();
+	if(correctFlux){
+		//Smax_rec/= fluxCorrectionFactor;
+		fluxDensity_rec/= fluxCorrectionFactor;
+	}
+			
+	//Find true sources associated to rec source
+	//NB: This should loop over all sources (independently of their type), as an extended source can reconstruct a compact source (for example when residual is not working properly)
+	nTrueMatchedSources= 0;
+	SourceNameList_true.clear();
+	PosXList_true.clear();
+	PosYList_true.clear();
 		
-		//Remove compact sources from total flux S_rec?
-		//...
+	std::map<MatchingSourceInfo,std::vector<int>>::iterator it= RecSourceAssociationMap.find(MatchingSourceInfo(sourceIndex,-1));
+	if(it!=RecSourceAssociationMap.end()){
+		std::vector<int> true_source_indexes= it->second;
+		nTrueMatchedSources= static_cast<int>(true_source_indexes.size());
+		for(size_t j=0;j<true_source_indexes.size();j++){
+			int index= true_source_indexes[j];
+			SourceName= std::string(sources[index]->GetName());
+			X0_true= sources[index]->X0;
+			Y0_true= sources[index]->Y0;
+			bool hasTrueInfo= sources[index]->HasTrueInfo();
+			if(hasTrueInfo) sources[index]->GetTruePos(X0_true,Y0_true);
+			SourceNameList_true.push_back(SourceName);
+			PosXList_true.push_back(X0_true);
+			PosYList_true.push_back(Y0_true);
+		}//end loop associated true sources
+	}//close if found true source association
 
-		//Correct flux from Jy/beam to Jy
-		if(correctFlux){
-			S_rec/= fluxCorrectionFactor;
-			Smax_rec/= fluxCorrectionFactor;
-		}
+	//Fill tree
+	recExtSourceInfo->Fill();	
 
-		
-	}//close else
+	return 0;
 
-	//Fill ROOT tree with match info
-	matchedExtSourceInfo->Fill();
-	
-	return foundSource;
+}//close FindExtendedRealAndFakeSources()
 
-}//close FindExtendedSourceMatch()
-*/
 
 void Init(){
 
@@ -1218,6 +943,7 @@ void Init(){
 	matchedSourceInfo->Branch("name",&SourceName);
 	matchedSourceInfo->Branch("type",&SourceType,"type/I");
 	matchedSourceInfo->Branch("simtype",&SourceSimType,"simtype/I");
+	matchedSourceInfo->Branch("NPix",&NPix,"NPix/L");	
 	matchedSourceInfo->Branch("S",&S,"S/D");
 	matchedSourceInfo->Branch("Smax",&Smax,"Smax/D");	
 	matchedSourceInfo->Branch("X0",&X0,"X0/D");
@@ -1260,6 +986,7 @@ void Init(){
 	matchedExtSourceInfo->Branch("name",&SourceName);
 	matchedExtSourceInfo->Branch("type",&SourceType,"type/I");
 	matchedExtSourceInfo->Branch("simtype",&SourceSimType,"simtype/I");
+	matchedExtSourceInfo->Branch("NPix",&NPix,"NPix/L");	
 	matchedExtSourceInfo->Branch("S",&S,"S/D");
 	matchedExtSourceInfo->Branch("Smax",&Smax,"Smax/D");	
 	matchedExtSourceInfo->Branch("X0",&X0,"X0/D");
@@ -1277,7 +1004,11 @@ void Init(){
 	matchedExtSourceInfo->Branch("Y0_rec",&Y0_rec,"Y0_rec/D");
 	matchedExtSourceInfo->Branch("MatchFraction",&MatchFraction,"MatchFraction/D");
 	matchedExtSourceInfo->Branch("MatchFraction_rec",&MatchFraction_rec,"MatchFraction_rec/D");
-
+	matchedExtSourceInfo->Branch("Sratio",&Sratio,"Sratio/D");
+	matchedExtSourceInfo->Branch("Sratio_rec",&Sratio_rec,"Sratio_rec/D");
+	matchedExtSourceInfo->Branch("dX",&dX,"dX/D");
+	matchedExtSourceInfo->Branch("dY",&dY,"dY/D");
+	
 	//Create rec source info (useful for reliability estimation)
 	if(!recSourceInfo) recSourceInfo= new TTree("RecSourceInfo","RecSourceInfo");
 	recSourceInfo->Branch("name_rec",&SourceName_rec);
@@ -1291,6 +1022,18 @@ void Init(){
 	recSourceInfo->Branch("name_true",&SourceNameList_true);
 	recSourceInfo->Branch("X0_true",&PosXList_true);
 	recSourceInfo->Branch("Y0_true",&PosYList_true);
+
+	if(!recExtSourceInfo) recExtSourceInfo= new TTree("RecExtSourceInfo","RecExtSourceInfo");
+	recExtSourceInfo->Branch("name_rec",&SourceName_rec);
+	recExtSourceInfo->Branch("type_rec",&SourceType_rec,"type_rec/I");
+	recExtSourceInfo->Branch("X0_rec",&X0_rec,"X0_rec/D");
+	recExtSourceInfo->Branch("Y0_rec",&Y0_rec,"Y0_rec/D");
+	recExtSourceInfo->Branch("Smax_rec",&Smax_rec,"Smax_rec/D");	
+	recExtSourceInfo->Branch("fluxDensity_rec",&fluxDensity_rec,"fluxDensity_rec/D");		
+	recExtSourceInfo->Branch("nTrueMatchedSources",&nTrueMatchedSources,"nTrueMatchedSources/I");
+	recExtSourceInfo->Branch("name_true",&SourceNameList_true);
+	recExtSourceInfo->Branch("X0_true",&PosXList_true);
+	recExtSourceInfo->Branch("Y0_true",&PosYList_true);
 	
 }//close Init()
 
@@ -1390,6 +1133,7 @@ void Save()
 		if(matchedSourceInfo) matchedSourceInfo->Write();
 		if(matchedExtSourceInfo) matchedExtSourceInfo->Write();
 		if(recSourceInfo) recSourceInfo->Write();
+		if(recExtSourceInfo) recExtSourceInfo->Write();
 		outputFile->Close();
 	}
 }//close Save()
