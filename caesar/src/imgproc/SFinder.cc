@@ -507,6 +507,7 @@ int SFinder::Configure(){
 	
 	//Get source fitting options
 	GET_OPTION_VALUE(fitSources,m_fitSources);
+	GET_OPTION_VALUE(nBeamsMaxToFit,m_nBeamsMaxToFit);
 	GET_OPTION_VALUE(fitMaxNComponents,m_fitMaxNComponents);
 	GET_OPTION_VALUE(fitWithCentroidLimits,m_fitWithCentroidLimits);
 	GET_OPTION_VALUE(fitWithBkgLimits,m_fitWithBkgLimits);
@@ -2061,7 +2062,6 @@ Image* SFinder::FindExtendedSources_AC(Image* inputImg,ImgBkgData* bkgData,TaskD
 	}
 
 	
-	
 	//## Remove sources of negative excess (because Chan-Vese detects them) (THIS METHOD SHOULD BE IMPROVED)
 	if(inputImg->HasStats()){
 		ImgStats* stats= inputImg->GetPixelStats();
@@ -2167,6 +2167,7 @@ Image* SFinder::FindExtendedSources_WT(Image* inputImg,TaskData* taskData,Image*
 		}
 		return nullptr;
 	}//close if
+
 
 	//## Find image binary mask with all sources found at all scales
 	bool isBinary= true;
@@ -2422,6 +2423,29 @@ bool SFinder::IsPointLikeSource(Source* aSource){
 
 }//close IsPointLikeSource()
 
+bool SFinder::IsFittableSource(Source* aSource)
+{
+	//Check if not point-like or compact
+	int sourceType= aSource->Type;
+	bool isCompact= (sourceType==Source::ePointLike || sourceType==Source::eCompact);
+	if(!isCompact) return false;
+
+	//If compact source check nbeams (if too large do not perform fit)
+	if(sourceType==Source::eCompact){
+		double NPix= aSource->GetNPixels();
+		double beamArea= aSource->GetBeamFluxIntegral();
+		double nBeams= 0;
+		if(beamArea>0) nBeams= NPix/beamArea;
+		if(nBeams>m_nBeamsMaxToFit) {
+			INFO_LOG("Source "<<aSource->GetName()<<" not fittable as nBeams="<<nBeams<<">"<<m_nBeamsMaxToFit);
+			return false;
+		}
+	}
+
+	return true;
+
+}//close IsFittableSource()
+
 int SFinder::FitSources(std::vector<Source*>& sources){
 
 	//Check given source list
@@ -2435,8 +2459,8 @@ int SFinder::FitSources(std::vector<Source*>& sources){
 		
 	//Set fit options
 	SourceFitOptions fitOptions;	
-	fitOptions.bmaj= m_beamBmaj/m_pixSizeX;//static_cast<int>( ceil(m_beamBmaj/m_pixSizeX) );//converted in pixels
-	fitOptions.bmin= m_beamBmin/m_pixSizeY;//static_cast<int>( ceil(m_beamBmin/m_pixSizeY) );//converted in pixels
+	fitOptions.bmaj= m_beamBmaj/m_pixSizeX;//converted in pixels
+	fitOptions.bmin= m_beamBmin/m_pixSizeY;//converted in pixels
 	fitOptions.bpa= m_beamBpa;
 	fitOptions.nMaxComponents= m_fitMaxNComponents;
 	fitOptions.limitCentroidInFit= m_fitWithCentroidLimits;
@@ -2463,24 +2487,27 @@ int SFinder::FitSources(std::vector<Source*>& sources){
 
 	for(size_t i=0;i<sources.size();i++){
 
-		//Skip non point-like sources
-		int sourceType= sources[i]->Type;
-		if(sourceType!=Source::ePointLike) continue;
+		//If source is non-fittable fit only nested components individually, otherwise perform a joint fit
+		bool isFittable= IsFittableSource(sources[i]);
+		if(isFittable) {
+			//Fit mother source
+			if(sources[i]->Fit(fitOptions)<0) {
+				WARN_LOG("[PROC "<<m_procId<<"] - Failed to fit source no. "<<i+1<<" (name="<<sources[i]->GetName()<<"), skip to next...");
+				continue;
+			}
+		}//close if fittable
+		else{
+			//Fit nested sources
+			INFO_LOG("Source "<<sources[i]->GetName()<<" not fittable as a whole (extended or large compact), fitting nested components individually (if any) ...");
+			std::vector<Source*> nestedSources= sources[i]->GetNestedSources();	
+			for(size_t j=0;j<nestedSources.size();j++){
+				if(nestedSources[j] && nestedSources[j]->Fit(fitOptions)<0){
+					WARN_LOG("Failed to fit nested source no. "<<j<<" of source no. "<<i<<" (name="<<sources[i]->GetName()<<"), skip to next nested...");
+					continue;
+				}
+			}//end loop nested sources
+		}//close else
 	
-		//Fit mother source
-		if(sources[i]->Fit(fitOptions)<0) {
-			WARN_LOG("[PROC "<<m_procId<<"] - Failed to fit source no. "<<i<<"!");
-			continue;
-		}
-
-		//Fit nested sources
-		//std::vector<Source*> nestedSources= sources[i]->GetNestedSources();	
-		//for(size_t j=0;j<nestedSources.size();j++){
-			//if(nestedSources[j] && nestedSources[j]->Deblend(m_deblendCurvThr,deblendComponentMinNPix)<0){//TO BE IMPLEMENTED!!!
-			//	WARN_LOG("Failed to deblend nested source no. "<<j<<" of source no. "<<i<<"...");
-			//}
-		//}//end loop nested sources
-
 	}//end loop sources
 	
 	return 0;

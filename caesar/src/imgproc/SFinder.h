@@ -232,6 +232,10 @@ class SFinder : public TObject {
 		* \brief Fit sources
 		*/
 		int FitSources(std::vector<Source*>& sources);
+		/**
+		* \brief Is fittable source
+		*/
+		bool IsFittableSource(Source* aSource);
 
 		/**
 		* \brief Print performance stats
@@ -424,6 +428,7 @@ class SFinder : public TObject {
 
 		//Source fitting
 		bool m_fitSources;
+		double m_nBeamsMaxToFit;
 		int m_fitMaxNComponents;
 		bool m_fitWithCentroidLimits;
 		bool m_fitWithFixedBkg;

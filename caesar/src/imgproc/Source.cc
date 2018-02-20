@@ -751,13 +751,28 @@ int Source::MergeSource(Source* aSource,bool copyPixels,bool checkIfAdjacent,boo
 
 	//Set sim type if different to combination of both types
 	if(SimType!=aSource->SimType){
-		std::stringstream ss;
-		ss<<SimType<<aSource->SimType;
-		std::istringstream buffer(ss.str());
-		int mergedSimType= 0;	
-		buffer >> mergedSimType;
-		SimType= mergedSimType;
-	}
+		//Search if merged source sim type is already present
+		//NB: This is to prevent adding the same types (e.g. when multiple sources with same type are added)
+		std::string simtype1_str= std::to_string(SimType);
+		std::string simtype2_str= std::to_string(aSource->SimType);
+		std::size_t found = simtype1_str.find(simtype2_str);
+		if (found==std::string::npos){//not found, add it
+			//Add sim type string and sort
+			std::string simtype12_str= simtype1_str + simtype2_str;
+			std::sort(simtype12_str.begin(), simtype12_str.end());
+			
+			//Set new sim type (catch for errors)
+			int simtype_merged= SimType;
+			try{
+				simtype_merged= std::stoi(simtype12_str);
+				INFO_LOG("Changing simtype from (simtype1="<<SimType<<", simtype2="<<aSource->SimType<<") to simtype="<<simtype_merged);
+				SimType= simtype_merged;
+			}
+			catch(...){
+				ERROR_LOG("C++ exception occurred while converting merged stringified simtype "<<simtype12_str<<" to int code (will not add merged soure to simtype!");
+			}
+		}//close if found
+	}//close if sim type
 
 	//At this stage stats (mean/median/etc...) are invalid and need to be recomputed if desired
 	this->SetHasStats(false);//set stats to false to remember that current stats are not valid anymore and need to be recomputed
